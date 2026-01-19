@@ -1,0 +1,413 @@
+service: gcdr-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'sa-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 29
+
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    CUSTOMERS_TABLE: ${self:custom.customersTable}
+    PARTNERS_TABLE: ${self:custom.partnersTable}
+    ROLES_TABLE: ${self:custom.rolesTable}
+    POLICIES_TABLE: ${self:custom.policiesTable}
+    ROLE_ASSIGNMENTS_TABLE: ${self:custom.roleAssignmentsTable}
+    EVENT_BUS_NAME: ${self:custom.eventBusName}
+    LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:BatchGetItem
+            - dynamodb:BatchWriteItem
+          Resource:
+            - !GetAtt CustomersTable.Arn
+            - !Join ['/', [!GetAtt CustomersTable.Arn, 'index', '*']]
+            - !GetAtt PartnersTable.Arn
+            - !Join ['/', [!GetAtt PartnersTable.Arn, 'index', '*']]
+            - !GetAtt RolesTable.Arn
+            - !Join ['/', [!GetAtt RolesTable.Arn, 'index', '*']]
+            - !GetAtt PoliciesTable.Arn
+            - !Join ['/', [!GetAtt PoliciesTable.Arn, 'index', '*']]
+            - !GetAtt RoleAssignmentsTable.Arn
+            - !Join ['/', [!GetAtt RoleAssignmentsTable.Arn, 'index', '*']]
+        - Effect: Allow
+          Action:
+            - events:PutEvents
+          Resource:
+            - !GetAtt GcdrEventBus.Arn
+
+custom:
+  customersTable: gcdr-customers-${self:provider.stage}
+  partnersTable: gcdr-partners-${self:provider.stage}
+  rolesTable: gcdr-roles-${self:provider.stage}
+  policiesTable: gcdr-policies-${self:provider.stage}
+  roleAssignmentsTable: gcdr-role-assignments-${self:provider.stage}
+  eventBusName: gcdr-events-${self:provider.stage}
+
+  logLevel:
+    dev: debug
+    staging: info
+    prod: warn
+
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    exclude:
+      - '@aws-sdk/*'
+    target: node20
+    platform: node
+    concurrency: 10
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+functions:
+  # Health Check
+  health:
+    handler: src/handlers/health.handler
+    events:
+      - http:
+          path: /health
+          method: get
+          cors: true
+
+  # Customer APIs
+  createCustomer:
+    handler: src/handlers/customers/create.handler
+    events:
+      - http:
+          path: /customers
+          method: post
+          cors: true
+
+  getCustomer:
+    handler: src/handlers/customers/get.handler
+    events:
+      - http:
+          path: /customers/{id}
+          method: get
+          cors: true
+
+  updateCustomer:
+    handler: src/handlers/customers/update.handler
+    events:
+      - http:
+          path: /customers/{id}
+          method: put
+          cors: true
+
+  deleteCustomer:
+    handler: src/handlers/customers/delete.handler
+    events:
+      - http:
+          path: /customers/{id}
+          method: delete
+          cors: true
+
+  listCustomers:
+    handler: src/handlers/customers/list.handler
+    events:
+      - http:
+          path: /customers
+          method: get
+          cors: true
+
+  getCustomerChildren:
+    handler: src/handlers/customers/getChildren.handler
+    events:
+      - http:
+          path: /customers/{id}/children
+          method: get
+          cors: true
+
+  getCustomerDescendants:
+    handler: src/handlers/customers/getDescendants.handler
+    events:
+      - http:
+          path: /customers/{id}/descendants
+          method: get
+          cors: true
+
+  getCustomerTree:
+    handler: src/handlers/customers/getTree.handler
+    events:
+      - http:
+          path: /customers/{id}/tree
+          method: get
+          cors: true
+
+  moveCustomer:
+    handler: src/handlers/customers/move.handler
+    events:
+      - http:
+          path: /customers/{id}/move
+          method: post
+          cors: true
+
+  # Partner APIs
+  registerPartner:
+    handler: src/handlers/partners/register.handler
+    events:
+      - http:
+          path: /partners
+          method: post
+          cors: true
+
+  getPartner:
+    handler: src/handlers/partners/get.handler
+    events:
+      - http:
+          path: /partners/{id}
+          method: get
+          cors: true
+
+  listPartners:
+    handler: src/handlers/partners/list.handler
+    events:
+      - http:
+          path: /partners
+          method: get
+          cors: true
+
+  approvePartner:
+    handler: src/handlers/partners/approve.handler
+    events:
+      - http:
+          path: /partners/{id}/approve
+          method: post
+          cors: true
+
+  rejectPartner:
+    handler: src/handlers/partners/reject.handler
+    events:
+      - http:
+          path: /partners/{id}/reject
+          method: post
+          cors: true
+
+  # Authorization APIs
+  checkPermission:
+    handler: src/handlers/authorization/check.handler
+    events:
+      - http:
+          path: /authorization/check
+          method: post
+          cors: true
+
+  listRoles:
+    handler: src/handlers/authorization/listRoles.handler
+    events:
+      - http:
+          path: /authorization/roles
+          method: get
+          cors: true
+
+  assignRole:
+    handler: src/handlers/authorization/assignRole.handler
+    events:
+      - http:
+          path: /authorization/assignments
+          method: post
+          cors: true
+
+  getUserRoles:
+    handler: src/handlers/authorization/getUserRoles.handler
+    events:
+      - http:
+          path: /authorization/users/{userId}/roles
+          method: get
+          cors: true
+
+resources:
+  Resources:
+    # DynamoDB Tables
+    CustomersTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.customersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: parentCustomerId
+            AttributeType: S
+          - AttributeName: path
+            AttributeType: S
+          - AttributeName: code
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-parent
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: parentCustomerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-path
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: path
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-code
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: code
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    PartnersTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.partnersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-status
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: status
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    RolesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.rolesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: key
+            KeyType: RANGE
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    PoliciesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.policiesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: key
+            KeyType: RANGE
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    RoleAssignmentsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.roleAssignmentsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: roleKey
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-user
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: userId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-role
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: roleKey
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    # EventBridge
+    GcdrEventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:custom.eventBusName}
+
+  Outputs:
+    CustomersTableArn:
+      Value: !GetAtt CustomersTable.Arn
+    PartnersTableArn:
+      Value: !GetAtt PartnersTable.Arn
+    EventBusArn:
+      Value: !GetAtt GcdrEventBus.Arn
+    ApiEndpoint:
+      Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
