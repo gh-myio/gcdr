@@ -219,11 +219,19 @@ functions:
           method: post
           cors: true
 
-  listRoles:
-    handler: src/handlers/authorization/listRoles.handler
+  evaluateBatch:
+    handler: src/handlers/authorization/evaluateBatch.handler
     events:
       - http:
-          path: /authorization/roles
+          path: /authorization/check/batch
+          method: post
+          cors: true
+
+  getEffectivePermissions:
+    handler: src/handlers/authorization/getEffectivePermissions.handler
+    events:
+      - http:
+          path: /authorization/users/{userId}/permissions
           method: get
           cors: true
 
@@ -235,11 +243,125 @@ functions:
           method: post
           cors: true
 
+  revokeAssignment:
+    handler: src/handlers/authorization/revokeAssignment.handler
+    events:
+      - http:
+          path: /authorization/assignments/{assignmentId}/revoke
+          method: post
+          cors: true
+
+  listAssignments:
+    handler: src/handlers/authorization/listAssignments.handler
+    events:
+      - http:
+          path: /authorization/assignments
+          method: get
+          cors: true
+
   getUserRoles:
     handler: src/handlers/authorization/getUserRoles.handler
     events:
       - http:
           path: /authorization/users/{userId}/roles
+          method: get
+          cors: true
+
+  # Role Management APIs
+  createRole:
+    handler: src/handlers/roles/create.handler
+    events:
+      - http:
+          path: /roles
+          method: post
+          cors: true
+
+  getRole:
+    handler: src/handlers/roles/get.handler
+    events:
+      - http:
+          path: /roles/{roleId}
+          method: get
+          cors: true
+
+  getRoleByKey:
+    handler: src/handlers/roles/getByKey.handler
+    events:
+      - http:
+          path: /roles/key/{roleKey}
+          method: get
+          cors: true
+
+  updateRole:
+    handler: src/handlers/roles/update.handler
+    events:
+      - http:
+          path: /roles/{roleId}
+          method: put
+          cors: true
+
+  deleteRole:
+    handler: src/handlers/roles/delete.handler
+    events:
+      - http:
+          path: /roles/{roleId}
+          method: delete
+          cors: true
+
+  listRoles:
+    handler: src/handlers/roles/list.handler
+    events:
+      - http:
+          path: /roles
+          method: get
+          cors: true
+
+  # Policy Management APIs
+  createPolicy:
+    handler: src/handlers/policies/create.handler
+    events:
+      - http:
+          path: /policies
+          method: post
+          cors: true
+
+  getPolicy:
+    handler: src/handlers/policies/get.handler
+    events:
+      - http:
+          path: /policies/{policyId}
+          method: get
+          cors: true
+
+  getPolicyByKey:
+    handler: src/handlers/policies/getByKey.handler
+    events:
+      - http:
+          path: /policies/key/{policyKey}
+          method: get
+          cors: true
+
+  updatePolicy:
+    handler: src/handlers/policies/update.handler
+    events:
+      - http:
+          path: /policies/{policyId}
+          method: put
+          cors: true
+
+  deletePolicy:
+    handler: src/handlers/policies/delete.handler
+    events:
+      - http:
+          path: /policies/{policyId}
+          method: delete
+          cors: true
+
+  listPolicies:
+    handler: src/handlers/policies/list.handler
+    events:
+      - http:
+          path: /policies
           method: get
           cors: true
 
@@ -489,13 +611,24 @@ resources:
         AttributeDefinitions:
           - AttributeName: tenantId
             AttributeType: S
+          - AttributeName: id
+            AttributeType: S
           - AttributeName: key
             AttributeType: S
         KeySchema:
           - AttributeName: tenantId
             KeyType: HASH
-          - AttributeName: key
+          - AttributeName: id
             KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-key
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: key
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
@@ -508,13 +641,24 @@ resources:
         AttributeDefinitions:
           - AttributeName: tenantId
             AttributeType: S
+          - AttributeName: id
+            AttributeType: S
           - AttributeName: key
             AttributeType: S
         KeySchema:
           - AttributeName: tenantId
             KeyType: HASH
-          - AttributeName: key
+          - AttributeName: id
             KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-key
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: key
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 

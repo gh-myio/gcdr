@@ -3,3 +3,6 @@ export * from './ICustomerRepository';
 export * from './IPartnerRepository';
 export * from './IAssetRepository';
 export * from './IDeviceRepository';
+export * from './IRoleRepository';
+export * from './IPolicyRepository';
+export * from './IRoleAssignmentRepository';

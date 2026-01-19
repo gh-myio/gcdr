@@ -1,20 +1,21 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { EvaluatePermissionSchema } from '../../dto/request/AuthorizationDTO';
 import { authorizationService } from '../../services/AuthorizationService';
 import { ok } from '../middleware/response';
 import { handleError } from '../middleware/errorHandler';
-import { extractContext, parseBody } from '../middleware/requestContext';
+import { extractContext } from '../middleware/requestContext';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const ctx = extractContext(event);
-    const body = parseBody(event);
+    const roleKey = event.pathParameters?.roleKey;
 
-    const data = EvaluatePermissionSchema.parse(body);
+    if (!roleKey) {
+      return handleError(new Error('Role key is required'));
+    }
 
-    const result = await authorizationService.evaluatePermission(ctx.tenantId, data, ctx.userId);
+    const role = await authorizationService.getRoleByKey(ctx.tenantId, roleKey);
 
-    return ok(result);
+    return ok(role);
   } catch (err) {
     return handleError(err);
   }

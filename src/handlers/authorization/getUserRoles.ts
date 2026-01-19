@@ -1,8 +1,8 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { success } from '../middleware/response';
+import { authorizationService } from '../../services/AuthorizationService';
+import { ok } from '../middleware/response';
 import { handleError } from '../middleware/errorHandler';
 import { extractContext, parsePathParams } from '../middleware/requestContext';
-import { mockRoleAssignments, mockRoles, mockPolicies } from '../../repositories/mockData';
 import { ValidationError } from '../../shared/errors/AppError';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -14,36 +14,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       throw new ValidationError('User ID is required');
     }
 
-    // Get user's role assignments
-    const assignments = Array.from(mockRoleAssignments.values()).filter(
-      (a) => a.userId === userId && a.tenantId === ctx.tenantId && a.status === 'active'
-    );
+    const assignments = await authorizationService.getUserAssignments(ctx.tenantId, userId);
+    const effectivePermissions = await authorizationService.getEffectivePermissions(ctx.tenantId, userId);
 
-    // Enrich with role details
-    const enrichedAssignments = assignments.map((assignment) => {
-      const role = mockRoles.get(assignment.roleKey);
-      const policies = role
-        ? role.policies.map((pKey) => mockPolicies.get(pKey)).filter(Boolean)
-        : [];
-
-      return {
-        ...assignment,
-        role: role
-          ? {
-              key: role.key,
-              displayName: role.displayName,
-              description: role.description,
-              riskLevel: role.riskLevel,
-            }
-          : null,
-        effectivePermissions: policies.flatMap((p) => p!.allow),
-      };
-    });
-
-    return success({
+    return ok({
       userId,
-      assignments: enrichedAssignments,
-      count: enrichedAssignments.length,
+      assignments: assignments.map((a) => ({
+        id: a.id,
+        roleKey: a.roleKey,
+        scope: a.scope,
+        status: a.status,
+        grantedAt: a.grantedAt,
+        grantedBy: a.grantedBy,
+        expiresAt: a.expiresAt,
+      })),
+      effectivePermissions: effectivePermissions.filter((p) => p.allowed).map((p) => p.permission),
+      deniedPatterns: effectivePermissions.filter((p) => !p.allowed).map((p) => p.permission),
+      count: assignments.length,
     });
   } catch (err) {
     return handleError(err);

@@ -21,7 +21,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         : undefined,
     };
 
-    const result = await authorizationService.listRoles(ctx.tenantId, params);
+    const result = await authorizationService.listPolicies(ctx.tenantId, params);
 
     return ok(result);
   } catch (err) {

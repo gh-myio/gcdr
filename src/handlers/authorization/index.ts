@@ -1,4 +1,9 @@
 export { handler as checkHandler } from './check';
+export { handler as evaluateBatchHandler } from './evaluateBatch';
 export { handler as listRolesHandler } from './listRoles';
 export { handler as assignRoleHandler } from './assignRole';
+export { handler as revokeAssignmentHandler } from './revokeAssignment';
 export { handler as getUserRolesHandler } from './getUserRoles';
+export { handler as getUserAssignmentsHandler } from './getUserAssignments';
+export { handler as getEffectivePermissionsHandler } from './getEffectivePermissions';
+export { handler as listAssignmentsHandler } from './listAssignments';

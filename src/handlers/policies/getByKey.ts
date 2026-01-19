@@ -1,20 +1,21 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { EvaluatePermissionSchema } from '../../dto/request/AuthorizationDTO';
 import { authorizationService } from '../../services/AuthorizationService';
 import { ok } from '../middleware/response';
 import { handleError } from '../middleware/errorHandler';
-import { extractContext, parseBody } from '../middleware/requestContext';
+import { extractContext } from '../middleware/requestContext';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const ctx = extractContext(event);
-    const body = parseBody(event);
+    const policyKey = event.pathParameters?.policyKey;
 
-    const data = EvaluatePermissionSchema.parse(body);
+    if (!policyKey) {
+      return handleError(new Error('Policy key is required'));
+    }
 
-    const result = await authorizationService.evaluatePermission(ctx.tenantId, data, ctx.userId);
+    const policy = await authorizationService.getPolicyByKey(ctx.tenantId, policyKey);
 
-    return ok(result);
+    return ok(policy);
   } catch (err) {
     return handleError(err);
   }

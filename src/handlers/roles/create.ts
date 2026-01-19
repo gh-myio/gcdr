@@ -1,5 +1,5 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { AssignRoleSchema } from '../../dto/request/AuthorizationDTO';
+import { CreateRoleSchema } from '../../dto/request/AuthorizationDTO';
 import { authorizationService } from '../../services/AuthorizationService';
 import { created } from '../middleware/response';
 import { handleError } from '../middleware/errorHandler';
@@ -10,11 +10,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const ctx = extractContext(event);
     const body = parseBody(event);
 
-    const data = AssignRoleSchema.parse(body);
+    const data = CreateRoleSchema.parse(body);
 
-    const assignment = await authorizationService.assignRole(ctx.tenantId, data, ctx.userId);
+    const role = await authorizationService.createRole(ctx.tenantId, data, ctx.userId);
 
-    return created(assignment);
+    return created(role);
   } catch (err) {
     return handleError(err);
   }
