@@ -20,6 +20,7 @@ provider:
     ROLE_ASSIGNMENTS_TABLE: ${self:custom.roleAssignmentsTable}
     ASSETS_TABLE: ${self:custom.assetsTable}
     DEVICES_TABLE: ${self:custom.devicesTable}
+    RULES_TABLE: ${self:custom.rulesTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -51,6 +52,8 @@ provider:
             - !Join ['/', [!GetAtt AssetsTable.Arn, 'index', '*']]
             - !GetAtt DevicesTable.Arn
             - !Join ['/', [!GetAtt DevicesTable.Arn, 'index', '*']]
+            - !GetAtt RulesTable.Arn
+            - !Join ['/', [!GetAtt RulesTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -65,6 +68,7 @@ custom:
   roleAssignmentsTable: gcdr-role-assignments-${self:provider.stage}
   assetsTable: gcdr-assets-${self:provider.stage}
   devicesTable: gcdr-devices-${self:provider.stage}
+  rulesTable: gcdr-rules-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -519,6 +523,87 @@ functions:
           method: patch
           cors: true
 
+  # Rule APIs
+  createRule:
+    handler: src/handlers/rules/create.handler
+    events:
+      - http:
+          path: /rules
+          method: post
+          cors: true
+
+  getRule:
+    handler: src/handlers/rules/get.handler
+    events:
+      - http:
+          path: /rules/{id}
+          method: get
+          cors: true
+
+  updateRule:
+    handler: src/handlers/rules/update.handler
+    events:
+      - http:
+          path: /rules/{id}
+          method: put
+          cors: true
+
+  deleteRule:
+    handler: src/handlers/rules/delete.handler
+    events:
+      - http:
+          path: /rules/{id}
+          method: delete
+          cors: true
+
+  listRulesAll:
+    handler: src/handlers/rules/list.handler
+    events:
+      - http:
+          path: /rules
+          method: get
+          cors: true
+
+  listRulesByCustomer:
+    handler: src/handlers/rules/listByCustomer.handler
+    events:
+      - http:
+          path: /customers/{customerId}/rules
+          method: get
+          cors: true
+
+  toggleRule:
+    handler: src/handlers/rules/toggle.handler
+    events:
+      - http:
+          path: /rules/{id}/toggle
+          method: post
+          cors: true
+
+  evaluateRule:
+    handler: src/handlers/rules/evaluate.handler
+    events:
+      - http:
+          path: /rules/evaluate
+          method: post
+          cors: true
+
+  getMaintenanceWindows:
+    handler: src/handlers/rules/getMaintenanceWindows.handler
+    events:
+      - http:
+          path: /rules/maintenance-windows
+          method: get
+          cors: true
+
+  getRuleStatistics:
+    handler: src/handlers/rules/getStatistics.handler
+    events:
+      - http:
+          path: /rules/statistics
+          method: get
+          cors: true
+
 resources:
   Resources:
     # DynamoDB Tables
@@ -802,6 +887,46 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    RulesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.rulesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: type
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-type
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: type
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -817,6 +942,8 @@ resources:
       Value: !GetAtt AssetsTable.Arn
     DevicesTableArn:
       Value: !GetAtt DevicesTable.Arn
+    RulesTableArn:
+      Value: !GetAtt RulesTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

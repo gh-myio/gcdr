@@ -5,3 +5,4 @@ export * from './Policy';
 export * from './RoleAssignment';
 export * from './Asset';
 export * from './Device';
+export * from './Rule';

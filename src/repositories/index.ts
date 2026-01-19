@@ -5,4 +5,5 @@ export * from './DeviceRepository';
 export * from './RoleRepository';
 export * from './PolicyRepository';
 export * from './RoleAssignmentRepository';
+export * from './RuleRepository';
 export * from './interfaces';

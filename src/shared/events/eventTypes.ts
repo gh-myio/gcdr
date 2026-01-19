@@ -35,6 +35,9 @@ export const EventType = {
   RULE_CREATED: { code: 'RULE_CREATED', description: 'Rule created' },
   RULE_UPDATED: { code: 'RULE_UPDATED', description: 'Rule updated' },
   RULE_DELETED: { code: 'RULE_DELETED', description: 'Rule deleted' },
+  RULE_ACTIVATED: { code: 'RULE_ACTIVATED', description: 'Rule activated' },
+  RULE_DEACTIVATED: { code: 'RULE_DEACTIVATED', description: 'Rule deactivated' },
+  RULE_TRIGGERED: { code: 'RULE_TRIGGERED', description: 'Rule condition triggered' },
 
   // Auth Operations
   USER_LOGIN: { code: 'USER_LOGIN', description: 'User logged in' },

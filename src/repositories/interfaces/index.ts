@@ -6,3 +6,4 @@ export * from './IDeviceRepository';
 export * from './IRoleRepository';
 export * from './IPolicyRepository';
 export * from './IRoleAssignmentRepository';
+export * from './IRuleRepository';
