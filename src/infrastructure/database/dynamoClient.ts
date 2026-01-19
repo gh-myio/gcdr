@@ -24,4 +24,6 @@ export const TableNames = {
   ASSETS: process.env.ASSETS_TABLE || 'gcdr-assets-dev',
   DEVICES: process.env.DEVICES_TABLE || 'gcdr-devices-dev',
   RULES: process.env.RULES_TABLE || 'gcdr-rules-dev',
+  INTEGRATIONS: process.env.INTEGRATIONS_TABLE || 'gcdr-integrations-dev',
+  SUBSCRIPTIONS: process.env.SUBSCRIPTIONS_TABLE || 'gcdr-subscriptions-dev',
 };

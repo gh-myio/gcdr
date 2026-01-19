@@ -21,6 +21,8 @@ provider:
     ASSETS_TABLE: ${self:custom.assetsTable}
     DEVICES_TABLE: ${self:custom.devicesTable}
     RULES_TABLE: ${self:custom.rulesTable}
+    INTEGRATIONS_TABLE: ${self:custom.integrationsTable}
+    SUBSCRIPTIONS_TABLE: ${self:custom.subscriptionsTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -54,6 +56,10 @@ provider:
             - !Join ['/', [!GetAtt DevicesTable.Arn, 'index', '*']]
             - !GetAtt RulesTable.Arn
             - !Join ['/', [!GetAtt RulesTable.Arn, 'index', '*']]
+            - !GetAtt IntegrationsTable.Arn
+            - !Join ['/', [!GetAtt IntegrationsTable.Arn, 'index', '*']]
+            - !GetAtt SubscriptionsTable.Arn
+            - !Join ['/', [!GetAtt SubscriptionsTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -69,6 +75,8 @@ custom:
   assetsTable: gcdr-assets-${self:provider.stage}
   devicesTable: gcdr-devices-${self:provider.stage}
   rulesTable: gcdr-rules-${self:provider.stage}
+  integrationsTable: gcdr-integrations-${self:provider.stage}
+  subscriptionsTable: gcdr-subscriptions-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -727,6 +735,111 @@ functions:
           method: get
           cors: true
 
+  # Integration Marketplace APIs
+  createPackage:
+    handler: src/handlers/integrations/create.handler
+    events:
+      - http:
+          path: /integrations/packages
+          method: post
+          cors: true
+
+  getPackage:
+    handler: src/handlers/integrations/get.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}
+          method: get
+          cors: true
+
+  getPackageBySlug:
+    handler: src/handlers/integrations/getBySlug.handler
+    events:
+      - http:
+          path: /integrations/packages/slug/{slug}
+          method: get
+          cors: true
+
+  updatePackage:
+    handler: src/handlers/integrations/update.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}
+          method: put
+          cors: true
+
+  deletePackage:
+    handler: src/handlers/integrations/delete.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}
+          method: delete
+          cors: true
+
+  searchPackages:
+    handler: src/handlers/integrations/search.handler
+    events:
+      - http:
+          path: /integrations/packages
+          method: get
+          cors: true
+
+  publishPackageVersion:
+    handler: src/handlers/integrations/publish.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}/publish
+          method: post
+          cors: true
+
+  submitPackageForReview:
+    handler: src/handlers/integrations/submitForReview.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}/submit
+          method: post
+          cors: true
+
+  reviewPackage:
+    handler: src/handlers/integrations/review.handler
+    events:
+      - http:
+          path: /integrations/packages/{id}/review
+          method: post
+          cors: true
+
+  subscribeToPackage:
+    handler: src/handlers/integrations/subscribe.handler
+    events:
+      - http:
+          path: /integrations/subscriptions
+          method: post
+          cors: true
+
+  unsubscribeFromPackage:
+    handler: src/handlers/integrations/unsubscribe.handler
+    events:
+      - http:
+          path: /integrations/subscriptions/{subscriptionId}
+          method: delete
+          cors: true
+
+  listMySubscriptions:
+    handler: src/handlers/integrations/listSubscriptions.handler
+    events:
+      - http:
+          path: /integrations/subscriptions
+          method: get
+          cors: true
+
+  listMyPublishedPackages:
+    handler: src/handlers/integrations/listPublisherPackages.handler
+    events:
+      - http:
+          path: /integrations/publisher/packages
+          method: get
+          cors: true
+
 resources:
   Resources:
     # DynamoDB Tables
@@ -1050,6 +1163,106 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    IntegrationsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.integrationsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: slug
+            AttributeType: S
+          - AttributeName: publisherId
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: category
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-slug
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: slug
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-publisher
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: publisherId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-status
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: status
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-category
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: category
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    SubscriptionsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.subscriptionsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: subscriberId
+            AttributeType: S
+          - AttributeName: packageId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-subscriber
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: subscriberId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-package
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: packageId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -1067,6 +1280,10 @@ resources:
       Value: !GetAtt DevicesTable.Arn
     RulesTableArn:
       Value: !GetAtt RulesTable.Arn
+    IntegrationsTableArn:
+      Value: !GetAtt IntegrationsTable.Arn
+    SubscriptionsTableArn:
+      Value: !GetAtt SubscriptionsTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

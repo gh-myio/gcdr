@@ -31,6 +31,9 @@ export const UpdatePartnerSchema = z.object({
   technicalContactEmail: z.string().email().optional(),
   webhookUrl: z.string().url().optional().nullable(),
   ipWhitelist: z.array(z.string()).optional(),
+  // Internal fields (managed by system)
+  subscribedPackages: z.array(z.string()).optional(),
+  publishedPackages: z.array(z.string()).optional(),
 });
 
 export type UpdatePartnerDTO = z.infer<typeof UpdatePartnerSchema>;
