@@ -18,6 +18,8 @@ provider:
     ROLES_TABLE: ${self:custom.rolesTable}
     POLICIES_TABLE: ${self:custom.policiesTable}
     ROLE_ASSIGNMENTS_TABLE: ${self:custom.roleAssignmentsTable}
+    ASSETS_TABLE: ${self:custom.assetsTable}
+    DEVICES_TABLE: ${self:custom.devicesTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -45,6 +47,10 @@ provider:
             - !Join ['/', [!GetAtt PoliciesTable.Arn, 'index', '*']]
             - !GetAtt RoleAssignmentsTable.Arn
             - !Join ['/', [!GetAtt RoleAssignmentsTable.Arn, 'index', '*']]
+            - !GetAtt AssetsTable.Arn
+            - !Join ['/', [!GetAtt AssetsTable.Arn, 'index', '*']]
+            - !GetAtt DevicesTable.Arn
+            - !Join ['/', [!GetAtt DevicesTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -57,6 +63,8 @@ custom:
   rolesTable: gcdr-roles-${self:provider.stage}
   policiesTable: gcdr-policies-${self:provider.stage}
   roleAssignmentsTable: gcdr-role-assignments-${self:provider.stage}
+  assetsTable: gcdr-assets-${self:provider.stage}
+  devicesTable: gcdr-devices-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -235,6 +243,160 @@ functions:
           method: get
           cors: true
 
+  # Asset APIs
+  createAsset:
+    handler: src/handlers/assets/create.handler
+    events:
+      - http:
+          path: /assets
+          method: post
+          cors: true
+
+  getAsset:
+    handler: src/handlers/assets/get.handler
+    events:
+      - http:
+          path: /assets/{id}
+          method: get
+          cors: true
+
+  updateAsset:
+    handler: src/handlers/assets/update.handler
+    events:
+      - http:
+          path: /assets/{id}
+          method: put
+          cors: true
+
+  deleteAsset:
+    handler: src/handlers/assets/delete.handler
+    events:
+      - http:
+          path: /assets/{id}
+          method: delete
+          cors: true
+
+  listAssets:
+    handler: src/handlers/assets/list.handler
+    events:
+      - http:
+          path: /assets
+          method: get
+          cors: true
+
+  listAssetsByCustomer:
+    handler: src/handlers/assets/listByCustomer.handler
+    events:
+      - http:
+          path: /customers/{customerId}/assets
+          method: get
+          cors: true
+
+  getAssetChildren:
+    handler: src/handlers/assets/getChildren.handler
+    events:
+      - http:
+          path: /assets/{id}/children
+          method: get
+          cors: true
+
+  getAssetDescendants:
+    handler: src/handlers/assets/getDescendants.handler
+    events:
+      - http:
+          path: /assets/{id}/descendants
+          method: get
+          cors: true
+
+  getAssetTree:
+    handler: src/handlers/assets/getTree.handler
+    events:
+      - http:
+          path: /assets/tree
+          method: get
+          cors: true
+
+  getAssetTreeById:
+    handler: src/handlers/assets/getTree.handler
+    events:
+      - http:
+          path: /assets/{id}/tree
+          method: get
+          cors: true
+
+  moveAsset:
+    handler: src/handlers/assets/move.handler
+    events:
+      - http:
+          path: /assets/{id}/move
+          method: post
+          cors: true
+
+  # Device APIs
+  createDevice:
+    handler: src/handlers/devices/create.handler
+    events:
+      - http:
+          path: /devices
+          method: post
+          cors: true
+
+  getDevice:
+    handler: src/handlers/devices/get.handler
+    events:
+      - http:
+          path: /devices/{id}
+          method: get
+          cors: true
+
+  updateDevice:
+    handler: src/handlers/devices/update.handler
+    events:
+      - http:
+          path: /devices/{id}
+          method: put
+          cors: true
+
+  deleteDevice:
+    handler: src/handlers/devices/delete.handler
+    events:
+      - http:
+          path: /devices/{id}
+          method: delete
+          cors: true
+
+  listDevices:
+    handler: src/handlers/devices/list.handler
+    events:
+      - http:
+          path: /devices
+          method: get
+          cors: true
+
+  listDevicesByAsset:
+    handler: src/handlers/devices/listByAsset.handler
+    events:
+      - http:
+          path: /assets/{assetId}/devices
+          method: get
+          cors: true
+
+  moveDevice:
+    handler: src/handlers/devices/move.handler
+    events:
+      - http:
+          path: /devices/{id}/move
+          method: post
+          cors: true
+
+  updateDeviceConnectivity:
+    handler: src/handlers/devices/updateConnectivity.handler
+    events:
+      - http:
+          path: /devices/{id}/connectivity
+          method: patch
+          cors: true
+
 resources:
   Resources:
     # DynamoDB Tables
@@ -396,6 +558,106 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    AssetsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.assetsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: parentAssetId
+            AttributeType: S
+          - AttributeName: path
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-parent
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: parentAssetId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-path
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: path
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    DevicesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.devicesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: assetId
+            AttributeType: S
+          - AttributeName: serialNumber
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-asset
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: assetId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-serial
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: serialNumber
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+          - IndexName: gsi-status
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: status
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -407,6 +669,10 @@ resources:
       Value: !GetAtt CustomersTable.Arn
     PartnersTableArn:
       Value: !GetAtt PartnersTable.Arn
+    AssetsTableArn:
+      Value: !GetAtt AssetsTable.Arn
+    DevicesTableArn:
+      Value: !GetAtt DevicesTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

@@ -21,4 +21,6 @@ export const TableNames = {
   ROLES: process.env.ROLES_TABLE || 'gcdr-roles-dev',
   POLICIES: process.env.POLICIES_TABLE || 'gcdr-policies-dev',
   ROLE_ASSIGNMENTS: process.env.ROLE_ASSIGNMENTS_TABLE || 'gcdr-role-assignments-dev',
+  ASSETS: process.env.ASSETS_TABLE || 'gcdr-assets-dev',
+  DEVICES: process.env.DEVICES_TABLE || 'gcdr-devices-dev',
 };

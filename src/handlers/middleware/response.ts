@@ -51,6 +51,10 @@ export function error(
   };
 }
 
+export function ok<T>(data: T): APIGatewayProxyResult {
+  return success(data, 200);
+}
+
 export function created<T>(data: T): APIGatewayProxyResult {
   return success(data, 201);
 }

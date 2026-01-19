@@ -24,6 +24,7 @@ export const EventType = {
   ASSET_CREATED: { code: 'ASSET_CREATED', description: 'Asset created' },
   ASSET_UPDATED: { code: 'ASSET_UPDATED', description: 'Asset updated' },
   ASSET_DELETED: { code: 'ASSET_DELETED', description: 'Asset deleted' },
+  ASSET_MOVED: { code: 'ASSET_MOVED', description: 'Asset moved to new parent/customer' },
 
   // Device Operations
   DEVICE_CREATED: { code: 'DEVICE_CREATED', description: 'Device created' },
