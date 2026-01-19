@@ -9,6 +9,7 @@ export interface ApiKey {
   expiresAt?: string;
   lastUsedAt?: string;
   createdAt: string;
+  revokedAt?: string;
   status: 'ACTIVE' | 'REVOKED';
 }
 
@@ -63,6 +64,15 @@ export interface Partner extends BaseEntity {
   rejectedAt?: string;
   rejectedBy?: string;
   rejectionReason?: string;
+
+  // Suspension
+  suspendedAt?: string;
+  suspendedBy?: string;
+  suspensionReason?: string;
+
+  // Activation
+  activatedAt?: string;
+  activatedBy?: string;
 }
 
 export const PARTNER_SCOPES = [

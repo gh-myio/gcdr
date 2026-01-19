@@ -1,5 +1,12 @@
 export { handler as registerHandler } from './register';
 export { handler as getHandler } from './get';
 export { handler as listHandler } from './list';
+export { handler as updateHandler } from './update';
 export { handler as approveHandler } from './approve';
 export { handler as rejectHandler } from './reject';
+export { handler as suspendHandler } from './suspend';
+export { handler as activateHandler } from './activate';
+export { handler as createApiKeyHandler } from './createApiKey';
+export { handler as revokeApiKeyHandler } from './revokeApiKey';
+export { handler as rotateApiKeyHandler } from './rotateApiKey';
+export { handler as listApiKeysHandler } from './listApiKeys';

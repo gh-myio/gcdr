@@ -440,7 +440,7 @@ export class PartnerRepository implements IPartnerRepository {
 
     const timestamp = now();
     const updatedApiKeys = existing.apiKeys.map((k) =>
-      k.id === apiKeyId ? { ...k, status: 'REVOKED' as const } : k
+      k.id === apiKeyId ? { ...k, status: 'REVOKED' as const, revokedAt: timestamp } : k
     );
 
     const result = await dynamoDb.send(

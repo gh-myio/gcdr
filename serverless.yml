@@ -214,6 +214,62 @@ functions:
           method: post
           cors: true
 
+  updatePartner:
+    handler: src/handlers/partners/update.handler
+    events:
+      - http:
+          path: /partners/{id}
+          method: put
+          cors: true
+
+  suspendPartner:
+    handler: src/handlers/partners/suspend.handler
+    events:
+      - http:
+          path: /partners/{id}/suspend
+          method: post
+          cors: true
+
+  activatePartner:
+    handler: src/handlers/partners/activate.handler
+    events:
+      - http:
+          path: /partners/{id}/activate
+          method: post
+          cors: true
+
+  createPartnerApiKey:
+    handler: src/handlers/partners/createApiKey.handler
+    events:
+      - http:
+          path: /partners/{id}/api-keys
+          method: post
+          cors: true
+
+  listPartnerApiKeys:
+    handler: src/handlers/partners/listApiKeys.handler
+    events:
+      - http:
+          path: /partners/{id}/api-keys
+          method: get
+          cors: true
+
+  revokePartnerApiKey:
+    handler: src/handlers/partners/revokeApiKey.handler
+    events:
+      - http:
+          path: /partners/{id}/api-keys/{keyId}
+          method: delete
+          cors: true
+
+  rotatePartnerApiKey:
+    handler: src/handlers/partners/rotateApiKey.handler
+    events:
+      - http:
+          path: /partners/{id}/api-keys/{keyId}/rotate
+          method: post
+          cors: true
+
   # Authorization APIs
   checkPermission:
     handler: src/handlers/authorization/check.handler

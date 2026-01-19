@@ -271,6 +271,63 @@ export class PartnerService {
     return updatedPartner;
   }
 
+  async rotateApiKey(
+    tenantId: string,
+    partnerId: string,
+    apiKeyId: string,
+    rotatedBy: string
+  ): Promise<{ partner: Partner; newApiKey: string }> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    const existingKey = partner.apiKeys.find((k) => k.id === apiKeyId);
+    if (!existingKey) {
+      throw new NotFoundError(`API key ${apiKeyId} not found`);
+    }
+
+    if (existingKey.status === 'REVOKED') {
+      throw new ValidationError('Cannot rotate a revoked API key');
+    }
+
+    // Generate new API key with same settings
+    const rawKey = this.generateApiKey();
+    const keyHash = this.hashApiKey(rawKey);
+    const keyPrefix = rawKey.substring(0, 8);
+
+    const newApiKey: ApiKey = {
+      id: generateId(),
+      keyHash,
+      keyPrefix,
+      name: existingKey.name,
+      scopes: existingKey.scopes,
+      expiresAt: existingKey.expiresAt,
+      createdAt: now(),
+      status: 'ACTIVE',
+    };
+
+    // Revoke old key and add new one
+    await this.repository.revokeApiKey(tenantId, partnerId, apiKeyId);
+    const updatedPartner = await this.repository.addApiKey(tenantId, partnerId, newApiKey);
+
+    await eventService.publish(EventType.PARTNER_API_KEY_CREATED, {
+      tenantId,
+      entityType: 'partner',
+      entityId: partnerId,
+      action: 'api_key_rotated',
+      data: {
+        oldKeyId: apiKeyId,
+        newKeyId: newApiKey.id,
+        keyName: newApiKey.name,
+        keyPrefix,
+      },
+      actor: { userId: rotatedBy, type: 'user' },
+    });
+
+    return {
+      partner: updatedPartner,
+      newApiKey: rawKey,
+    };
+  }
+
   async validateApiKey(tenantId: string, apiKey: string): Promise<{ partner: Partner; keyInfo: ApiKey } | null> {
     const keyPrefix = apiKey.substring(0, 8);
     const keyHash = this.hashApiKey(apiKey);
