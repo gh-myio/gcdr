@@ -66,3 +66,11 @@ export function noContent(): APIGatewayProxyResult {
     body: '',
   };
 }
+
+export function unauthorized(message: string = 'Unauthorized'): APIGatewayProxyResult {
+  return error(message, 'UNAUTHORIZED', 401);
+}
+
+export function forbidden(message: string = 'Forbidden'): APIGatewayProxyResult {
+  return error(message, 'FORBIDDEN', 403);
+}

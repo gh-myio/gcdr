@@ -270,6 +270,73 @@ functions:
           method: post
           cors: true
 
+  # OAuth Client endpoints
+  createPartnerOAuthClient:
+    handler: src/handlers/partners/createOAuthClient.handler
+    events:
+      - http:
+          path: /partners/{id}/oauth-clients
+          method: post
+          cors: true
+
+  listPartnerOAuthClients:
+    handler: src/handlers/partners/listOAuthClients.handler
+    events:
+      - http:
+          path: /partners/{id}/oauth-clients
+          method: get
+          cors: true
+
+  revokePartnerOAuthClient:
+    handler: src/handlers/partners/revokeOAuthClient.handler
+    events:
+      - http:
+          path: /partners/{id}/oauth-clients/{clientId}
+          method: delete
+          cors: true
+
+  # OAuth2 Token endpoint
+  oauthToken:
+    handler: src/handlers/partners/token.handler
+    events:
+      - http:
+          path: /oauth/token
+          method: post
+          cors: true
+
+  # Webhook endpoints
+  createPartnerWebhook:
+    handler: src/handlers/partners/createWebhook.handler
+    events:
+      - http:
+          path: /partners/{id}/webhooks
+          method: post
+          cors: true
+
+  listPartnerWebhooks:
+    handler: src/handlers/partners/listWebhooks.handler
+    events:
+      - http:
+          path: /partners/{id}/webhooks
+          method: get
+          cors: true
+
+  updatePartnerWebhook:
+    handler: src/handlers/partners/updateWebhook.handler
+    events:
+      - http:
+          path: /partners/{id}/webhooks/{webhookId}
+          method: put
+          cors: true
+
+  deletePartnerWebhook:
+    handler: src/handlers/partners/deleteWebhook.handler
+    events:
+      - http:
+          path: /partners/{id}/webhooks/{webhookId}
+          method: delete
+          cors: true
+
   # Authorization APIs
   checkPermission:
     handler: src/handlers/authorization/check.handler

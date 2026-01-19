@@ -1,5 +1,5 @@
-import { Partner, ApiKey } from '../../domain/entities/Partner';
-import { RegisterPartnerDTO, UpdatePartnerDTO, ApprovePartnerDTO } from '../../dto/request/PartnerDTO';
+import { Partner, ApiKey, OAuthClient, WebhookSubscription } from '../../domain/entities/Partner';
+import { RegisterPartnerDTO, UpdatePartnerDTO, ApprovePartnerDTO, UpdateWebhookDTO } from '../../dto/request/PartnerDTO';
 import { PaginatedResult, PartnerStatus } from '../../shared/types';
 import { IRepository } from './IRepository';
 
@@ -18,6 +18,11 @@ export interface IPartnerRepository extends IRepository<Partner, RegisterPartner
   activate(tenantId: string, id: string, activatedBy: string): Promise<Partner>;
   addApiKey(tenantId: string, partnerId: string, apiKey: ApiKey): Promise<Partner>;
   revokeApiKey(tenantId: string, partnerId: string, apiKeyId: string): Promise<Partner>;
+  addOAuthClient(tenantId: string, partnerId: string, client: OAuthClient): Promise<Partner>;
+  revokeOAuthClient(tenantId: string, partnerId: string, clientId: string): Promise<Partner>;
+  addWebhook(tenantId: string, partnerId: string, webhook: WebhookSubscription): Promise<Partner>;
+  updateWebhook(tenantId: string, partnerId: string, webhookId: string, data: UpdateWebhookDTO): Promise<Partner>;
+  deleteWebhook(tenantId: string, partnerId: string, webhookId: string): Promise<Partner>;
   listWithFilters(tenantId: string, params: ListPartnersParams): Promise<PaginatedResult<Partner>>;
   updateUsage(tenantId: string, partnerId: string, requestCount: number): Promise<void>;
 }

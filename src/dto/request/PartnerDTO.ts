@@ -59,3 +59,34 @@ export const RejectPartnerSchema = z.object({
 });
 
 export type RejectPartnerDTO = z.infer<typeof RejectPartnerSchema>;
+
+// OAuth Client DTOs
+export const CreateOAuthClientSchema = z.object({
+  name: z.string().min(1).max(100),
+  redirectUris: z.array(z.string().url()).optional().default([]),
+  scopes: z.array(z.enum(PARTNER_SCOPES)).min(1),
+  grantTypes: z
+    .array(z.enum(['client_credentials', 'authorization_code']))
+    .min(1)
+    .default(['client_credentials']),
+});
+
+export type CreateOAuthClientDTO = z.infer<typeof CreateOAuthClientSchema>;
+
+// Webhook Subscription DTOs
+export const CreateWebhookSchema = z.object({
+  url: z.string().url(),
+  events: z.array(z.string()).min(1),
+  secret: z.string().min(16).max(256).optional(),
+  enabled: z.boolean().default(true),
+});
+
+export type CreateWebhookDTO = z.infer<typeof CreateWebhookSchema>;
+
+export const UpdateWebhookSchema = z.object({
+  url: z.string().url().optional(),
+  events: z.array(z.string()).min(1).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export type UpdateWebhookDTO = z.infer<typeof UpdateWebhookSchema>;

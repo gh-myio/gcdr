@@ -21,7 +21,21 @@ export interface OAuthClient {
   scopes: string[];
   grantTypes: ('client_credentials' | 'authorization_code')[];
   createdAt: string;
+  revokedAt?: string;
   status: 'ACTIVE' | 'REVOKED';
+}
+
+export interface WebhookSubscription {
+  id: string;
+  url: string;
+  events: string[];
+  secretHash?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastDeliveryAt?: string;
+  lastDeliveryStatus?: 'success' | 'failed';
+  failureCount: number;
 }
 
 export interface Partner extends BaseEntity {
@@ -47,6 +61,7 @@ export interface Partner extends BaseEntity {
   // API Access
   apiKeys: ApiKey[];
   oauthClients: OAuthClient[];
+  webhooks: WebhookSubscription[];
   scopes: string[];
 
   // Limits

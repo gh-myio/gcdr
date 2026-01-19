@@ -1,10 +1,13 @@
-import { Partner, ApiKey } from '../domain/entities/Partner';
+import { Partner, ApiKey, OAuthClient, WebhookSubscription } from '../domain/entities/Partner';
 import {
   RegisterPartnerDTO,
   UpdatePartnerDTO,
   ApprovePartnerDTO,
   RejectPartnerDTO,
   CreateApiKeyDTO,
+  CreateOAuthClientDTO,
+  CreateWebhookDTO,
+  UpdateWebhookDTO,
 } from '../dto/request/PartnerDTO';
 import { PartnerRepository } from '../repositories/PartnerRepository';
 import { IPartnerRepository, ListPartnersParams } from '../repositories/interfaces/IPartnerRepository';
@@ -357,6 +360,205 @@ export class PartnerService {
     return null;
   }
 
+  // ==================== OAuth Client Methods ====================
+
+  async createOAuthClient(
+    tenantId: string,
+    partnerId: string,
+    data: CreateOAuthClientDTO,
+    createdBy: string
+  ): Promise<{ partner: Partner; clientId: string; clientSecret: string }> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    if (partner.status !== 'ACTIVE' && partner.status !== 'APPROVED') {
+      throw new ValidationError(`Cannot create OAuth client for partner with status ${partner.status}`);
+    }
+
+    // Validate requested scopes
+    const invalidScopes = data.scopes.filter((s) => !partner.scopes.includes(s));
+    if (invalidScopes.length > 0) {
+      throw new ValidationError(`Invalid scopes: ${invalidScopes.join(', ')}`);
+    }
+
+    // Generate client credentials
+    const clientId = `gcdr_${generateId()}`;
+    const clientSecret = this.generateClientSecret();
+    const secretHash = this.hashApiKey(clientSecret);
+
+    const oauthClient: OAuthClient = {
+      clientId,
+      clientSecretHash: secretHash,
+      name: data.name,
+      redirectUris: data.redirectUris || [],
+      scopes: data.scopes,
+      grantTypes: data.grantTypes,
+      createdAt: now(),
+      status: 'ACTIVE',
+    };
+
+    const updatedPartner = await this.repository.addOAuthClient(tenantId, partnerId, oauthClient);
+
+    return {
+      partner: updatedPartner,
+      clientId,
+      clientSecret,
+    };
+  }
+
+  async revokeOAuthClient(tenantId: string, partnerId: string, clientId: string, revokedBy: string): Promise<Partner> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    const client = partner.oauthClients.find((c) => c.clientId === clientId);
+    if (!client) {
+      throw new NotFoundError(`OAuth client ${clientId} not found`);
+    }
+
+    if (client.status === 'REVOKED') {
+      throw new ValidationError('OAuth client is already revoked');
+    }
+
+    return this.repository.revokeOAuthClient(tenantId, partnerId, clientId);
+  }
+
+  async validateOAuthClient(
+    clientId: string,
+    clientSecret: string
+  ): Promise<{ partner: Partner; client: OAuthClient } | null> {
+    const secretHash = this.hashApiKey(clientSecret);
+
+    // Get all partners and check their OAuth clients
+    // In production, this should use a dedicated OAuth clients table
+    const result = await this.repository.list('*', { limit: 1000 });
+
+    for (const partner of result.items) {
+      const matchingClient = partner.oauthClients.find(
+        (c) => c.clientId === clientId && c.clientSecretHash === secretHash && c.status === 'ACTIVE'
+      );
+
+      if (matchingClient) {
+        return { partner, client: matchingClient };
+      }
+    }
+
+    return null;
+  }
+
+  async issueAccessToken(
+    clientId: string,
+    clientSecret: string,
+    requestedScopes?: string[]
+  ): Promise<{ accessToken: string; tokenType: string; expiresIn: number; scopes: string[] }> {
+    const validation = await this.validateOAuthClient(clientId, clientSecret);
+
+    if (!validation) {
+      throw new ValidationError('Invalid client credentials');
+    }
+
+    const { partner, client } = validation;
+
+    // Check partner status
+    if (partner.status !== 'ACTIVE') {
+      throw new ValidationError('Partner is not active');
+    }
+
+    // Validate requested scopes
+    const grantedScopes = requestedScopes
+      ? requestedScopes.filter((s) => client.scopes.includes(s))
+      : client.scopes;
+
+    // Generate access token (JWT in production)
+    const tokenPayload = {
+      partnerId: partner.id,
+      tenantId: partner.tenantId,
+      clientId,
+      scopes: grantedScopes,
+      exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+      iat: Math.floor(Date.now() / 1000),
+    };
+
+    // For MVP, we generate a simple base64 encoded token
+    // In production, this should be a signed JWT
+    const accessToken = Buffer.from(JSON.stringify(tokenPayload)).toString('base64url');
+
+    return {
+      accessToken: `gcdr_oauth_${accessToken}`,
+      tokenType: 'Bearer',
+      expiresIn: 3600,
+      scopes: grantedScopes,
+    };
+  }
+
+  // ==================== Webhook Methods ====================
+
+  async createWebhook(
+    tenantId: string,
+    partnerId: string,
+    data: CreateWebhookDTO,
+    createdBy: string
+  ): Promise<{ partner: Partner; webhook: WebhookSubscription; secret?: string }> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    if (partner.status !== 'ACTIVE' && partner.status !== 'APPROVED') {
+      throw new ValidationError(`Cannot create webhook for partner with status ${partner.status}`);
+    }
+
+    // Generate or use provided secret
+    const secret = data.secret || this.generateWebhookSecret();
+    const secretHash = this.hashApiKey(secret);
+
+    const webhook: WebhookSubscription = {
+      id: generateId(),
+      url: data.url,
+      events: data.events,
+      secretHash,
+      enabled: data.enabled,
+      createdAt: now(),
+      updatedAt: now(),
+      failureCount: 0,
+    };
+
+    const updatedPartner = await this.repository.addWebhook(tenantId, partnerId, webhook);
+
+    return {
+      partner: updatedPartner,
+      webhook,
+      secret: data.secret ? undefined : secret, // Only return if we generated it
+    };
+  }
+
+  async updateWebhook(
+    tenantId: string,
+    partnerId: string,
+    webhookId: string,
+    data: UpdateWebhookDTO,
+    updatedBy: string
+  ): Promise<Partner> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    const webhook = partner.webhooks.find((w) => w.id === webhookId);
+    if (!webhook) {
+      throw new NotFoundError(`Webhook ${webhookId} not found`);
+    }
+
+    return this.repository.updateWebhook(tenantId, partnerId, webhookId, data);
+  }
+
+  async deleteWebhook(tenantId: string, partnerId: string, webhookId: string, deletedBy: string): Promise<Partner> {
+    const partner = await this.getById(tenantId, partnerId);
+
+    const webhook = partner.webhooks.find((w) => w.id === webhookId);
+    if (!webhook) {
+      throw new NotFoundError(`Webhook ${webhookId} not found`);
+    }
+
+    return this.repository.deleteWebhook(tenantId, partnerId, webhookId);
+  }
+
+  async listWebhooks(tenantId: string, partnerId: string): Promise<WebhookSubscription[]> {
+    const partner = await this.getById(tenantId, partnerId);
+    return partner.webhooks;
+  }
+
   private async updateApiKeyLastUsed(tenantId: string, partnerId: string, keyId: string): Promise<void> {
     // This would update the lastUsedAt field on the API key
     // For MVP, we'll skip the actual update
@@ -371,6 +573,16 @@ export class PartnerService {
 
   private hashApiKey(apiKey: string): string {
     return crypto.createHash('sha256').update(apiKey).digest('hex');
+  }
+
+  private generateClientSecret(): string {
+    const randomBytes = crypto.randomBytes(32);
+    return `gcdr_secret_${randomBytes.toString('hex')}`;
+  }
+
+  private generateWebhookSecret(): string {
+    const randomBytes = crypto.randomBytes(32);
+    return `whsec_${randomBytes.toString('hex')}`;
   }
 }
 

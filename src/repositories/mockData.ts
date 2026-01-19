@@ -195,6 +195,7 @@ export const mockPartners: Map<string, Partner> = new Map([
         },
       ],
       oauthClients: [],
+      webhooks: [],
       scopes: ['customers:read', 'assets:read', 'devices:read'],
       rateLimitPerMinute: 100,
       rateLimitPerDay: 10000,

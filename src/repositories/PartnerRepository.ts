@@ -5,8 +5,8 @@ import {
   DeleteCommand,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { Partner, ApiKey } from '../domain/entities/Partner';
-import { RegisterPartnerDTO, UpdatePartnerDTO, ApprovePartnerDTO } from '../dto/request/PartnerDTO';
+import { Partner, ApiKey, OAuthClient, WebhookSubscription } from '../domain/entities/Partner';
+import { RegisterPartnerDTO, UpdatePartnerDTO, ApprovePartnerDTO, UpdateWebhookDTO } from '../dto/request/PartnerDTO';
 import { PaginatedResult, PartnerStatus } from '../shared/types';
 import { IPartnerRepository, ListPartnersParams } from './interfaces/IPartnerRepository';
 import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
@@ -36,6 +36,7 @@ export class PartnerRepository implements IPartnerRepository {
       technicalContactEmail: data.technicalContactEmail,
       apiKeys: [],
       oauthClients: [],
+      webhooks: [],
       scopes: [],
       rateLimitPerMinute: 0,
       rateLimitPerDay: 0,
@@ -454,6 +455,193 @@ export class PartnerRepository implements IPartnerRepository {
         },
         ExpressionAttributeValues: {
           ':apiKeys': updatedApiKeys,
+          ':updatedAt': timestamp,
+          ':currentVersion': existing.version,
+          ':inc': 1,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+
+    return result.Attributes as Partner;
+  }
+
+  async addOAuthClient(tenantId: string, partnerId: string, client: OAuthClient): Promise<Partner> {
+    const existing = await this.getById(tenantId, partnerId);
+    if (!existing) {
+      throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
+    }
+
+    const timestamp = now();
+    const updatedClients = [...existing.oauthClients, client];
+
+    const result = await dynamoDb.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { tenantId, id: partnerId },
+        UpdateExpression: `SET oauthClients = :clients, updatedAt = :updatedAt, #version = #version + :inc`,
+        ConditionExpression: '#version = :currentVersion',
+        ExpressionAttributeNames: {
+          '#version': 'version',
+        },
+        ExpressionAttributeValues: {
+          ':clients': updatedClients,
+          ':updatedAt': timestamp,
+          ':currentVersion': existing.version,
+          ':inc': 1,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+
+    return result.Attributes as Partner;
+  }
+
+  async revokeOAuthClient(tenantId: string, partnerId: string, clientId: string): Promise<Partner> {
+    const existing = await this.getById(tenantId, partnerId);
+    if (!existing) {
+      throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
+    }
+
+    const clientIndex = existing.oauthClients.findIndex((c) => c.clientId === clientId);
+    if (clientIndex === -1) {
+      throw new AppError('OAUTH_CLIENT_NOT_FOUND', 'OAuth client not found', 404);
+    }
+
+    const timestamp = now();
+    const updatedClients = existing.oauthClients.map((c) =>
+      c.clientId === clientId ? { ...c, status: 'REVOKED' as const, revokedAt: timestamp } : c
+    );
+
+    const result = await dynamoDb.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { tenantId, id: partnerId },
+        UpdateExpression: `SET oauthClients = :clients, updatedAt = :updatedAt, #version = #version + :inc`,
+        ConditionExpression: '#version = :currentVersion',
+        ExpressionAttributeNames: {
+          '#version': 'version',
+        },
+        ExpressionAttributeValues: {
+          ':clients': updatedClients,
+          ':updatedAt': timestamp,
+          ':currentVersion': existing.version,
+          ':inc': 1,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+
+    return result.Attributes as Partner;
+  }
+
+  async addWebhook(tenantId: string, partnerId: string, webhook: WebhookSubscription): Promise<Partner> {
+    const existing = await this.getById(tenantId, partnerId);
+    if (!existing) {
+      throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
+    }
+
+    const timestamp = now();
+    const updatedWebhooks = [...existing.webhooks, webhook];
+
+    const result = await dynamoDb.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { tenantId, id: partnerId },
+        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
+        ConditionExpression: '#version = :currentVersion',
+        ExpressionAttributeNames: {
+          '#version': 'version',
+        },
+        ExpressionAttributeValues: {
+          ':webhooks': updatedWebhooks,
+          ':updatedAt': timestamp,
+          ':currentVersion': existing.version,
+          ':inc': 1,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+
+    return result.Attributes as Partner;
+  }
+
+  async updateWebhook(
+    tenantId: string,
+    partnerId: string,
+    webhookId: string,
+    data: UpdateWebhookDTO
+  ): Promise<Partner> {
+    const existing = await this.getById(tenantId, partnerId);
+    if (!existing) {
+      throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
+    }
+
+    const webhookIndex = existing.webhooks.findIndex((w) => w.id === webhookId);
+    if (webhookIndex === -1) {
+      throw new AppError('WEBHOOK_NOT_FOUND', 'Webhook not found', 404);
+    }
+
+    const timestamp = now();
+    const updatedWebhooks = existing.webhooks.map((w) =>
+      w.id === webhookId
+        ? {
+            ...w,
+            ...(data.url && { url: data.url }),
+            ...(data.events && { events: data.events }),
+            ...(data.enabled !== undefined && { enabled: data.enabled }),
+            updatedAt: timestamp,
+          }
+        : w
+    );
+
+    const result = await dynamoDb.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { tenantId, id: partnerId },
+        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
+        ConditionExpression: '#version = :currentVersion',
+        ExpressionAttributeNames: {
+          '#version': 'version',
+        },
+        ExpressionAttributeValues: {
+          ':webhooks': updatedWebhooks,
+          ':updatedAt': timestamp,
+          ':currentVersion': existing.version,
+          ':inc': 1,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+
+    return result.Attributes as Partner;
+  }
+
+  async deleteWebhook(tenantId: string, partnerId: string, webhookId: string): Promise<Partner> {
+    const existing = await this.getById(tenantId, partnerId);
+    if (!existing) {
+      throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
+    }
+
+    const webhookIndex = existing.webhooks.findIndex((w) => w.id === webhookId);
+    if (webhookIndex === -1) {
+      throw new AppError('WEBHOOK_NOT_FOUND', 'Webhook not found', 404);
+    }
+
+    const timestamp = now();
+    const updatedWebhooks = existing.webhooks.filter((w) => w.id !== webhookId);
+
+    const result = await dynamoDb.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { tenantId, id: partnerId },
+        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
+        ConditionExpression: '#version = :currentVersion',
+        ExpressionAttributeNames: {
+          '#version': 'version',
+        },
+        ExpressionAttributeValues: {
+          ':webhooks': updatedWebhooks,
           ':updatedAt': timestamp,
           ':currentVersion': existing.version,
           ':inc': 1,
