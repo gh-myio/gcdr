@@ -26,4 +26,6 @@ export const TableNames = {
   RULES: process.env.RULES_TABLE || 'gcdr-rules-dev',
   INTEGRATIONS: process.env.INTEGRATIONS_TABLE || 'gcdr-integrations-dev',
   SUBSCRIPTIONS: process.env.SUBSCRIPTIONS_TABLE || 'gcdr-subscriptions-dev',
+  CENTRALS: process.env.CENTRALS_TABLE || 'gcdr-centrals-dev',
+  THEMES: process.env.THEMES_TABLE || 'gcdr-themes-dev',
 };

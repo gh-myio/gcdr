@@ -55,6 +55,20 @@ export const EventType = {
   ROLE_ASSIGNED: { code: 'ROLE_ASSIGNED', description: 'Role assigned to user' },
   ROLE_REVOKED: { code: 'ROLE_REVOKED', description: 'Role revoked from user' },
 
+  // Central Operations
+  CENTRAL_CREATED: { code: 'CENTRAL_CREATED', description: 'Central created' },
+  CENTRAL_UPDATED: { code: 'CENTRAL_UPDATED', description: 'Central updated' },
+  CENTRAL_DELETED: { code: 'CENTRAL_DELETED', description: 'Central deleted' },
+  CENTRAL_CONNECTED: { code: 'CENTRAL_CONNECTED', description: 'Central connected' },
+  CENTRAL_DISCONNECTED: { code: 'CENTRAL_DISCONNECTED', description: 'Central disconnected' },
+  CENTRAL_HEARTBEAT: { code: 'CENTRAL_HEARTBEAT', description: 'Central heartbeat received' },
+
+  // Theme Operations
+  THEME_CREATED: { code: 'THEME_CREATED', description: 'Theme created' },
+  THEME_UPDATED: { code: 'THEME_UPDATED', description: 'Theme updated' },
+  THEME_DELETED: { code: 'THEME_DELETED', description: 'Theme deleted' },
+  THEME_SET_DEFAULT: { code: 'THEME_SET_DEFAULT', description: 'Theme set as default' },
+
   // Health
   HEALTH_CHECK: { code: 'HEALTH_CHECK', description: 'Health check performed' },
 } as const;

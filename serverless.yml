@@ -23,6 +23,8 @@ provider:
     RULES_TABLE: ${self:custom.rulesTable}
     INTEGRATIONS_TABLE: ${self:custom.integrationsTable}
     SUBSCRIPTIONS_TABLE: ${self:custom.subscriptionsTable}
+    CENTRALS_TABLE: ${self:custom.centralsTable}
+    THEMES_TABLE: ${self:custom.themesTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -60,6 +62,10 @@ provider:
             - !Join ['/', [!GetAtt IntegrationsTable.Arn, 'index', '*']]
             - !GetAtt SubscriptionsTable.Arn
             - !Join ['/', [!GetAtt SubscriptionsTable.Arn, 'index', '*']]
+            - !GetAtt CentralsTable.Arn
+            - !Join ['/', [!GetAtt CentralsTable.Arn, 'index', '*']]
+            - !GetAtt ThemesTable.Arn
+            - !Join ['/', [!GetAtt ThemesTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -77,6 +83,8 @@ custom:
   rulesTable: gcdr-rules-${self:provider.stage}
   integrationsTable: gcdr-integrations-${self:provider.stage}
   subscriptionsTable: gcdr-subscriptions-${self:provider.stage}
+  centralsTable: gcdr-centrals-${self:provider.stage}
+  themesTable: gcdr-themes-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -840,6 +848,176 @@ functions:
           method: get
           cors: true
 
+  # Central APIs
+  createCentral:
+    handler: src/handlers/centrals/create.handler
+    events:
+      - http:
+          path: /centrals
+          method: post
+          cors: true
+
+  getCentral:
+    handler: src/handlers/centrals/get.handler
+    events:
+      - http:
+          path: /centrals/{id}
+          method: get
+          cors: true
+
+  getCentralBySerial:
+    handler: src/handlers/centrals/getBySerial.handler
+    events:
+      - http:
+          path: /centrals/serial/{serialNumber}
+          method: get
+          cors: true
+
+  updateCentral:
+    handler: src/handlers/centrals/update.handler
+    events:
+      - http:
+          path: /centrals/{id}
+          method: put
+          cors: true
+
+  deleteCentral:
+    handler: src/handlers/centrals/delete.handler
+    events:
+      - http:
+          path: /centrals/{id}
+          method: delete
+          cors: true
+
+  listCentrals:
+    handler: src/handlers/centrals/list.handler
+    events:
+      - http:
+          path: /centrals
+          method: get
+          cors: true
+
+  listCentralsByAsset:
+    handler: src/handlers/centrals/listByAsset.handler
+    events:
+      - http:
+          path: /assets/{assetId}/centrals
+          method: get
+          cors: true
+
+  updateCentralStatus:
+    handler: src/handlers/centrals/updateStatus.handler
+    events:
+      - http:
+          path: /centrals/{id}/status
+          method: patch
+          cors: true
+
+  updateCentralConnection:
+    handler: src/handlers/centrals/updateConnection.handler
+    events:
+      - http:
+          path: /centrals/{id}/connection
+          method: patch
+          cors: true
+
+  centralHeartbeat:
+    handler: src/handlers/centrals/heartbeat.handler
+    events:
+      - http:
+          path: /centrals/{id}/heartbeat
+          method: post
+          cors: true
+
+  # Theme (Look and Feel) APIs
+  createTheme:
+    handler: src/handlers/themes/create.handler
+    events:
+      - http:
+          path: /themes
+          method: post
+          cors: true
+
+  getTheme:
+    handler: src/handlers/themes/get.handler
+    events:
+      - http:
+          path: /themes/{id}
+          method: get
+          cors: true
+
+  updateTheme:
+    handler: src/handlers/themes/update.handler
+    events:
+      - http:
+          path: /themes/{id}
+          method: put
+          cors: true
+
+  quickUpdateTheme:
+    handler: src/handlers/themes/quickUpdate.handler
+    events:
+      - http:
+          path: /themes/{id}/quick
+          method: patch
+          cors: true
+
+  deleteTheme:
+    handler: src/handlers/themes/delete.handler
+    events:
+      - http:
+          path: /themes/{id}
+          method: delete
+          cors: true
+
+  listThemes:
+    handler: src/handlers/themes/list.handler
+    events:
+      - http:
+          path: /themes
+          method: get
+          cors: true
+
+  listThemesByCustomer:
+    handler: src/handlers/themes/listByCustomer.handler
+    events:
+      - http:
+          path: /customers/{customerId}/themes
+          method: get
+          cors: true
+
+  getCustomerDefaultTheme:
+    handler: src/handlers/themes/getDefault.handler
+    events:
+      - http:
+          path: /customers/{customerId}/themes/default
+          method: get
+          cors: true
+
+  setCustomerDefaultTheme:
+    handler: src/handlers/themes/setDefault.handler
+    events:
+      - http:
+          path: /customers/{customerId}/themes/{id}/default
+          method: post
+          cors: true
+
+  compileTheme:
+    handler: src/handlers/themes/compile.handler
+    events:
+      - http:
+          path: /themes/{id}/compile
+          method: get
+          cors: true
+
+  getEffectiveTheme:
+    handler: src/handlers/themes/getEffective.handler
+    events:
+      - http:
+          path: /customers/{customerId}/themes/effective
+          method: get
+          cors: true
+
 resources:
   Resources:
     # DynamoDB Tables
@@ -1263,6 +1441,86 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    CentralsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.centralsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: assetId
+            AttributeType: S
+          - AttributeName: serialNumber
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-asset
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: assetId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-serial
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: serialNumber
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    ThemesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.themesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -1284,6 +1542,10 @@ resources:
       Value: !GetAtt IntegrationsTable.Arn
     SubscriptionsTableArn:
       Value: !GetAtt SubscriptionsTable.Arn
+    CentralsTableArn:
+      Value: !GetAtt CentralsTable.Arn
+    ThemesTableArn:
+      Value: !GetAtt ThemesTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

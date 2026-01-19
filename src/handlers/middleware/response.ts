@@ -74,3 +74,7 @@ export function unauthorized(message: string = 'Unauthorized'): APIGatewayProxyR
 export function forbidden(message: string = 'Forbidden'): APIGatewayProxyResult {
   return error(message, 'FORBIDDEN', 403);
 }
+
+export function notFound(message: string = 'Not found'): APIGatewayProxyResult {
+  return error(message, 'NOT_FOUND', 404);
+}
