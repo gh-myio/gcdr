@@ -25,6 +25,7 @@ provider:
     SUBSCRIPTIONS_TABLE: ${self:custom.subscriptionsTable}
     CENTRALS_TABLE: ${self:custom.centralsTable}
     THEMES_TABLE: ${self:custom.themesTable}
+    USERS_TABLE: ${self:custom.usersTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -66,6 +67,8 @@ provider:
             - !Join ['/', [!GetAtt CentralsTable.Arn, 'index', '*']]
             - !GetAtt ThemesTable.Arn
             - !Join ['/', [!GetAtt ThemesTable.Arn, 'index', '*']]
+            - !GetAtt UsersTable.Arn
+            - !Join ['/', [!GetAtt UsersTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -85,6 +88,7 @@ custom:
   subscriptionsTable: gcdr-subscriptions-${self:provider.stage}
   centralsTable: gcdr-centrals-${self:provider.stage}
   themesTable: gcdr-themes-${self:provider.stage}
+  usersTable: gcdr-users-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -1018,6 +1022,159 @@ functions:
           method: get
           cors: true
 
+  # User APIs
+  createUser:
+    handler: src/handlers/users/create.handler
+    events:
+      - http:
+          path: /users
+          method: post
+          cors: true
+
+  getUser:
+    handler: src/handlers/users/get.handler
+    events:
+      - http:
+          path: /users/{id}
+          method: get
+          cors: true
+
+  updateUser:
+    handler: src/handlers/users/update.handler
+    events:
+      - http:
+          path: /users/{id}
+          method: put
+          cors: true
+
+  deleteUser:
+    handler: src/handlers/users/delete.handler
+    events:
+      - http:
+          path: /users/{id}
+          method: delete
+          cors: true
+
+  listUsers:
+    handler: src/handlers/users/list.handler
+    events:
+      - http:
+          path: /users
+          method: get
+          cors: true
+
+  listUsersByCustomer:
+    handler: src/handlers/users/listByCustomer.handler
+    events:
+      - http:
+          path: /customers/{customerId}/users
+          method: get
+          cors: true
+
+  updateUserStatus:
+    handler: src/handlers/users/updateStatus.handler
+    events:
+      - http:
+          path: /users/{id}/status
+          method: patch
+          cors: true
+
+  inviteUser:
+    handler: src/handlers/users/invite.handler
+    events:
+      - http:
+          path: /users/invite
+          method: post
+          cors: true
+
+  acceptInvitation:
+    handler: src/handlers/users/acceptInvitation.handler
+    events:
+      - http:
+          path: /users/accept-invitation
+          method: post
+          cors: true
+
+  verifyUserEmail:
+    handler: src/handlers/users/verifyEmail.handler
+    events:
+      - http:
+          path: /users/verify-email
+          method: post
+          cors: true
+
+  changeUserPassword:
+    handler: src/handlers/users/changePassword.handler
+    events:
+      - http:
+          path: /users/{id}/password
+          method: put
+          cors: true
+
+  requestPasswordReset:
+    handler: src/handlers/users/requestPasswordReset.handler
+    events:
+      - http:
+          path: /users/password-reset/request
+          method: post
+          cors: true
+
+  resetUserPassword:
+    handler: src/handlers/users/resetPassword.handler
+    events:
+      - http:
+          path: /users/password-reset/confirm
+          method: post
+          cors: true
+
+  setupUserMfa:
+    handler: src/handlers/users/setupMfa.handler
+    events:
+      - http:
+          path: /users/{id}/mfa/setup
+          method: post
+          cors: true
+
+  enableUserMfa:
+    handler: src/handlers/users/enableMfa.handler
+    events:
+      - http:
+          path: /users/{id}/mfa/enable
+          method: post
+          cors: true
+
+  disableUserMfa:
+    handler: src/handlers/users/disableMfa.handler
+    events:
+      - http:
+          path: /users/{id}/mfa/disable
+          method: post
+          cors: true
+
+  unlockUser:
+    handler: src/handlers/users/unlock.handler
+    events:
+      - http:
+          path: /users/{id}/unlock
+          method: post
+          cors: true
+
+  getCurrentUser:
+    handler: src/handlers/users/me.handler
+    events:
+      - http:
+          path: /users/me
+          method: get
+          cors: true
+
+  updateUserPreferences:
+    handler: src/handlers/users/updatePreferences.handler
+    events:
+      - http:
+          path: /users/{id}/preferences
+          method: put
+          cors: true
+
 resources:
   Resources:
     # DynamoDB Tables
@@ -1521,6 +1678,66 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.usersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: partnerId
+            AttributeType: S
+          - AttributeName: username
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-email
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: email
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-partner
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: partnerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-username
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: username
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -1546,6 +1763,8 @@ resources:
       Value: !GetAtt CentralsTable.Arn
     ThemesTableArn:
       Value: !GetAtt ThemesTable.Arn
+    UsersTableArn:
+      Value: !GetAtt UsersTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

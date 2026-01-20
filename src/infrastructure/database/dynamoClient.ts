@@ -28,4 +28,5 @@ export const TableNames = {
   SUBSCRIPTIONS: process.env.SUBSCRIPTIONS_TABLE || 'gcdr-subscriptions-dev',
   CENTRALS: process.env.CENTRALS_TABLE || 'gcdr-centrals-dev',
   THEMES: process.env.THEMES_TABLE || 'gcdr-themes-dev',
+  USERS: process.env.USERS_TABLE || 'gcdr-users-dev',
 };

@@ -69,6 +69,21 @@ export const EventType = {
   THEME_DELETED: { code: 'THEME_DELETED', description: 'Theme deleted' },
   THEME_SET_DEFAULT: { code: 'THEME_SET_DEFAULT', description: 'Theme set as default' },
 
+  // User Operations
+  USER_CREATED: { code: 'USER_CREATED', description: 'User created' },
+  USER_UPDATED: { code: 'USER_UPDATED', description: 'User updated' },
+  USER_DELETED: { code: 'USER_DELETED', description: 'User deleted' },
+  USER_INVITED: { code: 'USER_INVITED', description: 'User invited' },
+  USER_INVITATION_ACCEPTED: { code: 'USER_INVITATION_ACCEPTED', description: 'User invitation accepted' },
+  USER_STATUS_CHANGED: { code: 'USER_STATUS_CHANGED', description: 'User status changed' },
+  USER_EMAIL_VERIFIED: { code: 'USER_EMAIL_VERIFIED', description: 'User email verified' },
+  USER_PASSWORD_CHANGED: { code: 'USER_PASSWORD_CHANGED', description: 'User password changed' },
+  USER_PASSWORD_RESET_REQUESTED: { code: 'USER_PASSWORD_RESET_REQUESTED', description: 'Password reset requested' },
+  USER_MFA_ENABLED: { code: 'USER_MFA_ENABLED', description: 'User MFA enabled' },
+  USER_MFA_DISABLED: { code: 'USER_MFA_DISABLED', description: 'User MFA disabled' },
+  USER_LOCKED: { code: 'USER_LOCKED', description: 'User account locked' },
+  USER_UNLOCKED: { code: 'USER_UNLOCKED', description: 'User account unlocked' },
+
   // Health
   HEALTH_CHECK: { code: 'HEALTH_CHECK', description: 'Health check performed' },
 } as const;

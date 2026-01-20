@@ -7,3 +7,4 @@ export * from './RuleService';
 export * from './IntegrationService';
 export * from './CentralService';
 export * from './ThemeService';
+export * from './UserService';
