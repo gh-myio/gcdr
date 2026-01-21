@@ -7,7 +7,7 @@ import { extractContext } from '../middleware/requestContext';
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const ctx = extractContext(event);
-    const customerId = event.pathParameters?.customerId;
+    const customerId = event.pathParameters?.id;
 
     if (!customerId) {
       return handleError(new Error('Customer ID is required'));

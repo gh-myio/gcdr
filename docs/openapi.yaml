@@ -1,0 +1,5270 @@
+openapi: 3.0.3
+info:
+  title: GCDR API
+  description: |
+    API para o sistema GCDR (Global Customer Data Repository).
+    Sistema multi-tenant para gerenciamento de clientes, assets, dispositivos, regras e integrações.
+  version: 1.0.0
+  contact:
+    name: GCDR Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev
+    description: Development
+  - url: https://api.gcdr.io/staging
+    description: Staging
+  - url: https://api.gcdr.io
+    description: Production
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Customers
+    description: Customer hierarchy management
+  - name: Partners
+    description: Partner management, API keys, OAuth clients, webhooks
+  - name: Authorization
+    description: Permission evaluation and role assignments
+  - name: Roles
+    description: Role management
+  - name: Policies
+    description: Policy management
+  - name: Assets
+    description: Asset hierarchy management
+  - name: Devices
+    description: Device management
+  - name: Rules
+    description: Business rules (alarms, SLA, escalation, maintenance)
+  - name: Integrations
+    description: Integration marketplace packages and subscriptions
+  - name: Centrals
+    description: Central/Gateway management
+  - name: Themes
+    description: Look and Feel customization
+  - name: Users
+    description: User management and authentication
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    TenantId:
+      name: x-tenant-id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Tenant identifier for multi-tenancy
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Resource UUID
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Pagination cursor
+
+  schemas:
+    # Common Response Wrappers
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required:
+        - success
+        - data
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+      required:
+        - success
+        - error
+
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: {}
+            cursor:
+              type: string
+              nullable: true
+            hasMore:
+              type: boolean
+
+    # Health
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        service:
+          type: string
+        version:
+          type: string
+        stage:
+          type: string
+
+    # Customer Schemas
+    Customer:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        type:
+          type: string
+          enum: [ROOT, RESELLER, ENTERPRISE, BUSINESS, INDIVIDUAL]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED, DELETED]
+        parentCustomerId:
+          type: string
+          format: uuid
+          nullable: true
+        path:
+          type: string
+        depth:
+          type: integer
+        settings:
+          $ref: '#/components/schemas/CustomerSettings'
+        contact:
+          $ref: '#/components/schemas/CustomerContact'
+        address:
+          $ref: '#/components/schemas/Address'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CustomerSettings:
+      type: object
+      properties:
+        timezone:
+          type: string
+        locale:
+          type: string
+        currency:
+          type: string
+        dateFormat:
+          type: string
+        maxUsers:
+          type: integer
+        maxAssets:
+          type: integer
+        maxDevices:
+          type: integer
+        features:
+          type: object
+
+    CustomerContact:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        alternativeEmail:
+          type: string
+          format: email
+        alternativePhone:
+          type: string
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        number:
+          type: string
+        complement:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    CreateCustomer:
+      type: object
+      required:
+        - code
+        - name
+        - displayName
+        - type
+      properties:
+        code:
+          type: string
+          minLength: 2
+          maxLength: 50
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 255
+        type:
+          type: string
+          enum: [ROOT, RESELLER, ENTERPRISE, BUSINESS, INDIVIDUAL]
+        parentCustomerId:
+          type: string
+          format: uuid
+        settings:
+          $ref: '#/components/schemas/CustomerSettings'
+        contact:
+          $ref: '#/components/schemas/CustomerContact'
+        address:
+          $ref: '#/components/schemas/Address'
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          maxItems: 20
+        metadata:
+          type: object
+
+    UpdateCustomer:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 255
+        type:
+          type: string
+          enum: [ROOT, RESELLER, ENTERPRISE, BUSINESS, INDIVIDUAL]
+        settings:
+          $ref: '#/components/schemas/CustomerSettings'
+        contact:
+          $ref: '#/components/schemas/CustomerContact'
+        address:
+          $ref: '#/components/schemas/Address'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    MoveCustomer:
+      type: object
+      required:
+        - newParentId
+      properties:
+        newParentId:
+          type: string
+          format: uuid
+
+    # Partner Schemas
+    Partner:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        type:
+          type: string
+          enum: [TECHNOLOGY, RESELLER, INTEGRATOR, OEM, DISTRIBUTOR, CONSULTING, OTHER]
+        status:
+          type: string
+          enum: [PENDING, APPROVED, ACTIVE, SUSPENDED, REJECTED, TERMINATED]
+        tier:
+          type: string
+          enum: [BRONZE, SILVER, GOLD, PLATINUM]
+        contact:
+          $ref: '#/components/schemas/PartnerContact'
+        company:
+          $ref: '#/components/schemas/CompanyInfo'
+        capabilities:
+          type: array
+          items:
+            type: string
+        apiKeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiKeyInfo'
+        oauthClients:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthClientInfo'
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookInfo'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PartnerContact:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        position:
+          type: string
+
+    CompanyInfo:
+      type: object
+      required:
+        - legalName
+        - taxId
+      properties:
+        legalName:
+          type: string
+          maxLength: 255
+        taxId:
+          type: string
+        website:
+          type: string
+          format: uri
+        address:
+          $ref: '#/components/schemas/Address'
+
+    RegisterPartner:
+      type: object
+      required:
+        - name
+        - displayName
+        - type
+        - contact
+        - company
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 255
+        type:
+          type: string
+          enum: [TECHNOLOGY, RESELLER, INTEGRATOR, OEM, DISTRIBUTOR, CONSULTING, OTHER]
+        contact:
+          $ref: '#/components/schemas/PartnerContact'
+        company:
+          $ref: '#/components/schemas/CompanyInfo'
+        capabilities:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    ApiKeyInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        keyPrefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, EXPIRED]
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateApiKey:
+      type: object
+      required:
+        - name
+        - scopes
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        scopes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        expiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+
+    OAuthClientInfo:
+      type: object
+      properties:
+        clientId:
+          type: string
+        name:
+          type: string
+        grantTypes:
+          type: array
+          items:
+            type: string
+        redirectUris:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOAuthClient:
+      type: object
+      required:
+        - name
+        - grantTypes
+        - scopes
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        grantTypes:
+          type: array
+          items:
+            type: string
+            enum: [client_credentials, authorization_code, refresh_token]
+          minItems: 1
+        redirectUris:
+          type: array
+          items:
+            type: string
+            format: uri
+        scopes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+
+    WebhookInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, FAILED]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateWebhook:
+      type: object
+      required:
+        - name
+        - url
+        - events
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        secret:
+          type: string
+          minLength: 16
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+
+    # OAuth Token
+    OAuthTokenRequest:
+      type: object
+      required:
+        - grant_type
+        - client_id
+        - client_secret
+      properties:
+        grant_type:
+          type: string
+          enum: [client_credentials, authorization_code, refresh_token]
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        code:
+          type: string
+        redirect_uri:
+          type: string
+        refresh_token:
+          type: string
+        scope:
+          type: string
+
+    OAuthTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+        refresh_token:
+          type: string
+        scope:
+          type: string
+
+    # Authorization Schemas
+    EvaluatePermission:
+      type: object
+      required:
+        - userId
+        - permission
+        - resourceScope
+      properties:
+        userId:
+          type: string
+        permission:
+          type: string
+          pattern: '^[a-z]+\.[a-z]+\.[a-z]+$'
+        resourceScope:
+          type: string
+
+    EvaluateBatch:
+      type: object
+      required:
+        - userId
+        - resourceScope
+        - permissions
+      properties:
+        userId:
+          type: string
+        resourceScope:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z]+\.[a-z]+\.[a-z]+$'
+          minItems: 1
+          maxItems: 100
+
+    PermissionResult:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        permission:
+          type: string
+        reason:
+          type: string
+
+    # Role Schemas
+    Role:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        policies:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+        isSystem:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateRole:
+      type: object
+      required:
+        - key
+        - displayName
+        - policies
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*$'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        policies:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        tags:
+          type: array
+          items:
+            type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          default: low
+
+    UpdateRole:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        policies:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        tags:
+          type: array
+          items:
+            type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+
+    # Policy Schemas
+    Policy:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        allow:
+          type: array
+          items:
+            type: string
+        deny:
+          type: array
+          items:
+            type: string
+        conditions:
+          $ref: '#/components/schemas/PolicyConditions'
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+        isSystem:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PolicyConditions:
+      type: object
+      properties:
+        requiresMFA:
+          type: boolean
+        onlyBusinessHours:
+          type: boolean
+        allowedDeviceTypes:
+          type: array
+          items:
+            type: string
+        ipAllowlist:
+          type: array
+          items:
+            type: string
+        maxSessionDuration:
+          type: integer
+
+    CreatePolicy:
+      type: object
+      required:
+        - key
+        - displayName
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*$'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        allow:
+          type: array
+          items:
+            type: string
+          default: []
+        deny:
+          type: array
+          items:
+            type: string
+          default: []
+        conditions:
+          $ref: '#/components/schemas/PolicyConditions'
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          default: low
+
+    # Role Assignment
+    AssignRole:
+      type: object
+      required:
+        - userId
+        - roleKey
+        - scope
+      properties:
+        userId:
+          type: string
+        roleKey:
+          type: string
+        scope:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          maxLength: 500
+
+    RoleAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        roleKey:
+          type: string
+        scope:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, EXPIRED]
+        expiresAt:
+          type: string
+          format: date-time
+        assignedBy:
+          type: string
+        assignedAt:
+          type: string
+          format: date-time
+
+    # Asset Schemas
+    Asset:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        type:
+          type: string
+          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, OTHER]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE, DECOMMISSIONED]
+        parentAssetId:
+          type: string
+          format: uuid
+          nullable: true
+        path:
+          type: string
+        depth:
+          type: integer
+        location:
+          $ref: '#/components/schemas/AssetLocation'
+        specs:
+          $ref: '#/components/schemas/AssetSpecs'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssetLocation:
+      type: object
+      properties:
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        altitude:
+          type: number
+        address:
+          $ref: '#/components/schemas/Address'
+        floor:
+          type: string
+        room:
+          type: string
+        position:
+          type: string
+
+    AssetSpecs:
+      type: object
+      properties:
+        area:
+          type: number
+        capacity:
+          type: integer
+        powerCapacity:
+          type: number
+        coolingCapacity:
+          type: number
+        custom:
+          type: object
+
+    CreateAsset:
+      type: object
+      required:
+        - customerId
+        - name
+        - displayName
+        - type
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          type: string
+          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, OTHER]
+        parentAssetId:
+          type: string
+          format: uuid
+        location:
+          $ref: '#/components/schemas/AssetLocation'
+        specs:
+          $ref: '#/components/schemas/AssetSpecs'
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          maxItems: 20
+        metadata:
+          type: object
+
+    # Device Schemas
+    Device:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        type:
+          type: string
+          enum: [SENSOR, ACTUATOR, CONTROLLER, GATEWAY, METER, CAMERA, HVAC, LIGHTING, ACCESS_CONTROL, OTHER]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE, FAULTY, DECOMMISSIONED]
+        serialNumber:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        firmwareVersion:
+          type: string
+        connectivity:
+          $ref: '#/components/schemas/DeviceConnectivity'
+        specs:
+          $ref: '#/components/schemas/DeviceSpecs'
+        telemetry:
+          $ref: '#/components/schemas/DeviceTelemetry'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DeviceConnectivity:
+      type: object
+      properties:
+        protocol:
+          type: string
+          enum: [MQTT, HTTP, COAP, MODBUS, BACNET, ZIGBEE, ZWAVE, LORA, CUSTOM]
+        status:
+          type: string
+          enum: [ONLINE, OFFLINE, DEGRADED, UNKNOWN]
+        lastSeen:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+        macAddress:
+          type: string
+        signalStrength:
+          type: integer
+
+    DeviceSpecs:
+      type: object
+      properties:
+        powerSource:
+          type: string
+          enum: [MAINS, BATTERY, SOLAR, POE]
+        batteryLevel:
+          type: integer
+          minimum: 0
+          maximum: 100
+        dataPoints:
+          type: array
+          items:
+            type: object
+        capabilities:
+          type: array
+          items:
+            type: string
+        custom:
+          type: object
+
+    DeviceTelemetry:
+      type: object
+      properties:
+        interval:
+          type: integer
+        lastValue:
+          type: object
+        lastTimestamp:
+          type: string
+          format: date-time
+
+    CreateDevice:
+      type: object
+      required:
+        - assetId
+        - name
+        - displayName
+        - type
+        - serialNumber
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          type: string
+          enum: [SENSOR, ACTUATOR, CONTROLLER, GATEWAY, METER, CAMERA, HVAC, LIGHTING, ACCESS_CONTROL, OTHER]
+        serialNumber:
+          type: string
+          minLength: 1
+          maxLength: 100
+        manufacturer:
+          type: string
+          maxLength: 100
+        model:
+          type: string
+          maxLength: 100
+        firmwareVersion:
+          type: string
+          maxLength: 50
+        connectivity:
+          $ref: '#/components/schemas/DeviceConnectivity'
+        specs:
+          $ref: '#/components/schemas/DeviceSpecs'
+        telemetry:
+          $ref: '#/components/schemas/DeviceTelemetry'
+        credentials:
+          type: object
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    # Rule Schemas
+    Rule:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW, AUTOMATION, NOTIFICATION]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, DRAFT]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 100
+        config:
+          type: object
+        scope:
+          $ref: '#/components/schemas/RuleScope'
+        schedule:
+          $ref: '#/components/schemas/RuleSchedule'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAction'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RuleScope:
+      type: object
+      properties:
+        assetIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        deviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        deviceTypes:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        includeDescendants:
+          type: boolean
+
+    RuleSchedule:
+      type: object
+      properties:
+        timezone:
+          type: string
+        activeDays:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 6
+        activeHours:
+          type: object
+          properties:
+            start:
+              type: string
+            end:
+              type: string
+        exceptions:
+          type: array
+          items:
+            type: object
+
+    RuleAction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [NOTIFY, WEBHOOK, COMMAND, ESCALATE, LOG]
+        config:
+          type: object
+        delay:
+          type: integer
+        retries:
+          type: integer
+
+    CreateRule:
+      type: object
+      required:
+        - customerId
+        - name
+        - type
+        - config
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        type:
+          type: string
+          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW, AUTOMATION, NOTIFICATION]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+        config:
+          type: object
+        scope:
+          $ref: '#/components/schemas/RuleScope'
+        schedule:
+          $ref: '#/components/schemas/RuleSchedule'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAction'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    EvaluateRuleRequest:
+      type: object
+      required:
+        - customerId
+        - deviceId
+        - dataPoint
+        - value
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        dataPoint:
+          type: string
+        value:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    # Integration Package Schemas
+    IntegrationPackage:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        publisherId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        longDescription:
+          type: string
+        category:
+          type: string
+        type:
+          type: string
+          enum: [INBOUND, OUTBOUND, BIDIRECTIONAL]
+        status:
+          type: string
+          enum: [DRAFT, PENDING_REVIEW, PUBLISHED, SUSPENDED, DEPRECATED]
+        version:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Endpoint'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        auth:
+          $ref: '#/components/schemas/AuthConfig'
+        rateLimits:
+          $ref: '#/components/schemas/RateLimitConfig'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        subscriberCount:
+          type: integer
+        verified:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        iconUrl:
+          type: string
+        documentationUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Capability:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        requiredScopes:
+          type: array
+          items:
+            type: string
+
+    Endpoint:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+        path:
+          type: string
+        description:
+          type: string
+        requiredScopes:
+          type: array
+          items:
+            type: string
+        rateLimit:
+          $ref: '#/components/schemas/RateLimitConfig'
+
+    Event:
+      type: object
+      properties:
+        eventType:
+          type: string
+        description:
+          type: string
+        payloadSchema:
+          type: object
+
+    AuthConfig:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [none, api_key, oauth2, basic, custom]
+        config:
+          type: object
+
+    RateLimitConfig:
+      type: object
+      properties:
+        requestsPerMinute:
+          type: integer
+        requestsPerDay:
+          type: integer
+        monthlyQuota:
+          type: integer
+
+    Pricing:
+      type: object
+      properties:
+        model:
+          type: string
+          enum: [FREE, PER_REQUEST, MONTHLY, ANNUAL, CUSTOM]
+        price:
+          type: number
+        currency:
+          type: string
+        includedRequests:
+          type: integer
+        overagePrice:
+          type: number
+
+    CreatePackage:
+      type: object
+      required:
+        - name
+        - slug
+        - description
+        - type
+        - scopes
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        slug:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-z0-9-]+$'
+        description:
+          type: string
+          minLength: 10
+          maxLength: 500
+        longDescription:
+          type: string
+          maxLength: 5000
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        iconUrl:
+          type: string
+          format: uri
+        documentationUrl:
+          type: string
+          format: uri
+        type:
+          type: string
+          enum: [INBOUND, OUTBOUND, BIDIRECTIONAL]
+        scopes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Endpoint'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        auth:
+          $ref: '#/components/schemas/AuthConfig'
+        rateLimits:
+          $ref: '#/components/schemas/RateLimitConfig'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+
+    PublishVersion:
+      type: object
+      required:
+        - version
+        - releaseNotes
+      properties:
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+        releaseNotes:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        breaking:
+          type: boolean
+          default: false
+
+    SubscribePackage:
+      type: object
+      required:
+        - packageId
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        version:
+          type: string
+        config:
+          type: object
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subscriberId:
+          type: string
+          format: uuid
+        packageId:
+          type: string
+          format: uuid
+        version:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, CANCELLED]
+        config:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    # Central Schemas
+    Central:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        serialNumber:
+          type: string
+        type:
+          type: string
+          enum: [NODEHUB, GATEWAY, EDGE_CONTROLLER, VIRTUAL]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, DELETED]
+        connectionStatus:
+          type: string
+          enum: [ONLINE, OFFLINE, DEGRADED, MAINTENANCE]
+        firmwareVersion:
+          type: string
+        softwareVersion:
+          type: string
+        config:
+          $ref: '#/components/schemas/CentralConfig'
+        location:
+          $ref: '#/components/schemas/Location'
+        stats:
+          $ref: '#/components/schemas/CentralStats'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        lastHeartbeat:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CentralConfig:
+      type: object
+      properties:
+        ipAddress:
+          type: string
+        macAddress:
+          type: string
+        hostname:
+          type: string
+        port:
+          type: integer
+        syncInterval:
+          type: integer
+        offlineBufferSize:
+          type: integer
+        enableLocalProcessing:
+          type: boolean
+        enableOfflineMode:
+          type: boolean
+        enableAutoUpdate:
+          type: boolean
+        maxDevices:
+          type: integer
+        maxRules:
+          type: integer
+        customSettings:
+          type: object
+
+    Location:
+      type: object
+      properties:
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        altitude:
+          type: number
+
+    CentralStats:
+      type: object
+      properties:
+        connectedDevices:
+          type: integer
+        activeRules:
+          type: integer
+        pendingSyncEvents:
+          type: integer
+        uptimeSeconds:
+          type: integer
+        cpuUsage:
+          type: number
+        memoryUsage:
+          type: number
+        diskUsage:
+          type: number
+
+    CreateCentral:
+      type: object
+      required:
+        - customerId
+        - assetId
+        - name
+        - displayName
+        - serialNumber
+        - type
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        serialNumber:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          type: string
+          enum: [NODEHUB, GATEWAY, EDGE_CONTROLLER, VIRTUAL]
+        firmwareVersion:
+          type: string
+          maxLength: 50
+        softwareVersion:
+          type: string
+          maxLength: 50
+        config:
+          $ref: '#/components/schemas/CentralConfig'
+        location:
+          $ref: '#/components/schemas/Location'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    UpdateCentralStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, DELETED]
+        reason:
+          type: string
+          maxLength: 500
+
+    UpdateConnectionStatus:
+      type: object
+      required:
+        - connectionStatus
+      properties:
+        connectionStatus:
+          type: string
+          enum: [ONLINE, OFFLINE, DEGRADED, MAINTENANCE]
+        stats:
+          $ref: '#/components/schemas/CentralStats'
+
+    # Theme Schemas
+    Theme:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        isDefault:
+          type: boolean
+        mode:
+          type: string
+          enum: [light, dark, system]
+        colors:
+          $ref: '#/components/schemas/ColorPalette'
+        darkModeColors:
+          $ref: '#/components/schemas/ColorPalette'
+        typography:
+          $ref: '#/components/schemas/Typography'
+        logo:
+          $ref: '#/components/schemas/LogoConfig'
+        brandName:
+          type: string
+        tagline:
+          type: string
+        layout:
+          $ref: '#/components/schemas/LayoutConfig'
+        components:
+          $ref: '#/components/schemas/ComponentStyles'
+        customCss:
+          $ref: '#/components/schemas/CustomCSS'
+        inheritFromParent:
+          type: boolean
+        parentThemeId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ColorPalette:
+      type: object
+      properties:
+        primary:
+          type: string
+          pattern: '^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$'
+        primaryLight:
+          type: string
+        primaryDark:
+          type: string
+        secondary:
+          type: string
+        secondaryLight:
+          type: string
+        secondaryDark:
+          type: string
+        accent:
+          type: string
+        background:
+          type: string
+        surface:
+          type: string
+        error:
+          type: string
+        warning:
+          type: string
+        success:
+          type: string
+        info:
+          type: string
+        textPrimary:
+          type: string
+        textSecondary:
+          type: string
+        textDisabled:
+          type: string
+        divider:
+          type: string
+
+    Typography:
+      type: object
+      properties:
+        fontFamily:
+          type: string
+        fontFamilySecondary:
+          type: string
+        fontSize:
+          type: object
+        fontWeight:
+          type: object
+        lineHeight:
+          type: object
+
+    LogoConfig:
+      type: object
+      properties:
+        primaryUrl:
+          type: string
+          format: uri
+        secondaryUrl:
+          type: string
+          format: uri
+        iconUrl:
+          type: string
+          format: uri
+        faviconUrl:
+          type: string
+          format: uri
+        darkModeUrl:
+          type: string
+          format: uri
+        width:
+          type: integer
+        height:
+          type: integer
+
+    LayoutConfig:
+      type: object
+      properties:
+        sidebarPosition:
+          type: string
+          enum: [left, right]
+        sidebarCollapsed:
+          type: boolean
+        headerHeight:
+          type: integer
+        footerHeight:
+          type: integer
+        maxContentWidth:
+          type: integer
+        borderRadius:
+          type: object
+        spacing:
+          type: object
+
+    ComponentStyles:
+      type: object
+      properties:
+        buttons:
+          type: object
+        cards:
+          type: object
+        inputs:
+          type: object
+        tables:
+          type: object
+
+    CustomCSS:
+      type: object
+      properties:
+        global:
+          type: string
+        header:
+          type: string
+        sidebar:
+          type: string
+        content:
+          type: string
+        footer:
+          type: string
+
+    CreateTheme:
+      type: object
+      required:
+        - customerId
+        - name
+        - colors
+        - logo
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        isDefault:
+          type: boolean
+          default: false
+        mode:
+          type: string
+          enum: [light, dark, system]
+          default: light
+        colors:
+          $ref: '#/components/schemas/ColorPalette'
+        darkModeColors:
+          $ref: '#/components/schemas/ColorPalette'
+        typography:
+          $ref: '#/components/schemas/Typography'
+        logo:
+          $ref: '#/components/schemas/LogoConfig'
+        brandName:
+          type: string
+        tagline:
+          type: string
+        layout:
+          $ref: '#/components/schemas/LayoutConfig'
+        components:
+          $ref: '#/components/schemas/ComponentStyles'
+        customCss:
+          $ref: '#/components/schemas/CustomCSS'
+        inheritFromParent:
+          type: boolean
+        parentThemeId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+
+    QuickThemeUpdate:
+      type: object
+      properties:
+        primaryColor:
+          type: string
+          pattern: '^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$'
+        secondaryColor:
+          type: string
+          pattern: '^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$'
+        logoUrl:
+          type: string
+          format: uri
+        faviconUrl:
+          type: string
+          format: uri
+        brandName:
+          type: string
+        mode:
+          type: string
+          enum: [light, dark, system]
+
+    # User Schemas
+    User:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        type:
+          type: string
+          enum: [INTERNAL, CUSTOMER, PARTNER, SERVICE_ACCOUNT]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED, PENDING_VERIFICATION, LOCKED]
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+        mfaEnabled:
+          type: boolean
+        emailVerified:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        lastLoginAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        phone:
+          type: string
+        department:
+          type: string
+        jobTitle:
+          type: string
+        bio:
+          type: string
+
+    UserPreferences:
+      type: object
+      properties:
+        language:
+          type: string
+        timezone:
+          type: string
+        dateFormat:
+          type: string
+        timeFormat:
+          type: string
+          enum: ['12h', '24h']
+        theme:
+          type: string
+          enum: [light, dark, system]
+        notifications:
+          $ref: '#/components/schemas/NotificationPreferences'
+        dashboardLayout:
+          type: object
+
+    NotificationPreferences:
+      type: object
+      properties:
+        email:
+          type: boolean
+        push:
+          type: boolean
+        sms:
+          type: boolean
+        inApp:
+          type: boolean
+
+    CreateUser:
+      type: object
+      required:
+        - email
+        - profile
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+        type:
+          type: string
+          enum: [INTERNAL, CUSTOMER, PARTNER, SERVICE_ACCOUNT]
+          default: CUSTOMER
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        sendInvitation:
+          type: boolean
+          default: true
+
+    UpdateUser:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+
+    UpdateUserStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+        reason:
+          type: string
+          maxLength: 500
+
+    InviteUser:
+      type: object
+      required:
+        - email
+        - profile
+      properties:
+        email:
+          type: string
+          format: email
+        customerId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [INTERNAL, CUSTOMER, PARTNER]
+          default: CUSTOMER
+        profile:
+          type: object
+          required:
+            - firstName
+            - lastName
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+        roleKeys:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+          maxLength: 500
+
+    AcceptInvitation:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+
+    ChangePassword:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    RequestPasswordReset:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPassword:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    EnableMfa:
+      type: object
+      required:
+        - method
+      properties:
+        method:
+          type: string
+          enum: [totp, sms, email]
+        verificationCode:
+          type: string
+          minLength: 6
+          maxLength: 6
+
+    VerifyEmail:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+
+paths:
+  # Health
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthStatus'
+
+  # Customers
+  /customers:
+    post:
+      tags: [Customers]
+      summary: Create customer
+      operationId: createCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomer'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Customers]
+      summary: List customers
+      operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: parentCustomerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [ROOT, RESELLER, ENTERPRISE, BUSINESS, INDIVIDUAL]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, SUSPENDED]
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - properties:
+                      data:
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Customer'
+
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Get customer by ID
+      operationId: getCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Customers]
+      summary: Update customer
+      operationId: updateCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomer'
+      responses:
+        '200':
+          description: Customer updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+    delete:
+      tags: [Customers]
+      summary: Delete customer
+      operationId: deleteCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Customer deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/children:
+    get:
+      tags: [Customers]
+      summary: Get direct children of customer
+      operationId: getCustomerChildren
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of child customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /customers/{id}/descendants:
+    get:
+      tags: [Customers]
+      summary: Get all descendants of customer
+      operationId: getCustomerDescendants
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: maxDepth
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of descendant customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/tree:
+    get:
+      tags: [Customers]
+      summary: Get customer hierarchy tree
+      operationId: getCustomerTree
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: maxDepth
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer tree structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/move:
+    post:
+      tags: [Customers]
+      summary: Move customer to new parent
+      operationId: moveCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveCustomer'
+      responses:
+        '200':
+          description: Customer moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+
+  # Partners
+  /partners:
+    post:
+      tags: [Partners]
+      summary: Register new partner
+      operationId: registerPartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterPartner'
+      responses:
+        '201':
+          description: Partner registered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Partner'
+    get:
+      tags: [Partners]
+      summary: List partners
+      operationId: listPartners
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, ACTIVE, SUSPENDED, REJECTED, TERMINATED]
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of partners
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /partners/{id}:
+    get:
+      tags: [Partners]
+      summary: Get partner by ID
+      operationId: getPartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Partner details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Partner'
+    put:
+      tags: [Partners]
+      summary: Update partner
+      operationId: updatePartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterPartner'
+      responses:
+        '200':
+          description: Partner updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Partner'
+
+  /partners/{id}/approve:
+    post:
+      tags: [Partners]
+      summary: Approve partner
+      operationId: approvePartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Partner approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/reject:
+    post:
+      tags: [Partners]
+      summary: Reject partner
+      operationId: rejectPartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Partner rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/suspend:
+    post:
+      tags: [Partners]
+      summary: Suspend partner
+      operationId: suspendPartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Partner suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/activate:
+    post:
+      tags: [Partners]
+      summary: Activate partner
+      operationId: activatePartner
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Partner activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/api-keys:
+    post:
+      tags: [Partners]
+      summary: Create API key for partner
+      operationId: createPartnerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKey'
+      responses:
+        '201':
+          description: API key created (key shown only once)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/ApiKeyInfo'
+                          - properties:
+                              key:
+                                type: string
+                                description: Full API key (only shown once)
+    get:
+      tags: [Partners]
+      summary: List partner API keys
+      operationId: listPartnerApiKeys
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ApiKeyInfo'
+
+  /partners/{id}/api-keys/{keyId}:
+    delete:
+      tags: [Partners]
+      summary: Revoke API key
+      operationId: revokePartnerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: API key revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/api-keys/{keyId}/rotate:
+    post:
+      tags: [Partners]
+      summary: Rotate API key
+      operationId: rotatePartnerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: API key rotated (new key shown only once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /partners/{id}/oauth-clients:
+    post:
+      tags: [Partners]
+      summary: Create OAuth client
+      operationId: createPartnerOAuthClient
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthClient'
+      responses:
+        '201':
+          description: OAuth client created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/OAuthClientInfo'
+                          - properties:
+                              clientSecret:
+                                type: string
+    get:
+      tags: [Partners]
+      summary: List OAuth clients
+      operationId: listPartnerOAuthClients
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of OAuth clients
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OAuthClientInfo'
+
+  /partners/{id}/oauth-clients/{clientId}:
+    delete:
+      tags: [Partners]
+      summary: Revoke OAuth client
+      operationId: revokePartnerOAuthClient
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth client revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /oauth/token:
+    post:
+      tags: [Partners]
+      summary: Get OAuth token
+      operationId: oauthToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequest'
+      responses:
+        '200':
+          description: Token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+
+  /partners/{id}/webhooks:
+    post:
+      tags: [Partners]
+      summary: Create webhook
+      operationId: createPartnerWebhook
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhook'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/WebhookInfo'
+    get:
+      tags: [Partners]
+      summary: List webhooks
+      operationId: listPartnerWebhooks
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WebhookInfo'
+
+  /partners/{id}/webhooks/{webhookId}:
+    put:
+      tags: [Partners]
+      summary: Update webhook
+      operationId: updatePartnerWebhook
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhook'
+      responses:
+        '200':
+          description: Webhook updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/WebhookInfo'
+    delete:
+      tags: [Partners]
+      summary: Delete webhook
+      operationId: deletePartnerWebhook
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Authorization
+  /authorization/check:
+    post:
+      tags: [Authorization]
+      summary: Check single permission
+      operationId: checkPermission
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluatePermission'
+      responses:
+        '200':
+          description: Permission evaluation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PermissionResult'
+
+  /authorization/check/batch:
+    post:
+      tags: [Authorization]
+      summary: Check multiple permissions
+      operationId: evaluateBatch
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateBatch'
+      responses:
+        '200':
+          description: Batch permission results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PermissionResult'
+
+  /authorization/users/{userId}/permissions:
+    get:
+      tags: [Authorization]
+      summary: Get effective permissions for user
+      operationId: getEffectivePermissions
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of effective permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /authorization/assignments:
+    post:
+      tags: [Authorization]
+      summary: Assign role to user
+      operationId: assignRole
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRole'
+      responses:
+        '201':
+          description: Role assigned
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/RoleAssignment'
+    get:
+      tags: [Authorization]
+      summary: List role assignments
+      operationId: listAssignments
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: roleKey
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /authorization/assignments/{assignmentId}/revoke:
+    post:
+      tags: [Authorization]
+      summary: Revoke role assignment
+      operationId: revokeAssignment
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: assignmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assignment revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /authorization/users/{userId}/roles:
+    get:
+      tags: [Authorization]
+      summary: Get user roles
+      operationId: getUserRoles
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of user roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Roles
+  /roles:
+    post:
+      tags: [Roles]
+      summary: Create role
+      operationId: createRole
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRole'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Role'
+    get:
+      tags: [Roles]
+      summary: List roles
+      operationId: listRoles
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /roles/{roleId}:
+    get:
+      tags: [Roles]
+      summary: Get role by ID
+      operationId: getRole
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Role'
+    put:
+      tags: [Roles]
+      summary: Update role
+      operationId: updateRole
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRole'
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Role'
+    delete:
+      tags: [Roles]
+      summary: Delete role
+      operationId: deleteRole
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /roles/key/{roleKey}:
+    get:
+      tags: [Roles]
+      summary: Get role by key
+      operationId: getRoleByKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: roleKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Role details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Role'
+
+  # Policies
+  /policies:
+    post:
+      tags: [Policies]
+      summary: Create policy
+      operationId: createPolicy
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicy'
+      responses:
+        '201':
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Policy'
+    get:
+      tags: [Policies]
+      summary: List policies
+      operationId: listPolicies
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of policies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /policies/{policyId}:
+    get:
+      tags: [Policies]
+      summary: Get policy by ID
+      operationId: getPolicy
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: policyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Policy details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Policy'
+    put:
+      tags: [Policies]
+      summary: Update policy
+      operationId: updatePolicy
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: policyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicy'
+      responses:
+        '200':
+          description: Policy updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Policy'
+    delete:
+      tags: [Policies]
+      summary: Delete policy
+      operationId: deletePolicy
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: policyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Policy deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /policies/key/{policyKey}:
+    get:
+      tags: [Policies]
+      summary: Get policy by key
+      operationId: getPolicyByKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: policyKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Policy details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Policy'
+
+  # Assets
+  /assets:
+    post:
+      tags: [Assets]
+      summary: Create asset
+      operationId: createAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAsset'
+      responses:
+        '201':
+          description: Asset created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Asset'
+    get:
+      tags: [Assets]
+      summary: List all assets
+      operationId: listAssets
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /assets/{id}:
+    get:
+      tags: [Assets]
+      summary: Get asset by ID
+      operationId: getAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Asset details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Asset'
+    put:
+      tags: [Assets]
+      summary: Update asset
+      operationId: updateAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAsset'
+      responses:
+        '200':
+          description: Asset updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Asset'
+    delete:
+      tags: [Assets]
+      summary: Delete asset
+      operationId: deleteAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Asset deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/assets:
+    get:
+      tags: [Assets]
+      summary: List assets by customer
+      operationId: listAssetsByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of customer assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /assets/{id}/children:
+    get:
+      tags: [Assets]
+      summary: Get direct children of asset
+      operationId: getAssetChildren
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of child assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /assets/{id}/descendants:
+    get:
+      tags: [Assets]
+      summary: Get all descendants of asset
+      operationId: getAssetDescendants
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of descendant assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /assets/tree:
+    get:
+      tags: [Assets]
+      summary: Get asset tree
+      operationId: getAssetTree
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Asset tree structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /assets/{id}/tree:
+    get:
+      tags: [Assets]
+      summary: Get asset tree by ID
+      operationId: getAssetTreeById
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Asset tree structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /assets/{id}/move:
+    post:
+      tags: [Assets]
+      summary: Move asset to new parent
+      operationId: moveAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newParentId
+              properties:
+                newParentId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Asset moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Asset'
+
+  # Devices
+  /devices:
+    post:
+      tags: [Devices]
+      summary: Create device
+      operationId: createDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDevice'
+      responses:
+        '201':
+          description: Device created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Device'
+    get:
+      tags: [Devices]
+      summary: List all devices
+      operationId: listDevices
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: assetId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /devices/{id}:
+    get:
+      tags: [Devices]
+      summary: Get device by ID
+      operationId: getDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Device'
+    put:
+      tags: [Devices]
+      summary: Update device
+      operationId: updateDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDevice'
+      responses:
+        '200':
+          description: Device updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Device'
+    delete:
+      tags: [Devices]
+      summary: Delete device
+      operationId: deleteDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Device deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /assets/{id}/devices:
+    get:
+      tags: [Devices]
+      summary: List devices by asset
+      operationId: listDevicesByAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of asset devices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /devices/{id}/move:
+    post:
+      tags: [Devices]
+      summary: Move device to new asset
+      operationId: moveDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newAssetId
+              properties:
+                newAssetId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Device moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Device'
+
+  /devices/{id}/connectivity:
+    patch:
+      tags: [Devices]
+      summary: Update device connectivity status
+      operationId: updateDeviceConnectivity
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceConnectivity'
+      responses:
+        '200':
+          description: Connectivity updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Device'
+
+  # Rules
+  /rules:
+    post:
+      tags: [Rules]
+      summary: Create rule
+      operationId: createRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRule'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+    get:
+      tags: [Rules]
+      summary: List all rules
+      operationId: listRulesAll
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /rules/{id}:
+    get:
+      tags: [Rules]
+      summary: Get rule by ID
+      operationId: getRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Rule details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+    put:
+      tags: [Rules]
+      summary: Update rule
+      operationId: updateRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRule'
+      responses:
+        '200':
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+    delete:
+      tags: [Rules]
+      summary: Delete rule
+      operationId: deleteRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Rule deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/rules:
+    get:
+      tags: [Rules]
+      summary: List rules by customer
+      operationId: listRulesByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of customer rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /rules/{id}/toggle:
+    post:
+      tags: [Rules]
+      summary: Toggle rule active/inactive
+      operationId: toggleRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Rule toggled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+
+  /rules/evaluate:
+    post:
+      tags: [Rules]
+      summary: Evaluate rules for a data point
+      operationId: evaluateRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateRuleRequest'
+      responses:
+        '200':
+          description: Evaluation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rules/maintenance-windows:
+    get:
+      tags: [Rules]
+      summary: Get active maintenance windows
+      operationId: getMaintenanceWindows
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of maintenance windows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rules/statistics:
+    get:
+      tags: [Rules]
+      summary: Get rule statistics
+      operationId: getRuleStatistics
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Integrations
+  /integrations/packages:
+    post:
+      tags: [Integrations]
+      summary: Create integration package
+      operationId: createPackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePackage'
+      responses:
+        '201':
+          description: Package created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/IntegrationPackage'
+    get:
+      tags: [Integrations]
+      summary: Search packages
+      operationId: searchPackages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [INBOUND, OUTBOUND, BIDIRECTIONAL]
+        - name: pricing
+          in: query
+          schema:
+            type: string
+            enum: [FREE, PER_REQUEST, MONTHLY, ANNUAL, CUSTOM]
+        - name: verified
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /integrations/packages/{id}:
+    get:
+      tags: [Integrations]
+      summary: Get package by ID
+      operationId: getPackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Package details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/IntegrationPackage'
+    put:
+      tags: [Integrations]
+      summary: Update package
+      operationId: updatePackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePackage'
+      responses:
+        '200':
+          description: Package updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/IntegrationPackage'
+    delete:
+      tags: [Integrations]
+      summary: Delete package
+      operationId: deletePackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Package deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /integrations/packages/slug/{slug}:
+    get:
+      tags: [Integrations]
+      summary: Get package by slug
+      operationId: getPackageBySlug
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Package details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/IntegrationPackage'
+
+  /integrations/packages/{id}/publish:
+    post:
+      tags: [Integrations]
+      summary: Publish package version
+      operationId: publishPackageVersion
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishVersion'
+      responses:
+        '200':
+          description: Version published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /integrations/packages/{id}/submit:
+    post:
+      tags: [Integrations]
+      summary: Submit package for review
+      operationId: submitPackageForReview
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Package submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /integrations/packages/{id}/review:
+    post:
+      tags: [Integrations]
+      summary: Review package (admin)
+      operationId: reviewPackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - approved
+              properties:
+                approved:
+                  type: boolean
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Package reviewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /integrations/subscriptions:
+    post:
+      tags: [Integrations]
+      summary: Subscribe to package
+      operationId: subscribeToPackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribePackage'
+      responses:
+        '201':
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Subscription'
+    get:
+      tags: [Integrations]
+      summary: List my subscriptions
+      operationId: listMySubscriptions
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /integrations/subscriptions/{subscriptionId}:
+    delete:
+      tags: [Integrations]
+      summary: Unsubscribe from package
+      operationId: unsubscribeFromPackage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /integrations/publisher/packages:
+    get:
+      tags: [Integrations]
+      summary: List my published packages
+      operationId: listMyPublishedPackages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of published packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  # Centrals
+  /centrals:
+    post:
+      tags: [Centrals]
+      summary: Create central
+      operationId: createCentral
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCentral'
+      responses:
+        '201':
+          description: Central created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+    get:
+      tags: [Centrals]
+      summary: List centrals
+      operationId: listCentrals
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: assetId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [NODEHUB, GATEWAY, EDGE_CONTROLLER, VIRTUAL]
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: connectionStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of centrals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /centrals/{id}:
+    get:
+      tags: [Centrals]
+      summary: Get central by ID
+      operationId: getCentral
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Central details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+    put:
+      tags: [Centrals]
+      summary: Update central
+      operationId: updateCentral
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCentral'
+      responses:
+        '200':
+          description: Central updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+    delete:
+      tags: [Centrals]
+      summary: Delete central
+      operationId: deleteCentral
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Central deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /centrals/serial/{serialNumber}:
+    get:
+      tags: [Centrals]
+      summary: Get central by serial number
+      operationId: getCentralBySerial
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: serialNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Central details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+
+  /assets/{id}/centrals:
+    get:
+      tags: [Centrals]
+      summary: List centrals by asset
+      operationId: listCentralsByAsset
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of asset centrals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /centrals/{id}/status:
+    patch:
+      tags: [Centrals]
+      summary: Update central status
+      operationId: updateCentralStatus
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCentralStatus'
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+
+  /centrals/{id}/connection:
+    patch:
+      tags: [Centrals]
+      summary: Update central connection status
+      operationId: updateCentralConnection
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConnectionStatus'
+      responses:
+        '200':
+          description: Connection status updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Central'
+
+  /centrals/{id}/heartbeat:
+    post:
+      tags: [Centrals]
+      summary: Central heartbeat
+      operationId: centralHeartbeat
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CentralStats'
+      responses:
+        '200':
+          description: Heartbeat received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Themes
+  /themes:
+    post:
+      tags: [Themes]
+      summary: Create theme
+      operationId: createTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTheme'
+      responses:
+        '201':
+          description: Theme created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+    get:
+      tags: [Themes]
+      summary: List themes
+      operationId: listThemes
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of themes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /themes/{id}:
+    get:
+      tags: [Themes]
+      summary: Get theme by ID
+      operationId: getTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Theme details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+    put:
+      tags: [Themes]
+      summary: Update theme
+      operationId: updateTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTheme'
+      responses:
+        '200':
+          description: Theme updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+    delete:
+      tags: [Themes]
+      summary: Delete theme
+      operationId: deleteTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Theme deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /themes/{id}/quick:
+    patch:
+      tags: [Themes]
+      summary: Quick theme update
+      operationId: quickUpdateTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickThemeUpdate'
+      responses:
+        '200':
+          description: Theme updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+
+  /customers/{id}/themes:
+    get:
+      tags: [Themes]
+      summary: List themes by customer
+      operationId: listThemesByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of customer themes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/themes/default:
+    get:
+      tags: [Themes]
+      summary: Get customer default theme
+      operationId: getCustomerDefaultTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Default theme
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+
+  /customers/{id}/themes/{themeId}/default:
+    post:
+      tags: [Themes]
+      summary: Set customer default theme
+      operationId: setCustomerDefaultTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Default theme set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /themes/{id}/compile:
+    get:
+      tags: [Themes]
+      summary: Compile theme (get CSS)
+      operationId: compileTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Compiled theme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/themes/effective:
+    get:
+      tags: [Themes]
+      summary: Get effective theme for customer
+      operationId: getEffectiveTheme
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Effective theme
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Theme'
+
+  # Users
+  /users:
+    post:
+      tags: [Users]
+      summary: Create user
+      operationId: createUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUser'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+    get:
+      tags: [Users]
+      summary: List users
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: partnerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+    put:
+      tags: [Users]
+      summary: Update user
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+    delete:
+      tags: [Users]
+      summary: Delete user
+      operationId: deleteUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user
+      operationId: getCurrentUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  /customers/{id}/users:
+    get:
+      tags: [Users]
+      summary: List users by customer
+      operationId: listUsersByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of customer users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+
+  /users/{id}/status:
+    patch:
+      tags: [Users]
+      summary: Update user status
+      operationId: updateUserStatus
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatus'
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  /users/invite:
+    post:
+      tags: [Users]
+      summary: Invite user
+      operationId: inviteUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteUser'
+      responses:
+        '201':
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/accept-invitation:
+    post:
+      tags: [Users]
+      summary: Accept invitation
+      operationId: acceptInvitation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitation'
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  /users/verify-email:
+    post:
+      tags: [Users]
+      summary: Verify email
+      operationId: verifyUserEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmail'
+      responses:
+        '200':
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/password:
+    put:
+      tags: [Users]
+      summary: Change password
+      operationId: changeUserPassword
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/password-reset/request:
+    post:
+      tags: [Users]
+      summary: Request password reset
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+      responses:
+        '200':
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/password-reset/confirm:
+    post:
+      tags: [Users]
+      summary: Reset password
+      operationId: resetUserPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/mfa/setup:
+    post:
+      tags: [Users]
+      summary: Setup MFA
+      operationId: setupUserMfa
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnableMfa'
+      responses:
+        '200':
+          description: MFA setup initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/mfa/enable:
+    post:
+      tags: [Users]
+      summary: Enable MFA
+      operationId: enableUserMfa
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnableMfa'
+      responses:
+        '200':
+          description: MFA enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/mfa/disable:
+    post:
+      tags: [Users]
+      summary: Disable MFA
+      operationId: disableUserMfa
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: MFA disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/unlock:
+    post:
+      tags: [Users]
+      summary: Unlock user
+      operationId: unlockUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: User unlocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/{id}/preferences:
+    put:
+      tags: [Users]
+      summary: Update user preferences
+      operationId: updateUserPreferences
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'

@@ -5,6 +5,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: nodejs20.x
+  profile: ${opt:profile, 'gcdr'}
   region: ${opt:region, 'sa-east-1'}
   stage: ${opt:stage, 'dev'}
   memorySize: 256
@@ -76,6 +77,15 @@ provider:
             - !GetAtt GcdrEventBus.Arn
 
 custom:
+  # Exclude AWS reserved env vars from being loaded by dotenv plugin
+  dotenv:
+    exclude:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
+      - AWS_DEFAULT_REGION
+
   customersTable: gcdr-customers-${self:provider.stage}
   partnersTable: gcdr-partners-${self:provider.stage}
   rolesTable: gcdr-roles-${self:provider.stage}
@@ -105,10 +115,19 @@ custom:
     target: node20
     platform: node
     concurrency: 10
+  splitStacks:
+    perFunction: true
+    perType: false
+    perGroupFunction: false
+    nestedStackCount: 20
+    stackConcurrency: 5
+    custom: stacks-map.js
 
 plugins:
+  - serverless-dotenv-plugin
   - serverless-esbuild
   - serverless-offline
+  - serverless-plugin-split-stacks
 
 functions:
   # Health Check
@@ -557,7 +576,7 @@ functions:
     handler: src/handlers/assets/listByCustomer.handler
     events:
       - http:
-          path: /customers/{customerId}/assets
+          path: /customers/{id}/assets
           method: get
           cors: true
 
@@ -646,7 +665,7 @@ functions:
     handler: src/handlers/devices/listByAsset.handler
     events:
       - http:
-          path: /assets/{assetId}/devices
+          path: /assets/{id}/devices
           method: get
           cors: true
 
@@ -711,7 +730,7 @@ functions:
     handler: src/handlers/rules/listByCustomer.handler
     events:
       - http:
-          path: /customers/{customerId}/rules
+          path: /customers/{id}/rules
           method: get
           cors: true
 
@@ -905,7 +924,7 @@ functions:
     handler: src/handlers/centrals/listByAsset.handler
     events:
       - http:
-          path: /assets/{assetId}/centrals
+          path: /assets/{id}/centrals
           method: get
           cors: true
 
@@ -986,7 +1005,7 @@ functions:
     handler: src/handlers/themes/listByCustomer.handler
     events:
       - http:
-          path: /customers/{customerId}/themes
+          path: /customers/{id}/themes
           method: get
           cors: true
 
@@ -994,7 +1013,7 @@ functions:
     handler: src/handlers/themes/getDefault.handler
     events:
       - http:
-          path: /customers/{customerId}/themes/default
+          path: /customers/{id}/themes/default
           method: get
           cors: true
 
@@ -1002,7 +1021,7 @@ functions:
     handler: src/handlers/themes/setDefault.handler
     events:
       - http:
-          path: /customers/{customerId}/themes/{id}/default
+          path: /customers/{id}/themes/{themeId}/default
           method: post
           cors: true
 
@@ -1018,7 +1037,7 @@ functions:
     handler: src/handlers/themes/getEffective.handler
     events:
       - http:
-          path: /customers/{customerId}/themes/effective
+          path: /customers/{id}/themes/effective
           method: get
           cors: true
 
@@ -1067,7 +1086,7 @@ functions:
     handler: src/handlers/users/listByCustomer.handler
     events:
       - http:
-          path: /customers/{customerId}/users
+          path: /customers/{id}/users
           method: get
           cors: true
 
