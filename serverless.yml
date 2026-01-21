@@ -30,6 +30,10 @@ provider:
     GROUPS_TABLE: ${self:custom.groupsTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
+    # JWT Configuration
+    JWT_SECRET: ${env:JWT_SECRET, 'development-secret-change-in-production'}
+    JWT_ISSUER: ${env:JWT_ISSUER, 'gcdr'}
+    JWT_AUDIENCE: ${env:JWT_AUDIENCE, 'gcdr-api'}
 
   iam:
     role:
@@ -164,6 +168,55 @@ functions:
       - http:
           path: /docs/openapi.json
           method: get
+          cors: true
+
+  # Authentication APIs
+  authLogin:
+    handler: src/handlers/auth/login.handler
+    events:
+      - http:
+          path: /auth/login
+          method: post
+          cors: true
+
+  authRefresh:
+    handler: src/handlers/auth/refresh.handler
+    events:
+      - http:
+          path: /auth/refresh
+          method: post
+          cors: true
+
+  authMfaVerify:
+    handler: src/handlers/auth/mfaVerify.handler
+    events:
+      - http:
+          path: /auth/mfa/verify
+          method: post
+          cors: true
+
+  authLogout:
+    handler: src/handlers/auth/logout.handler
+    events:
+      - http:
+          path: /auth/logout
+          method: post
+          cors: true
+
+  authForgotPassword:
+    handler: src/handlers/auth/forgotPassword.handler
+    events:
+      - http:
+          path: /auth/password/forgot
+          method: post
+          cors: true
+
+  authResetPassword:
+    handler: src/handlers/auth/resetPassword.handler
+    events:
+      - http:
+          path: /auth/password/reset
+          method: post
           cors: true
 
   # Customer APIs

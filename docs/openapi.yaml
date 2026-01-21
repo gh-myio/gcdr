@@ -21,6 +21,8 @@ servers:
 tags:
   - name: Health
     description: Health check endpoints
+  - name: Authentication
+    description: User authentication (login, logout, MFA, password reset)
   - name: Customers
     description: Customer hierarchy management
   - name: Partners
@@ -145,6 +147,172 @@ components:
               nullable: true
             hasMore:
               type: boolean
+
+    SuccessMessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: usuario@empresa.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+        mfaCode:
+          type: string
+          description: MFA code (if MFA is enabled)
+          minLength: 6
+          maxLength: 6
+        deviceInfo:
+          type: string
+          description: Device information for session tracking
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: JWT refresh token
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Access token expiry in seconds
+          example: 3600
+        refreshExpiresIn:
+          type: integer
+          description: Refresh token expiry in seconds
+          example: 604800
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            displayName:
+              type: string
+            type:
+              type: string
+            roles:
+              type: array
+              items:
+                type: string
+
+    MfaRequiredResponse:
+      type: object
+      properties:
+        mfaRequired:
+          type: boolean
+          example: true
+        mfaToken:
+          type: string
+          description: Temporary token to complete MFA verification
+        mfaMethod:
+          type: string
+          enum: [totp, sms, email]
+        expiresIn:
+          type: integer
+          description: MFA token expiry in seconds
+          example: 300
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+        refreshExpiresIn:
+          type: integer
+
+    MfaVerifyRequest:
+      type: object
+      required:
+        - mfaToken
+        - code
+      properties:
+        mfaToken:
+          type: string
+          description: Temporary MFA token from login response
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          description: MFA verification code
+        useBackupCode:
+          type: boolean
+          default: false
+          description: Set to true if using a backup code
+
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Current refresh token to invalidate
+        allDevices:
+          type: boolean
+          default: false
+          description: Logout from all devices
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetConfirm:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+          description: Password reset token from email
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          description: Must contain uppercase, lowercase, and number
 
     # Health
     HealthStatus:
@@ -2586,6 +2754,182 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/HealthStatus'
+
+  # Authentication
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      description: |
+        Authenticates a user with email and password.
+
+        If MFA is enabled for the user, returns a temporary MFA token instead of access tokens.
+        The client must then call `/auth/mfa/verify` to complete authentication.
+      operationId: authLogin
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful (or MFA required)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LoginResponse'
+                  - $ref: '#/components/schemas/MfaRequiredResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: |
+        Exchanges a valid refresh token for new access and refresh tokens.
+        The old refresh token is invalidated.
+      operationId: authRefresh
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/mfa/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify MFA code
+      description: |
+        Completes the MFA verification step after login.
+        Requires the temporary MFA token from the login response.
+      operationId: authMfaVerify
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: MFA verified, tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid MFA code or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user
+      description: |
+        Invalidates the current session.
+        Optionally invalidates all sessions for the user.
+      operationId: authLogout
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+
+  /auth/password/forgot:
+    post:
+      tags: [Authentication]
+      summary: Request password reset
+      description: |
+        Sends a password reset email to the user.
+        Always returns success to prevent email enumeration.
+      operationId: authForgotPassword
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Password reset email sent (if user exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+
+  /auth/password/reset:
+    post:
+      tags: [Authentication]
+      summary: Reset password with token
+      description: |
+        Resets the user password using a token received via email.
+      operationId: authResetPassword
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirm'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # Customers
   /customers:

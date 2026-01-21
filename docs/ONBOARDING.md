@@ -229,15 +229,119 @@ Todas as respostas seguem o formato:
 
 A API suporta dois métodos de autenticação:
 
-1. **JWT Bearer Token** (para aplicações frontend/mobile)
-   ```http
-   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-   ```
+#### 1. JWT Bearer Token (para aplicações frontend/mobile)
 
-2. **API Key** (para integrações de parceiros)
-   ```http
-   X-API-Key: gcdr_pk_live_xxxxxxxxxxxx
-   ```
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Estrutura do JWT esperado:**
+```json
+{
+  "sub": "user-uuid",
+  "tenant_id": "tenant-uuid",
+  "email": "usuario@empresa.com",
+  "roles": ["admin", "operator"],
+  "iat": 1737463200,
+  "exp": 1737466800,
+  "iss": "gcdr",
+  "aud": "gcdr-api"
+}
+```
+
+| Campo | Descrição |
+|-------|-----------|
+| `sub` | ID único do usuário |
+| `tenant_id` | ID do tenant (multi-tenancy) |
+| `email` | Email do usuário |
+| `roles` | Array de roles atribuídas |
+| `iat` | Timestamp de emissão |
+| `exp` | Timestamp de expiração |
+| `iss` | Emissor do token |
+| `aud` | Audiência (sistema destinatário) |
+
+#### 2. API Key (para integrações de parceiros)
+
+```http
+X-API-Key: gcdr_pk_live_xxxxxxxxxxxx
+```
+
+#### 3. OAuth2 Client Credentials (para integrações M2M)
+
+```bash
+# Obter access token
+curl -X POST https://api.gcdr.io/partners/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "client_credentials",
+    "client_id": "partner-client-id",
+    "client_secret": "partner-client-secret",
+    "scope": "customers:read devices:read"
+  }'
+```
+
+Resposta:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "customers:read devices:read"
+}
+```
+
+### Estado Atual da Autenticacao
+
+| Funcionalidade | Status | Endpoint |
+|----------------|--------|----------|
+| **Partner Token (OAuth2)** | Implementado | `POST /partners/token` |
+| **API Key Validation** | Implementado | Middleware |
+| **Login de Usuarios** | **NAO IMPLEMENTADO** | - |
+| **Refresh Token** | **NAO IMPLEMENTADO** | - |
+| **MFA Verification** | **NAO IMPLEMENTADO** | - |
+
+**Importante:** O GCDR possui toda a infraestrutura de usuarios (`UserService`) com:
+- Criacao/edicao de usuarios
+- Hash de senha (SHA256)
+- Verificacao de email
+- Reset de senha
+- MFA (TOTP, SMS, Email)
+- Bloqueio por tentativas falhas
+- Controle de sessao
+
+Porem, **nao existe endpoint de login** que emita JWT. O sistema apenas **valida** tokens, nao os **emite** para usuarios.
+
+### Endpoints de Autenticacao Planejados
+
+```
+POST /auth/login              -> Autentica usuario e emite JWT
+POST /auth/refresh            -> Renova token expirado
+POST /auth/logout             -> Invalida token (opcional)
+POST /auth/mfa/verify         -> Verifica codigo MFA
+POST /auth/password/forgot    -> Solicita reset de senha
+POST /auth/password/reset     -> Reseta senha com token
+```
+
+### Integracao com Outros Sistemas
+
+O JWT emitido pelo GCDR deve ser aceito por outros sistemas do ecossistema MYIO:
+
+```
++------------+     JWT      +------------------+
+|   GCDR     |  -------->   | alarm-orchestrator|
+| (emissor)  |              | (validador)       |
++------------+              +------------------+
+                                    |
+                            Valida: sub, tenant_id,
+                            email, roles, exp, iss, aud
+```
+
+**Configuracao necessaria no alarm-orchestrator:**
+```bash
+JWT_SECRET=<mesma-chave-do-gcdr>
+JWT_ISSUER=gcdr
+JWT_AUDIENCE=alarm-orchestrator
+```
 
 ### Rate Limiting
 
