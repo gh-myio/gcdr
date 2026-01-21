@@ -5,13 +5,14 @@ Este documento descreve como a equipe Node-RED pode consumir o **Alarm Rules Bun
 ## Sumario
 
 1. [Visao Geral](#1-visao-geral)
-2. [Endpoint do Bundle](#2-endpoint-do-bundle)
-3. [Estrutura do Bundle](#3-estrutura-do-bundle)
-4. [Gerenciamento de Versoes (ETag)](#4-gerenciamento-de-versoes-etag)
-5. [Verificacao de Assinatura](#5-verificacao-de-assinatura)
-6. [Exemplos Praticos](#6-exemplos-praticos)
-7. [Estrategias de Cache](#7-estrategias-de-cache)
-8. [Troubleshooting](#8-troubleshooting)
+2. [Autenticacao M2M (API Key)](#2-autenticacao-m2m-api-key)
+3. [Endpoint do Bundle](#3-endpoint-do-bundle)
+4. [Estrutura do Bundle](#4-estrutura-do-bundle)
+5. [Gerenciamento de Versoes (ETag)](#5-gerenciamento-de-versoes-etag)
+6. [Verificacao de Assinatura](#6-verificacao-de-assinatura)
+7. [Exemplos Praticos](#7-exemplos-praticos)
+8. [Estrategias de Cache](#8-estrategias-de-cache)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
@@ -38,7 +39,124 @@ O **Alarm Rules Bundle** e um pacote otimizado contendo todas as regras de alarm
 
 ---
 
-## 2. Endpoint do Bundle
+## 2. Autenticacao M2M (API Key)
+
+Para integracao M2M (Machine-to-Machine) como Node-RED, recomendamos usar **API Keys** em vez de tokens JWT. API Keys sao pre-geradas e nao expiram automaticamente, eliminando a necessidade de renovacao constante.
+
+### Por que usar API Key?
+
+| JWT Token | API Key |
+|-----------|---------|
+| Expira periodicamente | Nao expira (configuravel) |
+| Precisa renovar frequentemente | Configurar uma vez e usar |
+| Requer fluxo de autenticacao | Header simples com a key |
+| Complexo para M2M | Ideal para M2M |
+
+### Gerando uma API Key
+
+**Via API (requer autenticacao JWT de admin):**
+
+```bash
+curl -X POST \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys" \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: <tenant-uuid>" \
+  -H "Authorization: Bearer <jwt-admin-token>" \
+  -d '{
+    "name": "Node-RED Production",
+    "description": "API Key para consumo de bundles pelo Node-RED",
+    "scopes": ["bundles:read"]
+  }'
+```
+
+**Resposta:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "apiKey": {
+      "id": "key-uuid",
+      "name": "Node-RED Production",
+      "keyPrefix": "a1b2c3d4",
+      "scopes": ["bundles:read"],
+      "isActive": true,
+      "createdAt": "2026-01-21T13:00:00.000Z"
+    },
+    "plaintextKey": "gcdr_cust_a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef12345678"
+  }
+}
+```
+
+**IMPORTANTE**: O `plaintextKey` e retornado **apenas uma vez** na criacao. Guarde-o em local seguro (ex: AWS Secrets Manager, vault). Nao sera possivel recupera-lo depois.
+
+### Scopes Disponiveis
+
+| Scope | Descricao |
+|-------|-----------|
+| `bundles:read` | Acesso ao endpoint de bundles |
+| `devices:read` | Acesso a leitura de devices |
+| `rules:read` | Acesso a leitura de regras |
+| `assets:read` | Acesso a leitura de assets |
+| `groups:read` | Acesso a leitura de grupos |
+| `*:read` | Acesso de leitura a todos os recursos |
+
+### Usando a API Key
+
+Ao inves de usar `Authorization: Bearer <jwt>`, use o header `X-API-Key`:
+
+```bash
+curl -X GET \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/alarm-rules/bundle" \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: <tenant-uuid>" \
+  -H "X-API-Key: gcdr_cust_a1b2c3d4..."
+```
+
+### Configuracao no Node-RED
+
+```javascript
+// No function node
+msg.headers = {
+    'Content-Type': 'application/json',
+    'x-tenant-id': env.get('GCDR_TENANT_ID'),
+    'X-API-Key': env.get('GCDR_API_KEY')
+};
+
+msg.url = env.get('GCDR_API_URL') + '/customers/' + env.get('CUSTOMER_ID') + '/alarm-rules/bundle';
+return msg;
+```
+
+### Gerenciando API Keys
+
+**Listar keys de um customer:**
+
+```bash
+curl -X GET \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys" \
+  -H "Authorization: Bearer <jwt-admin-token>"
+```
+
+**Revogar uma key:**
+
+```bash
+curl -X DELETE \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys/{keyId}" \
+  -H "Authorization: Bearer <jwt-admin-token>"
+```
+
+**Desativar temporariamente:**
+
+```bash
+curl -X PUT \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys/{keyId}" \
+  -H "Authorization: Bearer <jwt-admin-token>" \
+  -d '{"isActive": false}'
+```
+
+---
+
+## 3. Endpoint do Bundle
 
 ### URL
 
@@ -53,6 +171,16 @@ https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId
 ```
 
 ### Headers Obrigatorios
+
+**Opcao 1: API Key (Recomendado para M2M/Node-RED)**
+
+```http
+Content-Type: application/json
+x-tenant-id: <uuid-do-tenant>
+X-API-Key: gcdr_cust_<sua-api-key>
+```
+
+**Opcao 2: JWT Token**
 
 ```http
 Content-Type: application/json
@@ -70,6 +198,18 @@ Authorization: Bearer <jwt-token>
 
 ### Exemplo de Requisicao
 
+**Com API Key (Recomendado para Node-RED):**
+
+```bash
+curl -X GET \
+  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/cust-123/alarm-rules/bundle?domain=energy" \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: tenant-uuid" \
+  -H "X-API-Key: gcdr_cust_a1b2c3d4e5f67890abcdef..."
+```
+
+**Com JWT Token:**
+
 ```bash
 curl -X GET \
   "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/cust-123/alarm-rules/bundle?domain=energy" \
@@ -80,7 +220,7 @@ curl -X GET \
 
 ---
 
-## 3. Estrutura do Bundle
+## 4. Estrutura do Bundle
 
 ### Resposta Completa
 
@@ -228,7 +368,7 @@ Agrupamento por tipo de device. Use para configuracao em massa ou quando precisa
 
 ---
 
-## 4. Gerenciamento de Versoes (ETag)
+## 5. Gerenciamento de Versoes (ETag)
 
 O bundle suporta **conditional requests** para evitar transferencias desnecessarias.
 
@@ -326,7 +466,7 @@ return msg;
 
 ---
 
-## 5. Verificacao de Assinatura
+## 6. Verificacao de Assinatura
 
 O bundle inclui uma assinatura HMAC-SHA256 para garantir que os dados nao foram adulterados.
 
@@ -419,9 +559,9 @@ return msg;
 
 ---
 
-## 6. Exemplos Praticos
+## 7. Exemplos Praticos
 
-### 6.1 Buscar Regras para um Device Especifico
+### 7.1 Buscar Regras para um Device Especifico
 
 Quando receber telemetria de um device, use o `deviceIndex` para lookup rapido:
 
@@ -478,7 +618,7 @@ function evaluateThreshold(value, rule) {
 }
 ```
 
-### 6.2 Configurar Todos os Devices de um Tipo
+### 7.2 Configurar Todos os Devices de um Tipo
 
 ```javascript
 // Function node - configurar devices por tipo
@@ -512,7 +652,7 @@ msg.payload = configurations;
 return msg;
 ```
 
-### 6.3 Fluxo Completo de Sincronizacao
+### 7.3 Fluxo Completo de Sincronizacao
 
 ```
 [Inject: Every 5min] --> [Build Request] --> [HTTP Request] --> [Handle Response] --> [Verify Signature] --> [Store Bundle]
@@ -525,7 +665,7 @@ return msg;
 
 ---
 
-## 7. Estrategias de Cache
+## 8. Estrategias de Cache
 
 ### Recomendacoes
 
@@ -571,7 +711,7 @@ return msg;
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### Erro: 404 Not Found
 

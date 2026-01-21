@@ -28,6 +28,7 @@ provider:
     THEMES_TABLE: ${self:custom.themesTable}
     USERS_TABLE: ${self:custom.usersTable}
     GROUPS_TABLE: ${self:custom.groupsTable}
+    CUSTOMER_API_KEYS_TABLE: ${self:custom.customerApiKeysTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
     # JWT Configuration
@@ -77,6 +78,8 @@ provider:
             - !Join ['/', [!GetAtt UsersTable.Arn, 'index', '*']]
             - !GetAtt GroupsTable.Arn
             - !Join ['/', [!GetAtt GroupsTable.Arn, 'index', '*']]
+            - !GetAtt CustomerApiKeysTable.Arn
+            - !Join ['/', [!GetAtt CustomerApiKeysTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -107,6 +110,7 @@ custom:
   themesTable: gcdr-themes-${self:provider.stage}
   usersTable: gcdr-users-${self:provider.stage}
   groupsTable: gcdr-groups-${self:provider.stage}
+  customerApiKeysTable: gcdr-customer-api-keys-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -952,6 +956,47 @@ functions:
       - http:
           path: /groups/{id}/move
           method: post
+          cors: true
+
+  # Customer API Keys (M2M Authentication)
+  createCustomerApiKey:
+    handler: src/handlers/customer-api-keys/create.handler
+    events:
+      - http:
+          path: /customers/{id}/api-keys
+          method: post
+          cors: true
+
+  listCustomerApiKeys:
+    handler: src/handlers/customer-api-keys/list.handler
+    events:
+      - http:
+          path: /customers/{id}/api-keys
+          method: get
+          cors: true
+
+  getCustomerApiKey:
+    handler: src/handlers/customer-api-keys/get.handler
+    events:
+      - http:
+          path: /customers/{id}/api-keys/{keyId}
+          method: get
+          cors: true
+
+  updateCustomerApiKey:
+    handler: src/handlers/customer-api-keys/update.handler
+    events:
+      - http:
+          path: /customers/{id}/api-keys/{keyId}
+          method: put
+          cors: true
+
+  revokeCustomerApiKey:
+    handler: src/handlers/customer-api-keys/revoke.handler
+    events:
+      - http:
+          path: /customers/{id}/api-keys/{keyId}
+          method: delete
           cors: true
 
   # Integration Marketplace APIs
@@ -1985,6 +2030,46 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    CustomerApiKeysTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.customerApiKeysTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: keyHash
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-key-hash
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: keyHash
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -2014,6 +2099,8 @@ resources:
       Value: !GetAtt UsersTable.Arn
     GroupsTableArn:
       Value: !GetAtt GroupsTable.Arn
+    CustomerApiKeysTableArn:
+      Value: !GetAtt CustomerApiKeysTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

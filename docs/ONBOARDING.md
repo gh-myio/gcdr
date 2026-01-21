@@ -87,6 +87,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | Módulo | Endpoints | Descrição |
 |--------|-----------|-----------|
 | **Health** | 1 | Health check da API |
+| **Authentication** | 6 | Login, logout, refresh token, MFA, password reset |
 | **Customers** | 9 | Hierarquia de clientes (ROOT → RESELLER → ENTERPRISE → BUSINESS → INDIVIDUAL) |
 | **Partners** | 15 | Parceiros, API Keys, OAuth Clients, Webhooks |
 | **Authorization** | 18 | RBAC completo (Roles, Policies, Assignments) |
@@ -96,7 +97,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Integrations** | 12 | Marketplace de integrações |
 | **Centrals** | 10 | Centrais IoT (NODEHUB, GATEWAY, EDGE_CONTROLLER) |
 | **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
-| **Users** | 18 | Usuários, autenticação, MFA |
+| **Users** | 18 | Usuários, gerenciamento, MFA |
 | **Groups** | 12 | Grupos de usuários, dispositivos e assets com hierarquia |
 
 ### Exemplos de Requisições
@@ -235,7 +236,7 @@ A API suporta dois métodos de autenticação:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Estrutura do JWT esperado:**
+**Estrutura do JWT emitido:**
 ```json
 {
   "sub": "user-uuid",
@@ -245,7 +246,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "iat": 1737463200,
   "exp": 1737466800,
   "iss": "gcdr",
-  "aud": "gcdr-api"
+  "aud": ["gcdr-api", "alarm-orchestrator"]
 }
 ```
 
@@ -258,7 +259,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | `iat` | Timestamp de emissão |
 | `exp` | Timestamp de expiração |
 | `iss` | Emissor do token |
-| `aud` | Audiência (sistema destinatário) |
+| `aud` | Audiência(s) - pode ser string ou array de strings (RFC 7519) |
 
 #### 2. API Key (para integrações de parceiros)
 
@@ -296,52 +297,126 @@ Resposta:
 |----------------|--------|----------|
 | **Partner Token (OAuth2)** | Implementado | `POST /partners/token` |
 | **API Key Validation** | Implementado | Middleware |
-| **Login de Usuarios** | **NAO IMPLEMENTADO** | - |
-| **Refresh Token** | **NAO IMPLEMENTADO** | - |
-| **MFA Verification** | **NAO IMPLEMENTADO** | - |
+| **Login de Usuarios** | Implementado | `POST /auth/login` |
+| **Refresh Token** | Implementado | `POST /auth/refresh` |
+| **MFA Verification** | Implementado | `POST /auth/mfa/verify` |
+| **Logout** | Implementado | `POST /auth/logout` |
+| **Forgot Password** | Implementado | `POST /auth/password/forgot` |
+| **Reset Password** | Implementado | `POST /auth/password/reset` |
 
-**Importante:** O GCDR possui toda a infraestrutura de usuarios (`UserService`) com:
-- Criacao/edicao de usuarios
-- Hash de senha (SHA256)
-- Verificacao de email
-- Reset de senha
-- MFA (TOTP, SMS, Email)
-- Bloqueio por tentativas falhas
-- Controle de sessao
-
-Porem, **nao existe endpoint de login** que emita JWT. O sistema apenas **valida** tokens, nao os **emite** para usuarios.
-
-### Endpoints de Autenticacao Planejados
+### Endpoints de Autenticacao
 
 ```
 POST /auth/login              -> Autentica usuario e emite JWT
 POST /auth/refresh            -> Renova token expirado
-POST /auth/logout             -> Invalida token (opcional)
+POST /auth/logout             -> Invalida token
 POST /auth/mfa/verify         -> Verifica codigo MFA
 POST /auth/password/forgot    -> Solicita reset de senha
 POST /auth/password/reset     -> Reseta senha com token
 ```
 
+### Exemplos de Uso
+
+#### Login Simples
+```bash
+curl -X POST https://api.gcdr.io/dev/auth/login \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: tenant-uuid" \
+  -d '{
+    "email": "usuario@empresa.com",
+    "password": "senha123"
+  }'
+```
+
+Resposta:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "refreshExpiresIn": 604800,
+  "user": {
+    "id": "user-uuid",
+    "email": "usuario@empresa.com",
+    "displayName": "Joao Silva",
+    "type": "CUSTOMER",
+    "roles": ["admin"]
+  }
+}
+```
+
+#### Login com MFA Habilitado
+Se o usuario tiver MFA habilitado, a resposta inicial sera:
+```json
+{
+  "mfaRequired": true,
+  "mfaToken": "eyJhbGciOiJIUzI1NiIs...",
+  "mfaMethod": "totp",
+  "expiresIn": 300
+}
+```
+
+Complete a autenticacao com:
+```bash
+curl -X POST https://api.gcdr.io/dev/auth/mfa/verify \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: tenant-uuid" \
+  -d '{
+    "mfaToken": "eyJhbGciOiJIUzI1NiIs...",
+    "code": "123456"
+  }'
+```
+
+#### Renovar Token
+```bash
+curl -X POST https://api.gcdr.io/dev/auth/refresh \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: tenant-uuid" \
+  -d '{
+    "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+  }'
+```
+
 ### Integracao com Outros Sistemas
 
-O JWT emitido pelo GCDR deve ser aceito por outros sistemas do ecossistema MYIO:
+O JWT emitido pelo GCDR e aceito por outros sistemas do ecossistema MYIO usando **Multiple Audience** (RFC 7519 Section 4.1.3):
 
 ```
 +------------+     JWT      +------------------+
 |   GCDR     |  -------->   | alarm-orchestrator|
 | (emissor)  |              | (validador)       |
 +------------+              +------------------+
-                                    |
-                            Valida: sub, tenant_id,
-                            email, roles, exp, iss, aud
+      |                             |
+      |  aud: ["gcdr-api",          |
+      |        "alarm-orchestrator"]|
+      |                             |
+      └─────────────────────────────┘
+                    |
+            Valida: sub, tenant_id,
+            email, roles, exp, iss, aud
 ```
 
-**Configuracao necessaria no alarm-orchestrator:**
+**Como funciona:**
+1. GCDR emite tokens com multiplas audiences: `aud: ["gcdr-api", "alarm-orchestrator"]`
+2. Cada servico valida se sua audience esta presente no array
+3. Mesmo token funciona em todos os servicos do ecossistema
+
+**Configuracao no GCDR (Identity Provider):**
+```bash
+JWT_SECRET=<chave-secreta-compartilhada>
+JWT_ISSUER=gcdr
+JWT_AUDIENCE=gcdr-api,alarm-orchestrator   # Comma-separated
+```
+
+**Configuracao no alarm-orchestrator (Resource Server):**
 ```bash
 JWT_SECRET=<mesma-chave-do-gcdr>
 JWT_ISSUER=gcdr
 JWT_AUDIENCE=alarm-orchestrator
 ```
+
+> **Nota**: Veja [RFC-0003-Refactoring-Multiple-Audience.md](./RFC-0003-Refactoring-Multiple-Audience.md) para detalhes da implementacao.
 
 ### Rate Limiting
 
@@ -1231,6 +1306,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 
 - [RFC-0001: GCDR Core & Marketplace](./RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Especificação completa
 - [RFC-0002: Authorization Model](./RFC-0002-GCDR-Authorization-Model.md) - Modelo de autorização
+- [RFC-0003: JWT Multiple Audience](./RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
 
 ### Documentação Externa
 

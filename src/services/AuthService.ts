@@ -28,7 +28,7 @@ interface JWTPayload {
   iat: number;
   exp: number;
   iss: string;
-  aud: string;
+  aud: string | string[];
 }
 
 interface RefreshTokenPayload {
@@ -63,6 +63,15 @@ function base64UrlDecode(input: string): Buffer {
   return Buffer.from(base64, 'base64');
 }
 
+/**
+ * Parse JWT_AUDIENCE env variable into string or array
+ * Supports comma-separated values for multiple audiences (RFC 7519 Section 4.1.3)
+ */
+function parseAudience(audience: string): string | string[] {
+  const parts = audience.split(',').map(s => s.trim()).filter(Boolean);
+  return parts.length === 1 ? parts[0]! : parts;
+}
+
 // JWT functions
 function createJWT(payload: object, expiresIn: number): string {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -73,7 +82,7 @@ function createJWT(payload: object, expiresIn: number): string {
     iat: now,
     exp: now + expiresIn,
     iss: JWT_ISSUER,
-    aud: JWT_AUDIENCE,
+    aud: parseAudience(JWT_AUDIENCE),
   };
 
   const headerB64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
