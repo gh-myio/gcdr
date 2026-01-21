@@ -535,3 +535,98 @@ Resumo do deploy:                                                               
   - Health checks
   - Schemas completos (Alarm, AlarmState, AlarmSeverity, Error, Pagination)
 
+---
+
+
+ Vou explicar como funciona:                                                                         
+  Arquitetura de Autenticação Centralizada                                                                                            
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                           FRONTEND (React/Next.js)                       │
+  │                                                                          │
+  │   1. Login                           3. Usa token                        │
+  │      ↓                                  ↓                                │
+  │   POST /auth/login ────────────►  Authorization: Bearer <token>          │
+  └─────────┬───────────────────────────────┬───────────────────────────────┘
+            │                               │
+            ▼                               ▼
+  ┌─────────────────────┐         ┌─────────────────────┐
+  │        GCDR         │         │  alarm-orchestrator │
+  │   (Identity Provider)│         │    (Resource Server) │
+  │                     │         │                     │
+  │ - Emite JWT         │         │ - Valida JWT        │
+  │ - Users/Roles       │         │ - Alarmes           │
+  │ - Cadastros         │         │ - Dispatches        │
+  └─────────────────────┘         └─────────────────────┘
+            │                               │
+            └───────── Mesma chave ─────────┘
+                      (JWT_SECRET)
+
+  Fluxo Detalhado
+  ┌───────┬───────────────────────────────┬───────────────────────────────────────────────┐
+  │ Passo │             Onde              │                     Ação                      │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 1     │ Frontend                      │ Usuário digita email/senha                    │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 2     │ Frontend → GCDR               │ POST /auth/login no GCDR                      │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 3     │ GCDR                          │ Valida credenciais, emite JWT                 │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 4     │ Frontend                      │ Armazena token (localStorage/cookie)          │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 5     │ Frontend → alarm-orchestrator │ Requisições com Authorization: Bearer <token> │
+  ├───────┼───────────────────────────────┼───────────────────────────────────────────────┤
+  │ 6     │ alarm-orchestrator            │ Valida JWT com mesma chave                    │
+  └───────┴───────────────────────────────┴───────────────────────────────────────────────┘
+  O que precisa ser configurado
+
+  1. Mesma chave JWT nos dois backends
+
+  GCDR (.env ou Lambda environment):
+  JWT_SECRET=chave-secreta-compartilhada-32-caracteres-minimo
+  JWT_ISSUER=gcdr
+  JWT_AUDIENCE=gcdr-api
+
+  alarm-orchestrator (.env):
+  JWT_SECRET=chave-secreta-compartilhada-32-caracteres-minimo
+  JWT_ISSUER=gcdr
+  JWT_AUDIENCE=alarm-orchestrator
+
+  2. Ajustar audience no alarm-orchestrator
+
+  O alarm-orchestrator precisa aceitar tokens do GCDR. Vou verificar como está configurado:
+
+● Read(src\api\middleware\auth.middleware.ts)
+  ⎿  Read 35 lines
+                                                                                                                                      
+	● Há um problema: o GCDR emite tokens com aud: "gcdr-api", mas o alarm-orchestrator espera aud: "alarm-orchestrator".
+
+Opções de Solução                                                                                                  
+
+Opção A: Audience Múltipla (Recomendado)                                                                                            
+ Modificar o GCDR para emitir tokens com múltiplas audiences:
+
+  {
+    "aud": ["gcdr-api", "alarm-orchestrator"]
+  }
+
+Opção B: Audience Genérica
+
+  Usar uma audience comum como "myio-api" em todos os sistemas.
+
+Opção C: Modificar alarm-orchestrator
+
+  Aceitar tokens de qualquer sistema MYIO.
+
+  ---
+  Qual opção você prefere? A Opção A é mais segura pois controla quais sistemas cada token pode acessar.
+
+  Se quiser, posso implementar a Opção A agora:
+  1. Modificar AuthService do GCDR para emitir tokens com múltiplas audiences
+  2. Modificar auth.middleware.ts do alarm-orchestrator para aceitar array de audiences
+  
+Opções de Solução                                                                                                  
+
+vamos na Opção A: Audience Múltipla. crie para a equipe de backend do gcdr um markdown .md file em ingles no estilo rust rfc em C:\Projetos\GitHub\myio\gcdr.git\docs\RFC-0003-Refactoring-Multiple-Audience.md e considere isso resolvido e funcional.
+
+vamos na Opção A: Audience Múltipla. crie para a equipe de backend do gcdr um markdown .md file em ingles no estilo rust rfc em       C:\Projetos\GitHub\myio\gcdr.git\docs\RFC-0003-Refactoring-Multiple-Audience.md e considere isso resolvido e funcional e faça
+  os ajustes que eventualmente precisamos fazer no backend C:\Projetos\GitHub\myio\alarms-backend.git  
