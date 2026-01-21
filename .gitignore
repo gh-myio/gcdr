@@ -143,3 +143,5 @@ gcdr-backend.md
 gcdr-backend.txt
 stacks-map.js
 docker/.env
+scripts/.env
+load-test-results-*.json
