@@ -1,60 +1,60 @@
-# Manual de Onboarding - Alarm Rules Bundle para Node-RED
+# Onboarding Manual - Alarm Rules Bundle for Node-RED
 
-Este documento descreve como a equipe Node-RED pode consumir o **Alarm Rules Bundle** do GCDR para configurar regras de alarme nos fluxos.
+This document describes how the Node-RED team can consume the **Alarm Rules Bundle** from GCDR to configure alarm rules in flows.
 
-## Sumario
+## Table of Contents
 
-1. [Visao Geral](#1-visao-geral)
-2. [Autenticacao M2M (API Key)](#2-autenticacao-m2m-api-key)
-3. [Endpoint do Bundle](#3-endpoint-do-bundle)
-4. [Estrutura do Bundle](#4-estrutura-do-bundle)
-5. [Gerenciamento de Versoes (ETag)](#5-gerenciamento-de-versoes-etag)
-6. [Verificacao de Assinatura](#6-verificacao-de-assinatura)
-7. [Exemplos Praticos](#7-exemplos-praticos)
-8. [Estrategias de Cache](#8-estrategias-de-cache)
+1. [Overview](#1-overview)
+2. [M2M Authentication (API Key)](#2-m2m-authentication-api-key)
+3. [Bundle Endpoint](#3-bundle-endpoint)
+4. [Bundle Structure](#4-bundle-structure)
+5. [Version Management (ETag)](#5-version-management-etag)
+6. [Signature Verification](#6-signature-verification)
+7. [Practical Examples](#7-practical-examples)
+8. [Cache Strategies](#8-cache-strategies)
 9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
-## 1. Visao Geral
+## 1. Overview
 
-### O que e o Alarm Rules Bundle?
+### What is the Alarm Rules Bundle?
 
-O **Alarm Rules Bundle** e um pacote otimizado contendo todas as regras de alarme de um cliente, estruturado para consumo eficiente pelo Node-RED. Ele inclui:
+The **Alarm Rules Bundle** is an optimized package containing all alarm rules for a customer, structured for efficient consumption by Node-RED. It includes:
 
-- **Catalogo de regras** de alarme com thresholds e configuracoes
-- **Mapeamento device-to-rules** para lookup rapido
-- **Agrupamento por tipo de device** para configuracao em massa
-- **Versionamento** para detectar mudancas
-- **Assinatura HMAC** para garantir integridade
+- **Alarm rules catalog** with thresholds and configurations
+- **Device-to-rules mapping** for fast lookup
+- **Grouping by device type** for bulk configuration
+- **Versioning** to detect changes
+- **HMAC signature** to ensure integrity
 
-### Por que usar o Bundle?
+### Why Use the Bundle?
 
-| Sem Bundle | Com Bundle |
-|------------|------------|
-| Multiplas chamadas para buscar regras | Uma unica chamada retorna tudo |
-| Logica de mapeamento no Node-RED | Mapeamento pre-calculado |
-| Sem cache inteligente | Cache com ETag e versionamento |
-| Sem garantia de integridade | Assinatura HMAC-SHA256 |
+| Without Bundle | With Bundle |
+|----------------|-------------|
+| Multiple calls to fetch rules | Single call returns everything |
+| Mapping logic in Node-RED | Pre-calculated mapping |
+| No intelligent cache | Cache with ETag and versioning |
+| No integrity guarantee | HMAC-SHA256 signature |
 
 ---
 
-## 2. Autenticacao M2M (API Key)
+## 2. M2M Authentication (API Key)
 
-Para integracao M2M (Machine-to-Machine) como Node-RED, recomendamos usar **API Keys** em vez de tokens JWT. API Keys sao pre-geradas e nao expiram automaticamente, eliminando a necessidade de renovacao constante.
+For M2M (Machine-to-Machine) integration like Node-RED, we recommend using **API Keys** instead of JWT tokens. API Keys are pre-generated and do not expire automatically, eliminating the need for constant renewal.
 
-### Por que usar API Key?
+### Why Use API Key?
 
 | JWT Token | API Key |
 |-----------|---------|
-| Expira periodicamente | Nao expira (configuravel) |
-| Precisa renovar frequentemente | Configurar uma vez e usar |
-| Requer fluxo de autenticacao | Header simples com a key |
-| Complexo para M2M | Ideal para M2M |
+| Expires periodically | Does not expire (configurable) |
+| Requires frequent renewal | Configure once and use |
+| Requires authentication flow | Simple header with key |
+| Complex for M2M | Ideal for M2M |
 
-### Gerando uma API Key
+### Generating an API Key
 
-**Via API (requer autenticacao JWT de admin):**
+**Via API (requires admin JWT authentication):**
 
 ```bash
 curl -X POST \
@@ -64,12 +64,12 @@ curl -X POST \
   -H "Authorization: Bearer <jwt-admin-token>" \
   -d '{
     "name": "Node-RED Production",
-    "description": "API Key para consumo de bundles pelo Node-RED",
+    "description": "API Key for bundle consumption by Node-RED",
     "scopes": ["bundles:read"]
   }'
 ```
 
-**Resposta:**
+**Response:**
 
 ```json
 {
@@ -88,22 +88,22 @@ curl -X POST \
 }
 ```
 
-**IMPORTANTE**: O `plaintextKey` e retornado **apenas uma vez** na criacao. Guarde-o em local seguro (ex: AWS Secrets Manager, vault). Nao sera possivel recupera-lo depois.
+**IMPORTANT**: The `plaintextKey` is returned **only once** at creation. Store it in a secure location (e.g., AWS Secrets Manager, vault). It cannot be recovered later.
 
-### Scopes Disponiveis
+### Available Scopes
 
-| Scope | Descricao |
-|-------|-----------|
-| `bundles:read` | Acesso ao endpoint de bundles |
-| `devices:read` | Acesso a leitura de devices |
-| `rules:read` | Acesso a leitura de regras |
-| `assets:read` | Acesso a leitura de assets |
-| `groups:read` | Acesso a leitura de grupos |
-| `*:read` | Acesso de leitura a todos os recursos |
+| Scope | Description |
+|-------|-------------|
+| `bundles:read` | Access to bundles endpoint |
+| `devices:read` | Read access to devices |
+| `rules:read` | Read access to rules |
+| `assets:read` | Read access to assets |
+| `groups:read` | Read access to groups |
+| `*:read` | Read access to all resources |
 
-### Usando a API Key
+### Using the API Key
 
-Ao inves de usar `Authorization: Bearer <jwt>`, use o header `X-API-Key`:
+Instead of using `Authorization: Bearer <jwt>`, use the `X-API-Key` header:
 
 ```bash
 curl -X GET \
@@ -113,10 +113,10 @@ curl -X GET \
   -H "X-API-Key: gcdr_cust_a1b2c3d4..."
 ```
 
-### Configuracao no Node-RED
+### Configuration in Node-RED
 
 ```javascript
-// No function node
+// In function node
 msg.headers = {
     'Content-Type': 'application/json',
     'x-tenant-id': env.get('GCDR_TENANT_ID'),
@@ -127,9 +127,9 @@ msg.url = env.get('GCDR_API_URL') + '/customers/' + env.get('CUSTOMER_ID') + '/a
 return msg;
 ```
 
-### Gerenciando API Keys
+### Managing API Keys
 
-**Listar keys de um customer:**
+**List keys for a customer:**
 
 ```bash
 curl -X GET \
@@ -137,7 +137,7 @@ curl -X GET \
   -H "Authorization: Bearer <jwt-admin-token>"
 ```
 
-**Revogar uma key:**
+**Revoke a key:**
 
 ```bash
 curl -X DELETE \
@@ -145,7 +145,7 @@ curl -X DELETE \
   -H "Authorization: Bearer <jwt-admin-token>"
 ```
 
-**Desativar temporariamente:**
+**Temporarily disable:**
 
 ```bash
 curl -X PUT \
@@ -156,7 +156,7 @@ curl -X PUT \
 
 ---
 
-## 3. Endpoint do Bundle
+## 3. Bundle Endpoint
 
 ### URL
 
@@ -164,41 +164,41 @@ curl -X PUT \
 GET /customers/{customerId}/alarm-rules/bundle
 ```
 
-### Ambiente de Desenvolvimento
+### Development Environment
 
 ```
 https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/alarm-rules/bundle
 ```
 
-### Headers Obrigatorios
+### Required Headers
 
-**Opcao 1: API Key (Recomendado para M2M/Node-RED)**
+**Option 1: API Key (Recommended for M2M/Node-RED)**
 
 ```http
 Content-Type: application/json
-x-tenant-id: <uuid-do-tenant>
-X-API-Key: gcdr_cust_<sua-api-key>
+x-tenant-id: <tenant-uuid>
+X-API-Key: gcdr_cust_<your-api-key>
 ```
 
-**Opcao 2: JWT Token**
+**Option 2: JWT Token**
 
 ```http
 Content-Type: application/json
-x-tenant-id: <uuid-do-tenant>
+x-tenant-id: <tenant-uuid>
 Authorization: Bearer <jwt-token>
 ```
 
 ### Query Parameters
 
-| Parametro | Tipo | Obrigatorio | Descricao |
-|-----------|------|-------------|-----------|
-| `domain` | string | Nao | Filtrar por dominio (ex: `energy`, `security`) |
-| `deviceType` | string | Nao | Filtrar por tipo de device (ex: `STORE`, `ELEVATOR`) |
-| `includeDisabled` | boolean | Nao | Incluir regras desabilitadas (default: `false`) |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `domain` | string | No | Filter by domain (e.g., `energy`, `security`) |
+| `deviceType` | string | No | Filter by device type (e.g., `STORE`, `ELEVATOR`) |
+| `includeDisabled` | boolean | No | Include disabled rules (default: `false`) |
 
-### Exemplo de Requisicao
+### Request Example
 
-**Com API Key (Recomendado para Node-RED):**
+**With API Key (Recommended for Node-RED):**
 
 ```bash
 curl -X GET \
@@ -208,7 +208,7 @@ curl -X GET \
   -H "X-API-Key: gcdr_cust_a1b2c3d4e5f67890abcdef..."
 ```
 
-**Com JWT Token:**
+**With JWT Token:**
 
 ```bash
 curl -X GET \
@@ -220,9 +220,9 @@ curl -X GET \
 
 ---
 
-## 4. Estrutura do Bundle
+## 4. Bundle Structure
 
-### Resposta Completa
+### Complete Response
 
 ```json
 {
@@ -232,7 +232,7 @@ curl -X GET \
       "version": "a1b2c3d4e5f67890",
       "generatedAt": "2026-01-21T13:00:00.000Z",
       "customerId": "cust-123",
-      "customerName": "Empresa ABC",
+      "customerName": "Company ABC",
       "tenantId": "tenant-uuid",
       "signature": "9f8e7d6c5b4a3210...",
       "algorithm": "HMAC-SHA256",
@@ -243,7 +243,7 @@ curl -X GET \
     "rules": {
       "rule-001": {
         "id": "rule-001",
-        "name": "Alta Temperatura",
+        "name": "High Temperature",
         "priority": "HIGH",
         "metric": "temperature",
         "operator": "GREATER_THAN",
@@ -259,7 +259,7 @@ curl -X GET \
       },
       "rule-002": {
         "id": "rule-002",
-        "name": "Consumo Elevado",
+        "name": "High Consumption",
         "priority": "MEDIUM",
         "metric": "power_consumption",
         "operator": "GREATER_THAN",
@@ -277,7 +277,7 @@ curl -X GET \
         "devices": [
           {
             "id": "dev-001",
-            "name": "Loja Centro",
+            "name": "Downtown Store",
             "serialNumber": "SN-001",
             "externalId": "EXT-001"
           }
@@ -291,7 +291,7 @@ curl -X GET \
         "devices": [
           {
             "id": "dev-010",
-            "name": "Elevador A",
+            "name": "Elevator A",
             "serialNumber": "SN-010"
           }
         ],
@@ -301,7 +301,7 @@ curl -X GET \
     "deviceIndex": {
       "dev-001": {
         "deviceId": "dev-001",
-        "deviceName": "Loja Centro",
+        "deviceName": "Downtown Store",
         "deviceType": "STORE",
         "domain": "energy",
         "serialNumber": "SN-001",
@@ -310,7 +310,7 @@ curl -X GET \
       },
       "dev-010": {
         "deviceId": "dev-010",
-        "deviceName": "Elevador A",
+        "deviceName": "Elevator A",
         "deviceType": "ELEVATOR",
         "domain": "facility",
         "serialNumber": "SN-010",
@@ -321,67 +321,67 @@ curl -X GET \
 }
 ```
 
-### Descricao dos Campos
+### Field Descriptions
 
 #### Meta
 
-| Campo | Tipo | Descricao |
-|-------|------|-----------|
-| `version` | string | Hash SHA-256 do conteudo (16 chars) - use como ETag |
-| `generatedAt` | ISO8601 | Timestamp de geracao |
-| `customerId` | string | ID do cliente |
-| `customerName` | string | Nome do cliente |
-| `tenantId` | string | ID do tenant |
-| `signature` | string | Assinatura HMAC-SHA256 para validacao |
-| `algorithm` | string | Algoritmo usado (sempre `HMAC-SHA256`) |
-| `ttlSeconds` | number | Tempo de vida sugerido para cache (default: 300s) |
-| `rulesCount` | number | Total de regras no bundle |
-| `devicesCount` | number | Total de devices no bundle |
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | SHA-256 hash of content (16 chars) - use as ETag |
+| `generatedAt` | ISO8601 | Generation timestamp |
+| `customerId` | string | Customer ID |
+| `customerName` | string | Customer name |
+| `tenantId` | string | Tenant ID |
+| `signature` | string | HMAC-SHA256 signature for validation |
+| `algorithm` | string | Algorithm used (always `HMAC-SHA256`) |
+| `ttlSeconds` | number | Suggested cache time-to-live (default: 300s) |
+| `rulesCount` | number | Total rules in bundle |
+| `devicesCount` | number | Total devices in bundle |
 
-#### Rules (Catalogo de Regras)
+#### Rules (Rules Catalog)
 
-| Campo | Tipo | Descricao |
-|-------|------|-----------|
-| `id` | string | ID unico da regra |
-| `name` | string | Nome descritivo |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique rule ID |
+| `name` | string | Descriptive name |
 | `priority` | enum | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
-| `metric` | string | Metrica a ser avaliada (ex: `temperature`) |
+| `metric` | string | Metric to evaluate (e.g., `temperature`) |
 | `operator` | enum | `EQUAL`, `NOT_EQUAL`, `GREATER_THAN`, `LESS_THAN`, `BETWEEN`, etc. |
-| `value` | number | Valor do threshold |
-| `valueHigh` | number | Valor alto (para `BETWEEN`) |
-| `unit` | string | Unidade de medida |
-| `duration` | number | Tempo em segundos para disparar |
-| `hysteresis` | number | Valor de histerese para evitar flapping |
-| `hysteresisType` | enum | `PERCENTAGE` ou `ABSOLUTE` |
+| `value` | number | Threshold value |
+| `valueHigh` | number | High value (for `BETWEEN`) |
+| `unit` | string | Unit of measurement |
+| `duration` | number | Time in seconds to trigger |
+| `hysteresis` | number | Hysteresis value to prevent flapping |
+| `hysteresisType` | enum | `PERCENTAGE` or `ABSOLUTE` |
 | `aggregation` | enum | `AVG`, `MIN`, `MAX`, `SUM`, `COUNT`, `LAST` |
-| `aggregationWindow` | number | Janela de agregacao em segundos |
-| `enabled` | boolean | Se a regra esta ativa |
-| `tags` | string[] | Tags para categorizacao |
+| `aggregationWindow` | number | Aggregation window in seconds |
+| `enabled` | boolean | Whether the rule is active |
+| `tags` | string[] | Tags for categorization |
 
 #### Device Index
 
-Mapeamento rapido de `deviceId` para suas regras aplicaveis. Use este indice quando receber telemetria de um device especifico.
+Fast mapping from `deviceId` to applicable rules. Use this index when receiving telemetry from a specific device.
 
 #### Rules By Device Type
 
-Agrupamento por tipo de device. Use para configuracao em massa ou quando precisar aplicar regras a todos os devices de um tipo.
+Grouping by device type. Use for bulk configuration or when you need to apply rules to all devices of a type.
 
 ---
 
-## 5. Gerenciamento de Versoes (ETag)
+## 5. Version Management (ETag)
 
-O bundle suporta **conditional requests** para evitar transferencias desnecessarias.
+The bundle supports **conditional requests** to avoid unnecessary transfers.
 
-### Como Funciona
+### How It Works
 
-1. Na primeira requisicao, guarde o header `ETag` da resposta
-2. Nas proximas requisicoes, envie o header `If-None-Match` com o ETag
-3. Se o bundle nao mudou, recebera `304 Not Modified` (sem body)
-4. Se mudou, recebera `200 OK` com o novo bundle
+1. On the first request, store the `ETag` header from the response
+2. On subsequent requests, send the `If-None-Match` header with the ETag
+3. If the bundle hasn't changed, you'll receive `304 Not Modified` (no body)
+4. If it changed, you'll receive `200 OK` with the new bundle
 
-### Exemplo com ETag
+### Example with ETag
 
-**Primeira requisicao:**
+**First request:**
 
 ```bash
 curl -i -X GET \
@@ -389,7 +389,7 @@ curl -i -X GET \
   -H "Authorization: Bearer <token>"
 ```
 
-**Resposta:**
+**Response:**
 
 ```http
 HTTP/1.1 200 OK
@@ -401,7 +401,7 @@ X-Bundle-Signature: 9f8e7d6c5b4a3210...
 {"success": true, "data": {...}}
 ```
 
-**Requisicoes subsequentes:**
+**Subsequent requests:**
 
 ```bash
 curl -i -X GET \
@@ -410,7 +410,7 @@ curl -i -X GET \
   -H "If-None-Match: \"a1b2c3d4e5f67890\""
 ```
 
-**Se nao mudou:**
+**If unchanged:**
 
 ```http
 HTTP/1.1 304 Not Modified
@@ -418,20 +418,20 @@ ETag: "a1b2c3d4e5f67890"
 Cache-Control: private, max-age=300
 ```
 
-**Se mudou:**
+**If changed:**
 
 ```http
 HTTP/1.1 200 OK
 ETag: "newversion12345678"
 Cache-Control: private, max-age=300
 
-{"success": true, "data": {...novo bundle...}}
+{"success": true, "data": {...new bundle...}}
 ```
 
-### Implementacao no Node-RED
+### Implementation in Node-RED
 
 ```javascript
-// No function node
+// In function node
 const cachedETag = flow.get('alarmBundleETag') || null;
 const cachedBundle = flow.get('alarmBundle') || null;
 
@@ -449,13 +449,13 @@ return msg;
 ```
 
 ```javascript
-// Apos o HTTP request node
+// After HTTP request node
 if (msg.statusCode === 304) {
-    // Usar bundle em cache
+    // Use cached bundle
     msg.payload = flow.get('alarmBundle');
     node.status({fill:"green", shape:"dot", text:"Using cached bundle"});
 } else if (msg.statusCode === 200) {
-    // Atualizar cache
+    // Update cache
     const etag = msg.headers['etag'];
     flow.set('alarmBundleETag', etag);
     flow.set('alarmBundle', msg.payload.data);
@@ -466,13 +466,13 @@ return msg;
 
 ---
 
-## 6. Verificacao de Assinatura
+## 6. Signature Verification
 
-O bundle inclui uma assinatura HMAC-SHA256 para garantir que os dados nao foram adulterados.
+The bundle includes an HMAC-SHA256 signature to ensure data hasn't been tampered with.
 
-### Estrutura Assinada
+### Signed Structure
 
-A assinatura e calculada sobre:
+The signature is calculated over:
 
 ```json
 {
@@ -487,7 +487,7 @@ A assinatura e calculada sobre:
 }
 ```
 
-### Verificacao em JavaScript
+### Verification in JavaScript
 
 ```javascript
 const crypto = require('crypto');
@@ -510,21 +510,21 @@ function verifyBundleSignature(bundle, secretKey) {
         .update(serialized)
         .digest('hex');
 
-    // Comparacao segura contra timing attacks
+    // Secure comparison against timing attacks
     return crypto.timingSafeEqual(
         Buffer.from(bundle.meta.signature),
         Buffer.from(expectedSignature)
     );
 }
 
-// Uso
+// Usage
 const isValid = verifyBundleSignature(bundle, process.env.BUNDLE_SIGNING_SECRET);
 if (!isValid) {
     throw new Error('Bundle signature verification failed!');
 }
 ```
 
-### Verificacao no Node-RED (Function Node)
+### Verification in Node-RED (Function Node)
 
 ```javascript
 const crypto = global.get('crypto');
@@ -559,19 +559,19 @@ return msg;
 
 ---
 
-## 7. Exemplos Praticos
+## 7. Practical Examples
 
-### 7.1 Buscar Regras para um Device Especifico
+### 7.1 Fetch Rules for a Specific Device
 
-Quando receber telemetria de um device, use o `deviceIndex` para lookup rapido:
+When receiving telemetry from a device, use the `deviceIndex` for fast lookup:
 
 ```javascript
-// Function node - processar telemetria
+// Function node - process telemetry
 const bundle = flow.get('alarmBundle');
 const deviceId = msg.payload.deviceId;
 const telemetry = msg.payload.data;
 
-// Lookup rapido no deviceIndex
+// Fast lookup in deviceIndex
 const deviceMapping = bundle.deviceIndex[deviceId];
 
 if (!deviceMapping) {
@@ -579,10 +579,10 @@ if (!deviceMapping) {
     return null;
 }
 
-// Buscar regras aplicaveis
+// Fetch applicable rules
 const applicableRules = deviceMapping.ruleIds.map(ruleId => bundle.rules[ruleId]);
 
-// Avaliar cada regra
+// Evaluate each rule
 const violations = [];
 for (const rule of applicableRules) {
     if (!rule.enabled) continue;
@@ -618,10 +618,10 @@ function evaluateThreshold(value, rule) {
 }
 ```
 
-### 7.2 Configurar Todos os Devices de um Tipo
+### 7.2 Configure All Devices of a Type
 
 ```javascript
-// Function node - configurar devices por tipo
+// Function node - configure devices by type
 const bundle = flow.get('alarmBundle');
 const targetDeviceType = 'STORE';
 
@@ -632,7 +632,7 @@ if (!deviceTypeGroup) {
     return null;
 }
 
-// Gerar configuracao para cada device
+// Generate configuration for each device
 const configurations = deviceTypeGroup.devices.map(device => ({
     deviceId: device.id,
     serialNumber: device.serialNumber,
@@ -652,7 +652,7 @@ msg.payload = configurations;
 return msg;
 ```
 
-### 7.3 Fluxo Completo de Sincronizacao
+### 7.3 Complete Synchronization Flow
 
 ```
 [Inject: Every 5min] --> [Build Request] --> [HTTP Request] --> [Handle Response] --> [Verify Signature] --> [Store Bundle]
@@ -665,43 +665,43 @@ return msg;
 
 ---
 
-## 8. Estrategias de Cache
+## 8. Cache Strategies
 
-### Recomendacoes
+### Recommendations
 
-| Cenario | TTL Sugerido | Estrategia |
-|---------|--------------|------------|
-| Ambiente de producao | 5 min (300s) | Usar ETag + polling periodico |
-| Desenvolvimento | 1 min (60s) | Recarregar mais frequente |
-| Alta carga | 10 min (600s) | Reduzir chamadas a API |
+| Scenario | Suggested TTL | Strategy |
+|----------|---------------|----------|
+| Production environment | 5 min (300s) | Use ETag + periodic polling |
+| Development | 1 min (60s) | Reload more frequently |
+| High load | 10 min (600s) | Reduce API calls |
 
-### Invalidacao de Cache
+### Cache Invalidation
 
-O cache deve ser invalidado quando:
+Cache should be invalidated when:
 
-1. **ETag muda**: O servidor retornou 200 ao inves de 304
-2. **Erro de assinatura**: Bundle pode estar corrompido
-3. **Requisicao administrativa**: Operador forca refresh
-4. **Timeout excedido**: TTL do bundle expirou
+1. **ETag changes**: Server returned 200 instead of 304
+2. **Signature error**: Bundle may be corrupted
+3. **Administrative request**: Operator forces refresh
+4. **Timeout exceeded**: Bundle TTL expired
 
-### Exemplo de Cache com TTL
+### Example Cache with TTL
 
 ```javascript
-// Function node - verificar cache
+// Function node - check cache
 const bundle = flow.get('alarmBundle');
 const bundleTimestamp = flow.get('alarmBundleTimestamp');
-const ttlSeconds = 300; // 5 minutos
+const ttlSeconds = 300; // 5 minutes
 
 const now = Date.now();
 const cacheAge = bundleTimestamp ? (now - bundleTimestamp) / 1000 : Infinity;
 
 if (bundle && cacheAge < ttlSeconds) {
-    // Cache ainda valido
+    // Cache still valid
     msg.useCache = true;
     msg.cacheAge = Math.round(cacheAge);
     node.status({fill:"green", shape:"dot", text:"Cache hit (" + msg.cacheAge + "s)"});
 } else {
-    // Precisa atualizar
+    // Needs update
     msg.useCache = false;
     node.status({fill:"yellow", shape:"ring", text:"Cache miss"});
 }
@@ -713,69 +713,69 @@ return msg;
 
 ## 9. Troubleshooting
 
-### Erro: 404 Not Found
+### Error: 404 Not Found
 
-**Causa:** Customer ID invalido ou inexistente.
+**Cause:** Invalid or non-existent Customer ID.
 
-**Solucao:** Verificar se o `customerId` esta correto e se o customer existe no GCDR.
+**Solution:** Verify that the `customerId` is correct and that the customer exists in GCDR.
 
 ```bash
-# Verificar customer
+# Verify customer
 curl -X GET "https://api.gcdr.io/dev/customers/{customerId}" \
   -H "Authorization: Bearer <token>"
 ```
 
-### Erro: 401 Unauthorized
+### Error: 401 Unauthorized
 
-**Causa:** Token JWT invalido ou expirado.
+**Cause:** Invalid or expired JWT token.
 
-**Solucao:** Renovar o token de autenticacao.
+**Solution:** Renew the authentication token.
 
-### Erro: Bundle vazio (0 rules, 0 devices)
+### Error: Empty bundle (0 rules, 0 devices)
 
-**Causa:** Customer nao tem regras ou devices cadastrados.
+**Cause:** Customer has no registered rules or devices.
 
-**Solucao:**
-1. Verificar se existem devices no customer
-2. Verificar se existem regras do tipo `ALARM_THRESHOLD`
-3. Verificar filtros (`domain`, `deviceType`)
+**Solution:**
+1. Verify devices exist for the customer
+2. Verify rules of type `ALARM_THRESHOLD` exist
+3. Check filters (`domain`, `deviceType`)
 
 ```bash
-# Listar rules do customer
+# List customer rules
 curl -X GET "https://api.gcdr.io/dev/customers/{customerId}/rules" \
   -H "Authorization: Bearer <token>"
 
-# Listar devices do customer
+# List customer assets/devices
 curl -X GET "https://api.gcdr.io/dev/customers/{customerId}/assets" \
   -H "Authorization: Bearer <token>"
 ```
 
-### Erro: Signature verification failed
+### Error: Signature verification failed
 
-**Causa:** Secret key incorreta ou bundle adulterado.
+**Cause:** Incorrect secret key or tampered bundle.
 
-**Solucao:**
-1. Verificar se `BUNDLE_SIGNING_SECRET` esta configurado corretamente
-2. Verificar se o bundle nao foi modificado apos recebimento
-3. Contatar equipe GCDR se o problema persistir
+**Solution:**
+1. Verify `BUNDLE_SIGNING_SECRET` is configured correctly
+2. Verify the bundle was not modified after receipt
+3. Contact GCDR team if the problem persists
 
-### Performance: Muitas chamadas a API
+### Performance: Too many API calls
 
-**Causa:** Cache nao esta sendo usado corretamente.
+**Cause:** Cache is not being used correctly.
 
-**Solucao:**
-1. Implementar cache com ETag (ver secao 4)
-2. Aumentar intervalo de polling
-3. Usar TTL do bundle (`meta.ttlSeconds`)
+**Solution:**
+1. Implement cache with ETag (see section 5)
+2. Increase polling interval
+3. Use bundle TTL (`meta.ttlSeconds`)
 
 ---
 
-## Contato
+## Contact
 
-- **Equipe GCDR**: gcdr-team@myio.com.br
+- **GCDR Team**: gcdr-team@myio.com.br
 - **Slack**: #gcdr-support
-- **Documentacao API**: https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs
+- **API Documentation**: https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs
 
 ---
 
-*Ultima atualizacao: 2026-01-21*
+*Last updated: 2026-01-21*
