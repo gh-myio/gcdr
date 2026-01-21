@@ -291,12 +291,43 @@ Resposta:
 }
 ```
 
+#### 4. Customer API Key (para M2M como Node-RED)
+
+Para integrações M2M de clientes (ex: Node-RED baixando bundles de alarme):
+
+```http
+X-API-Key: gcdr_cust_xxxxxxxxxxxx
+```
+
+**Criar API Key (requer JWT de admin):**
+```bash
+curl -X POST https://api.gcdr.io/dev/customers/{customerId}/api-keys \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: tenant-uuid" \
+  -H "Authorization: Bearer <jwt-admin-token>" \
+  -d '{
+    "name": "Node-RED Production",
+    "scopes": ["bundles:read"]
+  }'
+```
+
+**Scopes disponiveis:**
+- `bundles:read` - Bundles de alarme
+- `devices:read` - Leitura de devices
+- `rules:read` - Leitura de regras
+- `assets:read` - Leitura de assets
+- `groups:read` - Leitura de grupos
+- `*:read` - Leitura de todos os recursos
+
+Veja detalhes completos em: [ONBOARDING-NODERED-ALARM-BUNDLE.md](./ONBOARDING-NODERED-ALARM-BUNDLE.md)
+
 ### Estado Atual da Autenticacao
 
 | Funcionalidade | Status | Endpoint |
 |----------------|--------|----------|
 | **Partner Token (OAuth2)** | Implementado | `POST /partners/token` |
-| **API Key Validation** | Implementado | Middleware |
+| **Partner API Key Validation** | Implementado | Middleware |
+| **Customer API Key (M2M)** | Implementado | `POST /customers/{id}/api-keys` |
 | **Login de Usuarios** | Implementado | `POST /auth/login` |
 | **Refresh Token** | Implementado | `POST /auth/refresh` |
 | **MFA Verification** | Implementado | `POST /auth/mfa/verify` |
