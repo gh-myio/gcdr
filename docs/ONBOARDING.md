@@ -75,8 +75,8 @@ X-API-Key: <api-key-do-partner>
 A especificação completa da API está disponível em:
 - **Swagger UI (online)**: [`/docs`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs)
 - **OpenAPI JSON**: [`/docs/openapi.json`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs/openapi.json)
-- **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,270 linhas)
-- **130+ endpoints** documentados com schemas de request/response
+- **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,850+ linhas)
+- **140+ endpoints** documentados com schemas de request/response
 
 Você também pode importar o `openapi.yaml` em ferramentas como:
 - [Postman](https://www.postman.com/)
@@ -97,6 +97,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Centrals** | 10 | Centrais IoT (NODEHUB, GATEWAY, EDGE_CONTROLLER) |
 | **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
 | **Users** | 18 | Usuários, autenticação, MFA |
+| **Groups** | 12 | Grupos de usuários, dispositivos e assets com hierarquia |
 
 ### Exemplos de Requisições
 

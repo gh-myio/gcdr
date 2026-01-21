@@ -27,6 +27,7 @@ provider:
     CENTRALS_TABLE: ${self:custom.centralsTable}
     THEMES_TABLE: ${self:custom.themesTable}
     USERS_TABLE: ${self:custom.usersTable}
+    GROUPS_TABLE: ${self:custom.groupsTable}
     EVENT_BUS_NAME: ${self:custom.eventBusName}
     LOG_LEVEL: ${self:custom.logLevel.${self:provider.stage}, 'info'}
 
@@ -70,6 +71,8 @@ provider:
             - !Join ['/', [!GetAtt ThemesTable.Arn, 'index', '*']]
             - !GetAtt UsersTable.Arn
             - !Join ['/', [!GetAtt UsersTable.Arn, 'index', '*']]
+            - !GetAtt GroupsTable.Arn
+            - !Join ['/', [!GetAtt GroupsTable.Arn, 'index', '*']]
         - Effect: Allow
           Action:
             - events:PutEvents
@@ -99,6 +102,7 @@ custom:
   centralsTable: gcdr-centrals-${self:provider.stage}
   themesTable: gcdr-themes-${self:provider.stage}
   usersTable: gcdr-users-${self:provider.stage}
+  groupsTable: gcdr-groups-${self:provider.stage}
   eventBusName: gcdr-events-${self:provider.stage}
 
   logLevel:
@@ -787,6 +791,114 @@ functions:
       - http:
           path: /rules/statistics
           method: get
+          cors: true
+
+  # Alarm Rules Bundle (for Node-RED)
+  getAlarmBundle:
+    handler: src/handlers/rules/getAlarmBundle.handler
+    timeout: 60
+    memorySize: 512
+    events:
+      - http:
+          path: /customers/{id}/alarm-rules/bundle
+          method: get
+          cors: true
+
+  # Groups Management
+  createGroup:
+    handler: src/handlers/groups/create.handler
+    events:
+      - http:
+          path: /customers/{id}/groups
+          method: post
+          cors: true
+
+  getGroup:
+    handler: src/handlers/groups/get.handler
+    events:
+      - http:
+          path: /groups/{id}
+          method: get
+          cors: true
+
+  updateGroup:
+    handler: src/handlers/groups/update.handler
+    events:
+      - http:
+          path: /groups/{id}
+          method: put
+          cors: true
+
+  deleteGroup:
+    handler: src/handlers/groups/delete.handler
+    events:
+      - http:
+          path: /groups/{id}
+          method: delete
+          cors: true
+
+  listGroups:
+    handler: src/handlers/groups/list.handler
+    events:
+      - http:
+          path: /groups
+          method: get
+          cors: true
+
+  listGroupsByCustomer:
+    handler: src/handlers/groups/listByCustomer.handler
+    events:
+      - http:
+          path: /customers/{id}/groups
+          method: get
+          cors: true
+
+  addGroupMembers:
+    handler: src/handlers/groups/addMembers.handler
+    events:
+      - http:
+          path: /groups/{id}/members
+          method: post
+          cors: true
+
+  removeGroupMembers:
+    handler: src/handlers/groups/removeMembers.handler
+    events:
+      - http:
+          path: /groups/{id}/members
+          method: delete
+          cors: true
+
+  getGroupsByMember:
+    handler: src/handlers/groups/getGroupsByMember.handler
+    events:
+      - http:
+          path: /groups/by-member/{memberType}/{memberId}
+          method: get
+          cors: true
+
+  getGroupChildren:
+    handler: src/handlers/groups/getChildren.handler
+    events:
+      - http:
+          path: /groups/{id}/children
+          method: get
+          cors: true
+
+  getGroupDescendants:
+    handler: src/handlers/groups/getDescendants.handler
+    events:
+      - http:
+          path: /groups/{id}/descendants
+          method: get
+          cors: true
+
+  moveGroup:
+    handler: src/handlers/groups/moveGroup.handler
+    events:
+      - http:
+          path: /groups/{id}/move
+          method: post
           cors: true
 
   # Integration Marketplace APIs
@@ -1780,6 +1892,46 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    GroupsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:custom.groupsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+          - AttributeName: code
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-customer
+            KeySchema:
+              - AttributeName: tenantId
+                KeyType: HASH
+              - AttributeName: customerId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-customer-code
+            KeySchema:
+              - AttributeName: customerId
+                KeyType: HASH
+              - AttributeName: code
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # EventBridge
     GcdrEventBus:
       Type: AWS::Events::EventBus
@@ -1807,6 +1959,8 @@ resources:
       Value: !GetAtt ThemesTable.Arn
     UsersTableArn:
       Value: !GetAtt UsersTable.Arn
+    GroupsTableArn:
+      Value: !GetAtt GroupsTable.Arn
     EventBusArn:
       Value: !GetAtt GcdrEventBus.Arn
     ApiEndpoint:

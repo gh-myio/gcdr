@@ -427,3 +427,111 @@ Resumo - Keyboard Shortcuts
   - Seleção visual nos cards e tabela (borda/highlight)
   - Hint no header da página de alarms: "Press ? for shortcuts"
   - Modal organizado por categorias
+
+
+----
+
+ O Que Falta Implementar
+
+  Após as implementações críticas, aqui está o status atualizado:                                                                           
+  ---
+  Já Implementado (Crítico)
+  ┌─────────────────────────────────────────────────────────────┬────────┐
+  │                            Item                             │ Status │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ Verificação JWT com assinatura                              │ ✅     │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ GET /alarms com filtros e paginação                         │ ✅     │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ Health checks reais (DynamoDB/SQS)                          │ ✅     │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ Estatísticas admin                                          │ ✅     │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ Queue status real                                           │ ✅     │
+  ├─────────────────────────────────────────────────────────────┼────────┤
+  │ Testes dos guards (cooldown, silenced, maintenance, digest) │ ✅     │
+  └─────────────────────────────────────────────────────────────┴────────┘
+  ---
+  Ainda Falta (Média Prioridade)
+  ┌───────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────┐
+  │        Componente         │                                      Descrição                                      │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ DigestGuard persistente   │ Usa memória, perde estado ao reiniciar. Migrar para DynamoDB                        │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ Job de digest             │ getReadyDigests() nunca é chamado. Criar job agendado no worker                     │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ Notificação de fechamento │ src/domain/decision/decision.engine.ts:398 - enviar notificação quando alarme fecha │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ DLQ Retry                 │ src/api/routes/admin.routes.ts:295 - implementar lógica de retry                    │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ Cache management          │ /admin/rules/cache e DELETE /admin/rules/cache - inspeção e invalidação             │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ Templates faltantes       │ alarm.acknowledged.hbs, alarm.snoozed.hbs, alarm.digest.hbs                         │
+  └───────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────┘
+  ---
+  Baixa Prioridade (Futuro)
+  ┌──────────────────────┬──────────────────────────────────────────────────────────────────┐
+  │      Componente      │                            Descrição                             │
+  ├──────────────────────┼──────────────────────────────────────────────────────────────────┤
+  │ Canais de dispatch   │ Email/SMTP, WhatsApp                                             │
+  ├──────────────────────┼──────────────────────────────────────────────────────────────────┤
+  │ Node-RED Integration │ RFC existe em docs/RFC-NodeRed-Integration.md, 0% implementado   │
+  ├──────────────────────┼──────────────────────────────────────────────────────────────────┤
+  │ Observabilidade      │ Métricas detalhadas, circuit breakers                            │
+  ├──────────────────────┼──────────────────────────────────────────────────────────────────┤
+  │ Dispatch statistics  │ Contagem de dispatches bem-sucedidos/falhos no endpoint de stats │
+  └──────────────────────┴──────────────────────────────────────────────────────────────────┘
+  ---
+  TODOs Restantes no Código
+
+  src/api/routes/admin.routes.ts:295  - DLQ retry logic
+  src/api/routes/admin.routes.ts:354  - Cache inspection
+  src/api/routes/admin.routes.ts:398  - Cache invalidation
+  src/domain/decision/decision.engine.ts:398 - Closure notification
+
+  ---
+  Quer que eu implemente algum desses itens?
+
+
+----
+
+
+Resumo do deploy:                                                                                                                     ┌────────────────────┬────────────────────────┐
+  │      Recurso       │         Status         │
+  ├────────────────────┼────────────────────────┤
+  │ Infraestrutura AWS │ ✅ 63 recursos criados │
+  ├────────────────────┼────────────────────────┤
+  │ ECR                │ ✅ Imagem publicada    │
+  ├────────────────────┼────────────────────────┤
+  │ ECS API            │ ✅ Rodando             │
+  ├────────────────────┼────────────────────────┤
+  │ ECS Orchestrator   │ ✅ Rodando             │
+  ├────────────────────┼────────────────────────┤
+  │ ECS Dispatcher     │ ✅ Rodando             │
+  ├────────────────────┼────────────────────────┤
+  │ Código             │ ✅ Commitado e pushed  │
+  └────────────────────┴────────────────────────┘
+  URL da API: http://alarm-dev-alb-2015283771.us-east-1.elb.amazonaws.com
+
+
+----
+
+
+
+  URLs disponíveis:
+  ┌──────────────┬───────────────────────────────────────────────────────────────────────┐
+  │   Recurso    │                                  URL                                  │
+  ├──────────────┼───────────────────────────────────────────────────────────────────────┤
+  │ Swagger UI   │ http://alarm-dev-alb-2015283771.us-east-1.elb.amazonaws.com/docs/     │
+  ├──────────────┼───────────────────────────────────────────────────────────────────────┤
+  │ OpenAPI JSON │ http://alarm-dev-alb-2015283771.us-east-1.elb.amazonaws.com/docs/json │
+  ├──────────────┼───────────────────────────────────────────────────────────────────────┤
+  │ OpenAPI YAML │ http://alarm-dev-alb-2015283771.us-east-1.elb.amazonaws.com/docs/yaml │
+  └──────────────┴───────────────────────────────────────────────────────────────────────┘
+  A documentação inclui:
+  - Autenticação JWT (Bearer token)
+  - Endpoints de Alarmes (CRUD, ack, silence, escalate, close)
+  - Endpoints de Administração (stats, queues, cache)
+  - Health checks
+  - Schemas completos (Alarm, AlarmState, AlarmSeverity, Error, Pagination)
+

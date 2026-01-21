@@ -45,6 +45,8 @@ tags:
     description: Look and Feel customization
   - name: Users
     description: User management and authentication
+  - name: Groups
+    description: Group management for users, devices, and assets
 
 security:
   - bearerAuth: []
@@ -2342,6 +2344,226 @@ components:
       properties:
         token:
           type: string
+
+    # Groups
+    Group:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: Unique code within the customer
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [USER, DEVICE, ASSET, MIXED]
+        purposes:
+          type: array
+          items:
+            type: string
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMember'
+        memberCount:
+          type: integer
+        hierarchy:
+          $ref: '#/components/schemas/GroupHierarchy'
+        notificationSettings:
+          $ref: '#/components/schemas/GroupNotificationSettings'
+        metadata:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedBy:
+          type: string
+
+    GroupMember:
+      type: object
+      required:
+        - memberId
+        - memberType
+      properties:
+        memberId:
+          type: string
+          format: uuid
+        memberType:
+          type: string
+          enum: [USER, DEVICE, ASSET]
+        addedAt:
+          type: string
+          format: date-time
+        addedBy:
+          type: string
+
+    GroupHierarchy:
+      type: object
+      properties:
+        parentGroupId:
+          type: string
+          format: uuid
+          nullable: true
+        path:
+          type: string
+          description: Materialized path (e.g., /root/parent/current)
+        level:
+          type: integer
+          description: Depth in the hierarchy (0 = root)
+
+    GroupNotificationSettings:
+      type: object
+      properties:
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [EMAIL, SMS, PUSH, WEBHOOK]
+        escalationOrder:
+          type: integer
+        timePreferences:
+          type: object
+          properties:
+            timezone:
+              type: string
+            quietHoursStart:
+              type: string
+            quietHoursEnd:
+              type: string
+            workingDays:
+              type: array
+              items:
+                type: integer
+
+    CreateGroup:
+      type: object
+      required:
+        - customerId
+        - name
+        - type
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [USER, DEVICE, ASSET, MIXED]
+        purposes:
+          type: array
+          items:
+            type: string
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMember'
+        parentGroupId:
+          type: string
+          format: uuid
+          nullable: true
+        notificationSettings:
+          $ref: '#/components/schemas/GroupNotificationSettings'
+        metadata:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+          default: true
+
+    UpdateGroup:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        purposes:
+          type: array
+          items:
+            type: string
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+        notificationSettings:
+          $ref: '#/components/schemas/GroupNotificationSettings'
+        metadata:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+
+    AddGroupMembers:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMember'
+
+    RemoveGroupMembers:
+      type: object
+      required:
+        - memberIds
+      properties:
+        memberIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    MoveGroup:
+      type: object
+      required:
+        - parentGroupId
+      properties:
+        parentGroupId:
+          type: string
+          format: uuid
+          nullable: true
+          description: New parent group ID (null to move to root)
+
+    GroupList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+        nextCursor:
+          type: string
+          nullable: true
 
 paths:
   # Health
@@ -5268,3 +5490,363 @@ paths:
                   - properties:
                       data:
                         $ref: '#/components/schemas/User'
+
+  # Groups
+  /groups:
+    post:
+      tags: [Groups]
+      summary: Create group
+      operationId: createGroup
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroup'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Groups]
+      summary: List groups
+      operationId: listGroups
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [USER, DEVICE, ASSET, MIXED]
+        - name: purpose
+          in: query
+          schema:
+            type: string
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/GroupList'
+
+  /groups/{id}:
+    get:
+      tags: [Groups]
+      summary: Get group by ID
+      operationId: getGroup
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Groups]
+      summary: Update group
+      operationId: updateGroup
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroup'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Groups]
+      summary: Delete group
+      operationId: deleteGroup
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Group deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /customers/{id}/groups:
+    get:
+      tags: [Groups]
+      summary: List groups by customer
+      operationId: listGroupsByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [USER, DEVICE, ASSET, MIXED]
+        - name: purpose
+          in: query
+          schema:
+            type: string
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+      responses:
+        '200':
+          description: List of groups for customer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/GroupList'
+
+  /groups/{id}/members:
+    post:
+      tags: [Groups]
+      summary: Add members to group
+      operationId: addGroupMembers
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddGroupMembers'
+      responses:
+        '200':
+          description: Members added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Groups]
+      summary: Remove members from group
+      operationId: removeGroupMembers
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveGroupMembers'
+      responses:
+        '200':
+          description: Members removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /groups/member/{memberId}:
+    get:
+      tags: [Groups]
+      summary: Get groups by member
+      operationId: getGroupsByMember
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Member ID (user, device, or asset)
+      responses:
+        '200':
+          description: List of groups containing the member
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Group'
+
+  /groups/{id}/children:
+    get:
+      tags: [Groups]
+      summary: Get direct child groups
+      operationId: getGroupChildren
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of child groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /groups/{id}/descendants:
+    get:
+      tags: [Groups]
+      summary: Get all descendant groups
+      operationId: getGroupDescendants
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of descendant groups (children, grandchildren, etc.)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /groups/{id}/move:
+    post:
+      tags: [Groups]
+      summary: Move group to new parent
+      operationId: moveGroup
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveGroup'
+      responses:
+        '200':
+          description: Group moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

@@ -29,4 +29,5 @@ export const TableNames = {
   CENTRALS: process.env.CENTRALS_TABLE || 'gcdr-centrals-dev',
   THEMES: process.env.THEMES_TABLE || 'gcdr-themes-dev',
   USERS: process.env.USERS_TABLE || 'gcdr-users-dev',
+  GROUPS: process.env.GROUPS_TABLE || 'gcdr-groups-dev',
 };
