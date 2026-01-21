@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 gcdr-backend.md
 gcdr-backend.txt
 stacks-map.js
+docker/.env
