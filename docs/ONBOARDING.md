@@ -73,11 +73,12 @@ X-API-Key: <api-key-do-partner>
 ### Documentação OpenAPI
 
 A especificação completa da API está disponível em:
-- **Arquivo**: [`docs/openapi.yaml`](./openapi.yaml) (5,270 linhas)
+- **Swagger UI (online)**: [`/docs`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs)
+- **OpenAPI JSON**: [`/docs/openapi.json`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs/openapi.json)
+- **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,270 linhas)
 - **130+ endpoints** documentados com schemas de request/response
 
-Você pode importar o `openapi.yaml` em ferramentas como:
-- [Swagger Editor](https://editor.swagger.io/)
+Você também pode importar o `openapi.yaml` em ferramentas como:
 - [Postman](https://www.postman.com/)
 - [Insomnia](https://insomnia.rest/)
 
