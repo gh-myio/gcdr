@@ -5,16 +5,17 @@ Bem-vindo ao time! Este manual vai te ajudar a entender e começar a contribuir 
 ## Sumário
 
 1. [Visão Geral do Projeto](#1-visão-geral-do-projeto)
-2. [Configuração do Ambiente](#2-configuração-do-ambiente)
-3. [Arquitetura do Sistema](#3-arquitetura-do-sistema)
-4. [Estrutura do Código](#4-estrutura-do-código)
-5. [Fluxo de Dados](#5-fluxo-de-dados)
-6. [Padrões e Convenções](#6-padrões-e-convenções)
-7. [Desenvolvimento Local](#7-desenvolvimento-local)
-8. [Testes](#8-testes)
-9. [Tarefas Comuns](#9-tarefas-comuns)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Recursos Úteis](#11-recursos-úteis)
+2. [Acesso para Frontend](#2-acesso-para-frontend)
+3. [Configuração do Ambiente](#3-configuração-do-ambiente)
+4. [Arquitetura do Sistema](#4-arquitetura-do-sistema)
+5. [Estrutura do Código](#5-estrutura-do-código)
+6. [Fluxo de Dados](#6-fluxo-de-dados)
+7. [Padrões e Convenções](#7-padrões-e-convenções)
+8. [Desenvolvimento Local](#8-desenvolvimento-local)
+9. [Testes](#9-testes)
+10. [Tarefas Comuns](#10-tarefas-comuns)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Recursos Úteis](#12-recursos-úteis)
 
 ---
 
@@ -40,6 +41,214 @@ Sem o GCDR, cada sistema (ThingsBoard, NodeHub, OS, etc.) mantinha sua própria 
 
 O GCDR resolve isso centralizando tudo em um único lugar autoritativo.
 
+---
+
+## 2. Acesso para Frontend
+
+Esta seção contém todas as informações necessárias para a equipe de frontend consumir a API GCDR.
+
+### Ambientes Disponíveis
+
+| Ambiente | URL Base | Uso |
+|----------|----------|-----|
+| **Development** | `https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev` | Desenvolvimento e testes |
+| **Staging** | `https://api.gcdr.io/staging` | Homologação (em breve) |
+| **Production** | `https://api.gcdr.io` | Produção (em breve) |
+
+### Headers Obrigatórios
+
+Toda requisição deve incluir:
+
+```http
+Content-Type: application/json
+x-tenant-id: <uuid-do-tenant>
+Authorization: Bearer <jwt-token>
+```
+
+Para endpoints de parceiros, use API Key:
+```http
+X-API-Key: <api-key-do-partner>
+```
+
+### Documentação OpenAPI
+
+A especificação completa da API está disponível em:
+- **Arquivo**: [`docs/openapi.yaml`](./openapi.yaml) (5,270 linhas)
+- **130+ endpoints** documentados com schemas de request/response
+
+Você pode importar o `openapi.yaml` em ferramentas como:
+- [Swagger Editor](https://editor.swagger.io/)
+- [Postman](https://www.postman.com/)
+- [Insomnia](https://insomnia.rest/)
+
+### Módulos da API
+
+| Módulo | Endpoints | Descrição |
+|--------|-----------|-----------|
+| **Health** | 1 | Health check da API |
+| **Customers** | 9 | Hierarquia de clientes (ROOT → RESELLER → ENTERPRISE → BUSINESS → INDIVIDUAL) |
+| **Partners** | 15 | Parceiros, API Keys, OAuth Clients, Webhooks |
+| **Authorization** | 18 | RBAC completo (Roles, Policies, Assignments) |
+| **Assets** | 11 | Ativos com hierarquia (SITE → BUILDING → FLOOR → AREA → EQUIPMENT) |
+| **Devices** | 9 | Dispositivos IoT com conectividade |
+| **Rules** | 10 | Regras de negócio (ALARM, SLA, ESCALATION, MAINTENANCE) |
+| **Integrations** | 12 | Marketplace de integrações |
+| **Centrals** | 10 | Centrais IoT (NODEHUB, GATEWAY, EDGE_CONTROLLER) |
+| **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
+| **Users** | 18 | Usuários, autenticação, MFA |
+
+### Exemplos de Requisições
+
+#### Health Check
+```bash
+curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/health
+```
+
+Resposta:
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "service": "gcdr-api",
+    "version": "1.0.0",
+    "stage": "dev"
+  }
+}
+```
+
+#### Listar Customers
+```bash
+curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Criar Customer
+```bash
+curl -X POST https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "name": "Empresa ABC",
+    "type": "ENTERPRISE",
+    "document": "12.345.678/0001-90",
+    "email": "contato@empresaabc.com"
+  }'
+```
+
+#### Buscar Árvore de Customers
+```bash
+curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/tree \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Listar Assets de um Customer
+```bash
+curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/assets \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Obter Tema Efetivo (com herança)
+```bash
+curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/theme/effective \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>"
+```
+
+### Padrão de Resposta
+
+Todas as respostas seguem o formato:
+
+**Sucesso:**
+```json
+{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "requestId": "uuid",
+    "timestamp": "2026-01-21T00:00:00.000Z"
+  }
+}
+```
+
+**Erro:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Customer not found",
+    "details": { ... }
+  },
+  "meta": {
+    "requestId": "uuid",
+    "timestamp": "2026-01-21T00:00:00.000Z"
+  }
+}
+```
+
+**Lista com paginação:**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "meta": {
+    "requestId": "uuid",
+    "timestamp": "2026-01-21T00:00:00.000Z",
+    "pagination": {
+      "limit": 20,
+      "cursor": "eyJpZCI6Ijk5OSJ9",
+      "hasMore": true
+    }
+  }
+}
+```
+
+### Códigos de Erro HTTP
+
+| Código | Significado |
+|--------|-------------|
+| 200 | OK - Sucesso |
+| 201 | Created - Recurso criado |
+| 400 | Bad Request - Erro de validação |
+| 401 | Unauthorized - Token inválido ou ausente |
+| 403 | Forbidden - Sem permissão |
+| 404 | Not Found - Recurso não encontrado |
+| 409 | Conflict - Conflito (ex: duplicado) |
+| 422 | Unprocessable Entity - Regra de negócio violada |
+| 429 | Too Many Requests - Rate limit excedido |
+| 500 | Internal Server Error - Erro interno |
+
+### Autenticação
+
+A API suporta dois métodos de autenticação:
+
+1. **JWT Bearer Token** (para aplicações frontend/mobile)
+   ```http
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   ```
+
+2. **API Key** (para integrações de parceiros)
+   ```http
+   X-API-Key: gcdr_pk_live_xxxxxxxxxxxx
+   ```
+
+### Rate Limiting
+
+| Tipo | Limite |
+|------|--------|
+| Por IP | 1000 req/min |
+| Por API Key | Conforme plano do partner |
+| Por User | 100 req/min |
+
+---
+
+## 3. Configuração do Ambiente
+
 ### Tecnologias Principais
 
 | Tecnologia | Para quê usamos |
@@ -53,10 +262,6 @@ O GCDR resolve isso centralizando tudo em um único lugar autoritativo.
 | **Zod** | Validação de schemas |
 | **Jest** | Framework de testes |
 | **npm** | Gerenciador de pacotes |
-
----
-
-## 2. Configuração do Ambiente
 
 ### Pré-requisitos
 
@@ -127,7 +332,7 @@ curl http://localhost:3000/dev/health
 
 ---
 
-## 3. Arquitetura do Sistema
+## 4. Arquitetura do Sistema
 
 ### Diagrama de Alto Nível
 
@@ -203,7 +408,7 @@ curl http://localhost:3000/dev/health
 
 ---
 
-## 4. Estrutura do Código
+## 5. Estrutura do Código
 
 ### Visão Geral dos Diretórios
 
@@ -370,7 +575,7 @@ class CustomerRepository implements ICustomerRepository {
 
 ---
 
-## 5. Fluxo de Dados
+## 6. Fluxo de Dados
 
 ### Fluxo: Criar Customer
 
@@ -473,7 +678,7 @@ class CustomerRepository implements ICustomerRepository {
 
 ---
 
-## 6. Padrões e Convenções
+## 7. Padrões e Convenções
 
 ### Nomenclatura
 
@@ -545,7 +750,7 @@ if (!result.success) {
 
 ---
 
-## 7. Desenvolvimento Local
+## 8. Desenvolvimento Local
 
 ### Comandos Úteis
 
@@ -659,7 +864,7 @@ Crie `.vscode/launch.json`:
 
 ---
 
-## 8. Testes
+## 9. Testes
 
 ### Estrutura de Testes
 
@@ -744,7 +949,7 @@ npm run test:coverage
 
 ---
 
-## 9. Tarefas Comuns
+## 10. Tarefas Comuns
 
 ### Adicionar Novo Endpoint
 
@@ -845,7 +1050,7 @@ await this.eventService.publish({
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Erro: "Cannot find module"
 
@@ -914,7 +1119,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 
 ---
 
-## 11. Recursos Úteis
+## 12. Recursos Úteis
 
 ### Documentação Interna
 
