@@ -638,9 +638,9 @@ curl http://localhost:3015/health
 
 | Componente | Responsabilidade |
 |------------|------------------|
-| **Handlers** | Recebem requests HTTP, validam input, chamam services |
+| **Controllers** | Recebem requests HTTP, validam input, chamam services |
 | **Services** | Lógica de negócio, orquestração entre repositories |
-| **Repositories** | Acesso a dados no DynamoDB |
+| **Repositories** | Acesso a dados no PostgreSQL (Drizzle ORM) |
 | **DTOs** | Validação de entrada/saída com Zod |
 | **Middleware** | Error handling, request context, response formatting |
 | **Events** | Publicação no EventBridge para outros sistemas |
@@ -678,33 +678,23 @@ src/
 │       ├── CustomerResponseDTO.ts
 │       └── AuthorizationResponseDTO.ts
 │
-├── handlers/             # Lambda handlers (entry points)
-│   ├── health.ts         # Health check
-│   ├── customers/        # CRUD + hierarquia de customers
-│   │   ├── create.ts
-│   │   ├── get.ts
-│   │   ├── update.ts
-│   │   ├── delete.ts
-│   │   ├── list.ts
-│   │   ├── getChildren.ts
-│   │   ├── getDescendants.ts
-│   │   ├── getTree.ts
-│   │   └── move.ts
-│   ├── partners/         # Workflow de parceiros
-│   │   ├── register.ts
-│   │   ├── approve.ts
-│   │   ├── reject.ts
-│   │   ├── get.ts
-│   │   └── list.ts
-│   ├── authorization/    # Controle de acesso
-│   │   ├── check.ts
-│   │   ├── assignRole.ts
-│   │   ├── listRoles.ts
-│   │   └── getUserRoles.ts
-│   └── middleware/       # Middlewares compartilhados
-│       ├── errorHandler.ts
-│       ├── requestContext.ts
-│       └── response.ts
+├── controllers/          # HTTP route controllers (Express)
+│   ├── health.controller.ts      # Health check endpoints
+│   ├── auth.controller.ts        # Authentication endpoints
+│   ├── customers.controller.ts   # CRUD + hierarquia de customers
+│   ├── partners.controller.ts    # Workflow de parceiros
+│   ├── authorization.controller.ts # Controle de acesso
+│   ├── devices.controller.ts     # Device management
+│   ├── users.controller.ts       # User management
+│   ├── rules.controller.ts       # Rules engine
+│   └── admin/
+│       └── db-admin.controller.ts # Database Admin UI
+│
+├── middleware/           # Express middlewares
+│   ├── auth.ts           # JWT authentication
+│   ├── context.ts        # Request context extraction
+│   ├── errorHandler.ts   # Global error handling
+│   └── response.ts       # Standardized responses
 │
 ├── services/             # Lógica de negócio
 │   ├── CustomerService.ts
@@ -718,9 +708,12 @@ src/
 │       ├── IPartnerRepository.ts
 │       └── IRepository.ts
 │
-├── infrastructure/       # Infraestrutura técnica
+├── infrastructure/       # Infraestrutura tecnica
 │   ├── database/
-│   │   └── dynamoClient.ts
+│   │   └── drizzle/
+│   │       ├── schema.ts     # Drizzle schema definitions
+│   │       ├── client.ts     # PostgreSQL connection
+│   │       └── migrations/   # SQL migrations
 │   └── events/
 │       └── EventService.ts
 │
@@ -781,16 +774,22 @@ const createCustomerSchema = z.object({
 });
 ```
 
-#### `handlers/` - Entry Points
+#### `controllers/` - Entry Points
 
-Cada handler é uma Lambda function:
+Cada controller e um modulo Express com rotas HTTP:
 
 ```typescript
-export const handler: APIGatewayProxyHandler = async (event) => {
-  // 1. Parse e valida input
+import { Router } from 'express';
+
+const router = Router();
+
+router.get('/:id', async (req, res) => {
+  // 1. Parse e valida input (Zod)
   // 2. Chama service
   // 3. Retorna response formatada
-};
+});
+
+export default router;
 ```
 
 #### `services/` - Lógica de Negócio
@@ -810,7 +809,7 @@ class CustomerService {
 
 #### `repositories/` - Acesso a Dados
 
-Encapsula operações no DynamoDB:
+Encapsula operacoes no PostgreSQL usando Drizzle ORM:
 
 ```typescript
 class CustomerRepository implements ICustomerRepository {
@@ -848,8 +847,8 @@ class CustomerRepository implements ICustomerRepository {
    └─> Chama Repository.create()
 
 4. REPOSITORY (CustomerRepository.ts)
-   └─> Monta item DynamoDB
-   └─> PutItem na tabela gcdr-customers-{stage}
+   └─> Monta entidade com Drizzle ORM
+   └─> INSERT na tabela customers (PostgreSQL)
 
 5. EVENTOS (EventService.ts)
    └─> Publica evento "customer.created" no EventBridge
@@ -942,7 +941,8 @@ class CustomerRepository implements ICustomerRepository {
 
 ```typescript
 // 1. Imports externos
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { db } from '../infrastructure/database/drizzle/db';
+import { customers } from '../infrastructure/database/drizzle/schema';
 import { z } from 'zod';
 
 // 2. Imports internos
@@ -951,7 +951,7 @@ import type { ICustomerRepository } from './interfaces/ICustomerRepository';
 
 // 3. Tipos/Interfaces locais
 interface ServiceConfig {
-  tableName: string;
+  connectionString: string;
 }
 
 // 4. Constantes
@@ -1334,23 +1334,31 @@ export interface MyEntity {
 ```typescript
 export class MyEntityRepository implements IMyEntityRepository {
   async findById(tenantId: string, id: string): Promise<MyEntity | null> {
-    // implementação DynamoDB
+    const result = await db.select()
+      .from(myEntities)
+      .where(and(
+        eq(myEntities.tenantId, tenantId),
+        eq(myEntities.id, id)
+      ))
+      .limit(1);
+    return result[0] ?? null;
   }
 }
 ```
 
 4. **Crie o service** em `src/services/`
 
-5. **Adicione a tabela** no `serverless.yml`:
+5. **Adicione a tabela** no schema Drizzle (`src/infrastructure/database/drizzle/schema.ts`):
 
-```yaml
-resources:
-  Resources:
-    MyEntityTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: gcdr-my-entity-${self:provider.stage}
-        # ...schema
+```typescript
+export const myEntities = pgTable('my_entities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantIdx: index('my_entities_tenant_idx').on(table.tenantId),
+}));
 ```
 
 ### Adicionar Evento
@@ -1393,11 +1401,11 @@ npm run build
 # ou verifique os paths no tsconfig.json
 ```
 
-### Erro: "Validation error" no DynamoDB
+### Erro: "Validation error" no PostgreSQL
 
-**Causa**: Item não tem todas as chaves necessárias.
+**Causa**: Dados nao passaram na validacao do schema (Zod ou constraints do banco).
 
-**Solução**: Verifique se `tenantId` e `id` estão presentes no item.
+**Solucao**: Verifique se `tenantId` e `id` estao presentes e se os campos obrigatorios foram preenchidos.
 
 ### Container não inicia / Porta em uso
 
@@ -1522,11 +1530,13 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - Error Lens
 - GitLens
 - Thunder Client (para testar API)
-- AWS Toolkit
+- Docker
+- PostgreSQL (cweijan.vscode-postgresql-client2)
 
 **CLI Tools**:
-- [AWS CLI](https://aws.amazon.com/cli/)
-- [NoSQL Workbench](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/workbench.html) - GUI para DynamoDB
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [DBeaver](https://dbeaver.io/) - GUI para PostgreSQL
+- [pgAdmin](https://www.pgadmin.org/) - Alternativa para PostgreSQL
 
 ### Contatos
 

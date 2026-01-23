@@ -8,49 +8,49 @@
 
 ## Summary
 
-Implementar um sistema de audit logs flexível para o GCDR, inspirado no middleware `logEvent` do rec4go-api e alinhado com o RFC-0002 do Alarms Backend, permitindo rastrear ações de usuários e eventos do sistema em endpoints de forma estruturada e consultável.
+Implementar um sistema de audit logs flexivel para o GCDR, inspirado no middleware `logEvent` do rec4go-api e alinhado com o RFC-0002 do Alarms Backend, permitindo rastrear acoes de usuarios e eventos do sistema em endpoints de forma estruturada e consultavel.
 
 ## Motivation
 
 ### Necessidades
 
 1. **Compliance & Auditoria**: Rastrear quem fez o que e quando em um sistema multi-tenant
-2. **Debugging**: Entender a sequência de eventos que levaram a um estado
-3. **Analytics**: Métricas de uso e padrões de comportamento por tenant/customer
-4. **Segurança**: Detectar acessos suspeitos ou não autorizados
-5. **Integração**: Manter padrão consistente com outros serviços (Alarms)
+2. **Debugging**: Entender a sequencia de eventos que levaram a um estado
+3. **Analytics**: Metricas de uso e padroes de comportamento por tenant/customer
+4. **Seguranca**: Detectar acessos suspeitos ou nao autorizados
+5. **Integracao**: Manter padrao consistente com outros servicos (Alarms)
 
 ### Estado Atual
 
-O GCDR já possui uma tabela `audit_logs` no schema, mas:
-- Não tem middleware para captura automática
+O GCDR ja possui uma tabela `audit_logs` no schema, mas:
+- Nao tem middleware para captura automatica
 - Faltam campos para contexto de request (httpMethod, httpPath, statusCode, durationMs)
-- Faltam campos para categorização (eventCategory, description, actorType)
-- Não está sendo populada ativamente pelos endpoints
+- Faltam campos para categorizacao (eventCategory, description, actorType)
+- Nao esta sendo populada ativamente pelos endpoints
 
-## Comparação: Alarms RFC-0002 vs GCDR
+## Comparacao: Alarms RFC-0002 vs GCDR
 
-### Análise de Compatibilidade
+### Analise de Compatibilidade
 
 | Aspecto | Alarms RFC-0002 | GCDR (Atual) | GCDR (Proposto) |
 |---------|-----------------|--------------|-----------------|
 | ID | VARCHAR(26) nanoid | UUID | **UUID** (manter) |
 | Framework | Fastify hooks | Express | **Express middleware** |
-| Multi-tenant | tenantId opcional | tenantId obrigatório | **tenantId obrigatório** |
+| Multi-tenant | tenantId opcional | tenantId obrigatorio | **tenantId obrigatorio** |
 | Recurso | resourceType/Id | entityType/Id | **entityType/Id** (manter) |
 | Actor | actorId, actorType | userId | **userId + actorType** |
-| Request context | httpMethod, path, status, duration | Não tem | **Adicionar** |
-| Categorização | eventCategory | Não tem | **Adicionar** |
-| Descrição | description | Não tem | **Adicionar** |
+| Request context | httpMethod, path, status, duration | Nao tem | **Adicionar** |
+| Categorizacao | eventCategory | Nao tem | **Adicionar** |
+| Descricao | description | Nao tem | **Adicionar** |
 
-### Diferenças Justificadas
+### Diferencas Justificadas
 
 | Campo GCDR | Campo Alarms | Justificativa |
 |------------|--------------|---------------|
-| `entityType` + `entityId` | `resourceType` + `resourceId` | Nomenclatura GCDR já estabelecida |
-| `action` (CREATE, UPDATE, DELETE) | Não tem | GCDR precisa do tipo de ação CRUD |
-| `tenantId` obrigatório | `tenantId` opcional | GCDR é 100% multi-tenant |
-| UUID para IDs | nanoid | Padrão GCDR já estabelecido |
+| `entityType` + `entityId` | `resourceType` + `resourceId` | Nomenclatura GCDR ja estabelecida |
+| `action` (CREATE, UPDATE, DELETE) | Nao tem | GCDR precisa do tipo de acao CRUD |
+| `tenantId` obrigatorio | `tenantId` opcional | GCDR e 100% multi-tenant |
+| UUID para IDs | nanoid | Padrao GCDR ja estabelecido |
 
 ### Campos a Adicionar no GCDR
 
@@ -63,8 +63,230 @@ O GCDR já possui uma tabela `audit_logs` no schema, mas:
 + statusCode: integer('status_code')
 + errorMessage: text('error_message')
 + durationMs: integer('duration_ms')
-+ customerId: uuid('customer_id')  // Específico GCDR
++ customerId: uuid('customer_id')  // Especifico GCDR
 + externalLink: varchar('external_link', { length: 255 })  // Inspirado rec4go
+```
+
+## Non-Functional Requirements
+
+### Retencao de Dados
+
+| Audit Level | Retencao | Descricao |
+|-------------|----------|-----------|
+| MINIMAL | 365 dias | Acoes criticas (CREATE, DELETE, auth failures) |
+| STANDARD | 180 dias | Acoes de usuario em producao |
+| VERBOSE | 90 dias | Queries e leituras |
+| DEBUG | 30 dias | Tudo (apenas desenvolvimento) |
+
+### Particionamento
+
+A tabela `audit_logs` deve ser particionada por `created_at` para performance e facilitar purge:
+
+```sql
+-- Criar tabela particionada por range mensal
+CREATE TABLE audit_logs (
+  -- ... colunas ...
+) PARTITION BY RANGE (created_at);
+
+-- Particoes mensais
+CREATE TABLE audit_logs_2026_01 PARTITION OF audit_logs
+  FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+CREATE TABLE audit_logs_2026_02 PARTITION OF audit_logs
+  FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+-- ...
+```
+
+### Volume Estimado
+
+| Cenario | Logs/dia/tenant | Storage/mes/tenant |
+|---------|-----------------|-------------------|
+| Baixo uso | ~100 | ~5 MB |
+| Uso medio | ~500 | ~25 MB |
+| Alto uso | ~2000 | ~100 MB |
+
+### Purge Job
+
+Cron job diario para deletar logs expirados:
+
+```typescript
+// src/jobs/audit-purge.job.ts
+async function purgeExpiredAuditLogs() {
+  const retentionDays = {
+    [AuditLevel.MINIMAL]: 365,
+    [AuditLevel.STANDARD]: 180,
+    [AuditLevel.VERBOSE]: 90,
+    [AuditLevel.DEBUG]: 30,
+  };
+
+  for (const [level, days] of Object.entries(retentionDays)) {
+    const cutoffDate = subDays(new Date(), days);
+    await db.delete(auditLogs)
+      .where(and(
+        lte(auditLogs.createdAt, cutoffDate),
+        eq(auditLogs.auditLevel, level)
+      ));
+  }
+}
+
+// Executar diariamente as 03:00 UTC
+cron.schedule('0 3 * * *', purgeExpiredAuditLogs);
+```
+
+## Security & Privacy
+
+### Mascaramento de PII
+
+Dados sensiveis devem ser mascarados antes de persistir em `oldValues`, `newValues` e `metadata`:
+
+```typescript
+// src/shared/utils/pii-sanitizer.ts
+
+const SENSITIVE_PATTERNS = [
+  'password', 'senha', 'secret', 'token', 'apiKey', 'api_key',
+  'creditCard', 'credit_card', 'cardNumber', 'card_number',
+  'cvv', 'ssn', 'cpf', 'cnpj', 'privateKey', 'private_key',
+  'accessToken', 'access_token', 'refreshToken', 'refresh_token',
+];
+
+export function sanitizePII(data: Record<string, unknown>): Record<string, unknown> {
+  if (!data || typeof data !== 'object') return data;
+
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => {
+      // Verifica se a chave contem padrao sensivel
+      const isSensitive = SENSITIVE_PATTERNS.some(pattern =>
+        key.toLowerCase().includes(pattern.toLowerCase())
+      );
+
+      if (isSensitive) {
+        return [key, '***REDACTED***'];
+      }
+
+      // Recursivamente sanitiza objetos aninhados
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return [key, sanitizePII(value as Record<string, unknown>)];
+      }
+
+      // Mascara emails parcialmente
+      if (typeof value === 'string' && value.includes('@') && key.toLowerCase().includes('email')) {
+        const [local, domain] = value.split('@');
+        const maskedLocal = local.length > 2
+          ? local[0] + '*'.repeat(local.length - 2) + local[local.length - 1]
+          : '**';
+        return [key, `${maskedLocal}@${domain}`];
+      }
+
+      // Mascara IPs parcialmente
+      if (key.toLowerCase().includes('ip') && typeof value === 'string') {
+        const parts = value.split('.');
+        if (parts.length === 4) {
+          return [key, `${parts[0]}.${parts[1]}.***.***`];
+        }
+      }
+
+      return [key, value];
+    })
+  );
+}
+```
+
+### RBAC para Endpoint `/audit-logs`
+
+```typescript
+// Permissoes necessarias para acessar audit logs
+const AUDIT_LOG_PERMISSIONS = {
+  read: ['admin', 'auditor', 'security-analyst'],
+  export: ['admin', 'auditor'],
+  delete: ['admin'], // Apenas para compliance requests
+};
+
+// Middleware de autorizacao
+function requireAuditAccess(action: 'read' | 'export' | 'delete') {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userRoles = (req as any).user?.roles || [];
+    const allowedRoles = AUDIT_LOG_PERMISSIONS[action];
+
+    if (!userRoles.some((role: string) => allowedRoles.includes(role))) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `Requires one of roles: ${allowedRoles.join(', ')}`,
+      });
+    }
+    next();
+  };
+}
+```
+
+### Rate Limiting
+
+```typescript
+// Rate limit especifico para audit logs (evitar exfiltracao)
+const auditLogRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 10, // 10 requests por minuto
+  message: { error: 'Too many audit log requests, please try again later' },
+  keyGenerator: (req) => (req as any).user?.id || req.ip,
+});
+
+router.get('/audit-logs', auditLogRateLimiter, requireAuditAccess('read'), ...);
+```
+
+## Payload Limits
+
+Limites para evitar abuso e manter consistencia:
+
+```typescript
+// src/config/audit.config.ts
+
+export const AUDIT_PAYLOAD_LIMITS = {
+  description: {
+    maxLength: 500,
+  },
+  metadata: {
+    maxKeys: 20,
+    maxKeyLength: 50,
+    maxValueLength: 1000,
+    maxTotalSize: 10000, // 10KB
+  },
+  httpPath: {
+    maxLength: 500,
+  },
+  errorMessage: {
+    maxLength: 2000,
+  },
+  userAgent: {
+    maxLength: 500,
+  },
+  externalLink: {
+    maxLength: 255,
+  },
+};
+
+export function enforcePayloadLimits(data: Partial<AuditLog>): Partial<AuditLog> {
+  return {
+    ...data,
+    description: data.description?.slice(0, AUDIT_PAYLOAD_LIMITS.description.maxLength),
+    httpPath: data.httpPath?.slice(0, AUDIT_PAYLOAD_LIMITS.httpPath.maxLength),
+    errorMessage: data.errorMessage?.slice(0, AUDIT_PAYLOAD_LIMITS.errorMessage.maxLength),
+    userAgent: data.userAgent?.slice(0, AUDIT_PAYLOAD_LIMITS.userAgent.maxLength),
+    externalLink: data.externalLink?.slice(0, AUDIT_PAYLOAD_LIMITS.externalLink.maxLength),
+    metadata: truncateMetadata(data.metadata),
+  };
+}
+
+function truncateMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!metadata) return {};
+
+  const entries = Object.entries(metadata).slice(0, AUDIT_PAYLOAD_LIMITS.metadata.maxKeys);
+  return Object.fromEntries(
+    entries.map(([key, value]) => {
+      const truncatedKey = key.slice(0, AUDIT_PAYLOAD_LIMITS.metadata.maxKeyLength);
+      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+      const truncatedValue = stringValue.slice(0, AUDIT_PAYLOAD_LIMITS.metadata.maxValueLength);
+      return [truncatedKey, truncatedValue];
+    })
+  );
+}
 ```
 
 ## Guide-level Explanation
@@ -72,27 +294,32 @@ O GCDR já possui uma tabela `audit_logs` no schema, mas:
 ### Arquitetura Proposta
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Express Request                                │
-│                                 │                                        │
-│                                 ▼                                        │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │                      logEvent Middleware                           │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │  │
-│  │  │ Capture Req  │─▶│   Execute    │─▶│  Capture Response      │   │  │
-│  │  │   Context    │  │   Handler    │  │  & Write Audit Log     │   │  │
-│  │  └──────────────┘  └──────────────┘  └────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-│                                 │                                        │
-│                                 ▼                                        │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │                       audit_logs Table                             │  │
-│  │  ┌─────────┬───────────┬────────────┬───────────┬──────────────┐  │  │
-│  │  │ Event   │   Actor   │   Entity   │  Request  │  Timestamp   │  │  │
-│  │  │ Type    │ (User/Sys)│ (Customer) │  Context  │              │  │  │
-│  │  └─────────┴───────────┴────────────┴───────────┴──────────────┘  │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------------+
+|                           Express Request                                |
+|                                 |                                        |
+|                                 v                                        |
+|  +---------------------------------------------------------------+      |
+|  |                      logEvent Middleware                       |      |
+|  |  +---------------+  +---------------+  +--------------------+  |      |
+|  |  | Capture Req   |->|   Execute     |->| Capture Response   |  |      |
+|  |  |   Context     |  |   Handler     |  | & Write Audit Log  |  |      |
+|  |  +---------------+  +---------------+  +--------------------+  |      |
+|  +---------------------------------------------------------------+      |
+|                                 |                                        |
+|                                 v                                        |
+|  +---------------------------------------------------------------+      |
+|  |                    PII Sanitizer + Limits                      |      |
+|  +---------------------------------------------------------------+      |
+|                                 |                                        |
+|                                 v                                        |
+|  +---------------------------------------------------------------+      |
+|  |                       audit_logs Table                         |      |
+|  |  +---------+-----------+------------+-----------+------------+ |      |
+|  |  | Event   |   Actor   |   Entity   |  Request  |  Timestamp | |      |
+|  |  | Type    | (User/Sys)| (Customer) |  Context  |            | |      |
+|  |  +---------+-----------+------------+-----------+------------+ |      |
+|  +---------------------------------------------------------------+      |
++-------------------------------------------------------------------------+
 ```
 
 ### Exemplo de Uso (Inspirado no rec4go-api)
@@ -144,75 +371,82 @@ router.patch(
 
 export const eventCategoryEnum = pgEnum('event_category', [
   'ENTITY_CHANGE',    // CRUD em entidades
-  'USER_ACTION',      // Ações do usuário (login, export, etc.)
-  'SYSTEM_EVENT',     // Eventos automáticos
+  'USER_ACTION',      // Acoes do usuario (login, export, etc.)
+  'SYSTEM_EVENT',     // Eventos automaticos
   'QUERY',            // Consultas/leituras
-  'AUTH',             // Autenticação/autorização
-  'INTEGRATION',      // Eventos de integração
+  'AUTH',             // Autenticacao/autorizacao
+  'INTEGRATION',      // Eventos de integracao
 ]);
 
 export const actorTypeEnum = pgEnum('actor_type', [
-  'USER',             // Usuário autenticado
-  'SYSTEM',           // Sistema/automação
+  'USER',             // Usuario autenticado
+  'SYSTEM',           // Sistema/automacao
   'API_KEY',          // Acesso via API Key
-  'SERVICE_ACCOUNT',  // Conta de serviço
-  'ANONYMOUS',        // Não autenticado
+  'SERVICE_ACCOUNT',  // Conta de servico
+  'ANONYMOUS',        // Nao autenticado
+]);
+
+export const auditLevelEnum = pgEnum('audit_level', [
+  'MINIMAL',
+  'STANDARD',
+  'VERBOSE',
+  'DEBUG',
 ]);
 
 export const auditLogs = pgTable('audit_logs', {
-  // === Identificação ===
+  // === Identificacao ===
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull(),
 
   // === Evento ===
   eventType: varchar('event_type', { length: 100 }).notNull(),
   eventCategory: eventCategoryEnum('event_category').notNull(),
-  description: text('description'),
+  auditLevel: auditLevelEnum('audit_level').notNull().default('STANDARD'),
+  description: varchar('description', { length: 500 }),
   action: varchar('action', { length: 20 }).notNull(), // CREATE, UPDATE, DELETE, READ
 
-  // === Entidade (alvo da ação) ===
+  // === Entidade (alvo da acao) ===
   entityType: varchar('entity_type', { length: 50 }).notNull(),
   entityId: uuid('entity_id'),
-  customerId: uuid('customer_id'), // Customer context (GCDR específico)
+  customerId: uuid('customer_id'), // Customer context (GCDR especifico)
 
   // === Ator (quem executou) ===
   userId: uuid('user_id'),
   userEmail: varchar('user_email', { length: 255 }),
   actorType: actorTypeEnum('actor_type').notNull().default('USER'),
 
-  // === Estado antes/depois ===
+  // === Estado antes/depois (sanitizado) ===
   oldValues: jsonb('old_values'),
   newValues: jsonb('new_values'),
 
-  // === Contexto da requisição ===
+  // === Contexto da requisicao ===
   requestId: uuid('request_id'),
   ipAddress: varchar('ip_address', { length: 45 }),
-  userAgent: text('user_agent'),
+  userAgent: varchar('user_agent', { length: 500 }),
   httpMethod: varchar('http_method', { length: 10 }),
   httpPath: varchar('http_path', { length: 500 }),
 
   // === Resultado ===
   statusCode: integer('status_code'),
-  errorMessage: text('error_message'),
+  errorMessage: varchar('error_message', { length: 2000 }),
   durationMs: integer('duration_ms'),
 
-  // === Metadados flexíveis ===
+  // === Metadados flexiveis ===
   metadata: jsonb('metadata').notNull().default({}),
-  externalLink: varchar('external_link', { length: 255 }), // Link externo (rec4go style)
+  externalLink: varchar('external_link', { length: 255 }),
 
   // === Timestamp ===
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  // Índices existentes
+  // Indices para queries comuns
   tenantEntityIdx: index('audit_logs_tenant_entity_idx').on(table.tenantId, table.entityType, table.entityId),
   tenantUserIdx: index('audit_logs_tenant_user_idx').on(table.tenantId, table.userId),
   tenantCreatedIdx: index('audit_logs_tenant_created_idx').on(table.tenantId, table.createdAt),
   tenantEventTypeIdx: index('audit_logs_tenant_event_type_idx').on(table.tenantId, table.eventType),
-
-  // Novos índices
   tenantCustomerIdx: index('audit_logs_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantCategoryIdx: index('audit_logs_tenant_category_idx').on(table.tenantId, table.eventCategory),
   tenantActionIdx: index('audit_logs_tenant_action_idx').on(table.tenantId, table.action),
+  tenantLevelIdx: index('audit_logs_tenant_level_idx').on(table.tenantId, table.auditLevel),
   metadataGinIdx: index('audit_logs_metadata_gin_idx').using('gin', table.metadata),
 }));
 ```
@@ -233,26 +467,35 @@ CREATE TYPE actor_type AS ENUM (
   'USER', 'SYSTEM', 'API_KEY', 'SERVICE_ACCOUNT', 'ANONYMOUS'
 );
 
+CREATE TYPE audit_level AS ENUM (
+  'MINIMAL', 'STANDARD', 'VERBOSE', 'DEBUG'
+);
+
 -- Adicionar novas colunas
 ALTER TABLE audit_logs
   ADD COLUMN event_category event_category,
-  ADD COLUMN description TEXT,
+  ADD COLUMN audit_level audit_level DEFAULT 'STANDARD',
+  ADD COLUMN description VARCHAR(500),
   ADD COLUMN actor_type actor_type DEFAULT 'USER',
   ADD COLUMN customer_id UUID,
   ADD COLUMN http_method VARCHAR(10),
   ADD COLUMN http_path VARCHAR(500),
   ADD COLUMN status_code INTEGER,
-  ADD COLUMN error_message TEXT,
+  ADD COLUMN error_message VARCHAR(2000),
   ADD COLUMN duration_ms INTEGER,
   ADD COLUMN external_link VARCHAR(255);
 
--- Tornar entityId nullable (para eventos sem entidade específica)
+-- Ajustar limites de campos existentes
+ALTER TABLE audit_logs ALTER COLUMN user_agent TYPE VARCHAR(500);
+
+-- Tornar entityId nullable (para eventos sem entidade especifica)
 ALTER TABLE audit_logs ALTER COLUMN entity_id DROP NOT NULL;
 
--- Novos índices
+-- Novos indices
 CREATE INDEX audit_logs_tenant_customer_idx ON audit_logs(tenant_id, customer_id);
 CREATE INDEX audit_logs_tenant_category_idx ON audit_logs(tenant_id, event_category);
 CREATE INDEX audit_logs_tenant_action_idx ON audit_logs(tenant_id, action);
+CREATE INDEX audit_logs_tenant_level_idx ON audit_logs(tenant_id, audit_level);
 CREATE INDEX audit_logs_metadata_gin_idx ON audit_logs USING GIN(metadata);
 
 -- Backfill event_category para registros existentes
@@ -394,6 +637,14 @@ export enum ActionType {
   DELETE = 'DELETE',
   EXECUTE = 'EXECUTE',
 }
+
+export enum AuditLevel {
+  NONE = 0,
+  MINIMAL = 1,
+  STANDARD = 2,
+  VERBOSE = 3,
+  DEBUG = 4,
+}
 ```
 
 ### Middleware Implementation (Express)
@@ -402,12 +653,15 @@ export enum ActionType {
 // src/middleware/audit.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
-import { generateId } from '../shared/utils/idGenerator';
-import { EventType, EventCategory, ActorType, ActionType } from '../shared/types/audit.types';
+import { randomUUID } from 'crypto';
+import { EventType, EventCategory, ActorType, ActionType, AuditLevel } from '../shared/types/audit.types';
+import { sanitizePII } from '../shared/utils/pii-sanitizer';
+import { enforcePayloadLimits, AUDIT_PAYLOAD_LIMITS } from '../config/audit.config';
 
 export interface LogEventOptions {
   eventType: EventType;
   eventCategory?: EventCategory;
+  auditLevel?: AuditLevel;
   action?: ActionType;
   description?: string | ((req: Request, res: Response) => string);
   getEntityType?: (req: Request) => string;
@@ -425,27 +679,46 @@ export function logEvent(options: LogEventOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
 
-    // Capturar contexto da requisição
+    // Capturar contexto da requisicao
+    const requestId = req.headers['x-request-id'] as string || randomUUID();
     const context = {
-      requestId: req.headers['x-request-id'] as string || generateId(),
+      requestId,
       ipAddress: req.ip || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers['user-agent']?.slice(0, AUDIT_PAYLOAD_LIMITS.userAgent.maxLength),
       httpMethod: req.method,
-      httpPath: req.originalUrl,
+      httpPath: req.originalUrl.slice(0, AUDIT_PAYLOAD_LIMITS.httpPath.maxLength),
       tenantId: (req as any).tenantId,
       userId: (req as any).user?.id,
       userEmail: (req as any).user?.email,
       actorType: determineActorType(req),
     };
 
-    // Interceptar response
+    // Propagar requestId no response header
+    res.setHeader('X-Request-Id', requestId);
+
+    // Interceptar TODOS os metodos de response
+    const originalSend = res.send.bind(res);
     const originalJson = res.json.bind(res);
+    const originalEnd = res.end.bind(res);
+
+    res.send = function(body: any) {
+      res.locals.responseBody = body;
+      return originalSend(body);
+    };
+
     res.json = function(body: any) {
       res.locals.responseBody = body;
       return originalJson(body);
     };
 
-    // Hook para executar após response
+    res.end = function(chunk?: any, encoding?: BufferEncoding, cb?: () => void) {
+      if (chunk && !res.locals.responseBody) {
+        res.locals.responseBody = chunk;
+      }
+      return originalEnd(chunk, encoding, cb);
+    };
+
+    // Hook para executar apos response
     res.on('finish', async () => {
       const duration = Date.now() - startTime;
       const statusCode = res.statusCode;
@@ -454,16 +727,29 @@ export function logEvent(options: LogEventOptions) {
       if (isError && options.logOnError === false) return;
       if (!isError && options.logOnSuccess === false) return;
 
+      // Verificar nivel de audit configurado
+      const currentLevel = parseInt(process.env.AUDIT_LEVEL || '2', 10) as AuditLevel;
+      const eventLevel = options.auditLevel ?? inferAuditLevel(options.eventType);
+      if (currentLevel < eventLevel) return;
+
       try {
         const description = typeof options.description === 'function'
           ? options.description(req, res)
           : options.description;
 
-        const auditLog = {
-          id: generateId(),
+        // Sanitizar PII dos valores antigos/novos
+        const oldValues = options.getPreviousValue?.(req);
+        const newValues = options.getNewValue?.(req, res);
+
+        const auditLog = enforcePayloadLimits({
+          id: randomUUID(),
           tenantId: context.tenantId,
           eventType: options.eventType,
           eventCategory: options.eventCategory ?? inferCategory(options.eventType),
+          auditLevel: eventLevel === AuditLevel.MINIMAL ? 'MINIMAL'
+            : eventLevel === AuditLevel.VERBOSE ? 'VERBOSE'
+            : eventLevel === AuditLevel.DEBUG ? 'DEBUG'
+            : 'STANDARD',
           description,
           action: options.action ?? inferAction(options.eventType),
           entityType: options.getEntityType?.(req) ?? inferEntityType(options.eventType),
@@ -472,8 +758,8 @@ export function logEvent(options: LogEventOptions) {
           userId: context.userId,
           userEmail: context.userEmail,
           actorType: context.actorType,
-          oldValues: options.getPreviousValue?.(req),
-          newValues: options.getNewValue?.(req, res),
+          oldValues: oldValues ? sanitizePII(oldValues) : null,
+          newValues: newValues ? sanitizePII(newValues) : null,
           requestId: context.requestId,
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -482,14 +768,21 @@ export function logEvent(options: LogEventOptions) {
           statusCode,
           errorMessage: isError ? extractErrorMessage(res.locals.responseBody) : null,
           durationMs: duration,
-          metadata: options.getMetadata?.(req, res) ?? {},
+          metadata: sanitizePII(options.getMetadata?.(req, res) ?? {}),
           externalLink: options.getExternalLink?.(req),
-        };
+        });
 
-        // Inserir assíncronamente para não bloquear response
-        await insertAuditLog(auditLog);
+        // Inserir assincronamente - fire and forget com logging de erro
+        insertAuditLog(auditLog).catch(error => {
+          console.error('[AUDIT] Failed to write audit log:', {
+            eventType: options.eventType,
+            requestId: context.requestId,
+            error: error.message,
+          });
+          // TODO: Implementar fallback (fila, arquivo, etc.)
+        });
       } catch (error) {
-        console.error('Failed to write audit log:', error);
+        console.error('[AUDIT] Error preparing audit log:', error);
       }
     });
 
@@ -539,6 +832,24 @@ function inferAction(eventType: EventType): ActionType {
   return ActionType.EXECUTE;
 }
 
+function inferAuditLevel(eventType: EventType): AuditLevel {
+  // Criticos - sempre logar
+  if (eventType.includes('_DELETED') || eventType.includes('_REVOKED') ||
+      eventType.includes('AUTH_LOGIN_FAILED') || eventType.includes('AUTH_PASSWORD') ||
+      eventType.includes('API_KEY_')) {
+    return AuditLevel.MINIMAL;
+  }
+  // Verbose - queries/leituras
+  if (eventType.includes('_VIEWED') || eventType.includes('_LIST_')) {
+    return AuditLevel.VERBOSE;
+  }
+  // Debug
+  if (eventType.includes('TOKEN_REFRESHED')) {
+    return AuditLevel.DEBUG;
+  }
+  return AuditLevel.STANDARD;
+}
+
 function inferEntityType(eventType: EventType): string {
   const match = eventType.match(/^([A-Z]+)_/);
   return match ? match[1].toLowerCase() : 'unknown';
@@ -547,58 +858,16 @@ function inferEntityType(eventType: EventType): string {
 function extractErrorMessage(body: unknown): string | null {
   if (body && typeof body === 'object') {
     const obj = body as Record<string, unknown>;
-    return (obj.error as string) || (obj.message as string) || null;
+    const message = (obj.error as string) || (obj.message as string) || null;
+    return message?.slice(0, AUDIT_PAYLOAD_LIMITS.errorMessage.maxLength) ?? null;
   }
   return null;
 }
-```
 
-### Níveis de Audit (Configurável)
-
-```typescript
-// src/config/audit.config.ts
-
-export enum AuditLevel {
-  NONE = 0,
-  MINIMAL = 1,    // Apenas ações críticas (CREATE, DELETE, auth)
-  STANDARD = 2,   // Ações de usuário + erros
-  VERBOSE = 3,    // Inclui queries/leituras
-  DEBUG = 4,      // Tudo
-}
-
-export const AUDIT_CONFIG: Record<EventType, AuditLevel> = {
-  // Crítico - sempre loga
-  [EventType.CUSTOMER_CREATED]: AuditLevel.MINIMAL,
-  [EventType.CUSTOMER_DELETED]: AuditLevel.MINIMAL,
-  [EventType.USER_CREATED]: AuditLevel.MINIMAL,
-  [EventType.USER_DELETED]: AuditLevel.MINIMAL,
-  [EventType.ROLE_ASSIGNED]: AuditLevel.MINIMAL,
-  [EventType.ROLE_REVOKED]: AuditLevel.MINIMAL,
-  [EventType.API_KEY_CREATED]: AuditLevel.MINIMAL,
-  [EventType.API_KEY_REVOKED]: AuditLevel.MINIMAL,
-  [EventType.AUTH_LOGIN_FAILED]: AuditLevel.MINIMAL,
-  [EventType.AUTH_PASSWORD_CHANGED]: AuditLevel.MINIMAL,
-
-  // Standard
-  [EventType.CUSTOMER_UPDATED]: AuditLevel.STANDARD,
-  [EventType.DEVICE_CREATED]: AuditLevel.STANDARD,
-  [EventType.DEVICE_UPDATED]: AuditLevel.STANDARD,
-  [EventType.DEVICE_DELETED]: AuditLevel.STANDARD,
-  [EventType.RULE_CREATED]: AuditLevel.STANDARD,
-  [EventType.RULE_UPDATED]: AuditLevel.STANDARD,
-
-  // Verbose
-  [EventType.CUSTOMER_VIEWED]: AuditLevel.VERBOSE,
-  [EventType.CUSTOMER_LIST_VIEWED]: AuditLevel.VERBOSE,
-  [EventType.DEVICE_STATUS_CHANGED]: AuditLevel.VERBOSE,
-
-  // Debug
-  [EventType.AUTH_TOKEN_REFRESHED]: AuditLevel.DEBUG,
-};
-
-export function shouldLog(eventType: EventType, currentLevel: AuditLevel): boolean {
-  const requiredLevel = AUDIT_CONFIG[eventType] ?? AuditLevel.STANDARD;
-  return currentLevel >= requiredLevel;
+async function insertAuditLog(log: Record<string, unknown>): Promise<void> {
+  // Implementacao real usara o AuditLogRepository
+  // await auditLogRepository.create(log);
+  console.log('[AUDIT]', JSON.stringify(log));
 }
 ```
 
@@ -607,36 +876,59 @@ export function shouldLog(eventType: EventType, currentLevel: AuditLevel): boole
 ```typescript
 // GET /api/v1/audit-logs
 
-interface AuditLogQuery {
-  tenantId: string;           // Obrigatório
-  customerId?: string;
-  userId?: string;
-  eventType?: EventType;
-  eventCategory?: EventCategory;
-  entityType?: string;
-  entityId?: string;
-  action?: ActionType;
-  from?: string;              // ISO date
-  to?: string;                // ISO date
-  limit?: number;             // default: 50, max: 100
-  cursor?: string;
-}
+import { z } from 'zod';
+import { differenceInDays, subDays } from 'date-fns';
+
+const MAX_DATE_RANGE_DAYS = 30;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+
+const AuditLogQuerySchema = z.object({
+  tenantId: z.string().uuid(),
+  customerId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+  eventType: z.nativeEnum(EventType).optional(),
+  eventCategory: z.nativeEnum(EventCategory).optional(),
+  entityType: z.string().max(50).optional(),
+  entityId: z.string().uuid().optional(),
+  action: z.nativeEnum(ActionType).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  limit: z.coerce.number().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
+  cursor: z.string().optional(),
+  orderBy: z.enum(['createdAt:asc', 'createdAt:desc']).default('createdAt:desc'),
+}).refine(data => {
+  // Validar janela de datas
+  const from = data.from ? new Date(data.from) : subDays(new Date(), 7);
+  const to = data.to ? new Date(data.to) : new Date();
+
+  if (differenceInDays(to, from) > MAX_DATE_RANGE_DAYS) {
+    return false;
+  }
+  return true;
+}, {
+  message: `Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days`,
+});
 
 interface AuditLogResponse {
   data: AuditLog[];
   pagination: {
     cursor?: string;
     hasMore: boolean;
-    total?: number;
+  };
+  meta: {
+    from: string;
+    to: string;
+    totalInRange?: number; // Opcional - pode ser caro calcular
   };
 }
 ```
 
-## Ações a Serem Logadas por Entidade
+## Acoes a Serem Logadas por Entidade
 
-### Tier 1: Críticas (MINIMAL - Sempre logar)
+### Tier 1: Criticas (MINIMAL - Sempre logar)
 
-| Entidade | Ações | Contexto |
+| Entidade | Acoes | Contexto |
 |----------|-------|----------|
 | Customer | CREATE, DELETE | parentCustomerId, type |
 | User | CREATE, DELETE, SUSPEND | email, role |
@@ -644,9 +936,9 @@ interface AuditLogResponse {
 | API Key | CREATE, REVOKE | keyPrefix, scopes |
 | Auth | LOGIN_FAILED, PASSWORD_CHANGED | email, reason |
 
-### Tier 2: Standard (Produção)
+### Tier 2: Standard (Producao)
 
-| Entidade | Ações | Contexto |
+| Entidade | Acoes | Contexto |
 |----------|-------|----------|
 | Customer | UPDATE, MOVE | changedFields |
 | Device | CREATE, UPDATE, DELETE, MOVE | serialNumber, assetId |
@@ -656,7 +948,7 @@ interface AuditLogResponse {
 
 ### Tier 3: Verbose (Opcional)
 
-| Entidade | Ações | Contexto |
+| Entidade | Acoes | Contexto |
 |----------|-------|----------|
 | * | VIEW, LIST | filters |
 | Device | STATUS_CHANGED, CONNECTIVITY_CHANGED | oldStatus, newStatus |
@@ -666,32 +958,40 @@ interface AuditLogResponse {
 
 ### 1. Database
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
 | `src/infrastructure/database/drizzle/schema.ts` | Adicionar enums + novos campos em auditLogs |
 | `drizzle/*.sql` | Migration gerada |
 
-### 2. Tipos
+### 2. Tipos e Config
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
-| `src/shared/types/audit.types.ts` | Criar EventType, EventCategory, ActorType, ActionType |
+| `src/shared/types/audit.types.ts` | Criar EventType, EventCategory, ActorType, ActionType, AuditLevel |
+| `src/shared/utils/pii-sanitizer.ts` | Criar funcao de sanitizacao PII |
+| `src/config/audit.config.ts` | Criar limites de payload e configuracao |
 
 ### 3. Middleware
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
 | `src/middleware/audit.middleware.ts` | Criar middleware logEvent |
 | `src/middleware/index.ts` | Exportar logEvent |
 
 ### 4. Repository
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
 | `src/repositories/AuditLogRepository.ts` | Criar/atualizar repository |
 | `src/repositories/interfaces/IAuditLogRepository.ts` | Criar interface |
 
-### 5. Controllers (adicionar logEvent)
+### 5. Jobs
+
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/jobs/audit-purge.job.ts` | Criar job de purge |
+
+### 6. Controllers (adicionar logEvent)
 
 | Arquivo | Eventos |
 |---------|---------|
@@ -702,73 +1002,85 @@ interface AuditLogResponse {
 | `src/controllers/policies.controller.ts` | POLICY_* |
 | `src/controllers/auth.controller.ts` | AUTH_* |
 | `src/controllers/integrations.controller.ts` | PACKAGE_* |
+| `src/controllers/audit-logs.controller.ts` | Novo - endpoint de consulta |
 
-### 6. Documentação
+### 7. Documentacao
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
 | `docs/openapi.yaml` | Adicionar endpoint GET /audit-logs |
 | `scripts/db/seeds/15-audit-logs.sql` | Seed com exemplos |
 
 ## Drawbacks
 
-1. **Performance**: Escrita síncrona adiciona ~5-10ms por request
-2. **Storage**: Logs crescem rapidamente (necessário política de retenção)
-3. **Manutenção**: Cada novo endpoint precisa do decorator
+1. **Performance**: Escrita assincrona adiciona ~5-10ms por request
+2. **Storage**: Logs crescem rapidamente (mitigado por retencao e particionamento)
+3. **Manutencao**: Cada novo endpoint precisa do decorator
+4. **Complexidade**: PII sanitization adiciona overhead de processamento
 
 ## Rationale and Alternatives
 
 ### Por que manter compatibilidade com Alarms RFC-0002?
 
-1. **Consistência**: Facilita queries cross-service
-2. **Tooling**: Mesmas ferramentas de análise
+1. **Consistencia**: Facilita queries cross-service
+2. **Tooling**: Mesmas ferramentas de analise
 3. **Onboarding**: Desenvolvedores familiarizados
 
-### Diferenças justificadas do GCDR
+### Diferencas justificadas do GCDR
 
-| Diferença | Justificativa |
+| Diferenca | Justificativa |
 |-----------|---------------|
-| UUID vs nanoid | Padrão já estabelecido no GCDR |
+| UUID vs nanoid | Padrao ja estabelecido no GCDR |
 | entityType vs resourceType | Nomenclatura GCDR existente |
 | action separado | GCDR precisa filtrar por tipo CRUD |
-| customerId | GCDR é customer-centric |
+| customerId | GCDR e customer-centric |
+| auditLevel | Permite controle granular de retencao |
 
 ## Implementation Plan
 
-### Fase 1: Schema e Tipos
-- [ ] Criar enums no schema
+### Fase 1: Schema, Tipos e Config
+- [ ] Criar enums no schema (event_category, actor_type, audit_level)
 - [ ] Adicionar novas colunas em audit_logs
 - [ ] Criar migration
 - [ ] Criar audit.types.ts
+- [ ] Criar pii-sanitizer.ts
+- [ ] Criar audit.config.ts com limites
 
 ### Fase 2: Middleware e Repository
-- [ ] Criar middleware logEvent
+- [ ] Criar middleware logEvent (interceptando send/json/end)
 - [ ] Criar AuditLogRepository
 - [ ] Configurar audit levels
+- [ ] Criar job de purge
 
-### Fase 3: Integração nos Controllers
+### Fase 3: Integracao nos Controllers
 - [ ] Adicionar logEvent em customers
 - [ ] Adicionar logEvent em devices
 - [ ] Adicionar logEvent em users
 - [ ] Adicionar logEvent em rules
 - [ ] Adicionar logEvent em auth
 
-### Fase 4: API e Documentação
-- [ ] Criar endpoint GET /audit-logs
+### Fase 4: API, Seguranca e Documentacao
+- [ ] Criar endpoint GET /audit-logs com RBAC
+- [ ] Implementar rate limiting
+- [ ] Validar janela de datas obrigatoria
 - [ ] Documentar no OpenAPI
 - [ ] Criar seed com exemplos
 
-## Unresolved Questions
+## Resolved Questions
 
-1. **Retenção**: Quanto tempo manter logs? (sugestão: 90 dias para VERBOSE, 1 ano para MINIMAL)
-2. **PII**: Como mascarar dados sensíveis (emails, IPs)?
-3. **Export**: Formato para exportação (CSV, JSON)?
-4. **Rate Limiting**: Limitar queries de audit logs?
+| Questao | Decisao |
+|---------|---------|
+| Retencao | 90 dias VERBOSE, 180 dias STANDARD, 365 dias MINIMAL |
+| PII | Sanitizar automaticamente com allowlist de campos sensiveis |
+| Janela de consulta | Maximo 30 dias por request |
+| Rate limiting | 10 req/min para endpoint de audit logs |
 
 ## Future Possibilities
 
 1. **Real-time**: WebSocket para audit log em tempo real
-2. **Alertas**: Trigger alertas em padrões suspeitos
-3. **SIEM Integration**: Enviar para sistemas de segurança
-4. **Analytics Dashboard**: UI para visualização
+2. **Alertas**: Trigger alertas em padroes suspeitos (ex: muitos LOGIN_FAILED)
+3. **SIEM Integration**: Enviar para sistemas de seguranca (Splunk, ELK)
+4. **Analytics Dashboard**: UI para visualizacao e relatorios
 5. **Cross-service**: Agregar logs de GCDR + Alarms
+6. **Export**: CSV/JSON export com limite de registros
+7. **Particionamento automatico**: Script para criar particoes mensais
