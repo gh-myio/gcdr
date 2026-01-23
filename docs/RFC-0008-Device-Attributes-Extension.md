@@ -749,33 +749,33 @@ logAnnotations:
 ## Checklist de Validacao
 
 ### Apos Fase 1 (Schema)
-- [ ] Colunas existem no banco: `\d devices` no psql
-- [ ] Indices criados corretamente (todos com tenant_id)
-- [ ] CHECK constraint funciona (testar slave_id = 300 deve falhar)
-- [ ] FK para centrals funciona
-- [ ] UNIQUE constraint (tenant_id, identifier) funciona
-- [ ] UNIQUE constraint (tenant_id, central_id, slave_id) funciona
+- [x] Colunas existem no banco: `\d devices` no psql
+- [x] Indices criados corretamente (todos com tenant_id)
+- [x] CHECK constraint funciona (testar slave_id = 300 deve falhar)
+- [x] FK para centrals funciona
+- [x] UNIQUE constraint (tenant_id, identifier) funciona
+- [x] UNIQUE constraint (tenant_id, central_id, slave_id) funciona
 
 ### Apos Fase 2 (Repository)
-- [ ] `create()` aceita novos campos
-- [ ] `update()` atualiza novos campos
-- [ ] `findByCentralId()` retorna devices corretos
-- [ ] `findInactive()` retorna devices sem atividade
+- [x] `create()` aceita novos campos
+- [x] `update()` atualiza novos campos
+- [x] `findByCentralId()` retorna devices corretos
+- [x] `findInactive()` retorna devices sem atividade
 
 ### Apos Fase 3 (API)
-- [ ] POST /devices aceita novos campos
-- [ ] PATCH /devices/:id atualiza novos campos
-- [ ] GET /devices?deviceProfile=X filtra corretamente
-- [ ] Swagger mostra novos campos
+- [x] POST /devices aceita novos campos
+- [x] PATCH /devices/:id atualiza novos campos
+- [x] GET /devices?deviceProfile=X filtra corretamente
+- [ ] Swagger mostra novos campos (OpenAPI nao atualizado)
 
 ### Apos Fase 5 (Seeds)
-- [ ] Seed executa sem erros
-- [ ] Devices tem novos campos populados
-- [ ] Verificacao mostra dados corretos
+- [x] Seed executa sem erros
+- [x] Devices tem novos campos populados
+- [x] Verificacao mostra dados corretos
 
 ### Apos Fase 6 (Testes)
-- [ ] Todos os testes passam
-- [ ] Cobertura de codigo adequada
+- [ ] Todos os testes passam (testes unitarios pendentes)
+- [ ] Cobertura de codigo adequada (testes unitarios pendentes)
 
 ### Cobertura Minima Exigida
 
@@ -786,16 +786,16 @@ logAnnotations:
 | DTOs (validacao) | 100% |
 
 ### Cenarios de Teste Obrigatorios
-- [ ] Criar device com todos os novos campos
-- [ ] Atualizar device com novos campos
-- [ ] Filtrar por `deviceProfile`, `deviceType`, `centralId`
-- [ ] `findInactive()` com diferentes thresholds
-- [ ] Validacao de `slave_id` fora do range (1-247)
-- [ ] Validacao de `addrLow > addrHigh`
-- [ ] Rejeicao de `mapInstantaneousPower` > 100KB
-- [ ] FIFO em `logAnnotations.entries` > 100
-- [ ] Violacao de UNIQUE constraint em `identifier`
-- [ ] Violacao de UNIQUE constraint em `(central_id, slave_id)`
+- [x] Criar device com todos os novos campos
+- [x] Atualizar device com novos campos
+- [x] Filtrar por `deviceProfile`, `deviceType`, `centralId`
+- [x] `findInactive()` com diferentes thresholds
+- [x] Validacao de `slave_id` fora do range (1-247)
+- [x] Validacao de `addrLow > addrHigh`
+- [ ] Rejeicao de `mapInstantaneousPower` > 100KB (validacao no service pendente)
+- [ ] FIFO em `logAnnotations.entries` > 100 (logica FIFO pendente)
+- [x] Violacao de UNIQUE constraint em `identifier`
+- [x] Violacao de UNIQUE constraint em `(central_id, slave_id)`
 
 ## Prior Art
 
@@ -813,7 +813,9 @@ logAnnotations:
 
 ## Next Steps
 
-1. Implementacao da Fase 1 (Schema)
-2. Implementacao das Fases 2-4
-3. Atualizacao da documentacao
-4. Marcar RFC como Implemented
+1. ~~Implementacao da Fase 1 (Schema)~~ - Concluido
+2. ~~Implementacao das Fases 2-4~~ - Concluido
+3. Atualizar OpenAPI/Swagger com novos campos
+4. Implementar validacao de tamanho no service (mapInstantaneousPower > 100KB)
+5. Implementar logica FIFO para logAnnotations.entries > 100
+6. Adicionar testes unitarios para novos metodos
