@@ -7,43 +7,56 @@
 
 ## Summary
 
-Estender a entidade `devices` com novos atributos para suportar configuração Modbus, integração com sistemas de ingestão, identificação avançada e monitoramento de atividade. A implementação usa uma abordagem híbrida: colunas para campos frequentemente filtrados e JSONB para configurações técnicas complexas.
+Estender a entidade `devices` com novos atributos para suportar configuracao Modbus, integracao com sistemas de ingestao, identificacao avancada e monitoramento de atividade. A implementacao usa uma abordagem hibrida: colunas para campos frequentemente filtrados e JSONB para configuracoes tecnicas complexas.
 
 ## Motivation
 
-Os devices no GCDR precisam armazenar informações adicionais para:
+Os devices no GCDR precisam armazenar informacoes adicionais para:
 
-1. **Comunicação Modbus**: slave ID, endereços de registradores, frequência de polling
-2. **Integração**: IDs de sistemas externos de ingestão e gateways
-3. **Identificação**: identificadores legíveis e perfis de dispositivo
+1. **Comunicacao Modbus**: slave ID, enderecos de registradores, frequencia de polling
+2. **Integracao**: IDs de sistemas externos de ingestao e gateways
+3. **Identificacao**: identificadores legiveis e perfis de dispositivo
 4. **Monitoramento**: timestamps de atividade e alarmes
-5. **Configuração avançada**: mapas de potência e anotações de log
+5. **Configuracao avancada**: mapas de potencia e anotacoes de log
 
 ## Guide-level Explanation
 
-### Novos Campos Disponíveis
+### Novos Campos Disponiveis
 
-Após esta mudança, devices terão:
+Apos esta mudanca, devices terao:
 
 ```typescript
-// Novos campos como colunas (filtráveis)
+// Novos campos como colunas (filtraveis)
 device.slaveId          // Modbus slave ID (1-247)
 device.centralId        // UUID da central associada
 device.identifier       // Ex: "ENTRADA_SHOPPING_GARAGEM_L2"
 device.deviceProfile    // Ex: "HIDROMETRO_AREA_COMUM"
 device.deviceType       // Ex: "3F_MEDIDOR"
-device.ingestionId      // UUID no sistema de ingestão
-device.ingestionGatewayId // UUID do gateway de ingestão
-device.lastActivityTime // Última atividade do device
-device.lastAlarmTime    // Último alarme disparado
+device.ingestionId      // UUID no sistema de ingestao
+device.ingestionGatewayId // UUID do gateway de ingestao
+device.lastActivityTime // Ultima atividade do device
+device.lastAlarmTime    // Ultimo alarme disparado
 
-// Novos campos no specs (configuração técnica)
-device.specs.addrLow    // Endereço Modbus baixo
-device.specs.addrHigh   // Endereço Modbus alto
-device.specs.frequency  // Frequência de polling (segundos)
-device.specs.mapInstantaneousPower  // Mapa de limites de potência
-device.specs.logAnnotations         // Anotações de log
+// Novos campos no specs (configuracao tecnica)
+device.specs.addrLow    // Endereco Modbus baixo
+device.specs.addrHigh   // Endereco Modbus alto
+device.specs.frequency  // Frequencia de polling (segundos)
+device.specs.mapInstantaneousPower  // Mapa de limites de potencia
+device.specs.logAnnotations         // Anotacoes de log
 ```
+
+### Semantica dos Campos: `type` vs `device_type`
+
+| Campo | Tipo | Proposito | Controlado por | Exemplo |
+|-------|------|-----------|----------------|---------|
+| `type` | ENUM | Categoria tecnica padronizada do GCDR | GCDR (sistema) | `SENSOR`, `METER`, `ACTUATOR`, `GATEWAY` |
+| `device_type` | VARCHAR | Subtipo especifico do negocio/integracao | Integrador (usuario) | `3F_MEDIDOR`, `SENSOR_TEMP_HUMIDITY` |
+
+**Regras**:
+1. `type` e obrigatorio e define comportamento no sistema (ex: sensores tem telemetria, atuadores tem comandos)
+2. `device_type` e opcional e define o modelo/subtipo especifico para fins de dashboard/relatorios
+3. Nao ha sincronizacao automatica entre eles - sao campos independentes
+4. `type` e controlado pelo GCDR, `device_type` e livre para integradores definirem
 
 ### Exemplos de Queries
 
@@ -51,7 +64,7 @@ device.specs.logAnnotations         // Anotações de log
 // Buscar devices por central
 const devices = await deviceRepo.findByCentralId(centralId);
 
-// Buscar devices inativos (sem atividade há 1 hora)
+// Buscar devices inativos (sem atividade ha 1 hora)
 const inactive = await deviceRepo.findInactive({ hours: 1 });
 
 // Buscar por perfil
@@ -65,17 +78,37 @@ const device = await deviceRepo.findBySlaveId(1);
 
 ### Novos Campos como Colunas
 
-| Campo | Tipo | Nullable | Índice | Descrição |
-|-------|------|----------|--------|-----------|
-| `slave_id` | SMALLINT | Yes | Yes | Modbus slave ID (1-247) |
-| `central_id` | UUID | Yes | Yes (FK) | Referência à central |
-| `identifier` | VARCHAR(255) | Yes | Yes | Identificador legível único |
-| `device_profile` | VARCHAR(100) | Yes | Yes | Perfil do dispositivo |
-| `device_type` | VARCHAR(100) | Yes | Yes | Tipo específico do dispositivo |
-| `ingestion_id` | UUID | Yes | Yes | ID no sistema de ingestão |
-| `ingestion_gateway_id` | UUID | Yes | Yes | ID do gateway de ingestão |
-| `last_activity_time` | TIMESTAMPTZ | Yes | Yes | Última atividade registrada |
-| `last_alarm_time` | TIMESTAMPTZ | Yes | No | Último alarme disparado |
+| Campo | Tipo | Nullable | Indice | Constraint | Descricao |
+|-------|------|----------|--------|------------|-----------|
+| `slave_id` | SMALLINT | Yes | Yes | CHECK 1-247, UNIQUE(tenant,central,slave) | Modbus slave ID |
+| `central_id` | UUID | Yes | Yes (FK) | - | Referencia a central |
+| `identifier` | VARCHAR(255) | Yes | Yes | UNIQUE(tenant,identifier) | Identificador legivel unico |
+| `device_profile` | VARCHAR(100) | Yes | Yes | - | Perfil do dispositivo |
+| `device_type` | VARCHAR(100) | Yes | Yes | - | Tipo especifico do dispositivo |
+| `ingestion_id` | UUID | Yes | Yes | - | ID no sistema de ingestao |
+| `ingestion_gateway_id` | UUID | Yes | Yes | - | ID do gateway de ingestao |
+| `last_activity_time` | TIMESTAMPTZ | Yes | Yes | - | Ultima atividade registrada |
+| `last_alarm_time` | TIMESTAMPTZ | Yes | Yes | - | Ultimo alarme disparado |
+
+### Regras de Atualizacao de Timestamps
+
+| Campo | Quem Atualiza | Quando | Frequencia Recomendada |
+|-------|---------------|--------|------------------------|
+| `last_activity_time` | Servico de Ingestao | Ao receber telemetria valida | Debounce 1 minuto |
+| `last_alarm_time` | Servico de Alarmes | Ao disparar alarme para o device | A cada alarme |
+
+**Endpoints dedicados**:
+```typescript
+// PATCH /devices/:id/activity - chamado pelo servico de ingestao
+updateLastActivityTime(tenantId: string, id: string): Promise<Device>;
+
+// PATCH /devices/:id/alarm - chamado pelo servico de alarmes
+updateLastAlarmTime(tenantId: string, id: string): Promise<Device>;
+```
+
+**Consideracoes de performance**:
+- Recomenda-se debounce de 1 minuto para `last_activity_time` em devices com alta frequencia de telemetria
+- Updates sao feitos via query direta sem carregar a entidade completa
 
 ### Novos Campos no JSONB `specs`
 
@@ -84,11 +117,11 @@ interface DeviceSpecs {
   // Campos existentes...
 
   // Novos campos Modbus
-  addrLow?: number;      // 0-65535 (endereço registrador)
-  addrHigh?: number;     // 0-65535 (endereço registrador)
+  addrLow?: number;      // 0-65535 (endereco registrador)
+  addrHigh?: number;     // 0-65535 (endereco registrador)
   frequency?: number;    // 1-3600 (segundos)
 
-  // Configuração complexa de potência
+  // Configuracao complexa de potencia
   mapInstantaneousPower?: {
     version: string;
     limitsByInstantaneousPowerType: Array<{
@@ -108,7 +141,7 @@ interface DeviceSpecs {
     }>;
   };
 
-  // Anotações de log
+  // Anotacoes de log
   logAnnotations?: {
     entries?: Array<{
       timestamp: string;
@@ -119,6 +152,49 @@ interface DeviceSpecs {
   };
 }
 ```
+
+### Limites de Payload JSONB
+
+| Campo | Limite | Politica |
+|-------|--------|----------|
+| `mapInstantaneousPower` | 100 KB | Rejeitar se exceder |
+| `logAnnotations.entries` | 100 entradas | FIFO (remove mais antigas) |
+| `logAnnotations` total | 50 KB | Rejeitar se exceder |
+
+### Validacao de Campos JSONB (DTO)
+
+```typescript
+// src/dto/request/DeviceDTO.ts
+const deviceSpecsSchema = z.object({
+  addrLow: z.number().int().min(0).max(65535).optional(),
+  addrHigh: z.number().int().min(0).max(65535).optional(),
+  frequency: z.number().int().min(1).max(3600).optional(),
+  mapInstantaneousPower: z.any().optional(),
+  logAnnotations: z.object({
+    entries: z.array(z.object({
+      timestamp: z.string(),
+      message: z.string().max(1000),
+      level: z.enum(['info', 'warn', 'error', 'debug']),
+    })).max(100).optional(),
+    metadata: z.record(z.unknown()).optional(),
+  }).optional(),
+}).refine(
+  (data) => !data.addrLow || !data.addrHigh || data.addrLow <= data.addrHigh,
+  { message: 'addrLow must be less than or equal to addrHigh' }
+);
+
+// Validacao de tamanho no service
+const SPECS_LIMITS = {
+  mapInstantaneousPower: { maxSizeBytes: 100 * 1024 },
+  logAnnotations: { maxEntries: 100, maxSizeBytes: 50 * 1024 },
+};
+```
+
+| Campo | Tipo | Min | Max | Descricao |
+|-------|------|-----|-----|-----------|
+| `addrLow` | int | 0 | 65535 | Endereco Modbus (16-bit) |
+| `addrHigh` | int | 0 | 65535 | Endereco Modbus (16-bit) |
+| `frequency` | int | 1 | 3600 | Polling em segundos (1s a 1h) |
 
 ### Schema Drizzle Atualizado
 
@@ -156,7 +232,7 @@ export const devices = pgTable('devices', {
   // =====================
   // NOVOS CAMPOS
   // =====================
-  slaveId: integer('slave_id'),
+  slaveId: smallint('slave_id'),  // SMALLINT (nao integer)
   centralId: uuid('central_id').references(() => centrals.id),
   identifier: varchar('identifier', { length: 255 }),
   deviceProfile: varchar('device_profile', { length: 100 }),
@@ -167,25 +243,32 @@ export const devices = pgTable('devices', {
   lastAlarmTime: timestamp('last_alarm_time', { withTimezone: true }),
 
 }, (table) => ({
-  // Índices existentes...
+  // Indices existentes...
   tenantSerialUnique: uniqueIndex('devices_tenant_serial_unique').on(table.tenantId, table.serialNumber),
   tenantAssetIdx: index('devices_tenant_asset_idx').on(table.tenantId, table.assetId),
   tenantCustomerIdx: index('devices_tenant_customer_idx').on(table.tenantId, table.customerId),
   externalIdIdx: index('devices_external_id_idx').on(table.externalId),
 
   // =====================
-  // NOVOS ÍNDICES
+  // NOVOS INDICES (todos com tenant_id para multi-tenant)
   // =====================
   slaveIdIdx: index('devices_slave_id_idx').on(table.tenantId, table.slaveId),
   centralIdIdx: index('devices_central_id_idx').on(table.tenantId, table.centralId),
   identifierIdx: index('devices_identifier_idx').on(table.tenantId, table.identifier),
   deviceProfileIdx: index('devices_device_profile_idx').on(table.tenantId, table.deviceProfile),
   deviceTypeIdx: index('devices_device_type_idx').on(table.tenantId, table.deviceType),
-  ingestionIdIdx: index('devices_ingestion_id_idx').on(table.ingestionId),
-  ingestionGatewayIdIdx: index('devices_ingestion_gateway_id_idx').on(table.ingestionGatewayId),
+  ingestionIdIdx: index('devices_ingestion_id_idx').on(table.tenantId, table.ingestionId),
+  ingestionGatewayIdIdx: index('devices_ingestion_gateway_id_idx').on(table.tenantId, table.ingestionGatewayId),
   lastActivityTimeIdx: index('devices_last_activity_time_idx').on(table.tenantId, table.lastActivityTime),
+  lastAlarmTimeIdx: index('devices_last_alarm_time_idx').on(table.tenantId, table.lastAlarmTime),
 
-  // Constraint: slave_id válido (1-247 para Modbus)
+  // =====================
+  // CONSTRAINTS DE UNICIDADE
+  // =====================
+  tenantIdentifierUnique: uniqueIndex('devices_tenant_identifier_unique').on(table.tenantId, table.identifier),
+  tenantCentralSlaveUnique: uniqueIndex('devices_tenant_central_slave_unique').on(table.tenantId, table.centralId, table.slaveId),
+
+  // Constraint: slave_id valido (1-247 para Modbus)
   validSlaveId: check(
     'valid_slave_id',
     sql`${table.slaveId} IS NULL OR (${table.slaveId} >= 1 AND ${table.slaveId} <= 247)`
@@ -212,22 +295,51 @@ ALTER TABLE devices
   ADD COLUMN last_activity_time TIMESTAMPTZ,
   ADD COLUMN last_alarm_time TIMESTAMPTZ;
 
--- Constraint para slave_id Modbus válido
+-- Constraint para slave_id Modbus valido
 ALTER TABLE devices
   ADD CONSTRAINT valid_slave_id
   CHECK (slave_id IS NULL OR (slave_id >= 1 AND slave_id <= 247));
 
--- Índices para queries frequentes
-CREATE INDEX devices_slave_id_idx ON devices(tenant_id, slave_id) WHERE slave_id IS NOT NULL;
-CREATE INDEX devices_central_id_idx ON devices(tenant_id, central_id) WHERE central_id IS NOT NULL;
-CREATE INDEX devices_identifier_idx ON devices(tenant_id, identifier) WHERE identifier IS NOT NULL;
-CREATE INDEX devices_device_profile_idx ON devices(tenant_id, device_profile) WHERE device_profile IS NOT NULL;
-CREATE INDEX devices_device_type_idx ON devices(tenant_id, device_type) WHERE device_type IS NOT NULL;
-CREATE INDEX devices_ingestion_id_idx ON devices(ingestion_id) WHERE ingestion_id IS NOT NULL;
-CREATE INDEX devices_ingestion_gateway_id_idx ON devices(ingestion_gateway_id) WHERE ingestion_gateway_id IS NOT NULL;
-CREATE INDEX devices_last_activity_time_idx ON devices(tenant_id, last_activity_time) WHERE last_activity_time IS NOT NULL;
+-- Constraints de unicidade
+ALTER TABLE devices
+  ADD CONSTRAINT devices_tenant_identifier_unique
+  UNIQUE (tenant_id, identifier);
 
--- Índice GIN para specs (busca em JSONB)
+ALTER TABLE devices
+  ADD CONSTRAINT devices_tenant_central_slave_unique
+  UNIQUE (tenant_id, central_id, slave_id);
+
+-- Indices para queries frequentes (TODOS com tenant_id para multi-tenant)
+CREATE INDEX CONCURRENTLY devices_slave_id_idx
+  ON devices(tenant_id, slave_id) WHERE slave_id IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_central_id_idx
+  ON devices(tenant_id, central_id) WHERE central_id IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_identifier_idx
+  ON devices(tenant_id, identifier) WHERE identifier IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_device_profile_idx
+  ON devices(tenant_id, device_profile) WHERE device_profile IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_device_type_idx
+  ON devices(tenant_id, device_type) WHERE device_type IS NOT NULL;
+
+-- CORRECAO: indices de ingestao agora incluem tenant_id
+CREATE INDEX CONCURRENTLY devices_ingestion_id_idx
+  ON devices(tenant_id, ingestion_id) WHERE ingestion_id IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_ingestion_gateway_id_idx
+  ON devices(tenant_id, ingestion_gateway_id) WHERE ingestion_gateway_id IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY devices_last_activity_time_idx
+  ON devices(tenant_id, last_activity_time) WHERE last_activity_time IS NOT NULL;
+
+-- NOVO: indice para last_alarm_time
+CREATE INDEX CONCURRENTLY devices_last_alarm_time_idx
+  ON devices(tenant_id, last_alarm_time) WHERE last_alarm_time IS NOT NULL;
+
+-- Indice GIN para specs (busca em JSONB)
 CREATE INDEX IF NOT EXISTS devices_specs_gin ON devices USING GIN (specs);
 ```
 
@@ -287,7 +399,7 @@ export interface DeviceSpecs extends DeviceModbusConfig {
 }
 ```
 
-### Atualização do Seed Script
+### Atualizacao do Seed Script
 
 ```sql
 -- scripts/db/seeds/08-devices.sql (atualizado)
@@ -337,52 +449,52 @@ INSERT INTO devices (
 
 ## Drawbacks
 
-1. **Migration em tabela existente**: Pode ser lenta em tabelas grandes (mitigar com `CONCURRENTLY` nos índices)
-2. **Mais colunas**: Aumenta tamanho do catálogo (mas são todas nullable)
-3. **Duplicação conceitual**: `type` (enum) vs `device_type` (string livre) - necessário documentar diferença
+1. **Migration em tabela existente**: Pode ser lenta em tabelas grandes (mitigar com `CONCURRENTLY` nos indices)
+2. **Mais colunas**: Aumenta tamanho do catalogo (mas sao todas nullable)
+3. **Complexidade de validacao**: Limites de payload JSONB adicionam overhead no service
 
 ## Rationale and Alternatives
 
-### Por que abordagem híbrida?
+### Por que abordagem hibrida?
 
-| Abordagem | Prós | Contras |
+| Abordagem | Pros | Contras |
 |-----------|------|---------|
-| Tudo coluna | Máxima performance | Muitas migrations, rigidez |
-| Tudo JSONB | Máxima flexibilidade | Performance em filtros |
-| **Híbrida** | **Equilíbrio** | Complexidade moderada |
+| Tudo coluna | Maxima performance | Muitas migrations, rigidez |
+| Tudo JSONB | Maxima flexibilidade | Performance em filtros |
+| **Hibrida** | **Equilibrio** | Complexidade moderada |
 
 ### Campos escolhidos como coluna
 
 - `slave_id`: Filtro frequente para troubleshooting Modbus
 - `central_id`: FK, relacionamento forte
-- `identifier`: Busca por usuários, precisa ser rápido
+- `identifier`: Busca por usuarios, precisa ser rapido
 - `device_profile`, `device_type`: Filtros em dashboards
-- `ingestion_id`, `ingestion_gateway_id`: Integração externa
-- `last_activity_time`: Detectar devices inativos
+- `ingestion_id`, `ingestion_gateway_id`: Integracao externa
+- `last_activity_time`, `last_alarm_time`: Detectar devices inativos/com alarmes
 
 ### Campos escolhidos como JSONB
 
-- `addrLow`, `addrHigh`, `frequency`: Config técnica, raramente filtrada
-- `mapInstantaneousPower`: Estrutura complexa, só leitura
-- `logAnnotations`: Estrutura variável, só leitura
+- `addrLow`, `addrHigh`, `frequency`: Config tecnica, raramente filtrada
+- `mapInstantaneousPower`: Estrutura complexa, so leitura
+- `logAnnotations`: Estrutura variavel, so leitura
 
 ## Change Map - Arquivos a Modificar
 
 ### 1. Database Schema
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
-| `src/infrastructure/database/drizzle/schema.ts` | Adicionar 9 novas colunas + índices + CHECK constraint | P0 |
+| `src/infrastructure/database/drizzle/schema.ts` | Adicionar 9 novas colunas + indices + constraints | P0 |
 | `drizzle/*.sql` (gerado) | Migration gerada pelo drizzle-kit | P0 |
 
 ### 2. Domain Layer
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `src/domain/entities/Device.ts` | Adicionar novos campos na interface `Device` e `DeviceSpecs` | P0 |
-| `src/domain/entities/index.ts` | Exportar novos tipos se necessário | P1 |
+| `src/domain/entities/index.ts` | Exportar novos tipos se necessario | P1 |
 
-**Mudanças em Device.ts:**
+**Mudancas em Device.ts:**
 ```typescript
 // Adicionar na interface Device:
 slaveId?: number;
@@ -405,12 +517,12 @@ logAnnotations?: LogAnnotations;
 
 ### 3. Repository Layer
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
-| `src/repositories/interfaces/IDeviceRepository.ts` | Adicionar novos métodos de busca | P0 |
-| `src/repositories/DeviceRepository.ts` | Implementar novos métodos + mapear campos | P0 |
+| `src/repositories/interfaces/IDeviceRepository.ts` | Adicionar novos metodos de busca | P0 |
+| `src/repositories/DeviceRepository.ts` | Implementar novos metodos + mapear campos | P0 |
 
-**Novos métodos em IDeviceRepository:**
+**Novos metodos em IDeviceRepository:**
 ```typescript
 // Adicionar:
 findByCentralId(tenantId: string, centralId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>>;
@@ -424,27 +536,27 @@ updateLastActivityTime(tenantId: string, id: string): Promise<Device>;
 updateLastAlarmTime(tenantId: string, id: string): Promise<Device>;
 ```
 
-**Mudanças em DeviceRepository.ts:**
-- Atualizar método `create()` para aceitar novos campos
-- Atualizar método `update()` para aceitar novos campos
-- Atualizar método `mapToEntity()` para mapear novos campos
-- Implementar novos métodos de busca
+**Mudancas em DeviceRepository.ts:**
+- Atualizar metodo `create()` para aceitar novos campos
+- Atualizar metodo `update()` para aceitar novos campos
+- Atualizar metodo `mapToEntity()` para mapear novos campos
+- Implementar novos metodos de busca
 - Adicionar filtros por `deviceProfile`, `deviceType`, `centralId` no `list()`
 
 ### 4. Service Layer
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
-| `src/services/DeviceService.ts` | Expor novos métodos do repository | P1 |
+| `src/services/DeviceService.ts` | Expor novos metodos do repository + validacao de payload | P1 |
 
 ### 5. DTOs (Request/Response)
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `src/dto/request/DeviceDTO.ts` | Adicionar novos campos em CreateDeviceDTO e UpdateDeviceDTO | P0 |
 | `src/dto/response/DeviceResponseDTO.ts` | Adicionar novos campos na resposta (se existir) | P1 |
 
-**Mudanças em DeviceDTO.ts:**
+**Mudancas em DeviceDTO.ts:**
 ```typescript
 // CreateDeviceDTO - adicionar:
 slaveId?: number;
@@ -460,7 +572,7 @@ ingestionGatewayId?: string;
 
 ### 6. Controller Layer
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `src/controllers/devices.controller.ts` | Adicionar novos query params para filtros | P1 |
 
@@ -475,12 +587,12 @@ ingestionGatewayId?: string;
 
 ### 7. API Documentation (OpenAPI/Swagger)
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `docs/openapi.yaml` | Atualizar schemas Device, CreateDevice, UpdateDevice | P1 |
 | `src/handlers/docs/openapi.ts` | Atualizar se gerado programaticamente | P1 |
 
-**Mudanças em openapi.yaml:**
+**Mudancas em openapi.yaml:**
 ```yaml
 # Adicionar em components/schemas/Device:
 slaveId:
@@ -495,7 +607,7 @@ centralId:
 identifier:
   type: string
   maxLength: 255
-  description: Identificador legível único
+  description: Identificador legivel unico
 deviceProfile:
   type: string
   maxLength: 100
@@ -503,62 +615,68 @@ deviceProfile:
 deviceType:
   type: string
   maxLength: 100
-  description: Tipo específico do dispositivo
+  description: Tipo especifico do dispositivo
 ingestionId:
   type: string
   format: uuid
-  description: ID no sistema de ingestão
+  description: ID no sistema de ingestao
 ingestionGatewayId:
   type: string
   format: uuid
-  description: ID do gateway de ingestão
+  description: ID do gateway de ingestao
 lastActivityTime:
   type: string
   format: date-time
-  description: Última atividade registrada
+  description: Ultima atividade registrada
 lastAlarmTime:
   type: string
   format: date-time
-  description: Último alarme disparado
+  description: Ultimo alarme disparado
 
 # Adicionar em specs:
 addrLow:
   type: integer
-  description: Endereço Modbus baixo
+  minimum: 0
+  maximum: 65535
+  description: Endereco Modbus baixo
 addrHigh:
   type: integer
-  description: Endereço Modbus alto
+  minimum: 0
+  maximum: 65535
+  description: Endereco Modbus alto
 frequency:
   type: integer
-  description: Frequência de polling em segundos
+  minimum: 1
+  maximum: 3600
+  description: Frequencia de polling em segundos
 mapInstantaneousPower:
   type: object
-  description: Mapa de limites de potência instantânea
+  description: Mapa de limites de potencia instantanea (max 100KB)
 logAnnotations:
   type: object
-  description: Anotações de log
+  description: Anotacoes de log (max 100 entries, 50KB)
 ```
 
 ### 8. Seed Scripts
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `scripts/db/seeds/08-devices.sql` | Adicionar novos campos nos INSERTs | P1 |
-| `scripts/db/seeds/99-verify-all.sql` | Adicionar verificação dos novos campos | P2 |
+| `scripts/db/seeds/99-verify-all.sql` | Adicionar verificacao dos novos campos | P2 |
 
-### 9. Documentação
+### 9. Documentacao
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `docs/ONBOARDING.md` | Documentar novos campos do device | P2 |
-| `docs/url-api-gcdr.md` | Atualizar exemplos de API se necessário | P2 |
+| `docs/url-api-gcdr.md` | Atualizar exemplos de API se necessario | P2 |
 
 ### 10. Testes
 
-| Arquivo | Mudança | Prioridade |
+| Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
-| `tests/unit/repositories/DeviceRepository.test.ts` | Testar novos métodos | P1 |
-| `tests/unit/services/DeviceService.test.ts` | Testar novos métodos | P1 |
+| `tests/unit/repositories/DeviceRepository.test.ts` | Testar novos metodos | P1 |
+| `tests/unit/services/DeviceService.test.ts` | Testar novos metodos | P1 |
 | `tests/integration/devices.test.ts` | Testar endpoints com novos campos | P1 |
 
 ---
@@ -580,7 +698,7 @@ logAnnotations:
 |---|--------|---------|
 | 2.1 | Atualizar interface Device | `src/domain/entities/Device.ts` |
 | 2.2 | Atualizar interface IDeviceRepository | `src/repositories/interfaces/IDeviceRepository.ts` |
-| 2.3 | Implementar novos métodos | `src/repositories/DeviceRepository.ts` |
+| 2.3 | Implementar novos metodos | `src/repositories/DeviceRepository.ts` |
 | 2.4 | Atualizar mapeamento de entidade | `src/repositories/DeviceRepository.ts` |
 
 ### Fase 3 - DTOs e Controller (P1)
@@ -592,7 +710,7 @@ logAnnotations:
 | 3.3 | Adicionar query params | `src/controllers/devices.controller.ts` |
 | 3.4 | Atualizar DeviceService | `src/services/DeviceService.ts` |
 
-### Fase 4 - Documentação (P1)
+### Fase 4 - Documentacao (P1)
 
 | # | Tarefa | Arquivo |
 |---|--------|---------|
@@ -605,7 +723,7 @@ logAnnotations:
 | # | Tarefa | Arquivo |
 |---|--------|---------|
 | 5.1 | Atualizar seed de devices | `scripts/db/seeds/08-devices.sql` |
-| 5.2 | Atualizar script de verificação | `scripts/db/seeds/99-verify-all.sql` |
+| 5.2 | Atualizar script de verificacao | `scripts/db/seeds/99-verify-all.sql` |
 | 5.3 | Executar seeds | `npm run db:seed` |
 | 5.4 | Verificar dados | `npm run db:seed:verify` |
 
@@ -613,12 +731,12 @@ logAnnotations:
 
 | # | Tarefa | Arquivo |
 |---|--------|---------|
-| 6.1 | Testes unitários do repository | `tests/unit/repositories/DeviceRepository.test.ts` |
-| 6.2 | Testes unitários do service | `tests/unit/services/DeviceService.test.ts` |
-| 6.3 | Testes de integração | `tests/integration/devices.test.ts` |
+| 6.1 | Testes unitarios do repository | `tests/unit/repositories/DeviceRepository.test.ts` |
+| 6.2 | Testes unitarios do service | `tests/unit/services/DeviceService.test.ts` |
+| 6.3 | Testes de integracao | `tests/integration/devices.test.ts` |
 | 6.4 | Executar suite completa | `npm run test` |
 
-### Fase 7 - Documentação Final (P2)
+### Fase 7 - Documentacao Final (P2)
 
 | # | Tarefa | Arquivo |
 |---|--------|---------|
@@ -628,50 +746,74 @@ logAnnotations:
 
 ---
 
-## Checklist de Validação
+## Checklist de Validacao
 
-### Após Fase 1 (Schema)
+### Apos Fase 1 (Schema)
 - [ ] Colunas existem no banco: `\d devices` no psql
-- [ ] Índices criados corretamente
+- [ ] Indices criados corretamente (todos com tenant_id)
 - [ ] CHECK constraint funciona (testar slave_id = 300 deve falhar)
 - [ ] FK para centrals funciona
+- [ ] UNIQUE constraint (tenant_id, identifier) funciona
+- [ ] UNIQUE constraint (tenant_id, central_id, slave_id) funciona
 
-### Após Fase 2 (Repository)
+### Apos Fase 2 (Repository)
 - [ ] `create()` aceita novos campos
 - [ ] `update()` atualiza novos campos
 - [ ] `findByCentralId()` retorna devices corretos
 - [ ] `findInactive()` retorna devices sem atividade
 
-### Após Fase 3 (API)
+### Apos Fase 3 (API)
 - [ ] POST /devices aceita novos campos
 - [ ] PATCH /devices/:id atualiza novos campos
 - [ ] GET /devices?deviceProfile=X filtra corretamente
 - [ ] Swagger mostra novos campos
 
-### Após Fase 5 (Seeds)
+### Apos Fase 5 (Seeds)
 - [ ] Seed executa sem erros
-- [ ] Devices têm novos campos populados
-- [ ] Verificação mostra dados corretos
+- [ ] Devices tem novos campos populados
+- [ ] Verificacao mostra dados corretos
 
-### Após Fase 6 (Testes)
+### Apos Fase 6 (Testes)
 - [ ] Todos os testes passam
-- [ ] Cobertura de código adequada
+- [ ] Cobertura de codigo adequada
+
+### Cobertura Minima Exigida
+
+| Componente | Cobertura |
+|------------|-----------|
+| DeviceRepository (novos metodos) | 90% |
+| DeviceService (novos metodos) | 85% |
+| DTOs (validacao) | 100% |
+
+### Cenarios de Teste Obrigatorios
+- [ ] Criar device com todos os novos campos
+- [ ] Atualizar device com novos campos
+- [ ] Filtrar por `deviceProfile`, `deviceType`, `centralId`
+- [ ] `findInactive()` com diferentes thresholds
+- [ ] Validacao de `slave_id` fora do range (1-247)
+- [ ] Validacao de `addrLow > addrHigh`
+- [ ] Rejeicao de `mapInstantaneousPower` > 100KB
+- [ ] FIFO em `logAnnotations.entries` > 100
+- [ ] Violacao de UNIQUE constraint em `identifier`
+- [ ] Violacao de UNIQUE constraint em `(central_id, slave_id)`
 
 ## Prior Art
 
-- ThingsBoard: usa `additional_info` (JSONB) para campos extensíveis
-- AWS IoT: combina `attributes` fixos com `shadow` (JSON dinâmico)
+- ThingsBoard: usa `additional_info` (JSONB) para campos extensiveis
+- AWS IoT: combina `attributes` fixos com `shadow` (JSON dinamico)
 - Azure IoT Hub: `deviceTwin` com `properties` e `tags`
 
-## Unresolved Questions
+## Resolved Questions
 
-1. O campo `device_type` (string) deve substituir ou complementar o enum `type` existente?
-2. Deve haver validação de unicidade em `identifier` por tenant?
-3. O `slave_id` deve ser único por `central_id`?
+| Pergunta | Decisao | Justificativa |
+|----------|---------|---------------|
+| `device_type` substitui ou complementa `type`? | Complementa | `type` e categoria tecnica (GCDR), `device_type` e subtipo de negocio (integrador) |
+| `identifier` deve ser unico por tenant? | Sim | E uma chave logica de negocio |
+| `slave_id` deve ser unico por `central_id`? | Sim | Dois devices na mesma central nao podem ter o mesmo Modbus slave ID |
 
 ## Next Steps
 
-1. Revisão e aprovação deste RFC
-2. Implementação da Fase 1 (Schema)
-3. Implementação das Fases 2-4
-4. Atualização da documentação
+1. Implementacao da Fase 1 (Schema)
+2. Implementacao das Fases 2-4
+3. Atualizacao da documentacao
+4. Marcar RFC como Implemented
