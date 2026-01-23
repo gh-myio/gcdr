@@ -45,11 +45,11 @@ npm run dev
 
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:3015/health
 # Response: {"status":"ok"}
 
 # Readiness check (includes database)
-curl http://localhost:3000/health/ready
+curl http://localhost:3015/health/ready
 # Response: {"status":"ready"}
 ```
 
@@ -170,7 +170,7 @@ npm run test:coverage    # Tests with coverage
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NODE_ENV` | Environment | `development` |
-| `PORT` | Server port | `3000` |
+| `PORT` | Server port | `3015` |
 | `DATABASE_URL` | PostgreSQL connection | - |
 | `JWT_SECRET` | JWT signing key | - |
 | `JWT_ISSUER` | JWT issuer | `gcdr` |
@@ -182,7 +182,7 @@ npm run test:coverage    # Tests with coverage
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `api` | 3000 | GCDR API |
+| `api` | 3015 | GCDR API |
 | `postgres` | 5433 | PostgreSQL database |
 
 ## Documentation

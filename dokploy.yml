@@ -42,7 +42,7 @@ env:
   - name: NODE_ENV
     value: production
   - name: PORT
-    value: "3000"
+    value: "3015"
   - name: HOST
     value: "0.0.0.0"
   - name: LOG_LEVEL
@@ -73,7 +73,7 @@ env:
 # =============================================================================
 healthCheck:
   path: /health
-  port: 3000
+  port: 3015
   interval: 30s
   timeout: 5s
   startPeriod: 10s

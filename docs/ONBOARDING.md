@@ -51,7 +51,7 @@ Esta seção contém todas as informações necessárias para a equipe de fronte
 
 | Ambiente | URL Base | Uso |
 |----------|----------|-----|
-| **Local** | `http://localhost:3000` | Desenvolvimento local (Docker) |
+| **Local** | `http://localhost:3015` | Desenvolvimento local (Docker) |
 | **Staging** | `https://api-staging.gcdr.myio.com.br` | Homologação (Dokploy) |
 | **Production** | `https://api.gcdr.myio.com.br` | Produção (Dokploy) |
 
@@ -73,8 +73,8 @@ X-API-Key: <api-key-do-partner>
 ### Documentação OpenAPI
 
 A especificação completa da API está disponível em:
-- **Swagger UI (online)**: [`/docs`](http://localhost:3000/docs)
-- **OpenAPI JSON**: [`/docs/openapi.json`](http://localhost:3000/docs/openapi.json)
+- **Swagger UI (online)**: [`/docs`](http://localhost:3015/docs)
+- **OpenAPI JSON**: [`/docs/openapi.json`](http://localhost:3015/docs/openapi.json)
 - **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,850+ linhas)
 - **140+ endpoints** documentados com schemas de request/response
 
@@ -104,7 +104,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 
 #### Health Check
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3015/health
 ```
 
 Resposta:
@@ -122,14 +122,14 @@ Resposta:
 
 #### Listar Customers
 ```bash
-curl http://localhost:3000/customers \
+curl http://localhost:3015/customers \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Criar Customer
 ```bash
-curl -X POST http://localhost:3000/customers \
+curl -X POST http://localhost:3015/customers \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>" \
@@ -143,21 +143,21 @@ curl -X POST http://localhost:3000/customers \
 
 #### Buscar Árvore de Customers
 ```bash
-curl http://localhost:3000/customers/{id}/tree \
+curl http://localhost:3015/customers/{id}/tree \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Listar Assets de um Customer
 ```bash
-curl http://localhost:3000/customers/{id}/assets \
+curl http://localhost:3015/customers/{id}/assets \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Obter Tema Efetivo (com herança)
 ```bash
-curl http://localhost:3000/customers/{id}/theme/effective \
+curl http://localhost:3015/customers/{id}/theme/effective \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
@@ -545,10 +545,10 @@ docker compose up -d
 docker compose ps
 
 # Testar a API
-curl http://localhost:3000/health
+curl http://localhost:3015/health
 # Deve retornar: {"status":"ok"}
 
-curl http://localhost:3000/health/ready
+curl http://localhost:3015/health/ready
 # Deve retornar: {"status":"ready"}
 
 # Ver logs
@@ -568,7 +568,7 @@ npm run build
 npm run dev
 
 # Em outro terminal, teste a API
-curl http://localhost:3000/health
+curl http://localhost:3015/health
 # Deve retornar: {"status":"ok"}
 ```
 
@@ -631,7 +631,7 @@ curl http://localhost:3000/health
 
 | Serviço | Container | Porta | Descrição |
 |---------|-----------|-------|-----------|
-| API | gcdr-api | 3000 | Aplicação Express.js |
+| API | gcdr-api | 3015 | Aplicação Express.js |
 | Database | gcdr-postgres | 5433 | PostgreSQL 16 |
 
 ### Componentes Principais
@@ -1072,20 +1072,20 @@ docker compose up -d
 npm run dev
 
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:3015/health
 # Resposta: {"status":"ok"}
 
 # Health check com banco de dados
-curl http://localhost:3000/health/ready
+curl http://localhost:3015/health/ready
 # Resposta: {"status":"ready"}
 
 # Listar customers (requer autenticação)
-curl http://localhost:3000/customers \
+curl http://localhost:3015/customers \
   -H "x-tenant-id: tenant-123" \
   -H "Authorization: Bearer <seu-jwt-token>"
 
 # Criar customer (requer autenticação)
-curl -X POST http://localhost:3000/customers \
+curl -X POST http://localhost:3015/customers \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: tenant-123" \
   -H "Authorization: Bearer <seu-jwt-token>" \
@@ -1095,12 +1095,12 @@ curl -X POST http://localhost:3000/customers \
   }'
 
 # Buscar filhos de um customer
-curl http://localhost:3000/customers/customer-123/children \
+curl http://localhost:3015/customers/customer-123/children \
   -H "x-tenant-id: tenant-123" \
   -H "Authorization: Bearer <seu-jwt-token>"
 
 # Buscar árvore completa
-curl http://localhost:3000/customers/customer-123/tree \
+curl http://localhost:3015/customers/customer-123/tree \
   -H "x-tenant-id: tenant-123" \
   -H "Authorization: Bearer <seu-jwt-token>"
 ```
@@ -1112,7 +1112,7 @@ curl http://localhost:3000/customers/customer-123/tree \
 Em ambiente de desenvolvimento, uma interface web está disponível para gerenciar o banco de dados:
 
 ```
-http://localhost:3000/admin/db
+http://localhost:3015/admin/db
 ```
 
 **Funcionalidades:**
@@ -1407,11 +1407,11 @@ npm run build
 ```bash
 # Verificar o que está usando a porta
 # Windows:
-netstat -ano | findstr :3000
+netstat -ano | findstr :3015
 taskkill /PID <pid> /F
 
 # Linux/Mac:
-lsof -i :3000
+lsof -i :3015
 kill -9 <pid>
 
 # Ou verificar containers Docker
@@ -1542,7 +1542,7 @@ Use este checklist para acompanhar seu progresso:
 
 - [ ] Docker instalado e funcionando (`docker --version`)
 - [ ] Ambiente configurado e rodando (`docker compose up -d`)
-- [ ] Health check funcionando (`curl http://localhost:3000/health`)
+- [ ] Health check funcionando (`curl http://localhost:3015/health`)
 - [ ] Executou `npm test` com sucesso
 - [ ] Testou API local com curl ou Thunder Client
 - [ ] Entendeu a arquitetura de alto nível (containers + Express)

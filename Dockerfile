@@ -60,16 +60,16 @@ COPY --chown=gcdr:nodejs docs/openapi.yaml ./docs/
 USER gcdr
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3015
 
 # Environment
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3015
 ENV HOST=0.0.0.0
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3015/health || exit 1
 
 # Start application
 CMD ["node", "dist/app.js"]
@@ -92,10 +92,11 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3015
 
 # Environment
 ENV NODE_ENV=development
+ENV PORT=3015
 
 # Start with hot reload
 CMD ["npm", "run", "dev"]

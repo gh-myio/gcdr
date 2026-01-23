@@ -23,7 +23,7 @@ try {
       description: 'Global Central Data Registry API',
     },
     servers: [
-      { url: 'http://localhost:3000', description: 'Local Development' },
+      { url: 'http://localhost:3015', description: 'Local Development' },
     ],
     paths: {},
   };
