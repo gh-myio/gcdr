@@ -11,9 +11,17 @@ DECLARE
     v_room1_id UUID := 'ffff4444-4444-4444-4444-444444444444'; -- Server Room
     v_room2_id UUID := 'ffff5555-5555-5555-5555-555555555555'; -- Meeting Room
     v_equipment1_id UUID := 'ffff6666-6666-6666-6666-666666666666'; -- AC Unit
+    v_central1_id UUID := 'eeee1111-1111-1111-1111-111111111111'; -- Central 1
 BEGIN
-    -- Temperature Sensor in Server Room
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Temperature Sensor in Server Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type,
+        ingestion_id, ingestion_gateway_id, last_activity_time
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000001',
         v_tenant_id,
@@ -26,7 +34,7 @@ BEGIN
         'High-precision temperature sensor for server room monitoring',
         'SN-TEMP-001-2023',
         'tb-device-temp-001',
-        '{"manufacturer": "Sensirion", "model": "SHT40", "firmwareVersion": "2.1.0", "serialNumber": "SN-TEMP-001-2023", "protocol": "MQTT", "accuracy": 0.2}',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "firmwareVersion": "2.1.0", "serialNumber": "SN-TEMP-001-2023", "protocol": "MQTT", "accuracy": 0.2, "addrLow": 100, "addrHigh": 110, "frequency": 30}',
         'ONLINE',
         NOW() - INTERVAL '5 minutes',
         '{"type": "ACCESS_TOKEN", "accessToken": "temp001_access_token_xyz"}',
@@ -35,7 +43,16 @@ BEGIN
         '{"installationDate": "2023-06-15", "calibrationDate": "2024-01-10"}',
         '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10"}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        1,                                              -- slave_id (Modbus)
+        v_central1_id,                                  -- central_id
+        'TEMP_SENSOR_SERVER_ROOM_01',                   -- identifier
+        'SENSOR_TEMP_AMBIENTE',                         -- device_profile
+        'SHT40_TEMP_HUMIDITY',                          -- device_type
+        'ce6a7e51-e642-4562-8d3d-8f492929d4df',        -- ingestion_id
+        'd3202744-05dd-46d1-af33-495e9a2ecd52',        -- ingestion_gateway_id
+        NOW() - INTERVAL '5 minutes'                    -- last_activity_time
     );
 
     -- Humidity Sensor in Server Room
@@ -64,8 +81,15 @@ BEGIN
         1
     );
 
-    -- Power Meter in Server Room
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Power Meter in Server Room (with RFC-0008 Modbus fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type,
+        ingestion_id, ingestion_gateway_id, last_activity_time
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000003',
         v_tenant_id,
@@ -78,7 +102,7 @@ BEGIN
         'Smart power meter for server room energy monitoring',
         'SN-PWR-001-2023',
         'tb-device-pwr-001',
-        '{"manufacturer": "Schneider", "model": "PM5560", "firmwareVersion": "3.0.1", "serialNumber": "SN-PWR-001-2023", "protocol": "MODBUS"}',
+        '{"manufacturer": "Schneider", "model": "PM5560", "firmwareVersion": "3.0.1", "serialNumber": "SN-PWR-001-2023", "protocol": "MODBUS", "addrLow": 0, "addrHigh": 50, "frequency": 60}',
         'ONLINE',
         NOW() - INTERVAL '1 minute',
         '{"type": "MQTT_BASIC", "username": "pwr001", "password": "encrypted_password"}',
@@ -87,7 +111,16 @@ BEGIN
         '{"installationDate": "2023-06-15", "maxLoad": 100}',
         '{"firmware": "3.0.1", "totalEnergy": 125430.5}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        2,                                              -- slave_id (Modbus address 2)
+        v_central1_id,                                  -- central_id
+        'POWER_METER_SERVER_ROOM_01',                   -- identifier
+        '3F_MEDIDOR',                                   -- device_profile
+        'PM5560_POWER_METER',                           -- device_type
+        'bf7a8c31-d542-4562-9e3f-7a592929e5ef',        -- ingestion_id
+        'd3202744-05dd-46d1-af33-495e9a2ecd52',        -- ingestion_gateway_id
+        NOW() - INTERVAL '1 minute'                     -- last_activity_time
     );
 
     -- Camera in Meeting Room
@@ -199,4 +232,4 @@ BEGIN
 END $$;
 
 -- Verify
-SELECT id, name, label, type, connectivity_status, status FROM devices ORDER BY type, name;
+SELECT id, name, label, type, connectivity_status, status, slave_id, identifier, device_profile, device_type FROM devices ORDER BY type, name;

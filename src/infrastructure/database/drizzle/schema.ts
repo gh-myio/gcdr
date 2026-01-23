@@ -11,6 +11,7 @@ import {
   text,
   varchar,
   integer,
+  smallint,
   boolean,
   timestamp,
   jsonb,
@@ -250,11 +251,52 @@ export const devices = pgTable('devices', {
   createdBy: uuid('created_by'),
   updatedBy: uuid('updated_by'),
   version: integer('version').notNull().default(1),
+
+  // ==========================================================================
+  // RFC-0008: Device Attributes Extension
+  // ==========================================================================
+
+  // Modbus Configuration
+  slaveId: smallint('slave_id'),  // Modbus slave ID (1-247)
+  centralId: uuid('central_id'),  // FK to centrals table (added after centrals definition)
+
+  // Identification Extended
+  identifier: varchar('identifier', { length: 255 }),  // Human-readable unique identifier
+  deviceProfile: varchar('device_profile', { length: 100 }),  // Device profile (e.g., HIDROMETRO_AREA_COMUM)
+  deviceType: varchar('device_type', { length: 100 }),  // Specific device type (e.g., 3F_MEDIDOR)
+
+  // Ingestion Integration
+  ingestionId: uuid('ingestion_id'),  // ID in ingestion system
+  ingestionGatewayId: uuid('ingestion_gateway_id'),  // Gateway ID in ingestion system
+
+  // Activity Monitoring
+  lastActivityTime: timestamp('last_activity_time', { withTimezone: true }),  // Last telemetry received
+  lastAlarmTime: timestamp('last_alarm_time', { withTimezone: true }),  // Last alarm triggered
+
 }, (table) => ({
+  // Existing indexes
   tenantSerialUnique: uniqueIndex('devices_tenant_serial_unique').on(table.tenantId, table.serialNumber),
   tenantAssetIdx: index('devices_tenant_asset_idx').on(table.tenantId, table.assetId),
   tenantCustomerIdx: index('devices_tenant_customer_idx').on(table.tenantId, table.customerId),
   externalIdIdx: index('devices_external_id_idx').on(table.externalId),
+
+  // RFC-0008: New indexes (all with tenant_id for multi-tenant isolation)
+  slaveIdIdx: index('devices_slave_id_idx').on(table.tenantId, table.slaveId),
+  centralIdIdx: index('devices_central_id_idx').on(table.tenantId, table.centralId),
+  identifierIdx: index('devices_identifier_idx').on(table.tenantId, table.identifier),
+  deviceProfileIdx: index('devices_device_profile_idx').on(table.tenantId, table.deviceProfile),
+  deviceTypeIdx: index('devices_device_type_idx').on(table.tenantId, table.deviceType),
+  ingestionIdIdx: index('devices_ingestion_id_idx').on(table.tenantId, table.ingestionId),
+  ingestionGatewayIdIdx: index('devices_ingestion_gateway_id_idx').on(table.tenantId, table.ingestionGatewayId),
+  lastActivityTimeIdx: index('devices_last_activity_time_idx').on(table.tenantId, table.lastActivityTime),
+  lastAlarmTimeIdx: index('devices_last_alarm_time_idx').on(table.tenantId, table.lastAlarmTime),
+
+  // RFC-0008: Unique constraints
+  tenantIdentifierUnique: uniqueIndex('devices_tenant_identifier_unique').on(table.tenantId, table.identifier),
+  tenantCentralSlaveUnique: uniqueIndex('devices_tenant_central_slave_unique').on(table.tenantId, table.centralId, table.slaveId),
+
+  // RFC-0008: Check constraint for valid Modbus slave_id (1-247)
+  validSlaveId: check('valid_slave_id', sql`${table.slaveId} IS NULL OR (${table.slaveId} >= 1 AND ${table.slaveId} <= 247)`),
 }));
 
 // =============================================================================

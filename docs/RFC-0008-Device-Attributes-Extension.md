@@ -3,7 +3,7 @@
 - Feature Name: `device_attributes_extension`
 - Start Date: 2026-01-23
 - RFC PR: N/A
-- Status: Draft
+- Status: Implemented
 
 ## Summary
 

@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, lt, isNotNull } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Device, ConnectivityStatus, createDefaultDeviceSpecs, createDefaultTelemetryConfig } from '../domain/entities/Device';
 import { CreateDeviceDTO, UpdateDeviceDTO, ListDevicesParams } from '../dto/request/DeviceDTO';
@@ -40,6 +40,14 @@ export class DeviceRepository implements IDeviceRepository {
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),
       createdBy,
+      // RFC-0008: New fields
+      slaveId: data.slaveId,
+      centralId: data.centralId,
+      identifier: data.identifier,
+      deviceProfile: data.deviceProfile,
+      deviceType: data.deviceType,
+      ingestionId: data.ingestionId,
+      ingestionGatewayId: data.ingestionGatewayId,
     }).returning();
 
     return this.mapToEntity(result);
@@ -107,6 +115,15 @@ export class DeviceRepository implements IDeviceRepository {
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
     if (data.attributes !== undefined) updateData.attributes = { ...existing.attributes, ...data.attributes };
     if (data.status !== undefined) updateData.status = data.status;
+
+    // RFC-0008: New fields
+    if (data.slaveId !== undefined) updateData.slaveId = data.slaveId;
+    if (data.centralId !== undefined) updateData.centralId = data.centralId;
+    if (data.identifier !== undefined) updateData.identifier = data.identifier;
+    if (data.deviceProfile !== undefined) updateData.deviceProfile = data.deviceProfile;
+    if (data.deviceType !== undefined) updateData.deviceType = data.deviceType;
+    if (data.ingestionId !== undefined) updateData.ingestionId = data.ingestionId;
+    if (data.ingestionGatewayId !== undefined) updateData.ingestionGatewayId = data.ingestionGatewayId;
 
     const [result] = await db
       .update(devices)
@@ -352,7 +369,215 @@ export class DeviceRepository implements IDeviceRepository {
       createdBy: row.createdBy || undefined,
       updatedBy: row.updatedBy || undefined,
       version: row.version,
+      // RFC-0008: New fields
+      slaveId: row.slaveId || undefined,
+      centralId: row.centralId || undefined,
+      identifier: row.identifier || undefined,
+      deviceProfile: row.deviceProfile || undefined,
+      deviceType: row.deviceType || undefined,
+      ingestionId: row.ingestionId || undefined,
+      ingestionGatewayId: row.ingestionGatewayId || undefined,
+      lastActivityTime: row.lastActivityTime?.toISOString(),
+      lastAlarmTime: row.lastAlarmTime?.toISOString(),
     };
+  }
+
+  // ===========================================================================
+  // RFC-0008: New Query Methods
+  // ===========================================================================
+
+  async findByCentralId(tenantId: string, centralId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
+    const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions = [
+      eq(devices.tenantId, tenantId),
+      eq(devices.centralId, centralId),
+    ];
+
+    if (params?.status) {
+      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
+    }
+
+    const results = await db
+      .select()
+      .from(devices)
+      .where(and(...conditions))
+      .orderBy(devices.name)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
+
+    return {
+      items: items.map(this.mapToEntity),
+      pagination: {
+        hasMore,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
+      },
+    };
+  }
+
+  async findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null> {
+    const [result] = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.centralId, centralId),
+        eq(devices.slaveId, slaveId)
+      ))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByIdentifier(tenantId: string, identifier: string): Promise<Device | null> {
+    const [result] = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.identifier, identifier)
+      ))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByProfile(tenantId: string, deviceProfile: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
+    const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions = [
+      eq(devices.tenantId, tenantId),
+      eq(devices.deviceProfile, deviceProfile),
+    ];
+
+    if (params?.status) {
+      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
+    }
+
+    const results = await db
+      .select()
+      .from(devices)
+      .where(and(...conditions))
+      .orderBy(devices.name)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
+
+    return {
+      items: items.map(this.mapToEntity),
+      pagination: {
+        hasMore,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
+      },
+    };
+  }
+
+  async findByDeviceType(tenantId: string, deviceType: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
+    const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions = [
+      eq(devices.tenantId, tenantId),
+      eq(devices.deviceType, deviceType),
+    ];
+
+    if (params?.status) {
+      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
+    }
+
+    const results = await db
+      .select()
+      .from(devices)
+      .where(and(...conditions))
+      .orderBy(devices.name)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
+
+    return {
+      items: items.map(this.mapToEntity),
+      pagination: {
+        hasMore,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
+      },
+    };
+  }
+
+  async findInactive(tenantId: string, options: { hours: number }): Promise<Device[]> {
+    const threshold = new Date(Date.now() - options.hours * 60 * 60 * 1000);
+
+    const results = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.status, 'ACTIVE'),
+        isNotNull(devices.lastActivityTime),
+        lt(devices.lastActivityTime, threshold)
+      ))
+      .orderBy(devices.lastActivityTime);
+
+    return results.map(this.mapToEntity);
+  }
+
+  async findByIngestionId(tenantId: string, ingestionId: string): Promise<Device | null> {
+    const [result] = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.ingestionId, ingestionId)
+      ))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async updateLastActivityTime(tenantId: string, id: string): Promise<Device> {
+    const timestamp = new Date();
+
+    const [result] = await db
+      .update(devices)
+      .set({
+        lastActivityTime: timestamp,
+        updatedAt: timestamp,
+      })
+      .where(and(eq(devices.tenantId, tenantId), eq(devices.id, id)))
+      .returning();
+
+    if (!result) {
+      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+    }
+
+    return this.mapToEntity(result);
+  }
+
+  async updateLastAlarmTime(tenantId: string, id: string): Promise<Device> {
+    const timestamp = new Date();
+
+    const [result] = await db
+      .update(devices)
+      .set({
+        lastAlarmTime: timestamp,
+        updatedAt: timestamp,
+      })
+      .where(and(eq(devices.tenantId, tenantId), eq(devices.id, id)))
+      .returning();
+
+    if (!result) {
+      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+    }
+
+    return this.mapToEntity(result);
   }
 }
 
