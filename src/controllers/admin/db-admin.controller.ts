@@ -371,15 +371,20 @@ router.get('/', (req: Request, res: Response) => {
 
 function getHtmlPage(): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GCDR Database Admin</title>
+  <!-- CodeMirror CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
+    /* Dark Theme (default) */
+    :root, [data-theme="dark"] {
       --bg: #1a1a2e;
       --bg-secondary: #16213e;
       --bg-tertiary: #0f3460;
@@ -391,6 +396,23 @@ function getHtmlPage(): string {
       --error: #ff6b6b;
       --info: #4dabf7;
       --border: #2a2a4a;
+      --cm-theme: dracula;
+    }
+
+    /* Light Theme */
+    [data-theme="light"] {
+      --bg: #f5f5f5;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e8e8e8;
+      --text: #1a1a2e;
+      --text-secondary: #666666;
+      --primary: #e94560;
+      --success: #00a854;
+      --warning: #faad14;
+      --error: #f5222d;
+      --info: #1890ff;
+      --border: #d9d9d9;
+      --cm-theme: eclipse;
     }
 
     body {
@@ -398,6 +420,7 @@ function getHtmlPage(): string {
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
+      transition: background 0.3s, color 0.3s;
     }
 
     .container {
@@ -415,6 +438,18 @@ function getHtmlPage(): string {
       border-bottom: 1px solid var(--border);
     }
 
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
     header h1 {
       font-size: 1.5rem;
       color: var(--primary);
@@ -427,6 +462,21 @@ function getHtmlPage(): string {
       border-radius: 4px;
       font-size: 0.75rem;
       font-weight: bold;
+    }
+
+    .theme-toggle {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--primary);
     }
 
     .tabs {
@@ -467,6 +517,7 @@ function getHtmlPage(): string {
       color: var(--text-secondary);
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 8px;
     }
 
@@ -488,8 +539,9 @@ function getHtmlPage(): string {
     .btn-success { background: var(--success); color: white; }
     .btn-warning { background: var(--warning); color: black; }
     .btn-danger { background: var(--error); color: white; }
-    .btn-secondary { background: var(--bg-tertiary); color: var(--text); }
+    .btn-secondary { background: var(--bg-tertiary); color: var(--text); border: 1px solid var(--border); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
 
     .btn-group {
       display: flex;
@@ -544,22 +596,13 @@ function getHtmlPage(): string {
     .log-warning { color: var(--warning); }
     .log-info { color: var(--info); }
 
-    .query-editor {
-      width: 100%;
-      min-height: 150px;
-      background: var(--bg);
-      color: var(--text);
+    /* CodeMirror customization */
+    .CodeMirror {
+      height: 200px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 15px;
       font-family: 'Fira Code', 'Consolas', monospace;
       font-size: 0.9rem;
-      resize: vertical;
-    }
-
-    .query-editor:focus {
-      outline: none;
-      border-color: var(--primary);
     }
 
     .results-table {
@@ -587,6 +630,9 @@ function getHtmlPage(): string {
     }
 
     .results-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-top: 10px;
       font-size: 0.85rem;
       color: var(--text-secondary);
@@ -613,17 +659,36 @@ function getHtmlPage(): string {
     .example-name { font-weight: 600; margin-bottom: 4px; }
     .example-desc { font-size: 0.85rem; color: var(--text-secondary); }
 
-    .status-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 500;
+    /* Query History */
+    .history-list {
+      max-height: 200px;
+      overflow-y: auto;
     }
 
-    .status-running { background: var(--warning); color: black; }
-    .status-success { background: var(--success); color: white; }
-    .status-error { background: var(--error); color: white; }
+    .history-item {
+      padding: 8px 12px;
+      background: var(--bg);
+      border-radius: 4px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: all 0.2s;
+    }
+
+    .history-item:hover {
+      border-color: var(--primary);
+    }
+
+    .history-time {
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      margin-right: 8px;
+    }
 
     .spinner {
       display: inline-block;
@@ -657,12 +722,45 @@ function getHtmlPage(): string {
       max-height: 300px;
       overflow-y: auto;
     }
+
+    .collapsible {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .collapsible::before {
+      content: '\\25BC';
+      display: inline-block;
+      margin-right: 6px;
+      transition: transform 0.2s;
+    }
+
+    .collapsible.collapsed::before {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-content {
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .collapsible-content.collapsed {
+      max-height: 0;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>GCDR Database Admin</h1>
-    <span class="dev-badge">DEV ONLY</span>
+    <div class="header-left">
+      <h1>GCDR Database Admin</h1>
+      <span class="dev-badge">DEV ONLY</span>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">&#9790;</span>
+      </button>
+    </div>
   </header>
 
   <div class="tabs">
@@ -728,9 +826,12 @@ function getHtmlPage(): string {
       <div class="flex gap-20">
         <div class="flex-1">
           <div class="card">
-            <div class="card-title">SQL Query</div>
-            <textarea id="query-input" class="query-editor" placeholder="SELECT * FROM customers LIMIT 10;"></textarea>
-            <div class="mt-10 flex gap-10">
+            <div class="card-title">
+              <span>SQL Query</span>
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Ctrl+Enter to execute</span>
+            </div>
+            <textarea id="query-input"></textarea>
+            <div class="mt-10 flex gap-10" style="align-items: center; flex-wrap: wrap;">
               <button class="btn btn-success" onclick="executeQuery()" id="btn-execute">
                 <span>&#9654;</span> Execute
               </button>
@@ -742,7 +843,12 @@ function getHtmlPage(): string {
           </div>
 
           <div class="card">
-            <div class="card-title">Results</div>
+            <div class="card-title">
+              <span>Results</span>
+              <button class="btn btn-secondary btn-sm" onclick="exportCSV()" id="btn-export" style="display: none;">
+                Export CSV
+              </button>
+            </div>
             <div id="query-results">
               <p style="color: var(--text-secondary);">Execute a query to see results</p>
             </div>
@@ -751,9 +857,21 @@ function getHtmlPage(): string {
 
         <div style="width: 350px;">
           <div class="card">
-            <div class="card-title">Example Queries</div>
-            <div id="examples-list" class="examples-list">
-              Loading...
+            <div class="card-title collapsible" onclick="toggleCollapse(this)">Query History</div>
+            <div class="collapsible-content">
+              <div id="history-list" class="history-list">
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">No queries yet</p>
+              </div>
+              <button class="btn btn-secondary btn-sm mt-10" onclick="clearHistory()">Clear History</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title collapsible" onclick="toggleCollapse(this)">Example Queries</div>
+            <div class="collapsible-content">
+              <div id="examples-list" class="examples-list">
+                Loading...
+              </div>
             </div>
           </div>
         </div>
@@ -761,10 +879,142 @@ function getHtmlPage(): string {
     </div>
   </div>
 
+  <!-- CodeMirror JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+
   <script>
     const API_BASE = '/admin/db/api';
+    let editor = null;
+    let lastQueryResults = null;
 
-    // Tab navigation
+    // ==========================================================================
+    // Theme Management
+    // ==========================================================================
+    function getStoredTheme() {
+      return localStorage.getItem('gcdr-admin-theme') || 'dark';
+    }
+
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('gcdr-admin-theme', theme);
+      document.getElementById('theme-icon').innerHTML = theme === 'dark' ? '&#9790;' : '&#9728;';
+      if (editor) {
+        editor.setOption('theme', theme === 'dark' ? 'dracula' : 'eclipse');
+      }
+    }
+
+    function toggleTheme() {
+      const current = getStoredTheme();
+      setTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    // ==========================================================================
+    // Query History Management
+    // ==========================================================================
+    function getQueryHistory() {
+      try {
+        return JSON.parse(localStorage.getItem('gcdr-query-history') || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveQueryToHistory(query) {
+      const history = getQueryHistory();
+      const entry = {
+        query: query.trim(),
+        timestamp: new Date().toISOString()
+      };
+      // Remove duplicates
+      const filtered = history.filter(h => h.query !== entry.query);
+      filtered.unshift(entry);
+      // Keep only last 20 queries
+      const trimmed = filtered.slice(0, 20);
+      localStorage.setItem('gcdr-query-history', JSON.stringify(trimmed));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const history = getQueryHistory();
+      const container = document.getElementById('history-list');
+
+      if (history.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem;">No queries yet</p>';
+        return;
+      }
+
+      container.innerHTML = history.map((h, i) => {
+        const time = new Date(h.timestamp).toLocaleTimeString();
+        const preview = h.query.substring(0, 50) + (h.query.length > 50 ? '...' : '');
+        return \`<div class="history-item" onclick="loadFromHistory(\${i})" title="\${h.query.replace(/"/g, '&quot;')}">
+          <span class="history-time">\${time}</span>\${preview}
+        </div>\`;
+      }).join('');
+    }
+
+    function loadFromHistory(index) {
+      const history = getQueryHistory();
+      if (history[index]) {
+        editor.setValue(history[index].query);
+      }
+    }
+
+    function clearHistory() {
+      localStorage.removeItem('gcdr-query-history');
+      renderHistory();
+    }
+
+    // ==========================================================================
+    // CSV Export
+    // ==========================================================================
+    function exportCSV() {
+      if (!lastQueryResults || !lastQueryResults.rows || lastQueryResults.rows.length === 0) {
+        alert('No data to export');
+        return;
+      }
+
+      const { columns, rows } = lastQueryResults;
+
+      // Build CSV content
+      const escapeCSV = (val) => {
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\\n')) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      };
+
+      const header = columns.map(escapeCSV).join(',');
+      const body = rows.map(row => columns.map(c => escapeCSV(row[c])).join(',')).join('\\n');
+      const csv = header + '\\n' + body;
+
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', \`query-results-\${Date.now()}.csv\`);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    // ==========================================================================
+    // Collapsible Sections
+    // ==========================================================================
+    function toggleCollapse(element) {
+      element.classList.toggle('collapsed');
+      const content = element.nextElementSibling;
+      content.classList.toggle('collapsed');
+    }
+
+    // ==========================================================================
+    // Tab Navigation
+    // ==========================================================================
     function showTab(tabId) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -772,10 +1022,16 @@ function getHtmlPage(): string {
       document.getElementById(\`\${tabId}-panel\`).classList.add('active');
 
       if (tabId === 'logs') refreshLogs();
-      if (tabId === 'query') loadExamples();
+      if (tabId === 'query') {
+        loadExamples();
+        renderHistory();
+        if (editor) editor.refresh();
+      }
     }
 
-    // Load scripts list
+    // ==========================================================================
+    // Scripts Management
+    // ==========================================================================
     async function loadScripts() {
       try {
         const res = await fetch(\`\${API_BASE}/scripts\`);
@@ -799,7 +1055,6 @@ function getHtmlPage(): string {
       }
     }
 
-    // Run single script
     async function runScript(name) {
       const btn = document.getElementById(\`btn-\${name}\`);
       btn.disabled = true;
@@ -823,7 +1078,6 @@ function getHtmlPage(): string {
       btn.innerHTML = 'Run';
     }
 
-    // Run all seeds
     async function runAllSeeds() {
       const btn = document.getElementById('btn-seed-all');
       btn.disabled = true;
@@ -851,7 +1105,6 @@ function getHtmlPage(): string {
       btn.innerHTML = '<span>&#9654;</span> Run All Seeds';
     }
 
-    // Clear all data
     async function clearAll() {
       if (!confirm('This will DELETE ALL DATA. Are you sure?')) return;
 
@@ -877,7 +1130,6 @@ function getHtmlPage(): string {
       btn.innerHTML = '<span>&#128465;</span> Clear All';
     }
 
-    // Quick reset
     async function quickReset() {
       if (!confirm('This will CLEAR and RESEED all data. Continue?')) return;
 
@@ -894,7 +1146,6 @@ function getHtmlPage(): string {
       btn.innerHTML = '<span>&#8635;</span> Quick Reset';
     }
 
-    // Verify data
     async function verify() {
       const btn = document.getElementById('btn-verify');
       btn.disabled = true;
@@ -907,7 +1158,6 @@ function getHtmlPage(): string {
 
         if (data.success) {
           addLogEntry('success', \`Verification complete (\${data.duration}ms)\`);
-          // Show output in a modal or separate area
           console.log(data.output);
         } else {
           addLogEntry('error', \`Verification failed: \${data.error}\`);
@@ -920,7 +1170,9 @@ function getHtmlPage(): string {
       btn.innerHTML = '<span>&#10003;</span> Verify';
     }
 
-    // Add log entry to UI
+    // ==========================================================================
+    // Log Management
+    // ==========================================================================
     function addLogEntry(type, message) {
       const container = document.getElementById('execution-log');
       const time = new Date().toLocaleTimeString();
@@ -933,7 +1185,6 @@ function getHtmlPage(): string {
       container.insertBefore(entry, container.firstChild);
     }
 
-    // Refresh logs from server
     async function refreshLogs() {
       try {
         const res = await fetch(\`\${API_BASE}/logs\`);
@@ -958,46 +1209,51 @@ function getHtmlPage(): string {
       }
     }
 
-    // Clear logs
     async function clearLogs() {
       await fetch(\`\${API_BASE}/logs\`, { method: 'DELETE' });
       refreshLogs();
     }
 
-    // Load example queries
+    // ==========================================================================
+    // Query Execution
+    // ==========================================================================
     async function loadExamples() {
       try {
         const res = await fetch(\`\${API_BASE}/query/examples\`);
         const data = await res.json();
 
         const container = document.getElementById('examples-list');
-        container.innerHTML = data.examples.map(ex => {
-          const escapedQuery = ex.query.replace(/'/g, "\\'").replace(/\\n/g, '\\\\n');
-          return '<div class="example-item" onclick="setQuery(\\''+escapedQuery+'\\')">' +
-            '<div class="example-name">'+ex.name+'</div>' +
-            '<div class="example-desc">'+ex.description+'</div>' +
-          '</div>';
-        }).join('');
+        container.innerHTML = data.examples.map((ex, i) => \`
+          <div class="example-item" onclick="loadExample(\${i})">
+            <div class="example-name">\${ex.name}</div>
+            <div class="example-desc">\${ex.description}</div>
+          </div>
+        \`).join('');
+
+        window._examples = data.examples;
       } catch (err) {
         console.error('Failed to load examples:', err);
       }
     }
 
-    // Set query in editor
-    function setQuery(query) {
-      document.getElementById('query-input').value = query;
+    function loadExample(index) {
+      if (window._examples && window._examples[index]) {
+        editor.setValue(window._examples[index].query);
+      }
     }
 
-    // Clear query
     function clearQuery() {
-      document.getElementById('query-input').value = '';
+      editor.setValue('');
       document.getElementById('query-results').innerHTML = '<p style="color: var(--text-secondary);">Execute a query to see results</p>';
+      document.getElementById('btn-export').style.display = 'none';
+      lastQueryResults = null;
     }
 
-    // Execute query
     async function executeQuery() {
-      const query = document.getElementById('query-input').value.trim();
+      const query = editor.getValue().trim();
       if (!query) return;
+
+      saveQueryToHistory(query);
 
       const allowWrite = document.getElementById('allow-write').checked;
       const btn = document.getElementById('btn-execute');
@@ -1013,14 +1269,20 @@ function getHtmlPage(): string {
         const data = await res.json();
 
         const resultsDiv = document.getElementById('query-results');
+        const exportBtn = document.getElementById('btn-export');
 
         if (data.success) {
+          lastQueryResults = data;
+
           if (data.rows.length === 0) {
             resultsDiv.innerHTML = '<p style="color: var(--text-secondary);">Query executed successfully. No rows returned.</p>';
+            exportBtn.style.display = 'none';
           } else {
             const columns = data.columns;
             resultsDiv.innerHTML = \`
-              <div class="results-info">\${data.rowCount} rows (\${data.duration}ms)</div>
+              <div class="results-info">
+                <span>\${data.rowCount} rows (\${data.duration}ms)</span>
+              </div>
               <div style="overflow-x: auto;">
                 <table class="results-table">
                   <thead>
@@ -1034,19 +1296,23 @@ function getHtmlPage(): string {
                 </table>
               </div>
             \`;
+            exportBtn.style.display = 'inline-flex';
           }
         } else {
           resultsDiv.innerHTML = \`<pre style="color: var(--error);">\${data.error}</pre>\`;
+          exportBtn.style.display = 'none';
+          lastQueryResults = null;
         }
       } catch (err) {
         document.getElementById('query-results').innerHTML = \`<pre style="color: var(--error);">Error: \${err.message}</pre>\`;
+        document.getElementById('btn-export').style.display = 'none';
+        lastQueryResults = null;
       }
 
       btn.disabled = false;
       btn.innerHTML = '<span>&#9654;</span> Execute';
     }
 
-    // Format cell value
     function formatValue(val) {
       if (val === null) return '<span style="color: var(--text-secondary);">NULL</span>';
       if (typeof val === 'object') return JSON.stringify(val).substring(0, 50) + '...';
@@ -1054,18 +1320,35 @@ function getHtmlPage(): string {
       return String(val);
     }
 
-    // Keyboard shortcut for query execution
-    document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        if (document.getElementById('query-panel').classList.contains('active')) {
-          executeQuery();
-        }
-      }
-    });
+    // ==========================================================================
+    // Initialization
+    // ==========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Apply stored theme
+      setTheme(getStoredTheme());
 
-    // Initialize
-    loadScripts();
-    loadExamples();
+      // Initialize CodeMirror
+      editor = CodeMirror.fromTextArea(document.getElementById('query-input'), {
+        mode: 'text/x-sql',
+        theme: getStoredTheme() === 'dark' ? 'dracula' : 'eclipse',
+        lineNumbers: true,
+        indentWithTabs: true,
+        smartIndent: true,
+        lineWrapping: true,
+        matchBrackets: true,
+        autofocus: false,
+        extraKeys: {
+          'Ctrl-Enter': executeQuery,
+          'Cmd-Enter': executeQuery,
+        },
+        placeholder: 'SELECT * FROM customers LIMIT 10;'
+      });
+
+      // Load initial data
+      loadScripts();
+      loadExamples();
+      renderHistory();
+    });
   </script>
 </body>
 </html>`;

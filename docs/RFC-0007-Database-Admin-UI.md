@@ -244,11 +244,11 @@ Nenhuma nova dependência necessária. Usa apenas:
 - [x] Painel de exemplos
 - [x] Validação read-only
 
-### Fase 4 - Melhorias (Futuro)
-- [ ] Syntax highlighting (CodeMirror)
-- [ ] Exportar resultados CSV
-- [ ] Histórico de queries
-- [ ] Temas (light/dark toggle)
+### Fase 4 - Melhorias ✅
+- [x] Syntax highlighting (CodeMirror via CDN)
+- [x] Exportar resultados CSV
+- [x] Histórico de queries (localStorage, últimas 20)
+- [x] Temas (light/dark toggle com persistência)
 
 ## Drawbacks
 
