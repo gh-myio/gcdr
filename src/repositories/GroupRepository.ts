@@ -1,22 +1,16 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-  BatchGetCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { eq, and, ne, like, ilike, inArray, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Group, GroupSummary, GroupMember, createDefaultHierarchy } from '../domain/entities/Group';
 import { CreateGroupDTO, UpdateGroupDTO, AddMembersDTO } from '../dto/request/GroupDTO';
 import { PaginatedResult } from '../shared/types';
 import { IGroupRepository, ListGroupsParams } from './interfaces/IGroupRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { groups } = schema;
+
 export class GroupRepository implements IGroupRepository {
-  private tableName = TableNames.GROUPS;
 
   async create(tenantId: string, customerId: string, data: CreateGroupDTO, createdBy: string): Promise<Group> {
     // Check if code already exists (if provided)
@@ -59,79 +53,61 @@ export class GroupRepository implements IGroupRepository {
       metadata: m.metadata,
     }));
 
-    const group: Group = {
+    const [result] = await db.insert(groups).values({
       id,
       tenantId,
       customerId,
       name: data.name,
       displayName: data.displayName || data.name,
-      description: data.description,
-      code: data.code,
+      description: data.description || null,
+      code: data.code || null,
       type: data.type,
-      purposes: data.purposes,
+      purposes: data.purposes || [],
       members,
       memberCount: members.length,
       hierarchy,
-      notificationSettings: data.notificationSettings,
+      notificationSettings: data.notificationSettings || null,
       tags: data.tags || [],
       metadata: data.metadata || {},
       visibleToChildCustomers: data.visibleToChildCustomers || false,
       editableByChildCustomers: data.editableByChildCustomers || false,
       status: 'ACTIVE',
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
-
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: group,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
+    }).returning();
 
     // Update parent's childGroupIds if needed
     if (data.parentGroupId) {
       await this.addChildToParent(tenantId, data.parentGroupId, id);
     }
 
-    return group;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Group | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(groups)
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, id)))
+      .limit(1);
 
-    return (result.Item as Group) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByCode(tenantId: string, customerId: string, code: string): Promise<Group | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer-code',
-        KeyConditionExpression: 'customerId = :customerId AND code = :code',
-        FilterExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':customerId': customerId,
-          ':code': code,
-          ':tenantId': tenantId,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(groups)
+      .where(and(
+        eq(groups.tenantId, tenantId),
+        eq(groups.customerId, customerId),
+        eq(groups.code, code)
+      ))
+      .limit(1);
 
-    if (!result.Items || result.Items.length === 0) {
-      return null;
-    }
-
-    return result.Items[0] as Group;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdateGroupDTO, updatedBy: string): Promise<Group> {
@@ -140,45 +116,43 @@ export class GroupRepository implements IGroupRepository {
       throw new AppError('GROUP_NOT_FOUND', 'Group not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.purposes !== undefined) updateData.purposes = data.purposes;
+    if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
+    if (data.visibleToChildCustomers !== undefined) updateData.visibleToChildCustomers = data.visibleToChildCustomers;
+    if (data.editableByChildCustomers !== undefined) updateData.editableByChildCustomers = data.editableByChildCustomers;
+
     // Handle displayName derivation
     if (data.name && !data.displayName) {
-      fieldsToUpdate.displayName = data.name;
+      updateData.displayName = data.name;
     }
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    const [result] = await db
+      .update(groups)
+      .set(updateData)
+      .where(and(
+        eq(groups.tenantId, tenantId),
+        eq(groups.id, id),
+        eq(groups.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Group was modified by another process', 409);
+    }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
-
-    return result.Attributes as Group;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -197,13 +171,9 @@ export class GroupRepository implements IGroupRepository {
       await this.removeChildFromParent(tenantId, existing.hierarchy.parentGroupId, id);
     }
 
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(groups)
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, id)));
   }
 
   async softDelete(tenantId: string, id: string, deletedBy: string): Promise<void> {
@@ -212,86 +182,83 @@ export class GroupRepository implements IGroupRepository {
       throw new AppError('GROUP_NOT_FOUND', 'Group not found', 404);
     }
 
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: 'SET #status = :status, deletedAt = :deletedAt, updatedBy = :updatedBy, updatedAt = :updatedAt',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-          ':status': 'DELETED',
-          ':deletedAt': now(),
-          ':updatedBy': deletedBy,
-          ':updatedAt': now(),
-        },
+    await db
+      .update(groups)
+      .set({
+        status: 'DELETED',
+        deletedAt: new Date(),
+        updatedBy: deletedBy,
+        updatedAt: new Date(),
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, id)));
   }
 
   async list(tenantId: string, params?: ListGroupsParams): Promise<PaginatedResult<GroupSummary>> {
     const limit = params?.limit || 20;
-    const filterExpressions: string[] = ['#status <> :deleted'];
-    const expressionAttributeValues: Record<string, unknown> = {
-      ':tenantId': tenantId,
-      ':deleted': 'DELETED',
-    };
-    const expressionAttributeNames: Record<string, string> = { '#status': 'status' };
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+
+    // Build conditions
+    const conditions = [
+      eq(groups.tenantId, tenantId),
+      ne(groups.status, 'DELETED'),
+    ];
 
     if (params?.customerId) {
-      filterExpressions.push('customerId = :customerId');
-      expressionAttributeValues[':customerId'] = params.customerId;
+      conditions.push(eq(groups.customerId, params.customerId));
     }
 
     if (params?.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
-    }
-
-    if (params?.purpose) {
-      filterExpressions.push('contains(purposes, :purpose)');
-      expressionAttributeValues[':purpose'] = params.purpose;
+      conditions.push(eq(groups.type, params.type));
     }
 
     if (params?.status) {
-      filterExpressions.push('#status = :statusFilter');
-      expressionAttributeValues[':statusFilter'] = params.status;
+      conditions.push(eq(groups.status, params.status));
     }
 
-    if (params?.tag) {
-      filterExpressions.push('contains(tags, :tag)');
-      expressionAttributeValues[':tag'] = params.tag;
-    }
+    // Note: purpose and tag filtering on JSONB arrays would require raw SQL
+    // For simplicity, we'll filter in memory for now
+    // In production, consider using jsonb_exists_any or GIN indexes
 
     if (params?.search) {
-      filterExpressions.push('(contains(#name, :search) OR contains(displayName, :search))');
-      expressionAttributeNames['#name'] = 'name';
-      expressionAttributeValues[':search'] = params.search;
+      conditions.push(
+        sql`(${groups.name} ILIKE ${`%${params.search}%`} OR ${groups.displayName} ILIKE ${`%${params.search}%`})`
+      );
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.join(' AND '),
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(groups)
+      .where(and(...conditions))
+      .orderBy(groups.name)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Group[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    let filteredResults = results;
+
+    // Filter by purpose if specified
+    if (params?.purpose) {
+      filteredResults = filteredResults.filter(g => {
+        const purposes = g.purposes as string[];
+        return purposes && purposes.includes(params.purpose!);
+      });
+    }
+
+    // Filter by tag if specified
+    if (params?.tag) {
+      filteredResults = filteredResults.filter(g => {
+        const tags = g.tags as string[];
+        return tags && tags.includes(params.tag!);
+      });
+    }
+
+    const hasMore = filteredResults.length > limit;
+    const items = hasMore ? filteredResults.slice(0, limit) : filteredResults;
 
     return {
-      items: returnItems.map(this.toSummary),
+      items: items.map(r => this.toSummary(this.mapToEntity(r))),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
@@ -340,23 +307,19 @@ export class GroupRepository implements IGroupRepository {
 
     const updatedMembers = [...group.members, ...newMembers];
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: groupId },
-        UpdateExpression: 'SET members = :members, memberCount = :memberCount, updatedAt = :updatedAt, updatedBy = :updatedBy, version = version + :inc',
-        ExpressionAttributeValues: {
-          ':members': updatedMembers,
-          ':memberCount': updatedMembers.length,
-          ':updatedAt': timestamp,
-          ':updatedBy': addedBy,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(groups)
+      .set({
+        members: updatedMembers,
+        memberCount: updatedMembers.length,
+        updatedAt: new Date(timestamp),
+        updatedBy: addedBy,
+        version: group.version + 1,
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, groupId)))
+      .returning();
 
-    return result.Attributes as Group;
+    return this.mapToEntity(result);
   }
 
   async removeMembers(tenantId: string, groupId: string, memberIds: string[], removedBy: string): Promise<Group> {
@@ -368,49 +331,39 @@ export class GroupRepository implements IGroupRepository {
     const idsToRemove = new Set(memberIds);
     const updatedMembers = group.members.filter(m => !idsToRemove.has(m.id));
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: groupId },
-        UpdateExpression: 'SET members = :members, memberCount = :memberCount, updatedAt = :updatedAt, updatedBy = :updatedBy, version = version + :inc',
-        ExpressionAttributeValues: {
-          ':members': updatedMembers,
-          ':memberCount': updatedMembers.length,
-          ':updatedAt': now(),
-          ':updatedBy': removedBy,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(groups)
+      .set({
+        members: updatedMembers,
+        memberCount: updatedMembers.length,
+        updatedAt: new Date(),
+        updatedBy: removedBy,
+        version: group.version + 1,
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, groupId)))
+      .returning();
 
-    return result.Attributes as Group;
+    return this.mapToEntity(result);
   }
 
   async getGroupsByMember(tenantId: string, memberId: string, memberType: 'USER' | 'DEVICE' | 'ASSET'): Promise<GroupSummary[]> {
-    // Note: This requires a scan or GSI on member IDs
-    // For production, consider using a separate membership table
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: '#status <> :deleted',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':deleted': 'DELETED',
-        },
-      })
-    );
-
-    const groups = (result.Items as Group[]) || [];
+    // Query all groups for tenant and filter in memory
+    // For production, consider using jsonb operators with GIN indexes
+    const results = await db
+      .select()
+      .from(groups)
+      .where(and(
+        eq(groups.tenantId, tenantId),
+        ne(groups.status, 'DELETED')
+      ));
 
     // Filter groups that contain the member
-    const matchingGroups = groups.filter(group =>
-      group.members.some(m => m.id === memberId && m.type === memberType)
-    );
+    const matchingGroups = results.filter(group => {
+      const members = group.members as GroupMember[];
+      return members && members.some(m => m.id === memberId && m.type === memberType);
+    });
 
-    return matchingGroups.map(this.toSummary);
+    return matchingGroups.map(g => this.toSummary(this.mapToEntity(g)));
   }
 
   async getChildren(tenantId: string, parentGroupId: string): Promise<GroupSummary[]> {
@@ -436,25 +389,16 @@ export class GroupRepository implements IGroupRepository {
     // Use path prefix to find all descendants
     const pathPrefix = parent.hierarchy?.path || `/${parentGroupId}`;
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: 'begins_with(hierarchy.#path, :pathPrefix) AND #status <> :deleted',
-        ExpressionAttributeNames: {
-          '#path': 'path',
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':pathPrefix': pathPrefix + '/',
-          ':deleted': 'DELETED',
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(groups)
+      .where(and(
+        eq(groups.tenantId, tenantId),
+        ne(groups.status, 'DELETED'),
+        sql`(${groups.hierarchy}->>'path')::text LIKE ${pathPrefix + '/%'}`
+      ));
 
-    const groups = (result.Items as Group[]) || [];
-    return groups.map(this.toSummary);
+    return results.map(g => this.toSummary(this.mapToEntity(g)));
   }
 
   async moveGroup(tenantId: string, groupId: string, newParentGroupId: string | null, movedBy: string): Promise<Group> {
@@ -503,22 +447,18 @@ export class GroupRepository implements IGroupRepository {
       };
     }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: groupId },
-        UpdateExpression: 'SET hierarchy = :hierarchy, updatedAt = :updatedAt, updatedBy = :updatedBy, version = version + :inc',
-        ExpressionAttributeValues: {
-          ':hierarchy': newHierarchy,
-          ':updatedAt': now(),
-          ':updatedBy': movedBy,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(groups)
+      .set({
+        hierarchy: newHierarchy,
+        updatedAt: new Date(),
+        updatedBy: movedBy,
+        version: group.version + 1,
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, groupId)))
+      .returning();
 
-    return result.Attributes as Group;
+    return this.mapToEntity(result);
   }
 
   async getByIds(tenantId: string, ids: string[]): Promise<Group[]> {
@@ -526,19 +466,15 @@ export class GroupRepository implements IGroupRepository {
       return [];
     }
 
-    const keys = ids.map(id => ({ tenantId, id }));
+    const results = await db
+      .select()
+      .from(groups)
+      .where(and(
+        eq(groups.tenantId, tenantId),
+        inArray(groups.id, ids)
+      ));
 
-    const result = await dynamoDb.send(
-      new BatchGetCommand({
-        RequestItems: {
-          [this.tableName]: {
-            Keys: keys,
-          },
-        },
-      })
-    );
-
-    return (result.Responses?.[this.tableName] as Group[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getMembersByType(tenantId: string, groupId: string, memberType: 'USER' | 'DEVICE' | 'ASSET'): Promise<string[]> {
@@ -555,17 +491,23 @@ export class GroupRepository implements IGroupRepository {
   // Helper methods
 
   private async addChildToParent(tenantId: string, parentId: string, childId: string): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: parentId },
-        UpdateExpression: 'SET hierarchy.childGroupIds = list_append(if_not_exists(hierarchy.childGroupIds, :empty), :childId)',
-        ExpressionAttributeValues: {
-          ':childId': [childId],
-          ':empty': [],
+    const parent = await this.getById(tenantId, parentId);
+    if (!parent) return;
+
+    const childGroupIds = parent.hierarchy?.childGroupIds || [];
+    if (!childGroupIds.includes(childId)) {
+      childGroupIds.push(childId);
+    }
+
+    await db
+      .update(groups)
+      .set({
+        hierarchy: {
+          ...parent.hierarchy,
+          childGroupIds,
         },
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, parentId)));
   }
 
   private async removeChildFromParent(tenantId: string, parentId: string, childId: string): Promise<void> {
@@ -576,16 +518,15 @@ export class GroupRepository implements IGroupRepository {
 
     const updatedChildren = parent.hierarchy.childGroupIds.filter(id => id !== childId);
 
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: parentId },
-        UpdateExpression: 'SET hierarchy.childGroupIds = :children',
-        ExpressionAttributeValues: {
-          ':children': updatedChildren,
+    await db
+      .update(groups)
+      .set({
+        hierarchy: {
+          ...parent.hierarchy,
+          childGroupIds: updatedChildren,
         },
       })
-    );
+      .where(and(eq(groups.tenantId, tenantId), eq(groups.id, parentId)));
   }
 
   private toSummary(group: Group): GroupSummary {
@@ -604,6 +545,36 @@ export class GroupRepository implements IGroupRepository {
       updatedAt: group.updatedAt,
     };
   }
+
+  private mapToEntity(row: typeof groups.$inferSelect): Group {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      customerId: row.customerId,
+      name: row.name,
+      displayName: row.displayName,
+      description: row.description || undefined,
+      code: row.code || undefined,
+      type: row.type,
+      purposes: row.purposes as Group['purposes'],
+      members: row.members as GroupMember[],
+      memberCount: row.memberCount,
+      hierarchy: row.hierarchy as Group['hierarchy'],
+      notificationSettings: row.notificationSettings as Group['notificationSettings'],
+      tags: row.tags as string[],
+      metadata: row.metadata as Record<string, unknown>,
+      visibleToChildCustomers: row.visibleToChildCustomers,
+      editableByChildCustomers: row.editableByChildCustomers,
+      status: row.status,
+      deletedAt: row.deletedAt?.toISOString(),
+      version: row.version,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+    };
+  }
 }
 
+// Export singleton instance
 export const groupRepository = new GroupRepository();

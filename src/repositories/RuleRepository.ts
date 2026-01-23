@@ -1,27 +1,22 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-} from '@aws-sdk/lib-dynamodb';
-import { Rule, RuleType } from '../domain/entities/Rule';
+import { eq, and, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
+import { Rule, RuleType, RuleScope } from '../domain/entities/Rule';
 import { CreateRuleDTO, UpdateRuleDTO } from '../dto/request/RuleDTO';
 import { PaginatedResult } from '../shared/types';
 import { IRuleRepository, ListRulesParams } from './interfaces/IRuleRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { rules } = schema;
+
 export class RuleRepository implements IRuleRepository {
-  private tableName = TableNames.RULES;
 
   async create(tenantId: string, data: CreateRuleDTO, createdBy: string): Promise<Rule> {
     const id = generateId();
     const timestamp = now();
 
-    const rule: Rule = {
+    const [result] = await db.insert(rules).values({
       id,
       tenantId,
       customerId: data.customerId,
@@ -29,42 +24,35 @@ export class RuleRepository implements IRuleRepository {
       description: data.description,
       type: data.type,
       priority: data.priority || 'MEDIUM',
-      scope: data.scope,
-      alarmConfig: data.alarmConfig,
-      slaConfig: data.slaConfig,
-      escalationConfig: data.escalationConfig,
-      maintenanceConfig: data.maintenanceConfig,
-      notificationChannels: data.notificationChannels,
+      scopeType: data.scope.type,
+      scopeEntityId: data.scope.entityId || null,
+      scopeInherited: data.scope.inherited ?? false,
+      alarmConfig: data.alarmConfig || null,
+      slaConfig: data.slaConfig || null,
+      escalationConfig: data.escalationConfig || null,
+      maintenanceConfig: data.maintenanceConfig || null,
+      notificationChannels: data.notificationChannels || [],
       tags: data.tags || [],
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
       triggerCount: 0,
-      version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+      version: 1,
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: rule,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return rule;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Rule | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(rules)
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, id)))
+      .limit(1);
 
-    return (result.Item as Rule) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdateRuleDTO, updatedBy: string): Promise<Rule> {
@@ -73,182 +61,158 @@ export class RuleRepository implements IRuleRepository {
       throw new AppError('RULE_NOT_FOUND', 'Rule not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.priority !== undefined) updateData.priority = data.priority;
+    if (data.enabled !== undefined) updateData.enabled = data.enabled;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    // Handle scope updates
+    if (data.scope !== undefined) {
+      updateData.scopeType = data.scope.type;
+      updateData.scopeEntityId = data.scope.entityId || null;
+      updateData.scopeInherited = data.scope.inherited ?? false;
+    }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    // Handle config updates
+    if (data.alarmConfig !== undefined) updateData.alarmConfig = data.alarmConfig;
+    if (data.slaConfig !== undefined) updateData.slaConfig = data.slaConfig;
+    if (data.escalationConfig !== undefined) updateData.escalationConfig = data.escalationConfig;
+    if (data.maintenanceConfig !== undefined) updateData.maintenanceConfig = data.maintenanceConfig;
 
-    return result.Attributes as Rule;
+    const [result] = await db
+      .update(rules)
+      .set(updateData)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.id, id),
+        eq(rules.version, existing.version) // Optimistic locking
+      ))
+      .returning();
+
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Rule was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(rules)
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, id)));
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Rule>> {
     const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(eq(rules.tenantId, tenantId))
+      .orderBy(rules.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Rule[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listWithFilters(tenantId: string, params: ListRulesParams): Promise<PaginatedResult<Rule>> {
     const limit = params.limit || 20;
-    const filterExpressions: string[] = [];
-    const expressionAttributeValues: Record<string, unknown> = { ':tenantId': tenantId };
-    const expressionAttributeNames: Record<string, string> = {};
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
+
+    // Build conditions
+    const conditions = [eq(rules.tenantId, tenantId)];
 
     if (params.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
+      conditions.push(eq(rules.type, params.type));
     }
 
     if (params.priority) {
-      filterExpressions.push('priority = :priority');
-      expressionAttributeValues[':priority'] = params.priority;
+      conditions.push(eq(rules.priority, params.priority));
     }
 
     if (params.customerId) {
-      filterExpressions.push('customerId = :customerId');
-      expressionAttributeValues[':customerId'] = params.customerId;
+      conditions.push(eq(rules.customerId, params.customerId));
     }
 
     if (params.enabled !== undefined) {
-      filterExpressions.push('enabled = :enabled');
-      expressionAttributeValues[':enabled'] = params.enabled;
+      conditions.push(eq(rules.enabled, params.enabled));
     }
 
     if (params.status) {
-      filterExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = params.status;
+      conditions.push(eq(rules.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(...conditions))
+      .orderBy(rules.name)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Rule[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async getByCustomerId(tenantId: string, customerId: string): Promise<Rule[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer',
-        KeyConditionExpression: 'tenantId = :tenantId AND customerId = :customerId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':customerId': customerId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.customerId, customerId)
+      ))
+      .orderBy(rules.name);
 
-    return (result.Items as Rule[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getByType(tenantId: string, type: RuleType): Promise<Rule[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-type',
-        KeyConditionExpression: 'tenantId = :tenantId AND #type = :type',
-        ExpressionAttributeNames: {
-          '#type': 'type',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':type': type,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.type, type)
+      ))
+      .orderBy(rules.priority);
 
-    return (result.Items as Rule[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getActiveMaintenanceWindows(tenantId: string): Promise<Rule[]> {
     const currentTime = now();
-    const rules = await this.getByType(tenantId, 'MAINTENANCE_WINDOW');
+    const maintenanceRules = await this.getByType(tenantId, 'MAINTENANCE_WINDOW');
 
-    return rules.filter((rule) => {
+    return maintenanceRules.filter((rule) => {
       if (!rule.enabled || !rule.maintenanceConfig) return false;
 
       const config = rule.maintenanceConfig;
@@ -265,70 +229,87 @@ export class RuleRepository implements IRuleRepository {
   }
 
   async getEnabledRules(tenantId: string): Promise<Rule[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: 'enabled = :enabled AND #status = :status',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':enabled': true,
-          ':status': 'ACTIVE',
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.enabled, true),
+        eq(rules.status, 'ACTIVE')
+      ))
+      .orderBy(rules.priority);
 
-    return (result.Items as Rule[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getByScope(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: 'scope.#type = :scopeType AND scope.entityId = :entityId',
-        ExpressionAttributeNames: {
-          '#type': 'type',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':scopeType': scopeType,
-          ':entityId': entityId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.scopeType, scopeType as 'GLOBAL' | 'CUSTOMER' | 'ASSET' | 'DEVICE'),
+        eq(rules.scopeEntityId, entityId)
+      ))
+      .orderBy(rules.priority);
 
-    return (result.Items as Rule[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async incrementTriggerCount(tenantId: string, ruleId: string): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: ruleId },
-        UpdateExpression: 'SET triggerCount = if_not_exists(triggerCount, :zero) + :inc, lastTriggeredAt = :now',
-        ExpressionAttributeValues: {
-          ':zero': 0,
-          ':inc': 1,
-          ':now': now(),
-        },
+    await db
+      .update(rules)
+      .set({
+        triggerCount: sql`${rules.triggerCount} + 1`,
+        lastTriggeredAt: new Date(),
       })
-    );
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)));
   }
 
   async updateLastTriggered(tenantId: string, ruleId: string): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: ruleId },
-        UpdateExpression: 'SET lastTriggeredAt = :now',
-        ExpressionAttributeValues: {
-          ':now': now(),
-        },
+    await db
+      .update(rules)
+      .set({
+        lastTriggeredAt: new Date(),
       })
-    );
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)));
+  }
+
+  private mapToEntity(row: typeof rules.$inferSelect): Rule {
+    // Reconstruct the scope object from flat fields
+    const scope: RuleScope = {
+      type: row.scopeType,
+      entityId: row.scopeEntityId || undefined,
+      inherited: row.scopeInherited,
+    };
+
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      customerId: row.customerId,
+      name: row.name,
+      description: row.description || undefined,
+      type: row.type,
+      priority: row.priority,
+      scope,
+      alarmConfig: row.alarmConfig as Rule['alarmConfig'],
+      slaConfig: row.slaConfig as Rule['slaConfig'],
+      escalationConfig: row.escalationConfig as Rule['escalationConfig'],
+      maintenanceConfig: row.maintenanceConfig as Rule['maintenanceConfig'],
+      notificationChannels: row.notificationChannels as Rule['notificationChannels'],
+      tags: row.tags as string[],
+      status: row.status,
+      enabled: row.enabled,
+      lastTriggeredAt: row.lastTriggeredAt?.toISOString(),
+      triggerCount: row.triggerCount,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+      version: row.version,
+    };
   }
 }
+
+// Export singleton instance
+export const ruleRepository = new RuleRepository();

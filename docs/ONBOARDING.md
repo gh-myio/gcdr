@@ -51,9 +51,9 @@ Esta seção contém todas as informações necessárias para a equipe de fronte
 
 | Ambiente | URL Base | Uso |
 |----------|----------|-----|
-| **Development** | `https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev` | Desenvolvimento e testes |
-| **Staging** | `https://api.gcdr.io/staging` | Homologação (em breve) |
-| **Production** | `https://api.gcdr.io` | Produção (em breve) |
+| **Local** | `http://localhost:3000` | Desenvolvimento local (Docker) |
+| **Staging** | `https://api-staging.gcdr.myio.com.br` | Homologação (Dokploy) |
+| **Production** | `https://api.gcdr.myio.com.br` | Produção (Dokploy) |
 
 ### Headers Obrigatórios
 
@@ -73,8 +73,8 @@ X-API-Key: <api-key-do-partner>
 ### Documentação OpenAPI
 
 A especificação completa da API está disponível em:
-- **Swagger UI (online)**: [`/docs`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs)
-- **OpenAPI JSON**: [`/docs/openapi.json`](https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs/openapi.json)
+- **Swagger UI (online)**: [`/docs`](http://localhost:3000/docs)
+- **OpenAPI JSON**: [`/docs/openapi.json`](http://localhost:3000/docs/openapi.json)
 - **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,850+ linhas)
 - **140+ endpoints** documentados com schemas de request/response
 
@@ -104,7 +104,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 
 #### Health Check
 ```bash
-curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/health
+curl http://localhost:3000/health
 ```
 
 Resposta:
@@ -122,14 +122,14 @@ Resposta:
 
 #### Listar Customers
 ```bash
-curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers \
+curl http://localhost:3000/customers \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Criar Customer
 ```bash
-curl -X POST https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers \
+curl -X POST http://localhost:3000/customers \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>" \
@@ -143,21 +143,21 @@ curl -X POST https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customer
 
 #### Buscar Árvore de Customers
 ```bash
-curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/tree \
+curl http://localhost:3000/customers/{id}/tree \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Listar Assets de um Customer
 ```bash
-curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/assets \
+curl http://localhost:3000/customers/{id}/assets \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
 
 #### Obter Tema Efetivo (com herança)
 ```bash
-curl https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{id}/theme/effective \
+curl http://localhost:3000/customers/{id}/theme/effective \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```
@@ -467,13 +467,17 @@ JWT_AUDIENCE=alarm-orchestrator
 |------------|-----------------|
 | **Node.js 20** | Runtime JavaScript |
 | **TypeScript 5** | Tipagem estática |
-| **AWS Lambda** | Execução serverless |
-| **AWS DynamoDB** | Banco de dados NoSQL |
-| **AWS EventBridge** | Eventos entre sistemas |
-| **Serverless Framework** | Deploy e IaC |
+| **Express.js** | Framework HTTP |
+| **PostgreSQL 16** | Banco de dados relacional |
+| **Docker** | Containerização |
+| **Docker Compose** | Orquestração local |
+| **Dokploy** | Deploy em containers |
 | **Zod** | Validação de schemas |
 | **Jest** | Framework de testes |
 | **npm** | Gerenciador de pacotes |
+
+> **Nota**: O projeto foi migrado de AWS Lambda/DynamoDB para containers Docker com PostgreSQL.
+> Veja [RFC-0005](./RFC-0005-Container-Deployment-Migration.md) para detalhes.
 
 ### Pré-requisitos
 
@@ -513,33 +517,59 @@ cd gcdr
 # 2. Instale as dependências
 npm install
 
-# 3. Verifique se tudo está funcionando
+# 3. Configure o ambiente
+cp .env.example .env
+# Edite o .env se necessário
+
+# 4. Verifique se tudo está funcionando
 npm test
 ```
 
-### Configuração do AWS CLI (para deploy)
+### Pré-requisitos Adicionais
 
 ```bash
-# Configurar credenciais AWS
-aws configure
-# AWS Access Key ID: [sua-key]
-# AWS Secret Access Key: [sua-secret]
-# Default region name: sa-east-1
-# Default output format: json
+# Docker e Docker Compose (para desenvolvimento local)
+docker --version   # Docker 20+
+docker compose version  # Docker Compose v2+
 ```
 
 ### Verificação da Instalação
 
+#### Opção 1: Com Docker (Recomendado)
+
 ```bash
+# Iniciar todos os serviços (API + PostgreSQL)
+docker compose up -d
+
+# Verificar se os containers estão rodando
+docker compose ps
+
+# Testar a API
+curl http://localhost:3000/health
+# Deve retornar: {"status":"ok"}
+
+curl http://localhost:3000/health/ready
+# Deve retornar: {"status":"ready"}
+
+# Ver logs
+docker compose logs -f api
+```
+
+#### Opção 2: Desenvolvimento Local (sem Docker)
+
+```bash
+# Requer PostgreSQL rodando localmente ou em container separado
+# Configure DATABASE_URL no .env
+
 # Compilar TypeScript
 npm run build
 
-# Iniciar o servidor local (Serverless Offline)
-npm run offline
+# Iniciar o servidor com hot reload
+npm run dev
 
 # Em outro terminal, teste a API
-curl http://localhost:3000/dev/health
-# Deve retornar: {"status":"healthy",...}
+curl http://localhost:3000/health
+# Deve retornar: {"status":"ok"}
 ```
 
 ---
@@ -549,55 +579,60 @@ curl http://localhost:3000/dev/health
 ### Diagrama de Alto Nível
 
 ```
-                    ┌─────────────────────────────────────────────────────────────────┐
-                    │                         GCDR API                                 │
-                    │                    (AWS Lambda + API Gateway)                    │
-                    │                                                                  │
-                    │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-                    │  │   Customers  │  │   Partners   │  │Authorization │           │
-                    │  │   Handlers   │  │   Handlers   │  │   Handlers   │           │
-                    │  │              │  │              │  │              │           │
-                    │  │ - create     │  │ - register   │  │ - check      │           │
-                    │  │ - get        │  │ - approve    │  │ - assignRole │           │
-                    │  │ - update     │  │ - reject     │  │ - listRoles  │           │
-                    │  │ - delete     │  │ - list       │  │ - getUserRoles│          │
-                    │  │ - list       │  │ - get        │  │              │           │
-                    │  │ - getChildren│  │              │  │              │           │
-                    │  │ - getTree    │  │              │  │              │           │
-                    │  │ - move       │  │              │  │              │           │
-                    │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-                    │         │                 │                 │                    │
-                    │         └─────────────────┼─────────────────┘                    │
-                    │                           │                                      │
-                    │                    ┌──────▼───────┐                              │
-                    │                    │   Services   │                              │
-                    │                    │              │                              │
-                    │                    │ Customer     │                              │
-                    │                    │ Partner      │                              │
-                    │                    └──────┬───────┘                              │
-                    │                           │                                      │
-                    │                    ┌──────▼───────┐                              │
-                    │                    │ Repositories │                              │
-                    │                    │              │                              │
-                    │                    │ Customer     │                              │
-                    │                    │ Partner      │                              │
-                    │                    └──────┬───────┘                              │
-                    │                           │                                      │
-                    └───────────────────────────┼──────────────────────────────────────┘
-                                                │
-                    ┌───────────────────────────┼───────────────────────────┐
-                    │                           │                           │
-           ┌────────▼────────┐        ┌────────▼────────┐        ┌────────▼────────┐
-           │    DynamoDB     │        │   EventBridge   │        │   External      │
-           │                 │        │                 │        │   Systems       │
-           │ - Customers     │        │ - gcdr-events   │        │                 │
-           │ - Partners      │        │                 │        │ - ThingsBoard   │
-           │ - Roles         │        │ Events:         │        │ - NodeHub       │
-           │ - Policies      │        │ - customer.*    │        │ - OS            │
-           │ - RoleAssign.   │        │ - partner.*     │        │ - Alarmes       │
-           │                 │        │ - authz.*       │        │                 │
-           └─────────────────┘        └─────────────────┘        └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Dokploy Platform                                    │
+│                                                                                  │
+│  ┌─────────────┐     ┌────────────────────────────────────────────────────┐     │
+│  │   Traefik   │     │                  GCDR API Container                 │     │
+│  │   (proxy)   │────>│                   (Express.js)                      │     │
+│  │   :443/80   │     │                                                     │     │
+│  └─────────────┘     │  ┌────────────┐ ┌────────────┐ ┌────────────┐      │     │
+│                      │  │ Controllers│ │ Controllers│ │ Controllers│      │     │
+│                      │  │            │ │            │ │            │      │     │
+│                      │  │ customers  │ │  devices   │ │   rules    │      │     │
+│                      │  │ users      │ │  assets    │ │ authz      │      │     │
+│                      │  │ auth       │ │ integr.    │ │ policies   │      │     │
+│                      │  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘      │     │
+│                      │        │              │              │             │     │
+│                      │        └──────────────┼──────────────┘             │     │
+│                      │                       │                            │     │
+│                      │                ┌──────▼───────┐                    │     │
+│                      │                │   Services   │                    │     │
+│                      │                │              │                    │     │
+│                      │                │ Business     │                    │     │
+│                      │                │ Logic Layer  │                    │     │
+│                      │                └──────┬───────┘                    │     │
+│                      │                       │                            │     │
+│                      │                ┌──────▼───────┐                    │     │
+│                      │                │ Repositories │                    │     │
+│                      │                │              │                    │     │
+│                      │                │ Data Access  │                    │     │
+│                      │                │ Layer        │                    │     │
+│                      │                └──────┬───────┘                    │     │
+│                      │                       │                            │     │
+│                      └───────────────────────┼────────────────────────────┘     │
+│                                              │                                   │
+│                      ┌───────────────────────┼───────────────────────┐          │
+│                      │                       │                       │          │
+│             ┌────────▼────────┐     ┌────────▼────────┐     ┌───────▼────────┐ │
+│             │   PostgreSQL    │     │     Redis       │     │   External     │ │
+│             │   Container     │     │   (optional)    │     │   Systems      │ │
+│             │                 │     │                 │     │                │ │
+│             │ - customers     │     │ - cache         │     │ - ThingsBoard  │ │
+│             │ - devices       │     │ - sessions      │     │ - NodeHub      │ │
+│             │ - users         │     │ - queues        │     │ - Alarmes      │ │
+│             │ - rules         │     │                 │     │                │ │
+│             │ - policies      │     │                 │     │                │ │
+│             └─────────────────┘     └─────────────────┘     └────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Serviços Docker
+
+| Serviço | Container | Porta | Descrição |
+|---------|-----------|-------|-----------|
+| API | gcdr-api | 3000 | Aplicação Express.js |
+| Database | gcdr-postgres | 5433 | PostgreSQL 16 |
 
 ### Componentes Principais
 
@@ -968,13 +1003,28 @@ if (!result.success) {
 
 ```bash
 # Desenvolvimento
-npm run offline              # Inicia API local (Serverless Offline)
+npm run dev                  # Inicia servidor com hot reload (tsx watch)
 npm run build                # Compila TypeScript
+npm start                    # Executa código compilado
 
-# Deploy
-npm run deploy               # Deploy para dev
-npm run deploy:prod          # Deploy para produção
-npm run remove               # Remove stack do AWS
+# Docker
+docker compose up -d         # Inicia todos os serviços em background
+docker compose down          # Para todos os serviços
+docker compose logs -f       # Visualiza logs em tempo real
+docker compose logs -f api   # Logs apenas da API
+docker compose ps            # Status dos containers
+docker compose restart api   # Reinicia apenas a API
+
+# Build Docker
+npm run docker:build         # Constrói imagem Docker
+npm run docker:up            # docker compose up -d
+
+# Database (Seeds e Admin)
+npm run db:seed              # Popula banco com dados de teste
+npm run db:seed:clear        # Limpa todos os dados
+npm run db:seed:verify       # Verifica dados persistidos
+npm run db:seed:list         # Lista scripts disponíveis
+npm run db:seed:menu         # Menu interativo
 
 # Qualidade
 npm run lint                 # Verifica código com ESLint
@@ -1015,33 +1065,73 @@ git push origin feature/minha-feature
 ### Testando a API Localmente
 
 ```bash
-# Inicie o servidor
-npm run offline
+# Inicie os serviços com Docker
+docker compose up -d
+
+# Ou inicie apenas a API localmente (requer PostgreSQL)
+npm run dev
 
 # Health check
-curl http://localhost:3000/dev/health
+curl http://localhost:3000/health
+# Resposta: {"status":"ok"}
 
-# Listar customers
-curl http://localhost:3000/dev/customers \
-  -H "x-tenant-id: tenant-123"
+# Health check com banco de dados
+curl http://localhost:3000/health/ready
+# Resposta: {"status":"ready"}
 
-# Criar customer
-curl -X POST http://localhost:3000/dev/customers \
+# Listar customers (requer autenticação)
+curl http://localhost:3000/customers \
+  -H "x-tenant-id: tenant-123" \
+  -H "Authorization: Bearer <seu-jwt-token>"
+
+# Criar customer (requer autenticação)
+curl -X POST http://localhost:3000/customers \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: tenant-123" \
+  -H "Authorization: Bearer <seu-jwt-token>" \
   -d '{
     "name": "Empresa ABC",
     "type": "COMPANY"
   }'
 
 # Buscar filhos de um customer
-curl http://localhost:3000/dev/customers/customer-123/children \
-  -H "x-tenant-id: tenant-123"
+curl http://localhost:3000/customers/customer-123/children \
+  -H "x-tenant-id: tenant-123" \
+  -H "Authorization: Bearer <seu-jwt-token>"
 
 # Buscar árvore completa
-curl http://localhost:3000/dev/customers/customer-123/tree \
-  -H "x-tenant-id: tenant-123"
+curl http://localhost:3000/customers/customer-123/tree \
+  -H "x-tenant-id: tenant-123" \
+  -H "Authorization: Bearer <seu-jwt-token>"
 ```
+
+> **Nota**: As URLs não possuem mais o prefixo `/dev/` como na arquitetura serverless anterior.
+
+### Database Admin UI (Desenvolvimento)
+
+Em ambiente de desenvolvimento, uma interface web está disponível para gerenciar o banco de dados:
+
+```
+http://localhost:3000/admin/db
+```
+
+**Funcionalidades:**
+
+| Aba | Descrição |
+|-----|-----------|
+| **Scripts** | Executa seed scripts individualmente ou todos de uma vez |
+| **Logs** | Visualiza histórico de execuções com filtros |
+| **Query Console** | Executa queries SQL ad-hoc com exemplos prontos |
+
+**Ações rápidas:**
+- **Run All Seeds**: Executa todos os scripts de seed em ordem
+- **Clear All**: Limpa todos os dados (com confirmação)
+- **Quick Reset**: Clear + Seed em um clique
+- **Verify**: Valida contagem de registros
+
+> **IMPORTANTE**: Esta interface só está disponível em `NODE_ENV !== 'production'`.
+
+Para mais detalhes, veja: [RFC-0006-Database-Seed-Scripts.md](./RFC-0006-Database-Seed-Scripts.md) e [RFC-0007-Database-Admin-UI.md](./RFC-0007-Database-Admin-UI.md)
 
 ### Debug com VS Code
 
@@ -1052,15 +1142,13 @@ Crie `.vscode/launch.json`:
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Serverless Offline",
+      "name": "Debug API (Express)",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "offline"],
+      "runtimeArgs": ["run", "dev"],
       "console": "integratedTerminal",
-      "env": {
-        "SLS_DEBUG": "*"
-      }
+      "envFile": "${workspaceFolder}/.env"
     },
     {
       "name": "Debug Tests",
@@ -1069,6 +1157,15 @@ Crie `.vscode/launch.json`:
       "runtimeExecutable": "npm",
       "runtimeArgs": ["test", "--", "--runInBand", "${relativeFile}"],
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Attach to Docker",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "/app"
     }
   ]
 }
@@ -1165,36 +1262,58 @@ npm run test:coverage
 
 ### Adicionar Novo Endpoint
 
-1. **Crie o handler** em `src/handlers/{domain}/{action}.ts`:
+1. **Crie ou edite o controller** em `src/controllers/{domain}.controller.ts`:
 
 ```typescript
-import { APIGatewayProxyHandler } from 'aws-lambda';
-import { success, error } from '../middleware/response';
+import { Router, Request, Response, NextFunction } from 'express';
+import { sendSuccess, sendCreated } from '../middleware/response';
+import { ValidationError } from '../shared/errors/AppError';
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const router = Router();
+
+// GET /domain
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { tenantId, requestId } = req.context;
     // Sua lógica aqui
-    return success({ data: result });
+    const result = await myService.list(tenantId);
+    sendSuccess(res, result, 200, requestId);
   } catch (err) {
-    return error(err);
+    next(err);
   }
-};
+});
+
+// POST /domain
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const data = MySchema.parse(req.body);
+    const result = await myService.create(tenantId, data, userId);
+    sendCreated(res, result, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;
 ```
 
-2. **Registre no serverless.yml**:
+2. **Registre no app.ts**:
 
-```yaml
-functions:
-  myNewEndpoint:
-    handler: src/handlers/domain/myAction.handler
-    events:
-      - http:
-          path: /my-path
-          method: post
-          cors: true
+```typescript
+import myController from './controllers/my.controller';
+
+// Rotas protegidas (requerem autenticação)
+app.use('/my-domain', authMiddleware, myController);
 ```
 
-3. **Crie testes** em `tests/unit/handlers/`
+3. **Exporte no index** em `src/controllers/index.ts`:
+
+```typescript
+export { default as myController } from './my.controller';
+```
+
+4. **Crie testes** em `tests/unit/controllers/`
 
 ### Adicionar Nova Entidade
 
@@ -1280,13 +1399,13 @@ npm run build
 
 **Solução**: Verifique se `tenantId` e `id` estão presentes no item.
 
-### Serverless Offline não inicia
+### Container não inicia / Porta em uso
 
-**Causa**: Porta já em uso ou configuração inválida.
+**Causa**: Porta já em uso por outro processo ou container.
 
 **Solução**:
 ```bash
-# Matar processo na porta 3000
+# Verificar o que está usando a porta
 # Windows:
 netstat -ano | findstr :3000
 taskkill /PID <pid> /F
@@ -1294,6 +1413,46 @@ taskkill /PID <pid> /F
 # Linux/Mac:
 lsof -i :3000
 kill -9 <pid>
+
+# Ou verificar containers Docker
+docker ps -a
+docker stop <container-id>
+
+# Reiniciar os containers
+docker compose down
+docker compose up -d
+```
+
+### Erro de conexão com PostgreSQL
+
+**Causa**: Container do PostgreSQL não iniciou ou porta incorreta.
+
+**Solução**:
+```bash
+# Verificar se o container está rodando
+docker compose ps
+
+# Ver logs do PostgreSQL
+docker compose logs postgres
+
+# Verificar se a porta está correta no .env
+# POSTGRES_PORT=5433
+
+# Testar conexão
+docker compose exec postgres psql -U postgres -d db_gcdr -c "SELECT 1"
+```
+
+### API não conecta ao banco dentro do Docker
+
+**Causa**: URL de conexão incorreta.
+
+**Solução**:
+```bash
+# Dentro do Docker, use o nome do serviço (postgres), não localhost
+# DATABASE_URL=postgresql://postgres:password@postgres:5432/db_gcdr
+
+# Fora do Docker (desenvolvimento local), use localhost com a porta exposta
+# DATABASE_URL=postgresql://postgres:password@localhost:5433/db_gcdr
 ```
 
 ### Testes falhando com timeout
@@ -1338,18 +1497,22 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0001: GCDR Core & Marketplace](./RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Especificação completa
 - [RFC-0002: Authorization Model](./RFC-0002-GCDR-Authorization-Model.md) - Modelo de autorização
 - [RFC-0003: JWT Multiple Audience](./RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
+- [RFC-0004: Migration DynamoDB to PostgreSQL](./RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
+- [RFC-0005: Container Deployment](./RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
+- [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
 
 ### Documentação Externa
 
 | Recurso | Link |
 |---------|------|
 | TypeScript | https://www.typescriptlang.org/docs/ |
-| Serverless Framework | https://www.serverless.com/framework/docs |
-| AWS SDK v3 | https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/ |
-| DynamoDB | https://docs.aws.amazon.com/dynamodb/ |
-| EventBridge | https://docs.aws.amazon.com/eventbridge/ |
+| Express.js | https://expressjs.com/ |
+| Docker | https://docs.docker.com/ |
+| Docker Compose | https://docs.docker.com/compose/ |
+| PostgreSQL | https://www.postgresql.org/docs/ |
 | Zod | https://zod.dev/ |
 | Jest | https://jestjs.io/docs/getting-started |
+| Dokploy | https://dokploy.com/docs |
 
 ### Ferramentas Recomendadas
 
@@ -1377,13 +1540,16 @@ Se tiver dúvidas, procure:
 
 Use este checklist para acompanhar seu progresso:
 
-- [ ] Ambiente configurado e rodando (`npm run offline`)
+- [ ] Docker instalado e funcionando (`docker --version`)
+- [ ] Ambiente configurado e rodando (`docker compose up -d`)
+- [ ] Health check funcionando (`curl http://localhost:3000/health`)
 - [ ] Executou `npm test` com sucesso
 - [ ] Testou API local com curl ou Thunder Client
-- [ ] Entendeu a arquitetura de alto nível
-- [ ] Explorou a estrutura de diretórios
+- [ ] Entendeu a arquitetura de alto nível (containers + Express)
+- [ ] Explorou a estrutura de diretórios (`src/controllers/`, `src/middleware/`)
 - [ ] Leu sobre Customer Hierarchy (RFC-0001)
 - [ ] Leu sobre Authorization Model (RFC-0002)
+- [ ] Leu sobre Container Deployment (RFC-0005)
 - [ ] Entendeu o fluxo de dados
 - [ ] Fez uma alteração simples e testou
 - [ ] Criou um teste unitário

@@ -1,0 +1,81 @@
+<mxfile host="app.diagrams.net" modified="2026-01-21T00:00:00.000Z" agent="chatgpt" version="24.7.8" type="device">
+  <diagram id="ecosystem" name="MYIO – Ecossistema (Onboarding)">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1920" pageHeight="1080">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- TÍTULO -->
+        <mxCell id="title" value="MYIO / GCDR – Visão Geral do Ecossistema" style="text;html=1;fontSize=26;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1200" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- APPS -->
+        <mxCell id="apps" value="Usuários & Aplicações&#10;• Web App GCDR&#10;• Dashboards&#10;• Sistemas Externos" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="100" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- GCDR -->
+        <mxCell id="gcdr" value="GCDR&#10;Base Única de Cadastro&#10;&#10;• Clientes / Shoppings / Lojas&#10;• Centrais & Devices&#10;• Usuários / Perfis / Regras&#10;• API Keys / JWT" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#B91C1C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="90" width="420" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- INGESTION -->
+        <mxCell id="ingestion" value="Ingestion / Telemetry Processor&#10;• Recebe MQTT / HTTP&#10;• Normaliza eventos" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#065F46;" vertex="1" parent="1">
+          <mxGeometry x="60" y="320" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS -->
+        <mxCell id="sqs" value="Filas (SQS)&#10;• alarm-events&#10;• telegram / webhook / OS&#10;• DLQ" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="460" y="320" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- ORCHESTRATOR -->
+        <mxCell id="orchestrator" value="Alarm Orchestrator (Cérebro)&#10;• Decision Engine&#10;• Guards (dedup, cooldown…)&#10;• State Machine" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#16A34A;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="300" width="420" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- CANAIS -->
+        <mxCell id="channels" value="Canais de Ação&#10;• Telegram&#10;• Ordem de Serviço&#10;• Webhook&#10;• Notificações" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#F59E0B;" vertex="1" parent="1">
+          <mxGeometry x="460" y="520" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- CENTRAIS -->
+        <mxCell id="centrals" value="Centrais (Gateways)&#10;• Orange Pi / Linux&#10;• Node-RED&#10;• Cache local" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#1D4ED8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="520" width="420" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- DEVICES -->
+        <mxCell id="devices" value="Devices & Sensores&#10;• Energia&#10;• Água&#10;• Temperatura&#10;• Equipamentos" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#1D4ED8;" vertex="1" parent="1">
+          <mxGeometry x="860" y="700" width="420" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- SETAS -->
+        <mxCell id="e1" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="apps" target="gcdr">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e2" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="gcdr" target="centrals">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e3" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="devices" target="ingestion">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e4" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="ingestion" target="sqs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e5" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="sqs" target="orchestrator">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e6" style="endArrow=block;strokeWidth=2;" edge="1" parent="1" source="orchestrator" target="channels">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

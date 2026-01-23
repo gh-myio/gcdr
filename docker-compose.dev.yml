@@ -1,0 +1,25 @@
+version: "3.9"
+
+# Development override - use with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  api:
+    build:
+      target: development
+    container_name: gcdr-api-dev
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./src:/app/src:ro
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+    # Override command to use tsx watch for hot reload
+    command: npm run dev
+
+  postgres:
+    container_name: gcdr-postgres-dev
+    ports:
+      # Expose PostgreSQL on different port for dev
+      - "5433:5432"

@@ -1,27 +1,22 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { eq, and, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Partner, ApiKey, OAuthClient, WebhookSubscription } from '../domain/entities/Partner';
 import { RegisterPartnerDTO, UpdatePartnerDTO, ApprovePartnerDTO, UpdateWebhookDTO } from '../dto/request/PartnerDTO';
 import { PaginatedResult, PartnerStatus } from '../shared/types';
 import { IPartnerRepository, ListPartnersParams } from './interfaces/IPartnerRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { partners } = schema;
+
 export class PartnerRepository implements IPartnerRepository {
-  private tableName = TableNames.PARTNERS;
 
   async create(tenantId: string, data: RegisterPartnerDTO, createdBy: string): Promise<Partner> {
     const id = generateId();
     const timestamp = now();
 
-    const partner: Partner = {
+    const [result] = await db.insert(partners).values({
       id,
       tenantId,
       status: 'PENDING',
@@ -44,48 +39,32 @@ export class PartnerRepository implements IPartnerRepository {
       subscribedPackages: [],
       publishedPackages: [],
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: partner,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return partner;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Partner | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(partners)
+      .where(and(eq(partners.tenantId, tenantId), eq(partners.id, id)))
+      .limit(1);
 
-    return (result.Item as Partner) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByEmail(tenantId: string, email: string): Promise<Partner | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: 'contactEmail = :email',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':email': email,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(partners)
+      .where(and(eq(partners.tenantId, tenantId), eq(partners.contactEmail, email)))
+      .limit(1);
 
-    return result.Items && result.Items.length > 0 ? (result.Items[0] as Partner) : null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdatePartnerDTO, updatedBy: string): Promise<Partner> {
@@ -94,147 +73,114 @@ export class PartnerRepository implements IPartnerRepository {
       throw new AppError('PARTNER_NOT_FOUND', 'Partner not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.companyName !== undefined) updateData.companyName = data.companyName;
+    if (data.companyWebsite !== undefined) updateData.companyWebsite = data.companyWebsite;
+    if (data.companyDescription !== undefined) updateData.companyDescription = data.companyDescription;
+    if (data.industry !== undefined) updateData.industry = data.industry;
+    if (data.country !== undefined) updateData.country = data.country;
+    if (data.contactName !== undefined) updateData.contactName = data.contactName;
+    if (data.contactEmail !== undefined) updateData.contactEmail = data.contactEmail;
+    if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
+    if (data.technicalContactEmail !== undefined) updateData.technicalContactEmail = data.technicalContactEmail;
+    if (data.webhookUrl !== undefined) updateData.webhookUrl = data.webhookUrl;
+    if (data.ipWhitelist !== undefined) updateData.ipWhitelist = data.ipWhitelist;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    const [result] = await db
+      .update(partners)
+      .set(updateData)
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, id),
+        eq(partners.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
 
-    return result.Attributes as Partner;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(partners)
+      .where(and(eq(partners.tenantId, tenantId), eq(partners.id, id)));
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Partner>> {
     const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(partners)
+      .where(eq(partners.tenantId, tenantId))
+      .orderBy(partners.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Partner[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listWithFilters(tenantId: string, params: ListPartnersParams): Promise<PaginatedResult<Partner>> {
     const limit = params.limit || 20;
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
 
-    let queryCommand: QueryCommand;
+    // Build conditions
+    const conditions = [eq(partners.tenantId, tenantId)];
 
     if (params.status) {
-      queryCommand = new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-status',
-        KeyConditionExpression: 'tenantId = :tenantId AND #status = :status',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':status': params.status,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      });
-    } else {
-      queryCommand = new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      });
+      conditions.push(eq(partners.status, params.status));
     }
 
-    const result = await dynamoDb.send(queryCommand);
-    const items = (result.Items as Partner[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const results = await db
+      .select()
+      .from(partners)
+      .where(and(...conditions))
+      .orderBy(partners.companyName)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async getByStatus(tenantId: string, status: PartnerStatus): Promise<Partner[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-status',
-        KeyConditionExpression: 'tenantId = :tenantId AND #status = :status',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':status': status,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(partners)
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.status, status)
+      ))
+      .orderBy(partners.companyName);
 
-    return (result.Items as Partner[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async approve(tenantId: string, id: string, data: ApprovePartnerDTO, approvedBy: string): Promise<Partner> {
@@ -249,36 +195,31 @@ export class PartnerRepository implements IPartnerRepository {
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, scopes = :scopes, rateLimitPerMinute = :rateLimitPerMinute,
-          rateLimitPerDay = :rateLimitPerDay, monthlyQuota = :monthlyQuota,
-          approvedAt = :approvedAt, approvedBy = :approvedBy, updatedAt = :updatedAt,
-          #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': 'APPROVED',
-          ':scopes': data.scopes,
-          ':rateLimitPerMinute': data.rateLimitPerMinute,
-          ':rateLimitPerDay': data.rateLimitPerDay,
-          ':monthlyQuota': data.monthlyQuota,
-          ':approvedAt': timestamp,
-          ':approvedBy': approvedBy,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        status: 'APPROVED',
+        scopes: data.scopes,
+        rateLimitPerMinute: data.rateLimitPerMinute,
+        rateLimitPerDay: data.rateLimitPerDay,
+        monthlyQuota: data.monthlyQuota,
+        approvedAt: new Date(timestamp),
+        approvedBy,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, id),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async reject(tenantId: string, id: string, reason: string, rejectedBy: string): Promise<Partner> {
@@ -293,31 +234,28 @@ export class PartnerRepository implements IPartnerRepository {
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, rejectedAt = :rejectedAt, rejectedBy = :rejectedBy,
-          rejectionReason = :reason, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': 'REJECTED',
-          ':rejectedAt': timestamp,
-          ':rejectedBy': rejectedBy,
-          ':reason': reason,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        status: 'REJECTED',
+        rejectedAt: new Date(timestamp),
+        rejectedBy,
+        rejectionReason: reason,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, id),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async suspend(tenantId: string, id: string, reason: string, suspendedBy: string): Promise<Partner> {
@@ -332,31 +270,28 @@ export class PartnerRepository implements IPartnerRepository {
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, suspendedAt = :suspendedAt, suspendedBy = :suspendedBy,
-          suspensionReason = :reason, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': 'SUSPENDED',
-          ':suspendedAt': timestamp,
-          ':suspendedBy': suspendedBy,
-          ':reason': reason,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        status: 'SUSPENDED',
+        suspendedAt: new Date(timestamp),
+        suspendedBy,
+        suspensionReason: reason,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, id),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async activate(tenantId: string, id: string, activatedBy: string): Promise<Partner> {
@@ -371,30 +306,27 @@ export class PartnerRepository implements IPartnerRepository {
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, activatedAt = :activatedAt, activatedBy = :activatedBy,
-          updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': 'ACTIVE',
-          ':activatedAt': timestamp,
-          ':activatedBy': activatedBy,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        status: 'ACTIVE',
+        activatedAt: new Date(timestamp),
+        activatedBy,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, id),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async addApiKey(tenantId: string, partnerId: string, apiKey: ApiKey): Promise<Partner> {
@@ -406,26 +338,25 @@ export class PartnerRepository implements IPartnerRepository {
     const timestamp = now();
     const updatedApiKeys = [...existing.apiKeys, apiKey];
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET apiKeys = :apiKeys, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':apiKeys': updatedApiKeys,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        apiKeys: updatedApiKeys,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async revokeApiKey(tenantId: string, partnerId: string, apiKeyId: string): Promise<Partner> {
@@ -444,26 +375,25 @@ export class PartnerRepository implements IPartnerRepository {
       k.id === apiKeyId ? { ...k, status: 'REVOKED' as const, revokedAt: timestamp } : k
     );
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET apiKeys = :apiKeys, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':apiKeys': updatedApiKeys,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        apiKeys: updatedApiKeys,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async addOAuthClient(tenantId: string, partnerId: string, client: OAuthClient): Promise<Partner> {
@@ -475,26 +405,25 @@ export class PartnerRepository implements IPartnerRepository {
     const timestamp = now();
     const updatedClients = [...existing.oauthClients, client];
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET oauthClients = :clients, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':clients': updatedClients,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        oauthClients: updatedClients,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async revokeOAuthClient(tenantId: string, partnerId: string, clientId: string): Promise<Partner> {
@@ -513,26 +442,25 @@ export class PartnerRepository implements IPartnerRepository {
       c.clientId === clientId ? { ...c, status: 'REVOKED' as const, revokedAt: timestamp } : c
     );
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET oauthClients = :clients, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':clients': updatedClients,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        oauthClients: updatedClients,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async addWebhook(tenantId: string, partnerId: string, webhook: WebhookSubscription): Promise<Partner> {
@@ -544,26 +472,25 @@ export class PartnerRepository implements IPartnerRepository {
     const timestamp = now();
     const updatedWebhooks = [...existing.webhooks, webhook];
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':webhooks': updatedWebhooks,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        webhooks: updatedWebhooks,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async updateWebhook(
@@ -595,26 +522,25 @@ export class PartnerRepository implements IPartnerRepository {
         : w
     );
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':webhooks': updatedWebhooks,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        webhooks: updatedWebhooks,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async deleteWebhook(tenantId: string, partnerId: string, webhookId: string): Promise<Partner> {
@@ -631,26 +557,25 @@ export class PartnerRepository implements IPartnerRepository {
     const timestamp = now();
     const updatedWebhooks = existing.webhooks.filter((w) => w.id !== webhookId);
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: partnerId },
-        UpdateExpression: `SET webhooks = :webhooks, updatedAt = :updatedAt, #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':webhooks': updatedWebhooks,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(partners)
+      .set({
+        webhooks: updatedWebhooks,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(partners.tenantId, tenantId),
+        eq(partners.id, partnerId),
+        eq(partners.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Partner;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Partner was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async updateUsage(tenantId: string, partnerId: string, requestCount: number): Promise<void> {
@@ -658,4 +583,50 @@ export class PartnerRepository implements IPartnerRepository {
     // For MVP, we'll just log it
     console.log(`Partner ${partnerId} usage: ${requestCount} requests`);
   }
+
+  private mapToEntity(row: typeof partners.$inferSelect): Partner {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      status: row.status,
+      companyName: row.companyName,
+      companyWebsite: row.companyWebsite,
+      companyDescription: row.companyDescription,
+      industry: row.industry,
+      country: row.country,
+      contactName: row.contactName,
+      contactEmail: row.contactEmail,
+      contactPhone: row.contactPhone || undefined,
+      technicalContactEmail: row.technicalContactEmail,
+      webhookUrl: row.webhookUrl || undefined,
+      ipWhitelist: row.ipWhitelist as string[] | undefined,
+      apiKeys: row.apiKeys as ApiKey[],
+      oauthClients: row.oauthClients as OAuthClient[],
+      webhooks: row.webhooks as WebhookSubscription[],
+      scopes: row.scopes as string[],
+      rateLimitPerMinute: row.rateLimitPerMinute,
+      rateLimitPerDay: row.rateLimitPerDay,
+      monthlyQuota: row.monthlyQuota,
+      subscribedPackages: row.subscribedPackages as string[],
+      publishedPackages: row.publishedPackages as string[],
+      approvedAt: row.approvedAt?.toISOString(),
+      approvedBy: row.approvedBy || undefined,
+      rejectedAt: row.rejectedAt?.toISOString(),
+      rejectedBy: row.rejectedBy || undefined,
+      rejectionReason: row.rejectionReason || undefined,
+      suspendedAt: row.suspendedAt?.toISOString(),
+      suspendedBy: row.suspendedBy || undefined,
+      suspensionReason: row.suspensionReason || undefined,
+      activatedAt: row.activatedAt?.toISOString(),
+      activatedBy: row.activatedBy || undefined,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+      version: row.version,
+    };
+  }
 }
+
+// Export singleton instance
+export const partnerRepository = new PartnerRepository();

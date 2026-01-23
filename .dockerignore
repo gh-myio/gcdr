@@ -1,0 +1,60 @@
+# =============================================================================
+# Docker Ignore File
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+coverage
+.serverless
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Documentation
+docs
+!docs/openapi.yaml
+*.md
+!README.md
+
+# Tests
+tests
+__tests__
+*.test.ts
+*.spec.ts
+jest.config.js
+
+# Serverless (legacy)
+serverless.yml
+
+# Docker
+Dockerfile
+docker-compose*.yml
+dokploy.yml
+.dockerignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.tgz
+.npmrc
