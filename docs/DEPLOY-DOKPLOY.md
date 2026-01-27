@@ -5,115 +5,59 @@ Guia passo a passo para configurar e fazer deploy da GCDR API no Dokploy.
 ## Sumário
 
 1. [Pré-requisitos](#pré-requisitos)
-2. [Instalação do Dokploy](#instalação-do-dokploy)
-3. [Criar Projeto](#criar-projeto)
-4. [Configurar PostgreSQL](#configurar-postgresql)
-5. [Configurar a API](#configurar-a-api)
-6. [Variáveis de Ambiente](#variáveis-de-ambiente)
-7. [Deploy](#deploy)
-8. [Migrations e Seeds](#migrations-e-seeds)
-9. [Configurar Domínio e SSL](#configurar-domínio-e-ssl)
-10. [Verificação](#verificação)
-11. [Troubleshooting](#troubleshooting)
+2. [Infraestrutura Atual](#infraestrutura-atual)
+3. [Configurar a API](#configurar-a-api)
+4. [Variáveis de Ambiente](#variáveis-de-ambiente)
+5. [Deploy](#deploy)
+6. [Migrations e Seeds](#migrations-e-seeds)
+7. [Configurar Domínio e SSL](#configurar-domínio-e-ssl)
+8. [Verificação](#verificação)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Pré-requisitos
 
-- VPS com Ubuntu 22.04+ (mínimo 2GB RAM, 2 vCPU)
-- Domínio apontando para o IP do servidor
-- Acesso SSH ao servidor
-- Repositório Git (GitHub/GitLab/Bitbucket)
+- Acesso ao painel Dokploy
+- Repositório Git configurado (GitHub)
+- Banco de dados PostgreSQL já criado no Dokploy
 
 ---
 
-## Instalação do Dokploy
+## Infraestrutura Atual
 
-### 1. Conectar via SSH
+### Servidor Dokploy
 
-```bash
-ssh root@seu-servidor-ip
-```
+| Item | Valor |
+|------|-------|
+| IP | `13.218.248.206` |
+| Painel | `http://13.218.248.206:3000` |
+| Projeto | `myio-gcdr` |
 
-### 2. Instalar Dokploy
+### PostgreSQL (Produção)
 
-```bash
-curl -sSL https://dokploy.com/install.sh | sh
-```
+O banco de dados PostgreSQL já está configurado no Dokploy:
 
-### 3. Acessar o Painel
-
-Após instalação, acesse:
-```
-http://seu-servidor-ip:3000
-```
-
-### 4. Criar conta admin
-
-Na primeira execução, crie sua conta de administrador.
-
----
-
-## Criar Projeto
-
-### 1. Novo Projeto
-
-1. No painel do Dokploy, clique em **"Projects"**
-2. Clique em **"+ Create Project"**
-3. Nome: `gcdr-api`
-4. Descrição: `GCDR - Gestão de Regras de Alarme`
-
-### 2. Adicionar Serviços
-
-Vamos criar 2 serviços:
-- **PostgreSQL** (Database)
-- **GCDR API** (Application)
-
----
-
-## Configurar PostgreSQL
-
-### 1. Criar Database Service
-
-1. Dentro do projeto `gcdr-api`, clique em **"+ Create Service"**
-2. Selecione **"Database"**
-3. Selecione **"PostgreSQL"**
-
-### 2. Configurações do PostgreSQL
+#### Credenciais Internas (para a API)
 
 | Campo | Valor |
 |-------|-------|
-| Name | `gcdr-postgres` |
-| Image | `postgres:16-alpine` |
-| Database Name | `db_gcdr` |
-| Username | `postgres` |
-| Password | *(gerar senha segura)* |
+| User | `postgres` |
+| Database | `db_gcdr_prod` |
+| Password | `iZ4_4XTcMZEcoXthvHXJ` |
+| Host Interno | `myio-gcdr-gcdrprod-ixsmh2` |
+| Porta Interna | `5432` |
+| **Connection URL** | `postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@myio-gcdr-gcdrprod-ixsmh2:5432/db_gcdr_prod` |
 
-### 3. Configurações Avançadas
+#### Credenciais Externas (para acesso remoto/debug)
 
-Em **"Advanced"** → **"Environment Variables"**, adicione:
+| Campo | Valor |
+|-------|-------|
+| Host Externo | `13.218.248.206` |
+| Porta Externa | `5455` |
+| **Connection URL** | `postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod` |
 
-```env
-POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
-```
-
-### 4. Volume (Persistência)
-
-Em **"Volumes"**, verifique se o volume está configurado:
-```
-/var/lib/postgresql/data
-```
-
-### 5. Deploy do PostgreSQL
-
-Clique em **"Deploy"** e aguarde o status ficar **"Running"**.
-
-### 6. Anotar Connection String
-
-Após deploy, anote a connection string interna:
-```
-postgresql://postgres:SUA_SENHA@gcdr-postgres:5432/db_gcdr
-```
+> **Nota**: Use a URL **interna** para a API (comunicação container-to-container). Use a URL **externa** apenas para debug/administração remota.
 
 ---
 
@@ -121,7 +65,7 @@ postgresql://postgres:SUA_SENHA@gcdr-postgres:5432/db_gcdr
 
 ### 1. Criar Application Service
 
-1. Dentro do projeto `gcdr-api`, clique em **"+ Create Service"**
+1. Dentro do projeto `myio-gcdr`, clique em **"+ Create Service"**
 2. Selecione **"Application"**
 
 ### 2. Configurar Source
@@ -130,8 +74,8 @@ postgresql://postgres:SUA_SENHA@gcdr-postgres:5432/db_gcdr
 |-------|-------|
 | Name | `gcdr-api` |
 | Source | **Git** |
-| Repository | `https://github.com/seu-org/gcdr.git` |
-| Branch | `main` ou `migration-postgres` |
+| Repository | `https://github.com/gh-myio/gcdr.git` |
+| Branch | `migration-postgres` |
 | Build Type | **Dockerfile** |
 | Dockerfile Path | `Dockerfile` |
 
@@ -154,8 +98,6 @@ Em **"Network"**, certifique-se de que a API está na mesma rede que o PostgreSQ
 
 Em **"Environment Variables"**, adicione:
 
-### Obrigatórias
-
 ```env
 # Application
 NODE_ENV=production
@@ -163,18 +105,18 @@ PORT=3015
 HOST=0.0.0.0
 LOG_LEVEL=info
 
-# Database (usar hostname interno do Dokploy)
-DATABASE_URL=postgresql://postgres:SUA_SENHA@gcdr-postgres:5432/db_gcdr
+# Database (usar hostname INTERNO do Dokploy)
+DATABASE_URL=postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@myio-gcdr-gcdrprod-ixsmh2:5432/db_gcdr_prod
 
 # JWT (IMPORTANTE: gerar chave segura!)
-JWT_SECRET=sua-chave-secreta-com-pelo-menos-64-caracteres-gerada-com-openssl
+JWT_SECRET=<GERAR_COM_OPENSSL>
 JWT_ISSUER=gcdr
 JWT_AUDIENCE=gcdr-api
 JWT_EXPIRES_IN=1h
 JWT_REFRESH_EXPIRES_IN=7d
 
 # CORS (ajustar para seu domínio em produção)
-CORS_ORIGIN=https://seu-dominio.com
+CORS_ORIGIN=https://gcdr.myio.com.br,https://app.myio.com.br
 ```
 
 ### Gerar JWT_SECRET
@@ -182,6 +124,11 @@ CORS_ORIGIN=https://seu-dominio.com
 Execute no terminal:
 ```bash
 openssl rand -base64 64
+```
+
+Exemplo de resultado (use o seu próprio!):
+```
+K7xY9z2Qw4rT8uI0pA3sD6fG1hJ5kL8mN2bV4cX7zQ9wE1rT3yU6iO0pA2sD5fG8h=
 ```
 
 ---
@@ -240,6 +187,9 @@ npm run db:seed
 ### Alternativa: Via SSH no Servidor
 
 ```bash
+# Conectar ao servidor
+ssh root@13.218.248.206
+
 # Encontrar o container
 docker ps | grep gcdr-api
 
@@ -248,6 +198,16 @@ docker exec -it <container_id> npm run db:migrate
 
 # Executar seeds
 docker exec -it <container_id> npm run db:seed
+```
+
+### Alternativa: Conectar diretamente ao banco (debug)
+
+```bash
+# Via psql local
+psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod"
+
+# Ou via Docker no servidor
+docker exec -it <postgres_container> psql -U postgres -d db_gcdr_prod
 ```
 
 ---
@@ -259,7 +219,7 @@ docker exec -it <container_id> npm run db:seed
 Em **"Domains"**:
 
 1. Clique em **"+ Add Domain"**
-2. Digite seu domínio: `api.gcdr.seudominio.com`
+2. Digite seu domínio: `api.gcdr.myio.com.br`
 3. Selecione **"HTTPS"**
 4. Habilite **"Generate SSL Certificate"** (Let's Encrypt)
 
@@ -269,7 +229,7 @@ No seu provedor de DNS, adicione:
 
 | Tipo | Nome | Valor |
 |------|------|-------|
-| A | api.gcdr | IP_DO_SERVIDOR |
+| A | api.gcdr | `13.218.248.206` |
 
 ### 3. Aguardar Propagação
 
@@ -282,32 +242,32 @@ Aguarde 5-10 minutos para propagação do DNS e geração do certificado SSL.
 ### 1. Health Check
 
 ```bash
-curl https://api.gcdr.seudominio.com/health
+curl https://api.gcdr.myio.com.br/health
 ```
 
 Resposta esperada:
 ```json
 {
-  "status": "healthy",
-  "version": "1.0.0",
-  "timestamp": "2026-01-27T00:00:00.000Z"
+  "status": "ok"
 }
 ```
 
 ### 2. Testar Login
 
 ```bash
-curl -X POST https://api.gcdr.seudominio.com/auth/login \
+curl -X POST https://api.gcdr.myio.com.br/auth/login \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
   -d '{"email": "admin@gcdr.io", "password": "Test123!"}'
 ```
 
-### 3. Acessar Admin UI
+### 3. Acessar Admin UI (apenas em desenvolvimento)
 
 ```
-https://api.gcdr.seudominio.com/admin/db
+https://api.gcdr.myio.com.br/admin/db
 ```
+
+> **Nota**: O Admin UI só está disponível em `NODE_ENV=development`. Em produção, use conexão direta ao banco.
 
 ---
 
@@ -315,46 +275,51 @@ https://api.gcdr.seudominio.com/admin/db
 
 ### Container não inicia
 
-**Verificar logs:**
+**Verificar logs no Dokploy:**
+1. Clique no serviço
+2. Vá em **"Logs"**
+
+**Ou via SSH:**
 ```bash
+ssh root@13.218.248.206
 docker logs <container_id>
 ```
 
 **Causas comuns:**
-- `DATABASE_URL` incorreta
+- `DATABASE_URL` incorreta (verificar hostname interno)
 - PostgreSQL não está rodando
 - `JWT_SECRET` não definido
 
 ### Erro de conexão com banco
 
-**Verificar se estão na mesma rede:**
+**Verificar se estão na mesma rede Docker:**
 ```bash
 docker network ls
-docker network inspect <network_name>
+docker network inspect dokploy-network
 ```
 
-**Testar conexão:**
+**Testar conexão do container da API:**
 ```bash
 docker exec -it <api_container> sh
 # Dentro do container:
-wget -qO- gcdr-postgres:5432 || echo "Conectou"
+wget -qO- myio-gcdr-gcdrprod-ixsmh2:5432 || echo "Porta respondendo"
 ```
 
 ### Migrations falham
 
 **Verificar se o banco existe:**
 ```bash
-docker exec -it <postgres_container> psql -U postgres -c "\l"
+psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod" -c "\l"
 ```
 
-**Recriar banco se necessário:**
+**Verificar tabelas existentes:**
 ```bash
-docker exec -it <postgres_container> psql -U postgres -c "DROP DATABASE IF EXISTS db_gcdr; CREATE DATABASE db_gcdr;"
+psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod" -c "\dt"
 ```
 
 ### SSL não funciona
 
-1. Verificar se DNS está propagado: `nslookup api.gcdr.seudominio.com`
+1. Verificar se DNS está propagado: `nslookup api.gcdr.myio.com.br`
 2. Verificar se porta 80/443 estão abertas no firewall
 3. Regenerar certificado no Dokploy
 
@@ -364,6 +329,7 @@ docker exec -it <postgres_container> psql -U postgres -c "DROP DATABASE IF EXIST
 
 ### Ver logs em tempo real
 ```bash
+ssh root@13.218.248.206
 docker logs -f <container_id>
 ```
 
@@ -374,30 +340,45 @@ docker restart <container_id>
 
 ### Backup do banco
 ```bash
-docker exec <postgres_container> pg_dump -U postgres db_gcdr > backup_$(date +%Y%m%d).sql
+pg_dump "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod" > backup_$(date +%Y%m%d).sql
 ```
 
 ### Restore do banco
 ```bash
-docker exec -i <postgres_container> psql -U postgres db_gcdr < backup.sql
+psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod" < backup.sql
 ```
 
 ---
 
 ## Checklist de Deploy
 
-- [ ] Dokploy instalado e acessível
-- [ ] Projeto criado
-- [ ] PostgreSQL deployado e rodando
+- [x] Dokploy instalado e acessível
+- [x] Projeto criado (`myio-gcdr`)
+- [x] PostgreSQL deployado e rodando
 - [ ] API deployada e rodando
 - [ ] Variáveis de ambiente configuradas
 - [ ] Migrations executadas
-- [ ] Seeds executados (se necessário)
+- [ ] Seeds executados
 - [ ] Domínio configurado
 - [ ] SSL ativo
 - [ ] Health check passando
 - [ ] Login funcionando
-- [ ] Admin UI acessível
+
+---
+
+## Credenciais de Teste (Seeds)
+
+Após executar os seeds, os seguintes usuários estarão disponíveis:
+
+| Email | Senha | Tipo |
+|-------|-------|------|
+| `admin@gcdr.io` | `Test123!` | INTERNAL |
+| `joao.silva@acmetech.com` | `Test123!` | CUSTOMER |
+| `maria.santos@acmetech.com` | `Test123!` | CUSTOMER |
+
+**Tenant ID para testes:** `11111111-1111-1111-1111-111111111111`
+
+> **IMPORTANTE**: Altere as senhas padrão após o primeiro deploy em produção!
 
 ---
 
@@ -406,15 +387,15 @@ docker exec -i <postgres_container> psql -U postgres db_gcdr < backup.sql
 Após deploy bem-sucedido:
 
 1. **Alterar senhas padrão** dos usuários de seed
-2. **Configurar backup automático** do PostgreSQL
-3. **Configurar monitoramento** (opcional: Prometheus/Grafana)
-4. **Configurar CI/CD** para deploy automático via GitHub Actions
+2. **Configurar backup automático** do PostgreSQL no Dokploy
+3. **Configurar CI/CD** para deploy automático via GitHub Actions
+4. **Remover/desabilitar Admin UI** em produção
 
 ---
 
 ## Suporte
 
 Em caso de problemas:
-1. Verificar logs do container
-2. Verificar status dos serviços no Dokploy
+1. Verificar logs do container no Dokploy
+2. Verificar status dos serviços
 3. Consultar documentação do Dokploy: https://docs.dokploy.com
