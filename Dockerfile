@@ -59,6 +59,9 @@ COPY --chown=gcdr:nodejs docs/openapi.yaml ./docs/
 # Copy drizzle migrations (SQL files for manual migration if needed)
 COPY --chown=gcdr:nodejs drizzle/migrations ./drizzle/migrations
 
+# Copy database seed scripts (for admin/db UI)
+COPY --chown=gcdr:nodejs scripts/db/seeds ./scripts/db/seeds
+
 # Switch to non-root user
 USER gcdr
 
