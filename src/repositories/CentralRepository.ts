@@ -1,21 +1,22 @@
-import { GetCommand, PutCommand, UpdateCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { eq, and, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Central, ConnectionStatus, createDefaultCentralConfig, createDefaultCentralStats } from '../domain/entities/Central';
 import { CreateCentralDTO, UpdateCentralDTO, ListCentralsDTO } from '../dto/request/CentralDTO';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { ICentralRepository } from './interfaces/ICentralRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { centrals } = schema;
+
 export class CentralRepository implements ICentralRepository {
-  private tableName = TableNames.CENTRALS;
 
   async create(tenantId: string, data: CreateCentralDTO, createdBy: string): Promise<Central> {
     const id = generateId();
     const timestamp = now();
 
-    const central: Central = {
+    const [result] = await db.insert(centrals).values({
       id,
       tenantId,
       customerId: data.customerId,
@@ -30,52 +31,39 @@ export class CentralRepository implements ICentralRepository {
       softwareVersion: data.softwareVersion || '0.0.0',
       config: data.config ? { ...createDefaultCentralConfig(), ...data.config } : createDefaultCentralConfig(),
       stats: createDefaultCentralStats(),
-      location: data.location,
+      location: data.location || null,
       tags: data.tags || [],
       metadata: data.metadata || {},
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: central,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return central;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Central | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(centrals)
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .limit(1);
 
-    return (result.Item as Central) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Central | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-serial',
-        KeyConditionExpression: 'tenantId = :tenantId AND serialNumber = :serialNumber',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':serialNumber': serialNumber,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(centrals)
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.serialNumber, serialNumber)
+      ))
+      .limit(1);
 
-    return result.Items && result.Items.length > 0 ? (result.Items[0] as Central) : null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdateCentralDTO, updatedBy: string): Promise<Central> {
@@ -84,149 +72,120 @@ export class CentralRepository implements ICentralRepository {
       throw new AppError('CENTRAL_NOT_FOUND', 'Central not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.firmwareVersion !== undefined) updateData.firmwareVersion = data.firmwareVersion;
+    if (data.softwareVersion !== undefined) updateData.softwareVersion = data.softwareVersion;
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
+
     // Merge config if provided
-    if (data.config) {
-      fieldsToUpdate.config = { ...existing.config, ...data.config };
+    if (data.config !== undefined) {
+      updateData.config = { ...existing.config, ...data.config };
     }
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    const [result] = await db
+      .update(centrals)
+      .set(updateData)
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.id, id),
+        eq(centrals.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Central was modified by another process', 409);
+    }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
-
-    return result.Attributes as Central;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(centrals)
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
   }
 
   async list(tenantId: string, params: ListCentralsDTO): Promise<PaginatedResult<Central>> {
     const limit = params.limit || 20;
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const filterExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = { ':tenantId': tenantId };
+    // Build conditions
+    const conditions = [eq(centrals.tenantId, tenantId)];
 
     if (params.customerId) {
-      filterExpressions.push('customerId = :customerId');
-      expressionAttributeValues[':customerId'] = params.customerId;
+      conditions.push(eq(centrals.customerId, params.customerId));
     }
 
     if (params.assetId) {
-      filterExpressions.push('assetId = :assetId');
-      expressionAttributeValues[':assetId'] = params.assetId;
+      conditions.push(eq(centrals.assetId, params.assetId));
     }
 
     if (params.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
+      conditions.push(eq(centrals.type, params.type));
     }
 
     if (params.status) {
-      filterExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = params.status;
+      conditions.push(eq(centrals.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
     if (params.connectionStatus) {
-      filterExpressions.push('connectionStatus = :connectionStatus');
-      expressionAttributeValues[':connectionStatus'] = params.connectionStatus;
+      conditions.push(eq(centrals.connectionStatus, params.connectionStatus));
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(centrals)
+      .where(and(...conditions))
+      .orderBy(centrals.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Central[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor:
-          hasMore && result.LastEvaluatedKey
-            ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-            : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listByCustomer(tenantId: string, customerId: string): Promise<Central[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer',
-        KeyConditionExpression: 'tenantId = :tenantId AND customerId = :customerId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':customerId': customerId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(centrals)
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.customerId, customerId)
+      ))
+      .orderBy(centrals.name);
 
-    return (result.Items as Central[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async listByAsset(tenantId: string, assetId: string): Promise<Central[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-asset',
-        KeyConditionExpression: 'tenantId = :tenantId AND assetId = :assetId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':assetId': assetId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(centrals)
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.assetId, assetId)
+      ))
+      .orderBy(centrals.name);
 
-    return (result.Items as Central[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async updateStatus(tenantId: string, id: string, status: EntityStatus, updatedBy: string): Promise<Central> {
@@ -237,29 +196,26 @@ export class CentralRepository implements ICentralRepository {
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, updatedAt = :updatedAt, updatedBy = :updatedBy,
-          #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': status,
-          ':updatedAt': timestamp,
-          ':updatedBy': updatedBy,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(centrals)
+      .set({
+        status: status as 'ACTIVE' | 'INACTIVE' | 'DELETED',
+        updatedAt: new Date(timestamp),
+        updatedBy,
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.id, id),
+        eq(centrals.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as Central;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Central was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async updateConnectionStatus(
@@ -270,19 +226,15 @@ export class CentralRepository implements ICentralRepository {
   ): Promise<Central> {
     const timestamp = now();
 
-    const updateExpression = stats
-      ? `SET connectionStatus = :connectionStatus, stats = :stats, updatedAt = :updatedAt`
-      : `SET connectionStatus = :connectionStatus, updatedAt = :updatedAt`;
-
-    const expressionAttributeValues: Record<string, unknown> = {
-      ':connectionStatus': connectionStatus,
-      ':updatedAt': timestamp,
+    const updateData: Record<string, unknown> = {
+      connectionStatus,
+      updatedAt: new Date(timestamp),
     };
 
     if (stats) {
       const existing = await this.getById(tenantId, id);
       if (existing) {
-        expressionAttributeValues[':stats'] = {
+        updateData.stats = {
           ...existing.stats,
           ...stats,
           lastHeartbeatAt: timestamp,
@@ -290,17 +242,17 @@ export class CentralRepository implements ICentralRepository {
       }
     }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: updateExpression,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    const [result] = await db
+      .update(centrals)
+      .set(updateData)
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .returning();
 
-    return result.Attributes as Central;
+    if (!result) {
+      throw new AppError('CENTRAL_NOT_FOUND', 'Central not found', 404);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async recordHeartbeat(tenantId: string, id: string, stats: Partial<Central['stats']>): Promise<void> {
@@ -311,21 +263,47 @@ export class CentralRepository implements ICentralRepository {
       throw new AppError('CENTRAL_NOT_FOUND', 'Central not found', 404);
     }
 
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET connectionStatus = :online, stats = :stats, updatedAt = :updatedAt`,
-        ExpressionAttributeValues: {
-          ':online': 'ONLINE',
-          ':stats': {
-            ...existing.stats,
-            ...stats,
-            lastHeartbeatAt: timestamp,
-          },
-          ':updatedAt': timestamp,
+    await db
+      .update(centrals)
+      .set({
+        connectionStatus: 'ONLINE',
+        stats: {
+          ...existing.stats,
+          ...stats,
+          lastHeartbeatAt: timestamp,
         },
+        updatedAt: new Date(timestamp),
       })
-    );
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
+  }
+
+  private mapToEntity(row: typeof centrals.$inferSelect): Central {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      customerId: row.customerId,
+      assetId: row.assetId,
+      name: row.name,
+      displayName: row.displayName,
+      serialNumber: row.serialNumber,
+      type: row.type,
+      status: row.status,
+      connectionStatus: row.connectionStatus,
+      firmwareVersion: row.firmwareVersion,
+      softwareVersion: row.softwareVersion,
+      config: row.config as Central['config'],
+      stats: row.stats as Central['stats'],
+      location: row.location as Central['location'],
+      tags: row.tags as string[],
+      metadata: row.metadata as Record<string, unknown>,
+      version: row.version,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+    };
   }
 }
+
+// Export singleton instance
+export const centralRepository = new CentralRepository();

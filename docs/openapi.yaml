@@ -49,6 +49,12 @@ tags:
     description: User management and authentication
   - name: Groups
     description: Group management for users, devices, and assets
+  - name: Alarm Bundles
+    description: Alarm rules bundle for Node-RED integration (M2M)
+  - name: Audit Logs
+    description: Audit logs for compliance and traceability
+  - name: Customer API Keys
+    description: API key management for customer integrations
 
 security:
   - bearerAuth: []
@@ -2733,6 +2739,391 @@ components:
           type: string
           nullable: true
 
+    # Alarm Bundle Schemas
+    AlarmBundleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AlarmBundle'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    AlarmBundle:
+      type: object
+      properties:
+        versionId:
+          type: string
+          description: Bundle version hash
+        deviceIndex:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeviceMapping'
+        rulesByDeviceType:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/BundleAlarmRule'
+        rules:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/BundleAlarmRule'
+
+    DeviceMapping:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        deviceName:
+          type: string
+        deviceType:
+          type: string
+        domain:
+          type: string
+        serialNumber:
+          type: string
+        externalId:
+          type: string
+        centralId:
+          type: string
+          format: uuid
+        slaveId:
+          type: integer
+          minimum: 1
+          maximum: 247
+        ruleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    BundleAlarmRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        priority:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO]
+        metric:
+          type: string
+        operator:
+          type: string
+          enum: [EQ, NE, GT, GE, LT, LE, BETWEEN, OUTSIDE]
+        value:
+          type: number
+        valueHigh:
+          type: number
+        unit:
+          type: string
+        duration:
+          type: integer
+        hysteresis:
+          type: number
+        aggregation:
+          type: string
+          enum: [AVG, MIN, MAX, SUM, COUNT, LAST]
+        enabled:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+
+    SimpleAlarmBundleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SimpleAlarmBundle'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    SimpleAlarmBundle:
+      type: object
+      properties:
+        versionId:
+          type: string
+        deviceIndex:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SimpleDeviceMapping'
+        rules:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SimpleBundleRule'
+
+    SimpleDeviceMapping:
+      type: object
+      properties:
+        deviceName:
+          type: string
+        centralId:
+          type: string
+          format: uuid
+        slaveId:
+          type: integer
+        ruleIds:
+          type: array
+          items:
+            type: string
+
+    SimpleBundleRule:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        value:
+          type: number
+        valueHigh:
+          type: number
+        duration:
+          type: integer
+        hysteresis:
+          type: number
+        aggregation:
+          type: string
+        offset:
+          type: number
+          description: Calibration offset for temperature metrics
+        startAt:
+          type: string
+          pattern: '^[0-2][0-9]:[0-5][0-9]$'
+          description: Schedule start time (HH:mm)
+        endAt:
+          type: string
+          pattern: '^[0-2][0-9]:[0-5][0-9]$'
+          description: Schedule end time (HH:mm)
+        daysOfWeek:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 6
+          description: Days of week (0=Sunday, 6=Saturday)
+
+    # Customer API Key Schemas
+    CustomerApiKeyCreatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            key:
+              type: string
+              description: Full API key (shown only once)
+            keyPrefix:
+              type: string
+            scopes:
+              type: array
+              items:
+                type: string
+            expiresAt:
+              type: string
+              format: date-time
+
+    CustomerApiKeyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CustomerApiKey'
+
+    CustomerApiKeyListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomerApiKey'
+            cursor:
+              type: string
+              nullable: true
+            hasMore:
+              type: boolean
+
+    CustomerApiKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        keyPrefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsedIp:
+          type: string
+          nullable: true
+        usageCount:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+
+    CreateCustomerApiKey:
+      type: object
+      required:
+        - name
+        - scopes
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        scopes:
+          type: array
+          items:
+            type: string
+          description: 'API scopes (e.g., bundles:read, rules:read, devices:read)'
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiration date
+
+    # Audit Log Schemas
+    AuditLogResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AuditLog'
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLog'
+            cursor:
+              type: string
+              nullable: true
+            hasMore:
+              type: boolean
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+        actorType:
+          type: string
+          enum: [USER, SERVICE, SYSTEM, API_KEY]
+        entityType:
+          type: string
+          description: Entity type (CUSTOMER, DEVICE, RULE, etc.)
+        entityId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+          enum: [CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT, EXPORT]
+        eventCategory:
+          type: string
+          enum: [AUTH, DATA, ADMIN, SYSTEM]
+        description:
+          type: string
+        httpMethod:
+          type: string
+        httpPath:
+          type: string
+        statusCode:
+          type: integer
+        durationMs:
+          type: integer
+        previousValue:
+          type: object
+          nullable: true
+        newValue:
+          type: object
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ResponseMeta:
+      type: object
+      properties:
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
 paths:
   # Health
   /health:
@@ -4677,6 +5068,289 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+
+  # Alarm Bundles (M2M Integration)
+  /customers/{customerId}/alarm-rules/bundle:
+    get:
+      tags: [Alarm Bundles]
+      summary: Get full alarm rules bundle
+      description: |
+        Returns a complete bundle of alarm rules for a customer, optimized for Node-RED consumption.
+        Supports both JWT and API Key authentication (scope: bundles:read).
+        Uses ETag for conditional caching.
+      operationId: getAlarmBundle
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          schema:
+            type: string
+          description: ETag for conditional request (returns 304 if unchanged)
+      responses:
+        '200':
+          description: Alarm bundle
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: Bundle version for caching
+            X-Bundle-Version:
+              schema:
+                type: string
+            X-Bundle-Signature:
+              schema:
+                type: string
+              description: HMAC-SHA256 signature
+            X-Bundle-Rules-Count:
+              schema:
+                type: integer
+            X-Bundle-Devices-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlarmBundleResponse'
+        '304':
+          description: Not modified (ETag matched)
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /customers/{customerId}/alarm-rules/bundle/simple:
+    get:
+      tags: [Alarm Bundles]
+      summary: Get simplified alarm rules bundle
+      description: |
+        Returns a simplified bundle with minimal fields for Node-RED processing.
+        Includes centralId and slaveId for Modbus integration.
+        Supports both JWT and API Key authentication (scope: bundles:read).
+      operationId: getSimplifiedAlarmBundle
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Simplified alarm bundle
+          headers:
+            ETag:
+              schema:
+                type: string
+            X-Bundle-Version:
+              schema:
+                type: string
+            X-Bundle-Signature:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleAlarmBundleResponse'
+        '304':
+          description: Not modified
+        '401':
+          description: Unauthorized
+
+  # Customer API Keys
+  /customers/{customerId}/api-keys:
+    post:
+      tags: [Customer API Keys]
+      summary: Create API key for customer
+      operationId: createCustomerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerApiKey'
+      responses:
+        '201':
+          description: API key created (key shown only once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerApiKeyCreatedResponse'
+    get:
+      tags: [Customer API Keys]
+      summary: List customer API keys
+      operationId: listCustomerApiKeys
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerApiKeyListResponse'
+
+  /customers/{customerId}/api-keys/{keyId}:
+    get:
+      tags: [Customer API Keys]
+      summary: Get API key details
+      operationId: getCustomerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: API key details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerApiKeyResponse'
+    delete:
+      tags: [Customer API Keys]
+      summary: Revoke API key
+      operationId: revokeCustomerApiKey
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: API key revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Audit Logs (RFC-0009)
+  /audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: List audit logs
+      description: Query audit logs with filters for compliance and debugging
+      operationId: listAuditLogs
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by user
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by customer
+        - name: entityType
+          in: query
+          schema:
+            type: string
+          description: Filter by entity type (e.g., CUSTOMER, DEVICE, RULE)
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT, EXPORT]
+          description: Filter by action type
+        - name: eventCategory
+          in: query
+          schema:
+            type: string
+            enum: [AUTH, DATA, ADMIN, SYSTEM]
+          description: Filter by event category
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter from date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter to date
+      responses:
+        '200':
+          description: List of audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+
+  /audit-logs/{id}:
+    get:
+      tags: [Audit Logs]
+      summary: Get audit log entry
+      operationId: getAuditLog
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Audit log entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogResponse'
 
   # Integrations
   /integrations/packages:

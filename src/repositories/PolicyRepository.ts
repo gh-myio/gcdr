@@ -1,21 +1,16 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { eq, and, inArray } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Policy } from '../domain/entities/Policy';
 import { CreatePolicyDTO } from '../dto/request/AuthorizationDTO';
 import { PaginatedResult } from '../shared/types';
 import { IPolicyRepository, UpdatePolicyDTO, ListPoliciesParams } from './interfaces/IPolicyRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { policies } = schema;
+
 export class PolicyRepository implements IPolicyRepository {
-  private tableName = TableNames.POLICIES;
 
   async create(tenantId: string, data: CreatePolicyDTO, createdBy: string): Promise<Policy> {
     // Check if key already exists
@@ -27,7 +22,7 @@ export class PolicyRepository implements IPolicyRepository {
     const id = generateId();
     const timestamp = now();
 
-    const policy: Policy = {
+    const [result] = await db.insert(policies).values({
       id,
       tenantId,
       key: data.key,
@@ -35,60 +30,36 @@ export class PolicyRepository implements IPolicyRepository {
       description: data.description || '',
       allow: data.allow || [],
       deny: data.deny || [],
-      conditions: data.conditions,
+      conditions: data.conditions || null,
       riskLevel: data.riskLevel || 'low',
       isSystem: false,
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: policy,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return policy;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Policy | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(policies)
+      .where(and(eq(policies.tenantId, tenantId), eq(policies.id, id)))
+      .limit(1);
 
-    return (result.Item as Policy) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByKey(tenantId: string, key: string): Promise<Policy | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-key',
-        KeyConditionExpression: 'tenantId = :tenantId AND #key = :key',
-        ExpressionAttributeNames: {
-          '#key': 'key',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':key': key,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(policies)
+      .where(and(eq(policies.tenantId, tenantId), eq(policies.key, key)))
+      .limit(1);
 
-    if (!result.Items || result.Items.length === 0) {
-      return null;
-    }
-
-    const item = result.Items[0] as { tenantId: string; id: string };
-    return this.getById(item.tenantId, item.id);
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByKeys(tenantId: string, keys: string[]): Promise<Policy[]> {
@@ -96,15 +67,15 @@ export class PolicyRepository implements IPolicyRepository {
       return [];
     }
 
-    const policies: Policy[] = [];
-    for (const key of keys) {
-      const policy = await this.getByKey(tenantId, key);
-      if (policy) {
-        policies.push(policy);
-      }
-    }
+    const results = await db
+      .select()
+      .from(policies)
+      .where(and(
+        eq(policies.tenantId, tenantId),
+        inArray(policies.key, keys)
+      ));
 
-    return policies;
+    return results.map(this.mapToEntity);
   }
 
   async update(tenantId: string, id: string, data: UpdatePolicyDTO, updatedBy: string): Promise<Policy> {
@@ -117,40 +88,35 @@ export class PolicyRepository implements IPolicyRepository {
       throw new AppError('SYSTEM_POLICY', 'Cannot modify system policy', 403);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.allow !== undefined) updateData.allow = data.allow;
+    if (data.deny !== undefined) updateData.deny = data.deny;
+    if (data.conditions !== undefined) updateData.conditions = data.conditions;
+    if (data.riskLevel !== undefined) updateData.riskLevel = data.riskLevel;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    const [result] = await db
+      .update(policies)
+      .set(updateData)
+      .where(and(
+        eq(policies.tenantId, tenantId),
+        eq(policies.id, id),
+        eq(policies.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Policy was modified by another process', 409);
+    }
 
-    return result.Attributes as Policy;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -163,85 +129,90 @@ export class PolicyRepository implements IPolicyRepository {
       throw new AppError('SYSTEM_POLICY', 'Cannot delete system policy', 403);
     }
 
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(policies)
+      .where(and(eq(policies.tenantId, tenantId), eq(policies.id, id)));
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Policy>> {
     const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(policies)
+      .where(eq(policies.tenantId, tenantId))
+      .orderBy(policies.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Policy[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listWithFilters(tenantId: string, params: ListPoliciesParams): Promise<PaginatedResult<Policy>> {
     const limit = params.limit || 20;
-    const filterExpressions: string[] = [];
-    const expressionAttributeValues: Record<string, unknown> = { ':tenantId': tenantId };
-    const expressionAttributeNames: Record<string, string> = {};
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
+
+    // Build conditions
+    const conditions = [eq(policies.tenantId, tenantId)];
 
     if (params.riskLevel) {
-      filterExpressions.push('riskLevel = :riskLevel');
-      expressionAttributeValues[':riskLevel'] = params.riskLevel;
+      conditions.push(eq(policies.riskLevel, params.riskLevel as 'low' | 'medium' | 'high' | 'critical'));
     }
 
     if (params.isSystem !== undefined) {
-      filterExpressions.push('isSystem = :isSystem');
-      expressionAttributeValues[':isSystem'] = params.isSystem;
+      conditions.push(eq(policies.isSystem, params.isSystem));
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(policies)
+      .where(and(...conditions))
+      .orderBy(policies.displayName)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Policy[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
+
+  private mapToEntity(row: typeof policies.$inferSelect): Policy {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      key: row.key,
+      displayName: row.displayName,
+      description: row.description,
+      allow: row.allow as string[],
+      deny: row.deny as string[],
+      conditions: row.conditions as Policy['conditions'],
+      riskLevel: row.riskLevel,
+      isSystem: row.isSystem,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+      version: row.version,
+    };
+  }
 }
+
+// Export singleton instance
+export const policyRepository = new PolicyRepository();

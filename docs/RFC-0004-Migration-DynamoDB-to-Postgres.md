@@ -3,7 +3,7 @@
 - Feature Name: `migration_dynamodb_to_postgres`
 - Start Date: 2026-01-20
 - RFC PR: N/A
-- Status: Draft
+- Status: Implemented
 
 ## Summary
 

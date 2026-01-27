@@ -1,4 +1,5 @@
-import { GetCommand, PutCommand, UpdateCommand, DeleteCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { eq, and, sql, ilike, gt } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   IntegrationPackage,
   PackageSubscription,
@@ -8,13 +9,13 @@ import {
 import { CreatePackageDTO, UpdatePackageDTO, SearchPackagesDTO } from '../dto/request/IntegrationDTO';
 import { PaginatedResult } from '../shared/types';
 import { IIntegrationPackageRepository, ISubscriptionRepository } from './interfaces/IIntegrationRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { integrationPackages, packageSubscriptions } = schema;
+
 export class IntegrationPackageRepository implements IIntegrationPackageRepository {
-  private tableName = TableNames.INTEGRATIONS;
 
   async create(
     tenantId: string,
@@ -25,17 +26,17 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
     const id = generateId();
     const timestamp = now();
 
-    const pkg: IntegrationPackage = {
+    const [result] = await db.insert(integrationPackages).values({
       id,
       tenantId,
       name: data.name,
       slug: data.slug,
       description: data.description,
-      longDescription: data.longDescription,
+      longDescription: data.longDescription || null,
       category: data.category,
-      tags: data.tags,
-      iconUrl: data.iconUrl,
-      documentationUrl: data.documentationUrl,
+      tags: data.tags || [],
+      iconUrl: data.iconUrl || null,
+      documentationUrl: data.documentationUrl || null,
       type: data.type,
       status: 'DRAFT',
       currentVersion: '0.0.0',
@@ -43,57 +44,44 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
       publisherId,
       publisherName,
       verified: false,
-      scopes: data.scopes,
-      capabilities: data.capabilities,
-      endpoints: data.endpoints,
-      events: data.events,
-      auth: data.auth,
-      rateLimits: data.rateLimits,
-      pricing: data.pricing,
+      scopes: data.scopes || [],
+      capabilities: data.capabilities || [],
+      endpoints: data.endpoints || [],
+      events: data.events || [],
+      auth: data.auth || {},
+      rateLimits: data.rateLimits || {},
+      pricing: data.pricing || {},
       subscriberCount: 0,
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy: publisherId,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: pkg,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return pkg;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<IntegrationPackage | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(eq(integrationPackages.tenantId, tenantId), eq(integrationPackages.id, id)))
+      .limit(1);
 
-    return (result.Item as IntegrationPackage) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getBySlug(tenantId: string, slug: string): Promise<IntegrationPackage | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-slug',
-        KeyConditionExpression: 'tenantId = :tenantId AND slug = :slug',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':slug': slug,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.slug, slug)
+      ))
+      .limit(1);
 
-    return result.Items && result.Items.length > 0 ? (result.Items[0] as IntegrationPackage) : null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(
@@ -107,113 +95,107 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
       throw new AppError('PACKAGE_NOT_FOUND', 'Integration package not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.longDescription !== undefined) updateData.longDescription = data.longDescription;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.iconUrl !== undefined) updateData.iconUrl = data.iconUrl;
+    if (data.documentationUrl !== undefined) updateData.documentationUrl = data.documentationUrl;
+    if (data.capabilities !== undefined) updateData.capabilities = data.capabilities;
+    if (data.endpoints !== undefined) updateData.endpoints = data.endpoints;
+    if (data.events !== undefined) updateData.events = data.events;
+    if (data.auth !== undefined) updateData.auth = data.auth;
+    if (data.rateLimits !== undefined) updateData.rateLimits = data.rateLimits;
+    if (data.pricing !== undefined) updateData.pricing = data.pricing;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    const [result] = await db
+      .update(integrationPackages)
+      .set(updateData)
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.id, id),
+        eq(integrationPackages.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Package was modified by another process', 409);
+    }
 
-    return result.Attributes as IntegrationPackage;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(integrationPackages)
+      .where(and(eq(integrationPackages.tenantId, tenantId), eq(integrationPackages.id, id)));
   }
 
   async search(tenantId: string, params: SearchPackagesDTO): Promise<PaginatedResult<IntegrationPackage>> {
     const limit = params.limit || 20;
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
 
-    // Build filter expression
-    const filterExpressions: string[] = ['#status = :status'];
-    const expressionAttributeNames: Record<string, string> = { '#status': 'status' };
-    const expressionAttributeValues: Record<string, unknown> = { ':status': params.status || 'PUBLISHED' };
+    // Build conditions
+    const conditions = [
+      eq(integrationPackages.tenantId, tenantId),
+      eq(integrationPackages.status, (params.status || 'PUBLISHED') as PackageStatus),
+    ];
 
     if (params.category) {
-      filterExpressions.push('category = :category');
-      expressionAttributeValues[':category'] = params.category;
+      conditions.push(eq(integrationPackages.category, params.category));
     }
 
     if (params.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
-    }
-
-    if (params.pricing) {
-      filterExpressions.push('pricing.model = :pricing');
-      expressionAttributeValues[':pricing'] = params.pricing;
+      conditions.push(eq(integrationPackages.type, params.type));
     }
 
     if (params.verified !== undefined) {
-      filterExpressions.push('verified = :verified');
-      expressionAttributeValues[':verified'] = params.verified;
+      conditions.push(eq(integrationPackages.verified, params.verified));
     }
 
     if (params.query) {
-      filterExpressions.push('(contains(#name, :query) OR contains(description, :query))');
-      expressionAttributeNames['#name'] = 'name';
-      expressionAttributeValues[':query'] = params.query;
+      conditions.push(
+        sql`(${integrationPackages.name} ILIKE ${`%${params.query}%`} OR ${integrationPackages.description} ILIKE ${`%${params.query}%`})`
+      );
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.join(' AND '),
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ...expressionAttributeValues,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor
-          ? JSON.parse(Buffer.from(params.cursor, 'base64').toString())
-          : undefined,
-      })
-    );
+    // Note: pricing filter would need JSONB operator
+    // For simplicity, we'll filter in memory if needed
 
-    const items = (result.Items as IntegrationPackage[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const results = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(...conditions))
+      .orderBy(integrationPackages.name)
+      .limit(limit + 1)
+      .offset(offset);
+
+    let filteredResults = results;
+
+    // Filter by pricing model if specified
+    if (params.pricing) {
+      filteredResults = filteredResults.filter(pkg => {
+        const pricing = pkg.pricing as { model?: string };
+        return pricing && pricing.model === params.pricing;
+      });
+    }
+
+    const hasMore = filteredResults.length > limit;
+    let items = hasMore ? filteredResults.slice(0, limit) : filteredResults;
 
     // Sort if specified
     if (params.sortBy) {
-      returnItems.sort((a, b) => {
-        const aVal = a[params.sortBy as keyof IntegrationPackage];
-        const bVal = b[params.sortBy as keyof IntegrationPackage];
+      items = [...items].sort((a, b) => {
+        const aVal = a[params.sortBy as keyof typeof a];
+        const bVal = b[params.sortBy as keyof typeof b];
         const order = params.sortOrder === 'desc' ? -1 : 1;
         if (typeof aVal === 'string' && typeof bVal === 'string') {
           return aVal.localeCompare(bVal) * order;
@@ -226,71 +208,52 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
     }
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor:
-          hasMore && result.LastEvaluatedKey
-            ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-            : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listByPublisher(tenantId: string, publisherId: string): Promise<IntegrationPackage[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-publisher',
-        KeyConditionExpression: 'tenantId = :tenantId AND publisherId = :publisherId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':publisherId': publisherId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.publisherId, publisherId)
+      ))
+      .orderBy(integrationPackages.name);
 
-    return (result.Items as IntegrationPackage[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async listByStatus(tenantId: string, status: PackageStatus): Promise<IntegrationPackage[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-status',
-        KeyConditionExpression: 'tenantId = :tenantId AND #status = :status',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':status': status,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.status, status)
+      ))
+      .orderBy(integrationPackages.name);
 
-    return (result.Items as IntegrationPackage[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async listByCategory(tenantId: string, category: string): Promise<IntegrationPackage[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-category',
-        KeyConditionExpression: 'tenantId = :tenantId AND category = :category',
-        FilterExpression: '#status = :published',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':category': category,
-          ':published': 'PUBLISHED',
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(integrationPackages)
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.category, category),
+        eq(integrationPackages.status, 'PUBLISHED')
+      ))
+      .orderBy(integrationPackages.name);
 
-    return (result.Items as IntegrationPackage[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async updateStatus(
@@ -306,29 +269,26 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, updatedAt = :updatedAt, updatedBy = :updatedBy,
-          #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': status,
-          ':updatedAt': timestamp,
-          ':updatedBy': updatedBy,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(integrationPackages)
+      .set({
+        status,
+        updatedAt: new Date(timestamp),
+        updatedBy,
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.id, id),
+        eq(integrationPackages.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as IntegrationPackage;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Package was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async publish(
@@ -352,32 +312,30 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
       breaking,
     };
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET currentVersion = :currentVersion, versions = list_append(versions, :newVersion),
-          #status = :status, publishedAt = :publishedAt, updatedAt = :updatedAt,
-          #version = #version + :inc`,
-        ConditionExpression: '#version = :existingVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':currentVersion': version,
-          ':newVersion': [newVersion],
-          ':status': 'PUBLISHED',
-          ':publishedAt': timestamp,
-          ':updatedAt': timestamp,
-          ':existingVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    const updatedVersions = [...(existing.versions || []), newVersion];
 
-    return result.Attributes as IntegrationPackage;
+    const [result] = await db
+      .update(integrationPackages)
+      .set({
+        currentVersion: version,
+        versions: updatedVersions,
+        status: 'PUBLISHED',
+        publishedAt: new Date(timestamp),
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.id, id),
+        eq(integrationPackages.version, existing.version)
+      ))
+      .returning();
+
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Package was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async deprecate(tenantId: string, id: string, reason: string): Promise<IntegrationPackage> {
@@ -388,62 +346,88 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
 
     const timestamp = now();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET #status = :status, deprecatedAt = :deprecatedAt, updatedAt = :updatedAt,
-          #version = #version + :inc`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: {
-          '#status': 'status',
-          '#version': 'version',
-        },
-        ExpressionAttributeValues: {
-          ':status': 'DEPRECATED',
-          ':deprecatedAt': timestamp,
-          ':updatedAt': timestamp,
-          ':currentVersion': existing.version,
-          ':inc': 1,
-        },
-        ReturnValues: 'ALL_NEW',
+    const [result] = await db
+      .update(integrationPackages)
+      .set({
+        status: 'DEPRECATED',
+        deprecatedAt: new Date(timestamp),
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
       })
-    );
+      .where(and(
+        eq(integrationPackages.tenantId, tenantId),
+        eq(integrationPackages.id, id),
+        eq(integrationPackages.version, existing.version)
+      ))
+      .returning();
 
-    return result.Attributes as IntegrationPackage;
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Package was modified by another process', 409);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async incrementSubscriberCount(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: 'SET subscriberCount = subscriberCount + :inc',
-        ExpressionAttributeValues: {
-          ':inc': 1,
-        },
+    await db
+      .update(integrationPackages)
+      .set({
+        subscriberCount: sql`${integrationPackages.subscriberCount} + 1`,
       })
-    );
+      .where(and(eq(integrationPackages.tenantId, tenantId), eq(integrationPackages.id, id)));
   }
 
   async decrementSubscriberCount(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: 'SET subscriberCount = subscriberCount - :dec',
-        ConditionExpression: 'subscriberCount > :zero',
-        ExpressionAttributeValues: {
-          ':dec': 1,
-          ':zero': 0,
-        },
+    await db
+      .update(integrationPackages)
+      .set({
+        subscriberCount: sql`GREATEST(${integrationPackages.subscriberCount} - 1, 0)`,
       })
-    );
+      .where(and(eq(integrationPackages.tenantId, tenantId), eq(integrationPackages.id, id)));
+  }
+
+  private mapToEntity(row: typeof integrationPackages.$inferSelect): IntegrationPackage {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      longDescription: row.longDescription || undefined,
+      category: row.category,
+      tags: row.tags as string[],
+      iconUrl: row.iconUrl || undefined,
+      documentationUrl: row.documentationUrl || undefined,
+      type: row.type,
+      status: row.status,
+      currentVersion: row.currentVersion,
+      versions: row.versions as PackageVersion[],
+      publisherId: row.publisherId,
+      publisherName: row.publisherName,
+      verified: row.verified,
+      scopes: row.scopes as string[],
+      capabilities: row.capabilities as IntegrationPackage['capabilities'],
+      endpoints: row.endpoints as IntegrationPackage['endpoints'],
+      events: row.events as IntegrationPackage['events'],
+      auth: row.auth as IntegrationPackage['auth'],
+      rateLimits: row.rateLimits as IntegrationPackage['rateLimits'],
+      pricing: row.pricing as IntegrationPackage['pricing'],
+      subscriberCount: row.subscriberCount,
+      reviewedAt: row.reviewedAt?.toISOString(),
+      reviewedBy: row.reviewedBy || undefined,
+      rejectionReason: row.rejectionReason || undefined,
+      publishedAt: row.publishedAt?.toISOString(),
+      deprecatedAt: row.deprecatedAt?.toISOString(),
+      version: row.version,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+    };
   }
 }
 
 export class SubscriptionRepository implements ISubscriptionRepository {
-  private tableName = TableNames.SUBSCRIPTIONS;
 
   async create(
     tenantId: string,
@@ -456,44 +440,35 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     const id = generateId();
     const timestamp = now();
 
-    const subscription: PackageSubscription = {
+    const [result] = await db.insert(packageSubscriptions).values({
       id,
+      tenantId,
       packageId,
       packageVersion,
       subscriberId,
       subscriberType,
       status: 'ACTIVE',
-      subscribedAt: timestamp,
-      config,
+      subscribedAt: new Date(timestamp),
+      config: config || null,
       usageStats: {
         requestCount: 0,
         monthlyUsage: 0,
       },
-    };
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: {
-          tenantId,
-          ...subscription,
-        },
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return subscription;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<PackageSubscription | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(packageSubscriptions)
+      .where(and(eq(packageSubscriptions.tenantId, tenantId), eq(packageSubscriptions.id, id)))
+      .limit(1);
 
-    return (result.Item as PackageSubscription) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByPackageAndSubscriber(
@@ -501,22 +476,17 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     packageId: string,
     subscriberId: string
   ): Promise<PackageSubscription | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-subscriber',
-        KeyConditionExpression: 'tenantId = :tenantId AND subscriberId = :subscriberId',
-        FilterExpression: 'packageId = :packageId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':subscriberId': subscriberId,
-          ':packageId': packageId,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(packageSubscriptions)
+      .where(and(
+        eq(packageSubscriptions.tenantId, tenantId),
+        eq(packageSubscriptions.packageId, packageId),
+        eq(packageSubscriptions.subscriberId, subscriberId)
+      ))
+      .limit(1);
 
-    return result.Items && result.Items.length > 0 ? (result.Items[0] as PackageSubscription) : null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(
@@ -524,27 +494,15 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     id: string,
     data: { version?: string; config?: Record<string, unknown>; status?: string }
   ): Promise<PackageSubscription> {
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
 
-    if (data.version) {
-      updateExpressions.push('packageVersion = :version');
-      expressionAttributeValues[':version'] = data.version;
-    }
+    if (data.version !== undefined) updateData.packageVersion = data.version;
+    if (data.config !== undefined) updateData.config = data.config;
+    if (data.status !== undefined) updateData.status = data.status;
 
-    if (data.config) {
-      updateExpressions.push('config = :config');
-      expressionAttributeValues[':config'] = data.config;
-    }
-
-    if (data.status) {
-      updateExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = data.status;
-    }
-
-    if (updateExpressions.length === 0) {
+    if (Object.keys(updateData).length === 1) {
       const existing = await this.getById(tenantId, id);
       if (!existing) {
         throw new AppError('SUBSCRIPTION_NOT_FOUND', 'Subscription not found', 404);
@@ -552,76 +510,89 @@ export class SubscriptionRepository implements ISubscriptionRepository {
       return existing;
     }
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    const [result] = await db
+      .update(packageSubscriptions)
+      .set(updateData)
+      .where(and(eq(packageSubscriptions.tenantId, tenantId), eq(packageSubscriptions.id, id)))
+      .returning();
 
-    return result.Attributes as PackageSubscription;
+    if (!result) {
+      throw new AppError('SUBSCRIPTION_NOT_FOUND', 'Subscription not found', 404);
+    }
+
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    await db
+      .delete(packageSubscriptions)
+      .where(and(eq(packageSubscriptions.tenantId, tenantId), eq(packageSubscriptions.id, id)));
   }
 
   async listBySubscriber(tenantId: string, subscriberId: string): Promise<PackageSubscription[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-subscriber',
-        KeyConditionExpression: 'tenantId = :tenantId AND subscriberId = :subscriberId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':subscriberId': subscriberId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(packageSubscriptions)
+      .where(and(
+        eq(packageSubscriptions.tenantId, tenantId),
+        eq(packageSubscriptions.subscriberId, subscriberId)
+      ));
 
-    return (result.Items as PackageSubscription[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async listByPackage(tenantId: string, packageId: string): Promise<PackageSubscription[]> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-package',
-        KeyConditionExpression: 'tenantId = :tenantId AND packageId = :packageId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':packageId': packageId,
-        },
-      })
-    );
+    const results = await db
+      .select()
+      .from(packageSubscriptions)
+      .where(and(
+        eq(packageSubscriptions.tenantId, tenantId),
+        eq(packageSubscriptions.packageId, packageId)
+      ));
 
-    return (result.Items as PackageSubscription[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async updateUsageStats(tenantId: string, id: string, requestCount: number): Promise<void> {
     const timestamp = now();
+    const existing = await this.getById(tenantId, id);
 
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET usageStats.requestCount = usageStats.requestCount + :count,
-          usageStats.monthlyUsage = usageStats.monthlyUsage + :count,
-          usageStats.lastRequestAt = :timestamp`,
-        ExpressionAttributeValues: {
-          ':count': requestCount,
-          ':timestamp': timestamp,
-        },
+    if (!existing) {
+      throw new AppError('SUBSCRIPTION_NOT_FOUND', 'Subscription not found', 404);
+    }
+
+    const updatedStats = {
+      ...existing.usageStats,
+      requestCount: (existing.usageStats?.requestCount || 0) + requestCount,
+      monthlyUsage: (existing.usageStats?.monthlyUsage || 0) + requestCount,
+      lastRequestAt: timestamp,
+    };
+
+    await db
+      .update(packageSubscriptions)
+      .set({
+        usageStats: updatedStats,
+        updatedAt: new Date(timestamp),
       })
-    );
+      .where(and(eq(packageSubscriptions.tenantId, tenantId), eq(packageSubscriptions.id, id)));
+  }
+
+  private mapToEntity(row: typeof packageSubscriptions.$inferSelect): PackageSubscription {
+    return {
+      id: row.id,
+      packageId: row.packageId,
+      packageVersion: row.packageVersion,
+      subscriberId: row.subscriberId,
+      subscriberType: row.subscriberType as 'partner' | 'customer',
+      status: row.status as 'ACTIVE' | 'SUSPENDED' | 'CANCELLED',
+      subscribedAt: row.subscribedAt.toISOString(),
+      expiresAt: row.expiresAt?.toISOString(),
+      config: row.config as Record<string, unknown> | undefined,
+      usageStats: row.usageStats as PackageSubscription['usageStats'],
+    };
   }
 }
+
+// Export singleton instances
+export const integrationPackageRepository = new IntegrationPackageRepository();
+export const subscriptionRepository = new SubscriptionRepository();

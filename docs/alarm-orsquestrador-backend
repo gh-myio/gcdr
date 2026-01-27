@@ -630,3 +630,404 @@ vamos na Opção A: Audience Múltipla. crie para a equipe de backend do gcdr um
 
 vamos na Opção A: Audience Múltipla. crie para a equipe de backend do gcdr um markdown .md file em ingles no estilo rust rfc em       C:\Projetos\GitHub\myio\gcdr.git\docs\RFC-0003-Refactoring-Multiple-Audience.md e considere isso resolvido e funcional e faça
   os ajustes que eventualmente precisamos fazer no backend C:\Projetos\GitHub\myio\alarms-backend.git  
+  
+  
+  
+  ----
+  
+  
+Resumo da Migração para Dokploy                                                                                                                                                                                                                                             Arquivos Criados/Modificados
+
+  Configuração:
+  - package.json - Adicionadas dependências: bullmq, drizzle-orm, ioredis, postgres, drizzle-kit
+  - drizzle.config.ts - Configuração do Drizzle ORM
+  - src/config/env.ts - Novas variáveis para PostgreSQL e Redis (removidas DynamoDB/SQS)
+
+  Database (PostgreSQL):
+  - src/infrastructure/database/schema.ts - Schema com tabelas: alarms, dedup_entries, cooldown_entries, digest_entries,
+  dispatch_logs, state_history
+  - src/infrastructure/database/db.ts - Cliente PostgreSQL com Drizzle
+  - src/infrastructure/database/alarm.repository.pg.ts
+  - src/infrastructure/database/cooldown.repository.pg.ts
+  - src/infrastructure/database/digest.repository.pg.ts
+  - src/infrastructure/database/dispatch-log.repository.pg.ts
+  - src/infrastructure/database/index.ts - Atualizado para usar os novos repos
+
+  Messaging (BullMQ):
+  - src/infrastructure/messaging/redis.client.ts - Cliente Redis e nomes das filas
+  - src/infrastructure/messaging/bullmq.consumer.ts - Consumer BullMQ
+  - src/infrastructure/messaging/bullmq.producer.ts - EventProducer e DispatchProducer
+  - src/infrastructure/messaging/index.ts - Atualizado exports
+
+  Workers:
+  - src/workers/orchestrator.worker.ts - Atualizado para usar BullMQ
+  - src/workers/dispatcher.worker.ts - Atualizado para usar BullMQ
+
+  Docker/Deploy:
+  - docker/Dockerfile - Atualizado
+  - docker-compose.yml - Para desenvolvimento local
+  - docker-compose.dokploy.yml - Para produção no Dokploy
+  - .github/workflows/deploy-dokploy.yml - CI/CD workflow
+  - .env.dokploy.example - Template de variáveis
+  - .env.local - Para desenvolvimento local
+
+  Próximos Passos
+
+  1. Instalar dependências:
+  pnpm install
+  2. Iniciar ambiente local:
+  docker-compose up -d postgres redis
+  3. Gerar e aplicar migrations:
+  pnpm db:generate
+  pnpm db:push
+  4. Testar localmente:
+  pnpm dev
+  5. Configurar Dokploy:
+    - Provisionar VPS com Dokploy instalado
+    - Configurar DNS para alarms.myio.com.br
+    - Configurar secrets no GitHub:
+        - DOKPLOY_WEBHOOK_URL
+      - DOKPLOY_API_TOKEN
+      - APP_URL
+  6. Deploy:
+    - Push para branch main dispara o workflow automaticamente
+
+---
+
+ Para fazer o deploy no Dokploy, você precisará:                                                                                                                                                                                                                              
+  1. Configurar secrets no GitHub:
+  DOKPLOY_WEBHOOK_URL    # URL do webhook do Dokploy
+  DOKPLOY_API_TOKEN      # Token de API do Dokploy
+  APP_URL                # URL da aplicação (ex: https://alarms.myio.com.br)
+
+  2. Configurar variáveis no Dokploy:
+  # Obrigatórias
+  POSTGRES_PASSWORD=<senha-segura>
+  JWT_SECRET=<chave-jwt-32-chars>
+
+  # Integrações
+  GCDR_API_URL=https://api.myio.com/gcdr
+  GCDR_API_KEY=<sua-api-key>
+  TELEGRAM_BOT_TOKEN=<token-telegram>
+
+  3. Fazer push para a branch main:
+  git add .
+  git commit -m "Add Dokploy deployment configuration"
+  git push origin main
+
+  O GitHub Actions irá:
+  1. Rodar testes e typecheck
+  2. Buildar e publicar a imagem no GitHub Container Registry
+  3. Disparar o webhook do Dokploy para deploy
+
+
+---
+
+Modelagem PostgreSQL completa!                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Resumo
+                                                                                                                                                                                                                                                                                 Entidades Mapeadas (16 tabelas)                                                                                                                                                                                                                                                ┌─────────────────────┬───────────────────────┬────────────────────────────────────────────────────────────────────┐                                                                                                                                                           │      Entidade       │        Tabela         │                         Campos Principais                          │                                                                                                                                                           ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤                                                                                                                                                           │ Customer            │ customers             │ id, tenant_id, parent_customer_id, path, depth, name, type, status │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ User                │ users                 │ id, tenant_id, customer_id, email, type, status, profile, security │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Asset               │ assets                │ id, tenant_id, customer_id, parent_asset_id, path, type            │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Device              │ devices               │ id, tenant_id, asset_id, serial_number, type, connectivity_status  │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Partner             │ partners              │ id, tenant_id, company_name, status, api_keys, oauth_clients       │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Role                │ roles                 │ id, tenant_id, key, policies, risk_level                           │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Policy              │ policies              │ id, tenant_id, key, allow, deny, conditions                        │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ RoleAssignment      │ role_assignments      │ id, user_id, role_key, scope, status                               │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Rule                │ rules                 │ id, customer_id, type, priority, alarm_config, sla_config          │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Central             │ centrals              │ id, customer_id, asset_id, serial_number, type, connection_status  │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ Group               │ groups                │ id, customer_id, type, purposes, members                           │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ LookAndFeel         │ look_and_feels        │ id, customer_id, colors, typography, layout                        │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ CustomerApiKey      │ customer_api_keys     │ id, customer_id, key_hash, scopes                                  │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ IntegrationPackage  │ integration_packages  │ id, publisher_id, type, status, pricing                            │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ PackageSubscription │ package_subscriptions │ id, package_id, subscriber_id, status                              │
+  ├─────────────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ AuditLog            │ audit_logs            │ id, event_type, entity_type, entity_id, old/new_values             │
+  └─────────────────────┴───────────────────────┴────────────────────────────────────────────────────────────────────┘
+  Arquivos Criados
+
+  prisma/
+  ├── schema.prisma              # Schema completo (500+ linhas)
+  └── migrations/
+      └── 20260123132940_init/
+          └── migration.sql      # SQL gerado automaticamente
+
+  Comandos Prisma
+
+  # Gerar cliente após mudanças no schema
+  npx prisma generate
+
+  # Criar nova migration
+  npx prisma migrate dev --name nome_da_migration
+
+  # Aplicar migrations em produção
+  npx prisma migrate deploy
+
+  # Abrir Prisma Studio (GUI para o banco)
+  npx prisma studio
+
+  # Reset do banco (CUIDADO: apaga tudo)
+  npx prisma migrate reset
+
+  Verificar no DBeaver
+
+  Conecte no PostgreSQL e veja as 17 tabelas criadas:
+  - Host: localhost
+  - Port: 5433
+  - Database: db_gcdr
+  - User: postgres
+  - Password: gcdr_dev_password_123
+
+
+
+---
+
+
+ 1. Iniciar os serviços:                                                                                                                                                                                                                                                        # Containers (postgres + redis)
+  docker-compose up -d
+
+  # API (em outro terminal)
+  DATABASE_URL=postgres://alarm:alarm123@localhost:5432/alarm_orchestrator REDIS_URL=redis://localhost:6379 pnpm dev
+
+  2. URLs dos Serviços:
+  ┌──────────────┬────────────────────────────────────┐
+  │   Serviço    │                URL                 │
+  ├──────────────┼────────────────────────────────────┤
+  │ API Base     │ http://localhost:3000              │
+  ├──────────────┼────────────────────────────────────┤
+  │ Swagger UI   │ http://localhost:3000/docs         │
+  ├──────────────┼────────────────────────────────────┤
+  │ Health       │ http://localhost:3000/health       │
+  ├──────────────┼────────────────────────────────────┤
+  │ Health Ready │ http://localhost:3000/health/ready │
+  ├──────────────┼────────────────────────────────────┤
+  │ Health Live  │ http://localhost:3000/health/live  │
+  ├──────────────┼────────────────────────────────────┤
+  │ Admin Stats  │ http://localhost:3000/admin/stats  │
+  ├──────────────┼────────────────────────────────────┤
+  │ Admin Queues │ http://localhost:3000/admin/queues │
+  └──────────────┴────────────────────────────────────┘
+  3. Conexão DBeaver (PostgreSQL):
+  ┌──────────┬─────────────────────────────────────────────────────┐
+  │  Campo   │                        Valor                        │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ Host     │ localhost                                           │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ Port     │ 5432                                                │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ Database │ alarm_orchestrator                                  │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ Username │ alarm                                               │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ Password │ alarm123                                            │
+  ├──────────┼─────────────────────────────────────────────────────┤
+  │ URL JDBC │ jdbc:postgresql://localhost:5432/alarm_orchestrator │
+  └──────────┴─────────────────────────────────────────────────────┘
+  4. Conexão Redis (opcional):
+  ┌───────┬────────────────────────┐
+  │ Campo │         Valor          │
+  ├───────┼────────────────────────┤
+  │ Host  │ localhost              │
+  ├───────┼────────────────────────┤
+  │ Port  │ 6379                   │
+  ├───────┼────────────────────────┤
+  │ URL   │ redis://localhost:6379 │
+  └───────┴────────────────────────┘
+  5. Drizzle Studio (alternativa ao DBeaver):
+  pnpm db:studio
+  Abre em https://local.drizzle.studio
+
+
+---
+
+
+Resumo dos Testes:                                                                                                                                                                                                                                                             
+  ┌───────────────┬────────┬──────────────────────────┐
+  │  Componente   │ Status │         Detalhes         │                                                                                                                                                                                                                          
+  ├───────────────┼────────┼──────────────────────────┤                                                                                                                                                                                                                          
+  │ PostgreSQL    │ ✅ OK  │ 6 tabelas criadas        │
+  ├───────────────┼────────┼──────────────────────────┤
+  │ Redis         │ ✅ OK  │ Conectado                │
+  ├───────────────┼────────┼──────────────────────────┤
+  │ API           │ ✅ OK  │ Porta 3001               │
+  ├───────────────┼────────┼──────────────────────────┤
+  │ Health Checks │ ✅ OK  │ database: ok, queues: ok │
+  └───────────────┴────────┴──────────────────────────┘
+  URLs do Serviço (Porta 3001):
+  ┌────────────────┬───────────────────────────────────────────┬───────────┐
+  │    Endpoint    │                    URL                    │   Auth    │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Health         │ http://localhost:3001/health              │ Não       │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Health Ready   │ http://localhost:3001/health/ready        │ Não       │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Health Live    │ http://localhost:3001/health/live         │ Não       │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Swagger UI     │ http://localhost:3001/docs/               │ Não       │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Listar Alarmes │ http://localhost:3001/api/v1/alarms       │ Não*      │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Admin Stats    │ http://localhost:3001/api/v1/admin/stats  │ Sim (JWT) │
+  ├────────────────┼───────────────────────────────────────────┼───────────┤
+  │ Admin Queues   │ http://localhost:3001/api/v1/admin/queues │ Sim (JWT) │
+  └────────────────┴───────────────────────────────────────────┴───────────┘
+  *Em produção requer autenticação
+
+  Conexão DBeaver:
+  ┌──────────┬────────────────────┐
+  │  Campo   │       Valor        │
+  ├──────────┼────────────────────┤
+  │ Host     │ localhost          │
+  ├──────────┼────────────────────┤
+  │ Port     │ 5432               │
+  ├──────────┼────────────────────┤
+  │ Database │ alarm_orchestrator │
+  ├──────────┼────────────────────┤
+  │ Username │ alarm              │
+  ├──────────┼────────────────────┤
+  │ Password │ alarm123           │
+  └──────────┴────────────────────┘
+  Tabelas no Banco:
+
+  ✅ alarms
+  ✅ dedup_entries
+  ✅ cooldown_entries
+  ✅ digest_entries
+  ✅ dispatch_logs
+  ✅ state_history
+
+
+---
+
+
+Resumo das Conexões Locais:                                                                                                                                                                                                                                                    
+  ┌────────────────┬───────┬──────────────────────────────────────────────────────────────────┐
+  │    Serviço     │ Porta │                             Conexão                              │
+  ├────────────────┼───────┼──────────────────────────────────────────────────────────────────┤
+  │ alarm-postgres │ 5434  │ postgres://alarm:alarm123@localhost:5434/alarm_orchestrator      │
+  ├────────────────┼───────┼──────────────────────────────────────────────────────────────────┤
+  │ gcdr-postgres  │ 5433  │ postgres://postgres:gcdr_dev_password_123@localhost:5433/db_gcdr │
+  ├────────────────┼───────┼──────────────────────────────────────────────────────────────────┤
+  │ alarm-redis    │ 6379  │ redis://localhost:6379                                           │
+  ├────────────────┼───────┼──────────────────────────────────────────────────────────────────┤
+  │ API (alarm)    │ 3001  │ http://localhost:3001                                            │
+  ├────────────────┼───────┼──────────────────────────────────────────────────────────────────┤
+  │ Swagger UI     │ 3001  │ http://localhost:3001/docs/                                      │
+  └────────────────┴───────┴──────────────────────────────────────────────────────────────────┘
+  Para rodar a API:
+
+  DATABASE_URL=postgres://alarm:alarm123@localhost:5434/alarm_orchestrator REDIS_URL=redis://localhost:6379 PORT=3001 pnpm dev
+
+
+---
+
+Tudo OK!                                                                                                                                                                                                                                                                       ┌────────────────┬────────┬───────────────────────┐                                                                                                                                                                                                                            │   Componente   │ Status │       Detalhes        │                                                                                                                                                                                                                            ├────────────────┼────────┼───────────────────────┤                                                                                                                                                                                                                            │ PostgreSQL     │ ✅ OK  │ Porta 5434, 6 tabelas │                                                                                                                                                                                                                            ├────────────────┼────────┼───────────────────────┤                                                                                                                                                                                                                            │ Redis          │ ✅ OK  │ Porta 6379            │
+  ├────────────────┼────────┼───────────────────────┤
+  │ API            │ ✅ OK  │ Porta 3001            │
+  ├────────────────┼────────┼───────────────────────┤
+  │ Database Check │ ✅ OK  │ Conectado             │
+  ├────────────────┼────────┼───────────────────────┤
+  │ Queues Check   │ ✅ OK  │ Conectado             │
+  └────────────────┴────────┴───────────────────────┘
+  URLs Locais:
+  ┌────────────┬─────────────────────────────────────┐
+  │  Serviço   │                 URL                 │
+  ├────────────┼─────────────────────────────────────┤
+  │ Health     │ http://localhost:3001/health        │
+  ├────────────┼─────────────────────────────────────┤
+  │ Swagger    │ http://localhost:3001/docs/         │
+  ├────────────┼─────────────────────────────────────┤
+  │ Alarms API │ http://localhost:3001/api/v1/alarms │
+  ├────────────┼─────────────────────────────────────┤
+  │ DBeaver    │ localhost:5434 / alarm / alarm123   │
+  └────────────┴─────────────────────────────────────┘
+  Resposta do Health:
+
+  {
+    "status": "healthy",
+    "app": "alarm-orchestrator",
+    "version": "0.1.0",
+    "checks": {
+      "database": "ok",
+      "queues": "ok"
+    }
+  }
+
+  Serviço local pronto! Quer partir para o deploy no Dokploy?
+
+
+---
+
+Resumo do RFC
+  Tabela audit_logs (flexivel)
+  ┌────────────────┬──────────────┬──────────────────────────────────┐
+  │     Campo      │     Tipo     │            Descricao             │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ id             │ VARCHAR(26)  │ ID unico (nanoid)                │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ event_type     │ VARCHAR(50)  │ Tipo do evento (enum)            │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ event_category │ VARCHAR(20)  │ USER_ACTION, SYSTEM_EVENT, QUERY │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ description    │ TEXT         │ Descricao legivel                │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ actor_id       │ VARCHAR(100) │ ID do usuario ou 'system'        │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ actor_email    │ VARCHAR(255) │ Email do usuario                 │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ resource_type  │ VARCHAR(50)  │ alarm, queue, cache              │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ resource_id    │ VARCHAR(100) │ ID do recurso                    │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ tenant_id      │ VARCHAR(36)  │ Tenant                           │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ previous_value │ JSONB        │ Estado anterior                  │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ new_value      │ JSONB        │ Novo estado                      │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ metadata       │ JSONB        │ Dados flexiveis                  │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ ip_address     │ VARCHAR(45)  │ IP do cliente                    │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ status_code    │ INTEGER      │ HTTP status                      │
+  ├────────────────┼──────────────┼──────────────────────────────────┤
+  │ created_at     │ TIMESTAMP    │ Quando ocorreu                   │
+  └────────────────┴──────────────┴──────────────────────────────────┘
+  Middleware (inspirado no rec4go)
+
+  app.post('/alarms/:id/ack', {
+    preHandler: [
+      logEvent({
+        eventType: EventType.ALARM_ACKNOWLEDGED,
+        description: (req) => `Alarme ${req.params.id} reconhecido`,
+        getResourceId: (req) => req.params.id,
+        getMetadata: (req) => ({ acknowledgedBy: req.body.acknowledgedBy }),
+      }),
+    ],
+  }, handler);
+
+  Niveis de Audit
+  ┌──────────┬────────────┬──────────────────────────────┐
+  │  Nivel   │ Descricao  │           Eventos            │
+  ├──────────┼────────────┼──────────────────────────────┤
+  │ MINIMAL  │ Criticos   │ ACK, CLOSE, ESCALATE         │
+  ├──────────┼────────────┼──────────────────────────────┤
+  │ STANDARD │ + Erros    │ DISPATCH_FAILED, AUTH_FAILED │
+  ├──────────┼────────────┼──────────────────────────────┤
+  │ VERBOSE  │ + Leituras │ ALARM_VIEWED, LIST           │
+  ├──────────┼────────────┼──────────────────────────────┤
+  │ DEBUG    │ Tudo       │ SYSTEM events                │
+  └──────────┴────────────┴──────────────────────────────┘
+  Quer que eu implemente agora?

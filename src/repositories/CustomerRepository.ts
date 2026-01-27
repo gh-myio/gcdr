@@ -1,22 +1,16 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-  BatchGetCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { eq, and, like, isNull, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Customer, createDefaultCustomerSettings } from '../domain/entities/Customer';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../dto/request/CustomerDTO';
 import { PaginatedResult } from '../shared/types';
 import { ICustomerRepository, CustomerTreeNode } from './interfaces/ICustomerRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { customers } = schema;
+
 export class CustomerRepository implements ICustomerRepository {
-  private tableName = TableNames.CUSTOMERS;
 
   async create(tenantId: string, data: CreateCustomerDTO, createdBy: string): Promise<Customer> {
     const id = generateId();
@@ -41,7 +35,7 @@ export class CustomerRepository implements ICustomerRepository {
     // Generate code if not provided
     const code = data.code || this.generateCode(data.name);
 
-    const customer: Customer = {
+    const [result] = await db.insert(customers).values({
       id,
       tenantId,
       parentCustomerId: data.parentCustomerId || null,
@@ -58,54 +52,32 @@ export class CustomerRepository implements ICustomerRepository {
       metadata: data.metadata || {},
       status: 'ACTIVE',
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: customer,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return customer;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Customer | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.id, id)))
+      .limit(1);
 
-    return (result.Item as Customer) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByCode(tenantId: string, code: string): Promise<Customer | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-code',
-        KeyConditionExpression: 'tenantId = :tenantId AND code = :code',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':code': code,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.code, code)))
+      .limit(1);
 
-    if (!result.Items || result.Items.length === 0) {
-      return null;
-    }
-
-    // GSI only has keys, need to fetch full item
-    const item = result.Items[0] as { tenantId: string; id: string };
-    return this.getById(item.tenantId, item.id);
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, updatedBy: string): Promise<Customer> {
@@ -114,41 +86,40 @@ export class CustomerRepository implements ICustomerRepository {
       throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    // Build dynamic update expression
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.settings !== undefined) updateData.settings = { ...existing.settings, ...data.settings };
+    if (data.theme !== undefined) updateData.theme = data.theme;
+    if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
+    if (data.status !== undefined) updateData.status = data.status;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    const [result] = await db
+      .update(customers)
+      .set(updateData)
+      .where(and(
+        eq(customers.tenantId, tenantId),
+        eq(customers.id, id),
+        eq(customers.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Customer was modified by another process', 409);
+    }
 
-    return result.Attributes as Customer;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -158,139 +129,104 @@ export class CustomerRepository implements ICustomerRepository {
       throw new AppError('HAS_CHILDREN', 'Cannot delete customer with children', 400);
     }
 
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    const result = await db
+      .delete(customers)
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.id, id)));
+
+    // Drizzle doesn't return affected rows directly, so we trust it worked
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Customer>> {
     const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.tenantId, tenantId))
+      .orderBy(customers.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Customer[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listWithFilters(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>> {
     const limit = params.limit || 20;
-    const filterExpressions: string[] = [];
-    const expressionAttributeValues: Record<string, unknown> = { ':tenantId': tenantId };
-    const expressionAttributeNames: Record<string, string> = {};
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
 
-    // Add filters
+    // Build conditions
+    const conditions = [eq(customers.tenantId, tenantId)];
+
     if (params.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
+      conditions.push(eq(customers.type, params.type));
     }
 
     if (params.status) {
-      filterExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = params.status;
+      conditions.push(eq(customers.status, params.status));
     }
-
-    // Query by parent if specified
-    let queryCommand: QueryCommand;
 
     if (params.parentCustomerId !== undefined) {
-      queryCommand = new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-parent',
-        KeyConditionExpression: 'tenantId = :tenantId AND parentCustomerId = :parentId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: {
-          ...expressionAttributeValues,
-          ':parentId': params.parentCustomerId,
-        },
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      });
-    } else {
-      queryCommand = new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      });
+      if (params.parentCustomerId === null) {
+        conditions.push(isNull(customers.parentCustomerId));
+      } else {
+        conditions.push(eq(customers.parentCustomerId, params.parentCustomerId));
+      }
     }
 
-    const result = await dynamoDb.send(queryCommand);
-    const items = (result.Items as Customer[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const results = await db
+      .select()
+      .from(customers)
+      .where(and(...conditions))
+      .orderBy(customers.name)
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async getChildren(tenantId: string, parentCustomerId: string | null): Promise<Customer[]> {
-    // For null parent, we need to query root customers
+    let results;
+
     if (parentCustomerId === null) {
-      const result = await dynamoDb.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          KeyConditionExpression: 'tenantId = :tenantId',
-          FilterExpression: 'attribute_not_exists(parentCustomerId) OR parentCustomerId = :null',
-          ExpressionAttributeValues: {
-            ':tenantId': tenantId,
-            ':null': null,
-          },
-        })
-      );
-      return (result.Items as Customer[]) || [];
+      results = await db
+        .select()
+        .from(customers)
+        .where(and(
+          eq(customers.tenantId, tenantId),
+          isNull(customers.parentCustomerId)
+        ))
+        .orderBy(customers.name);
+    } else {
+      results = await db
+        .select()
+        .from(customers)
+        .where(and(
+          eq(customers.tenantId, tenantId),
+          eq(customers.parentCustomerId, parentCustomerId)
+        ))
+        .orderBy(customers.name);
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-parent',
-        KeyConditionExpression: 'tenantId = :tenantId AND parentCustomerId = :parentId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':parentId': parentCustomerId,
-        },
-      })
-    );
-
-    return (result.Items as Customer[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getDescendants(tenantId: string, customerId: string, maxDepth?: number): Promise<Customer[]> {
@@ -299,31 +235,25 @@ export class CustomerRepository implements ICustomerRepository {
       throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
     }
 
-    // Query by path prefix
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-path',
-        KeyConditionExpression: 'tenantId = :tenantId AND begins_with(#path, :pathPrefix)',
-        ExpressionAttributeNames: {
-          '#path': 'path',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':pathPrefix': `${customer.path}/`,
-        },
-      })
-    );
+    // Query by path prefix using LIKE
+    const pathPrefix = `${customer.path}/%`;
 
-    let descendants = (result.Items as Customer[]) || [];
+    let results = await db
+      .select()
+      .from(customers)
+      .where(and(
+        eq(customers.tenantId, tenantId),
+        like(customers.path, pathPrefix)
+      ))
+      .orderBy(customers.depth, customers.name);
 
     // Filter by maxDepth if specified
     if (maxDepth !== undefined) {
       const maxAllowedDepth = customer.depth + maxDepth;
-      descendants = descendants.filter((d) => d.depth <= maxAllowedDepth);
+      results = results.filter((c) => c.depth <= maxAllowedDepth);
     }
 
-    return descendants;
+    return results.map(this.mapToEntity);
   }
 
   async getAncestors(tenantId: string, customerId: string): Promise<Customer[]> {
@@ -341,26 +271,21 @@ export class CustomerRepository implements ICustomerRepository {
       return [];
     }
 
-    // Batch get ancestors
-    const keys = ancestorIds.map((id) => ({ tenantId, id }));
-    const result = await dynamoDb.send(
-      new BatchGetCommand({
-        RequestItems: {
-          [this.tableName]: {
-            Keys: keys,
-          },
-        },
-      })
-    );
+    // Fetch ancestors
+    const results = await db
+      .select()
+      .from(customers)
+      .where(and(
+        eq(customers.tenantId, tenantId),
+        sql`${customers.id} = ANY(${ancestorIds})`
+      ))
+      .orderBy(customers.depth);
 
-    const ancestors = (result.Responses?.[this.tableName] as Customer[]) || [];
-
-    // Sort by depth (root first)
-    return ancestors.sort((a, b) => a.depth - b.depth);
+    return results.map(this.mapToEntity);
   }
 
   async getTree(tenantId: string, rootCustomerId?: string): Promise<CustomerTreeNode[]> {
-    let customers: Customer[];
+    let customerList: Customer[];
 
     if (rootCustomerId) {
       const root = await this.getById(tenantId, rootCustomerId);
@@ -368,13 +293,13 @@ export class CustomerRepository implements ICustomerRepository {
         throw new AppError('CUSTOMER_NOT_FOUND', 'Root customer not found', 404);
       }
       const descendants = await this.getDescendants(tenantId, rootCustomerId);
-      customers = [root, ...descendants];
+      customerList = [root, ...descendants];
     } else {
       const result = await this.list(tenantId, { limit: 1000 });
-      customers = result.items;
+      customerList = result.items;
     }
 
-    return this.buildTree(customers, rootCustomerId || null);
+    return this.buildTree(customerList, rootCustomerId || null);
   }
 
   async move(tenantId: string, customerId: string, newParentId: string | null, updatedBy: string): Promise<Customer> {
@@ -407,18 +332,18 @@ export class CustomerRepository implements ICustomerRepository {
 
     const oldPath = customer.path;
 
-    // Update customer
-    const updatedCustomer = await this.update(
-      tenantId,
-      customerId,
-      {
-        // path and depth are not in UpdateCustomerDTO, handled separately
-      } as UpdateCustomerDTO,
-      updatedBy
-    );
-
-    // Update path and depth directly
+    // Update customer path
     await this.updatePath(tenantId, customerId, newPath, newDepth);
+
+    // Update parent reference
+    await db
+      .update(customers)
+      .set({
+        parentCustomerId: newParentId,
+        updatedAt: new Date(),
+        updatedBy,
+      })
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.id, customerId)));
 
     // Update all descendants' paths
     const descendants = await this.getDescendants(tenantId, customerId);
@@ -433,35 +358,27 @@ export class CustomerRepository implements ICustomerRepository {
   }
 
   async updatePath(tenantId: string, customerId: string, newPath: string, newDepth: number): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: customerId },
-        UpdateExpression: 'SET #path = :path, #depth = :depth, updatedAt = :updatedAt',
-        ExpressionAttributeNames: {
-          '#path': 'path',
-          '#depth': 'depth',
-        },
-        ExpressionAttributeValues: {
-          ':path': newPath,
-          ':depth': newDepth,
-          ':updatedAt': now(),
-        },
+    await db
+      .update(customers)
+      .set({
+        path: newPath,
+        depth: newDepth,
+        updatedAt: new Date(),
       })
-    );
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.id, customerId)));
   }
 
-  private buildTree(customers: Customer[], rootParentId: string | null): CustomerTreeNode[] {
+  private buildTree(customerList: Customer[], rootParentId: string | null): CustomerTreeNode[] {
     const customerMap = new Map<string, CustomerTreeNode>();
     const roots: CustomerTreeNode[] = [];
 
     // Initialize all nodes
-    customers.forEach((customer) => {
+    customerList.forEach((customer) => {
       customerMap.set(customer.id, { ...customer, children: [] });
     });
 
     // Build tree structure
-    customers.forEach((customer) => {
+    customerList.forEach((customer) => {
       const node = customerMap.get(customer.id)!;
       if (customer.parentCustomerId === rootParentId) {
         roots.push(node);
@@ -487,4 +404,34 @@ export class CustomerRepository implements ICustomerRepository {
       .replace(/-+/g, '-')
       .substring(0, 20);
   }
+
+  private mapToEntity(row: typeof customers.$inferSelect): Customer {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      parentCustomerId: row.parentCustomerId,
+      path: row.path,
+      depth: row.depth,
+      name: row.name,
+      displayName: row.displayName,
+      code: row.code,
+      type: row.type,
+      email: row.email || undefined,
+      phone: row.phone || undefined,
+      address: row.address as Customer['address'],
+      settings: row.settings as Customer['settings'],
+      theme: row.theme as Customer['theme'],
+      metadata: row.metadata as Record<string, unknown>,
+      status: row.status,
+      deletedAt: row.deletedAt?.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+      version: row.version,
+    };
+  }
 }
+
+// Export singleton instance
+export const customerRepository = new CustomerRepository();

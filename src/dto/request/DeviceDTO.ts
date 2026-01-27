@@ -1,6 +1,28 @@
 import { z } from 'zod';
 import { PaginationParams } from '../../shared/types';
 
+// =============================================================================
+// RFC-0008: Log Annotations Schema
+// =============================================================================
+const LogAnnotationEntrySchema = z.object({
+  timestamp: z.string(),
+  message: z.string().max(1000),
+  level: z.enum(['info', 'warn', 'error', 'debug']),
+});
+
+const LogAnnotationsSchema = z.object({
+  entries: z.array(LogAnnotationEntrySchema).max(100).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).optional();
+
+// =============================================================================
+// RFC-0008: Map Instantaneous Power Schema (simplified - complex nested structure)
+// =============================================================================
+const MapInstantaneousPowerSchema = z.object({
+  version: z.string(),
+  limitsByInstantaneousPowerType: z.array(z.any()),
+}).optional();
+
 // Device Specs Schema
 const DeviceSpecsSchema = z.object({
   manufacturer: z.string().max(200).optional(),
@@ -14,7 +36,19 @@ const DeviceSpecsSchema = z.object({
   dataSheet: z.string().url().optional(),
   installationDate: z.string().datetime().optional(),
   warrantyExpiration: z.string().datetime().optional(),
-});
+
+  // RFC-0008: Modbus configuration
+  addrLow: z.number().int().min(0).max(65535).optional(),
+  addrHigh: z.number().int().min(0).max(65535).optional(),
+  frequency: z.number().int().min(1).max(3600).optional(),
+
+  // RFC-0008: Complex configuration
+  mapInstantaneousPower: MapInstantaneousPowerSchema,
+  logAnnotations: LogAnnotationsSchema,
+}).refine(
+  (data) => !data.addrLow || !data.addrHigh || data.addrLow <= data.addrHigh,
+  { message: 'addrLow must be less than or equal to addrHigh' }
+);
 
 // Telemetry Config Schema
 const TelemetryConfigSchema = z.object({
@@ -47,6 +81,15 @@ export const CreateDeviceSchema = z.object({
   tags: z.array(z.string().max(50)).max(20).optional(),
   metadata: z.record(z.unknown()).optional(),
   attributes: z.record(z.unknown()).optional(),
+
+  // RFC-0008: New fields
+  slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
+  centralId: z.string().uuid().optional(),               // Central reference
+  identifier: z.string().max(255).optional(),            // Human-readable identifier
+  deviceProfile: z.string().max(100).optional(),         // Device profile
+  deviceType: z.string().max(100).optional(),            // Specific device type
+  ingestionId: z.string().uuid().optional(),             // Ingestion system ID
+  ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
 });
 
 export type CreateDeviceDTO = z.infer<typeof CreateDeviceSchema>;
@@ -66,6 +109,15 @@ export const UpdateDeviceSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   attributes: z.record(z.unknown()).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+
+  // RFC-0008: New fields
+  slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
+  centralId: z.string().uuid().optional(),               // Central reference
+  identifier: z.string().max(255).optional(),            // Human-readable identifier
+  deviceProfile: z.string().max(100).optional(),         // Device profile
+  deviceType: z.string().max(100).optional(),            // Specific device type
+  ingestionId: z.string().uuid().optional(),             // Ingestion system ID
+  ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
 });
 
 export type UpdateDeviceDTO = z.infer<typeof UpdateDeviceSchema>;
@@ -92,4 +144,14 @@ export interface ListDevicesParams extends PaginationParams {
   status?: string;
   connectivityStatus?: string;
   serialNumber?: string;
+
+  // RFC-0008: New filter options
+  centralId?: string;
+  identifier?: string;
+  deviceProfile?: string;
+  deviceType?: string;
+  ingestionId?: string;
+  ingestionGatewayId?: string;
+  inactive?: boolean;         // Filter for inactive devices
+  inactiveHours?: number;     // Hours threshold for inactivity
 }

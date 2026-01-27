@@ -47,6 +47,9 @@ export class RuleService {
     // Validate scope entity exists if not GLOBAL
     await this.validateScope(tenantId, data.scope);
 
+    // Validate config matches rule type (dual validation with PostgreSQL CHECK constraints)
+    this.validateRuleConfig(data);
+
     const rule = await this.repository.create(tenantId, data, userId);
 
     await eventService.publish(EventType.RULE_CREATED, {
@@ -264,6 +267,48 @@ export class RuleService {
     // Validate the entity exists based on scope type
     // This is simplified - full implementation would check the appropriate repository
     // For now, we just validate that an entityId is provided
+  }
+
+  /**
+   * Validates that the correct config is provided based on rule type.
+   * This provides TypeScript-level validation that complements the PostgreSQL CHECK constraints.
+   * Together they form a dual-validation layer for data integrity.
+   */
+  private validateRuleConfig(data: CreateRuleDTO): void {
+    const configErrors: string[] = [];
+
+    switch (data.type) {
+      case 'ALARM_THRESHOLD':
+        if (!data.alarmConfig) {
+          configErrors.push('alarmConfig is required for ALARM_THRESHOLD rules');
+        }
+        break;
+
+      case 'SLA':
+        if (!data.slaConfig) {
+          configErrors.push('slaConfig is required for SLA rules');
+        }
+        break;
+
+      case 'ESCALATION':
+        if (!data.escalationConfig) {
+          configErrors.push('escalationConfig is required for ESCALATION rules');
+        }
+        break;
+
+      case 'MAINTENANCE_WINDOW':
+        if (!data.maintenanceConfig) {
+          configErrors.push('maintenanceConfig is required for MAINTENANCE_WINDOW rules');
+        }
+        break;
+
+      default:
+        configErrors.push(`Unknown rule type: ${data.type}`);
+    }
+
+    if (configErrors.length > 0) {
+      throw new ValidationError(configErrors.join('; '));
+    }
   }
 
   private async getInheritedRules(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]> {

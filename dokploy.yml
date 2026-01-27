@@ -1,0 +1,111 @@
+# =============================================================================
+# Dokploy Deployment Configuration
+# https://docs.dokploy.com/
+# =============================================================================
+
+name: gcdr-api
+type: application
+
+# =============================================================================
+# Build Configuration
+# =============================================================================
+build:
+  dockerfile: Dockerfile
+  context: .
+  target: production
+
+# =============================================================================
+# Deployment Configuration
+# =============================================================================
+deploy:
+  replicas: 2
+  strategy: rolling-update
+
+  resources:
+    limits:
+      memory: 512M
+      cpu: 500m
+    requests:
+      memory: 256M
+      cpu: 100m
+
+  # Rolling update configuration
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+env:
+  # Application
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "3015"
+  - name: HOST
+    value: "0.0.0.0"
+  - name: LOG_LEVEL
+    value: info
+
+  # Database (from Dokploy secrets)
+  - name: DATABASE_URL
+    fromSecret: database-url
+
+  # JWT (from Dokploy secrets)
+  - name: JWT_SECRET
+    fromSecret: jwt-secret
+  - name: JWT_ISSUER
+    value: gcdr
+  - name: JWT_AUDIENCE
+    value: gcdr-api
+  - name: JWT_EXPIRES_IN
+    value: "1h"
+  - name: JWT_REFRESH_EXPIRES_IN
+    value: "7d"
+
+  # CORS
+  - name: CORS_ORIGIN
+    value: "https://gcdr.myio.com.br"
+
+# =============================================================================
+# Health Check
+# =============================================================================
+healthCheck:
+  path: /health
+  port: 3015
+  interval: 30s
+  timeout: 5s
+  startPeriod: 10s
+  retries: 3
+
+# =============================================================================
+# Ingress / Domain
+# =============================================================================
+ingress:
+  host: api.gcdr.myio.com.br
+  tls: true
+  annotations:
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+
+# =============================================================================
+# Volumes (if needed)
+# =============================================================================
+# volumes:
+#   - name: logs
+#     mountPath: /app/logs
+#     size: 1Gi
+
+# =============================================================================
+# PostgreSQL Database (Managed by Dokploy)
+# =============================================================================
+# Note: Configure PostgreSQL as a separate database service in Dokploy
+# The connection string will be available as the 'database-url' secret
+#
+# Recommended PostgreSQL configuration:
+# - Image: postgres:16-alpine
+# - Memory: 512M-1G
+# - Storage: 10-50Gi
+# - Backup: Daily automated backups

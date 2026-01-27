@@ -1,22 +1,16 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-  BatchGetCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { eq, and, like, isNull, sql } from 'drizzle-orm';
+import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Asset } from '../domain/entities/Asset';
 import { CreateAssetDTO, UpdateAssetDTO, ListAssetsParams } from '../dto/request/AssetDTO';
 import { PaginatedResult } from '../shared/types';
 import { IAssetRepository, AssetTreeNode } from './interfaces/IAssetRepository';
-import { dynamoDb, TableNames } from '../infrastructure/database/dynamoClient';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
 
+const { assets } = schema;
+
 export class AssetRepository implements IAssetRepository {
-  private tableName = TableNames.ASSETS;
 
   async create(tenantId: string, data: CreateAssetDTO, createdBy: string): Promise<Asset> {
     const id = generateId();
@@ -44,7 +38,7 @@ export class AssetRepository implements IAssetRepository {
     // Generate code if not provided
     const code = data.code || this.generateCode(data.name);
 
-    const asset: Asset = {
+    const [result] = await db.insert(assets).values({
       id,
       tenantId,
       customerId: data.customerId,
@@ -62,52 +56,36 @@ export class AssetRepository implements IAssetRepository {
       metadata: data.metadata || {},
       status: 'ACTIVE',
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
       createdBy,
-    };
+    }).returning();
 
-    await dynamoDb.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: asset,
-        ConditionExpression: 'attribute_not_exists(id)',
-      })
-    );
-
-    return asset;
+    return this.mapToEntity(result);
   }
 
   async getById(tenantId: string, id: string): Promise<Asset | null> {
-    const result = await dynamoDb.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.tenantId, tenantId), eq(assets.id, id)))
+      .limit(1);
 
-    return (result.Item as Asset) || null;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async getByCode(tenantId: string, customerId: string, code: string): Promise<Asset | null> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer-code',
-        KeyConditionExpression: 'tenantId = :tenantId AND customerCode = :customerCode',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':customerCode': `${customerId}#${code}`,
-        },
-        Limit: 1,
-      })
-    );
+    const [result] = await db
+      .select()
+      .from(assets)
+      .where(and(
+        eq(assets.tenantId, tenantId),
+        eq(assets.customerId, customerId),
+        eq(assets.code, code)
+      ))
+      .limit(1);
 
-    if (!result.Items || result.Items.length === 0) {
-      return null;
-    }
-
-    return result.Items[0] as Asset;
+    return result ? this.mapToEntity(result) : null;
   }
 
   async update(tenantId: string, id: string, data: UpdateAssetDTO, updatedBy: string): Promise<Asset> {
@@ -116,41 +94,39 @@ export class AssetRepository implements IAssetRepository {
       throw new AppError('ASSET_NOT_FOUND', 'Asset not found', 404);
     }
 
-    const updateExpressions: string[] = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, unknown> = {};
-
-    // Build dynamic update expression
-    const fieldsToUpdate: Record<string, unknown> = {
-      ...data,
-      updatedAt: now(),
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
       updatedBy,
       version: existing.version + 1,
     };
 
-    Object.entries(fieldsToUpdate).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateExpressions.push(`#${key} = :${key}`);
-        expressionAttributeNames[`#${key}`] = key;
-        expressionAttributeValues[`:${key}`] = value;
-      }
-    });
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.location !== undefined) updateData.location = { ...existing.location, ...data.location };
+    if (data.specs !== undefined) updateData.specs = { ...existing.specs, ...data.specs };
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
+    if (data.status !== undefined) updateData.status = data.status;
 
-    expressionAttributeValues[':currentVersion'] = existing.version;
+    const [result] = await db
+      .update(assets)
+      .set(updateData)
+      .where(and(
+        eq(assets.tenantId, tenantId),
+        eq(assets.id, id),
+        eq(assets.version, existing.version) // Optimistic locking
+      ))
+      .returning();
 
-    const result = await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ConditionExpression: '#version = :currentVersion',
-        ExpressionAttributeNames: { ...expressionAttributeNames, '#version': 'version' },
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      })
-    );
+    if (!result) {
+      throw new AppError('CONCURRENT_UPDATE', 'Asset was modified by another process', 409);
+    }
 
-    return result.Attributes as Asset;
+    return this.mapToEntity(result);
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -160,159 +136,120 @@ export class AssetRepository implements IAssetRepository {
       throw new AppError('HAS_CHILDREN', 'Cannot delete asset with children', 400);
     }
 
-    await dynamoDb.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id },
-        ConditionExpression: 'attribute_exists(id)',
-      })
-    );
+    await db
+      .delete(assets)
+      .where(and(eq(assets.tenantId, tenantId), eq(assets.id, id)));
   }
 
   async list(tenantId: string, params?: ListAssetsParams): Promise<PaginatedResult<Asset>> {
     const limit = params?.limit || 20;
-    const filterExpressions: string[] = [];
-    const expressionAttributeValues: Record<string, unknown> = { ':tenantId': tenantId };
-    const expressionAttributeNames: Record<string, string> = {};
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    // Add filters
+    // Build conditions
+    const conditions = [eq(assets.tenantId, tenantId)];
+
     if (params?.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
+      conditions.push(eq(assets.type, params.type as typeof assets.type.enumValues[number]));
     }
 
     if (params?.status) {
-      filterExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = params.status;
+      conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tenantId = :tenantId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(assets)
+      .where(and(...conditions))
+      .orderBy(assets.createdAt)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Asset[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async listByCustomer(tenantId: string, customerId: string, params?: ListAssetsParams): Promise<PaginatedResult<Asset>> {
     const limit = params?.limit || 20;
-    const filterExpressions: string[] = [];
-    const expressionAttributeValues: Record<string, unknown> = {
-      ':tenantId': tenantId,
-      ':customerId': customerId,
-    };
-    const expressionAttributeNames: Record<string, string> = {};
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    // Add filters
+    // Build conditions
+    const conditions = [
+      eq(assets.tenantId, tenantId),
+      eq(assets.customerId, customerId),
+    ];
+
     if (params?.type) {
-      filterExpressions.push('#type = :type');
-      expressionAttributeNames['#type'] = 'type';
-      expressionAttributeValues[':type'] = params.type;
+      conditions.push(eq(assets.type, params.type as typeof assets.type.enumValues[number]));
     }
 
     if (params?.status) {
-      filterExpressions.push('#status = :status');
-      expressionAttributeNames['#status'] = 'status';
-      expressionAttributeValues[':status'] = params.status;
+      conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer',
-        KeyConditionExpression: 'tenantId = :tenantId AND customerId = :customerId',
-        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-        ExpressionAttributeValues: expressionAttributeValues,
-        Limit: limit + 1,
-        ExclusiveStartKey: params?.cursor ? JSON.parse(Buffer.from(params.cursor, 'base64').toString()) : undefined,
-      })
-    );
+    const results = await db
+      .select()
+      .from(assets)
+      .where(and(...conditions))
+      .orderBy(assets.name)
+      .limit(limit + 1)
+      .offset(offset);
 
-    const items = (result.Items as Asset[]) || [];
-    const hasMore = items.length > limit;
-    const returnItems = hasMore ? items.slice(0, limit) : items;
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
 
     return {
-      items: returnItems,
+      items: items.map(this.mapToEntity),
       pagination: {
         hasMore,
-        nextCursor: hasMore && result.LastEvaluatedKey
-          ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-          : undefined,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
   }
 
   async getChildren(tenantId: string, parentAssetId: string | null, customerId?: string): Promise<Asset[]> {
+    let results;
+
     if (parentAssetId === null && customerId) {
       // Get root assets for a customer
-      const result = await dynamoDb.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          IndexName: 'gsi-customer',
-          KeyConditionExpression: 'tenantId = :tenantId AND customerId = :customerId',
-          FilterExpression: 'attribute_not_exists(parentAssetId) OR parentAssetId = :null',
-          ExpressionAttributeValues: {
-            ':tenantId': tenantId,
-            ':customerId': customerId,
-            ':null': null,
-          },
-        })
-      );
-      return (result.Items as Asset[]) || [];
-    }
-
-    if (parentAssetId === null) {
+      results = await db
+        .select()
+        .from(assets)
+        .where(and(
+          eq(assets.tenantId, tenantId),
+          eq(assets.customerId, customerId),
+          isNull(assets.parentAssetId)
+        ))
+        .orderBy(assets.name);
+    } else if (parentAssetId === null) {
       // Get all root assets
-      const result = await dynamoDb.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          KeyConditionExpression: 'tenantId = :tenantId',
-          FilterExpression: 'attribute_not_exists(parentAssetId) OR parentAssetId = :null',
-          ExpressionAttributeValues: {
-            ':tenantId': tenantId,
-            ':null': null,
-          },
-        })
-      );
-      return (result.Items as Asset[]) || [];
+      results = await db
+        .select()
+        .from(assets)
+        .where(and(
+          eq(assets.tenantId, tenantId),
+          isNull(assets.parentAssetId)
+        ))
+        .orderBy(assets.name);
+    } else {
+      results = await db
+        .select()
+        .from(assets)
+        .where(and(
+          eq(assets.tenantId, tenantId),
+          eq(assets.parentAssetId, parentAssetId)
+        ))
+        .orderBy(assets.name);
     }
 
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-parent',
-        KeyConditionExpression: 'tenantId = :tenantId AND parentAssetId = :parentId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':parentId': parentAssetId,
-        },
-      })
-    );
-
-    return (result.Items as Asset[]) || [];
+    return results.map(this.mapToEntity);
   }
 
   async getDescendants(tenantId: string, assetId: string, maxDepth?: number): Promise<Asset[]> {
@@ -321,31 +258,25 @@ export class AssetRepository implements IAssetRepository {
       throw new AppError('ASSET_NOT_FOUND', 'Asset not found', 404);
     }
 
-    // Query by path prefix
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-path',
-        KeyConditionExpression: 'tenantId = :tenantId AND begins_with(#path, :pathPrefix)',
-        ExpressionAttributeNames: {
-          '#path': 'path',
-        },
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':pathPrefix': `${asset.path}/`,
-        },
-      })
-    );
+    // Query by path prefix using LIKE
+    const pathPrefix = `${asset.path}/%`;
 
-    let descendants = (result.Items as Asset[]) || [];
+    let results = await db
+      .select()
+      .from(assets)
+      .where(and(
+        eq(assets.tenantId, tenantId),
+        like(assets.path, pathPrefix)
+      ))
+      .orderBy(assets.depth, assets.name);
 
     // Filter by maxDepth if specified
     if (maxDepth !== undefined) {
       const maxAllowedDepth = asset.depth + maxDepth;
-      descendants = descendants.filter((d) => d.depth <= maxAllowedDepth);
+      results = results.filter((a) => a.depth <= maxAllowedDepth);
     }
 
-    return descendants;
+    return results.map(this.mapToEntity);
   }
 
   async getAncestors(tenantId: string, assetId: string): Promise<Asset[]> {
@@ -363,26 +294,21 @@ export class AssetRepository implements IAssetRepository {
       return [];
     }
 
-    // Batch get ancestors
-    const keys = ancestorIds.map((id) => ({ tenantId, id }));
-    const result = await dynamoDb.send(
-      new BatchGetCommand({
-        RequestItems: {
-          [this.tableName]: {
-            Keys: keys,
-          },
-        },
-      })
-    );
+    // Fetch ancestors
+    const results = await db
+      .select()
+      .from(assets)
+      .where(and(
+        eq(assets.tenantId, tenantId),
+        sql`${assets.id} = ANY(${ancestorIds})`
+      ))
+      .orderBy(assets.depth);
 
-    const ancestors = (result.Responses?.[this.tableName] as Asset[]) || [];
-
-    // Sort by depth (root first)
-    return ancestors.sort((a, b) => a.depth - b.depth);
+    return results.map(this.mapToEntity);
   }
 
   async getTree(tenantId: string, customerId?: string, rootAssetId?: string): Promise<AssetTreeNode[]> {
-    let assets: Asset[];
+    let assetList: Asset[];
 
     if (rootAssetId) {
       const root = await this.getById(tenantId, rootAssetId);
@@ -390,16 +316,16 @@ export class AssetRepository implements IAssetRepository {
         throw new AppError('ASSET_NOT_FOUND', 'Root asset not found', 404);
       }
       const descendants = await this.getDescendants(tenantId, rootAssetId);
-      assets = [root, ...descendants];
+      assetList = [root, ...descendants];
     } else if (customerId) {
       const result = await this.listByCustomer(tenantId, customerId, { limit: 1000 });
-      assets = result.items;
+      assetList = result.items;
     } else {
       const result = await this.list(tenantId, { limit: 1000 });
-      assets = result.items;
+      assetList = result.items;
     }
 
-    return this.buildTree(assets, rootAssetId || null);
+    return this.buildTree(assetList, rootAssetId || null);
   }
 
   async move(
@@ -446,19 +372,15 @@ export class AssetRepository implements IAssetRepository {
 
     // Update asset with new customer if changed
     if (newCustomerId && newCustomerId !== asset.customerId) {
-      await dynamoDb.send(
-        new UpdateCommand({
-          TableName: this.tableName,
-          Key: { tenantId, id: assetId },
-          UpdateExpression: 'SET customerId = :customerId, parentAssetId = :parentId, updatedAt = :updatedAt, updatedBy = :updatedBy',
-          ExpressionAttributeValues: {
-            ':customerId': newCustomerId,
-            ':parentId': newParentId,
-            ':updatedAt': now(),
-            ':updatedBy': updatedBy,
-          },
+      await db
+        .update(assets)
+        .set({
+          customerId: newCustomerId,
+          parentAssetId: newParentId,
+          updatedAt: new Date(),
+          updatedBy,
         })
-      );
+        .where(and(eq(assets.tenantId, tenantId), eq(assets.id, assetId)));
     }
 
     // Update path and depth
@@ -473,16 +395,10 @@ export class AssetRepository implements IAssetRepository {
 
       // Update customer if needed
       if (newCustomerId && newCustomerId !== asset.customerId) {
-        await dynamoDb.send(
-          new UpdateCommand({
-            TableName: this.tableName,
-            Key: { tenantId, id: descendant.id },
-            UpdateExpression: 'SET customerId = :customerId',
-            ExpressionAttributeValues: {
-              ':customerId': newCustomerId,
-            },
-          })
-        );
+        await db
+          .update(assets)
+          .set({ customerId: newCustomerId })
+          .where(and(eq(assets.tenantId, tenantId), eq(assets.id, descendant.id)));
       }
     }
 
@@ -490,52 +406,39 @@ export class AssetRepository implements IAssetRepository {
   }
 
   async updatePath(tenantId: string, assetId: string, newPath: string, newDepth: number): Promise<void> {
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { tenantId, id: assetId },
-        UpdateExpression: 'SET #path = :path, #depth = :depth, updatedAt = :updatedAt',
-        ExpressionAttributeNames: {
-          '#path': 'path',
-          '#depth': 'depth',
-        },
-        ExpressionAttributeValues: {
-          ':path': newPath,
-          ':depth': newDepth,
-          ':updatedAt': now(),
-        },
+    await db
+      .update(assets)
+      .set({
+        path: newPath,
+        depth: newDepth,
+        updatedAt: new Date(),
       })
-    );
+      .where(and(eq(assets.tenantId, tenantId), eq(assets.id, assetId)));
   }
 
   async countByCustomer(tenantId: string, customerId: string): Promise<number> {
-    const result = await dynamoDb.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'gsi-customer',
-        KeyConditionExpression: 'tenantId = :tenantId AND customerId = :customerId',
-        ExpressionAttributeValues: {
-          ':tenantId': tenantId,
-          ':customerId': customerId,
-        },
-        Select: 'COUNT',
-      })
-    );
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(assets)
+      .where(and(
+        eq(assets.tenantId, tenantId),
+        eq(assets.customerId, customerId)
+      ));
 
-    return result.Count || 0;
+    return result[0]?.count || 0;
   }
 
-  private buildTree(assets: Asset[], rootParentId: string | null): AssetTreeNode[] {
+  private buildTree(assetList: Asset[], rootParentId: string | null): AssetTreeNode[] {
     const assetMap = new Map<string, AssetTreeNode>();
     const roots: AssetTreeNode[] = [];
 
     // Initialize all nodes
-    assets.forEach((asset) => {
+    assetList.forEach((asset) => {
       assetMap.set(asset.id, { ...asset, children: [] });
     });
 
     // Build tree structure
-    assets.forEach((asset) => {
+    assetList.forEach((asset) => {
       const node = assetMap.get(asset.id)!;
       if (asset.parentAssetId === rootParentId) {
         roots.push(node);
@@ -561,4 +464,34 @@ export class AssetRepository implements IAssetRepository {
       .replace(/-+/g, '-')
       .substring(0, 20);
   }
+
+  private mapToEntity(row: typeof assets.$inferSelect): Asset {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      customerId: row.customerId,
+      parentAssetId: row.parentAssetId,
+      path: row.path,
+      depth: row.depth,
+      name: row.name,
+      displayName: row.displayName,
+      code: row.code,
+      type: row.type,
+      description: row.description || undefined,
+      location: row.location as Asset['location'],
+      specs: row.specs as Asset['specs'],
+      tags: row.tags as string[],
+      metadata: row.metadata as Record<string, unknown>,
+      status: row.status,
+      deletedAt: row.deletedAt?.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      createdBy: row.createdBy || undefined,
+      updatedBy: row.updatedBy || undefined,
+      version: row.version,
+    };
+  }
 }
+
+// Export singleton instance
+export const assetRepository = new AssetRepository();
