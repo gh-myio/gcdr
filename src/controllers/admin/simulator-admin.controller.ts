@@ -87,10 +87,13 @@ router.post('/api/sessions/start', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Use provided userId or fallback to a valid UUID for admin cockpit
+    const effectiveUserId = userId || '00000000-0000-0000-0000-000000000000';
+
     const session = await simulatorEngine.startSession(
       tenantId,
       customerId,
-      userId || 'admin-cockpit',
+      effectiveUserId,
       name,
       config
     );
@@ -142,6 +145,7 @@ const DEMO_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 const DEMO_CUSTOMER_ID = '22222222-2222-2222-2222-222222222222';
 const DEMO_ASSET_ID = '33333333-3333-3333-3333-333333333333';
 const DEMO_CENTRAL_ID = '44444444-4444-4444-4444-444444444444';
+const DEMO_USER_ID = '77777777-7777-7777-7777-777777777777';
 const DEMO_DEVICE_IDS = [
   '55555555-5555-5555-5555-555555555501',
   '55555555-5555-5555-5555-555555555502',
@@ -365,7 +369,7 @@ router.post('/api/demo/start-session', async (req: Request, res: Response) => {
     const session = await simulatorEngine.startSession(
       DEMO_TENANT_ID,
       DEMO_CUSTOMER_ID,
-      'demo-user',
+      DEMO_USER_ID,
       sessionName,
       {
         customerId: DEMO_CUSTOMER_ID,
