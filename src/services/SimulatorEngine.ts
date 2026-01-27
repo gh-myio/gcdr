@@ -110,6 +110,8 @@ export class SimulatorEngine extends EventEmitter {
       expiresAt,
     };
 
+    console.log('[SimulatorEngine] Creating session with input:', JSON.stringify(input, null, 2));
+
     // Create session in database
     const session = await this.repository.createSession(input);
 

@@ -25,21 +25,31 @@ export class SimulatorRepository {
    * Create a new simulator session
    */
   async createSession(input: CreateSimulatorSessionInput): Promise<SimulatorSession> {
-    const [session] = await db
-      .insert(simulatorSessions)
-      .values({
-        tenantId: input.tenantId,
-        customerId: input.customerId,
-        createdBy: input.createdBy,
-        name: input.name,
-        config: input.config,
-        scansLimit: input.scansLimit,
-        expiresAt: input.expiresAt,
-        status: 'PENDING',
-      })
-      .returning();
+    const values = {
+      tenantId: input.tenantId,
+      customerId: input.customerId,
+      createdBy: input.createdBy,
+      name: input.name,
+      config: input.config,
+      scansLimit: input.scansLimit,
+      expiresAt: input.expiresAt,
+      status: 'PENDING' as const,
+    };
 
-    return this.mapSession(session);
+    console.log('[SimulatorRepository] Inserting session with values:', JSON.stringify(values, null, 2));
+
+    try {
+      const [session] = await db
+        .insert(simulatorSessions)
+        .values(values)
+        .returning();
+
+      console.log('[SimulatorRepository] Session created successfully:', session.id);
+      return this.mapSession(session);
+    } catch (error) {
+      console.error('[SimulatorRepository] Failed to create session:', error);
+      throw error;
+    }
   }
 
   /**
