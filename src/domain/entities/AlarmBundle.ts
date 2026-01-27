@@ -119,7 +119,7 @@ export interface SimpleBundleAlarmRule {
   // Schedule fields (always present)
   startAt: string;      // HH:mm format (default "00:00")
   endAt: string;        // HH:mm format (default "23:59")
-  daysOfWeek: number[]; // 0-6, where 0 is Sunday (default [0,1,2,3,4,5,6])
+  daysOfWeek: Record<number, boolean>; // 0-6, where 0 is Sunday (e.g., {0: true, 1: true, ...})
 }
 
 /**

@@ -45,18 +45,25 @@ function addLog(type: 'info' | 'success' | 'error' | 'warning', message: string,
 }
 
 // =============================================================================
-// Middleware: Development Only
+// Configuration: Admin Password
 // =============================================================================
 
-function devOnlyMiddleware(req: Request, res: Response, next: Function) {
-  const allowInProd = process.env.ENABLE_DB_ADMIN === 'true';
-  if (process.env.NODE_ENV === 'production' && !allowInProd) {
-    return res.status(403).json({ error: 'Not available in production. Set ENABLE_DB_ADMIN=true to enable.' });
+const ADMIN_PASSWORD = process.env.DB_ADMIN_PASSWORD || 'myio2026';
+
+// =============================================================================
+// Middleware: Password Verification for API routes
+// =============================================================================
+
+function verifyPasswordMiddleware(req: Request, res: Response, next: Function) {
+  const authHeader = req.headers['x-admin-password'];
+  if (authHeader !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized. Invalid admin password.' });
   }
   next();
 }
 
-router.use(devOnlyMiddleware);
+// Apply password verification to all API routes
+router.use('/api', verifyPasswordMiddleware);
 
 // =============================================================================
 // API Routes
@@ -622,6 +629,70 @@ function getHtmlPage(): string {
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
 
+    /* Password Modal */
+    .password-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .password-modal.hidden { display: none; }
+
+    .password-box {
+      background: var(--bg-secondary);
+      padding: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .password-box h2 {
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .password-box p {
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+
+    .password-box input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 15px;
+    }
+
+    .password-box input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .password-error {
+      color: var(--error);
+      font-size: 0.85rem;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .password-error.show { display: block; }
+
+    .main-content.locked { display: none; }
+
     .btn-group {
       display: flex;
       gap: 10px;
@@ -940,10 +1011,22 @@ function getHtmlPage(): string {
   </style>
 </head>
 <body>
+  <!-- Password Modal -->
+  <div id="password-modal" class="password-modal">
+    <div class="password-box">
+      <h2>🔒 Admin Access</h2>
+      <p>Enter the admin password to access the Database Admin panel.</p>
+      <input type="password" id="admin-password" placeholder="Password" onkeypress="if(event.key==='Enter')checkPassword()">
+      <div id="password-error" class="password-error">Invalid password. Try again.</div>
+      <button class="btn btn-primary" onclick="checkPassword()" style="width:100%">Unlock</button>
+    </div>
+  </div>
+
+  <div id="main-content" class="main-content locked">
   <header>
     <div class="header-left">
       <h1>GCDR Database Admin</h1>
-      <span class="dev-badge">DEV ONLY</span>
+      <span class="dev-badge">ADMIN</span>
     </div>
     <div class="header-right">
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
@@ -1572,12 +1655,75 @@ function getHtmlPage(): string {
     });
 
     // ==========================================================================
-    // Initialization
+    // Password Authentication
     // ==========================================================================
-    document.addEventListener('DOMContentLoaded', () => {
-      // Apply stored theme
-      setTheme(getStoredTheme());
+    let adminPassword = '';
 
+    function checkPassword() {
+      const input = document.getElementById('admin-password');
+      const password = input.value;
+      const errorEl = document.getElementById('password-error');
+
+      // Try to authenticate with the backend
+      fetch('/admin/db/api/scripts', {
+        headers: { 'X-Admin-Password': password }
+      })
+      .then(res => {
+        if (res.ok) {
+          adminPassword = password;
+          sessionStorage.setItem('dbAdminAuth', password);
+          document.getElementById('password-modal').classList.add('hidden');
+          document.getElementById('main-content').classList.remove('locked');
+          initializeApp();
+        } else {
+          errorEl.classList.add('show');
+          input.value = '';
+          input.focus();
+        }
+      })
+      .catch(() => {
+        errorEl.classList.add('show');
+        input.value = '';
+        input.focus();
+      });
+    }
+
+    function checkStoredAuth() {
+      const stored = sessionStorage.getItem('dbAdminAuth');
+      if (stored) {
+        fetch('/admin/db/api/scripts', {
+          headers: { 'X-Admin-Password': stored }
+        })
+        .then(res => {
+          if (res.ok) {
+            adminPassword = stored;
+            document.getElementById('password-modal').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('locked');
+            initializeApp();
+          } else {
+            sessionStorage.removeItem('dbAdminAuth');
+            document.getElementById('admin-password').focus();
+          }
+        })
+        .catch(() => {
+          document.getElementById('admin-password').focus();
+        });
+      } else {
+        document.getElementById('admin-password').focus();
+      }
+    }
+
+    // Override fetch to include password header
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      if (url.toString().includes('/admin/db/api/') && adminPassword) {
+        options.headers = options.headers || {};
+        options.headers['X-Admin-Password'] = adminPassword;
+      }
+      return originalFetch(url, options);
+    };
+
+    function initializeApp() {
       // Initialize CodeMirror
       editor = CodeMirror.fromTextArea(document.getElementById('query-input'), {
         mode: 'text/x-sql',
@@ -1599,8 +1745,20 @@ function getHtmlPage(): string {
       loadScripts();
       loadExamples();
       renderHistory();
+    }
+
+    // ==========================================================================
+    // Initialization
+    // ==========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Apply stored theme
+      setTheme(getStoredTheme());
+
+      // Check if already authenticated
+      checkStoredAuth();
     });
   </script>
+  </div><!-- end main-content -->
 </body>
 </html>`;
 }

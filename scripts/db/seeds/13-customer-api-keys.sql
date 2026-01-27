@@ -108,17 +108,18 @@ BEGIN
     );
 
     -- Node-RED Bundle API Key (for testing)
-    -- Plaintext Key: gcdr_cust_nodered_test_bundle_key_2024
+    -- Plaintext Key: gcdr_cust_test_bundle_key_myio2026
+    -- Hash: SHA256 of the plaintext key
     INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
     VALUES (
         'cee00001-0001-0001-0001-000000000006',
         v_tenant_id,
         v_company1_id,
-        'aae3ce071e3226c15d5bb9702e539830282d325fb5913ca84a65fbbbe6c5cd53',
+        'ac16eb3ec57f3f5d5156741a71187740976686a2dc9c5144281ce5cc6ed269d1',
         'gcdr_cust_',
         'Node-RED Bundle Key',
-        'API key for Node-RED alarm bundle integration',
-        '["bundles:read", "rules:read"]',
+        'API key for Node-RED alarm bundle integration - TEST KEY: gcdr_cust_test_bundle_key_myio2026',
+        '["bundles:read", "rules:read", "devices:read"]',
         NOW() + INTERVAL '365 days',
         0,
         true,

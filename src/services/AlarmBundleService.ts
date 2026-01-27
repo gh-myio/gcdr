@@ -131,6 +131,18 @@ export class AlarmBundleService {
     const rulesCatalog: Record<string, SimpleBundleAlarmRule> = {};
     for (const rule of rules) {
       if (rule.alarmConfig) {
+        // Convert daysOfWeek array to object format {0: true, 1: false, ...}
+        const daysArray = rule.alarmConfig.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
+        const daysOfWeekObj: Record<number, boolean> = {
+          0: daysArray.includes(0),
+          1: daysArray.includes(1),
+          2: daysArray.includes(2),
+          3: daysArray.includes(3),
+          4: daysArray.includes(4),
+          5: daysArray.includes(5),
+          6: daysArray.includes(6),
+        };
+
         const simplifiedRule: SimpleBundleAlarmRule = {
           id: rule.id,
           name: rule.name,
@@ -142,7 +154,7 @@ export class AlarmBundleService {
           // Schedule fields (always present with defaults)
           startAt: rule.alarmConfig.startAt || '00:00',
           endAt: rule.alarmConfig.endAt || '23:59',
-          daysOfWeek: rule.alarmConfig.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
+          daysOfWeek: daysOfWeekObj,
         };
 
         // Include offset for temperature metrics (default 0 if not set)
@@ -458,12 +470,19 @@ export class AlarmBundleService {
   }
 
   /**
-   * Calculate SHA-256 hash of bundle content for versioning
+   * Generate a friendly version ID with timestamp and short hash
+   * Format: v1-YYYYMMDD-HHmmss (e.g., v1-20260127-214530)
    */
   private calculateVersionHash(content: object): string {
-    // Sort keys for deterministic serialization
-    const serialized = JSON.stringify(content, Object.keys(content).sort());
-    return crypto.createHash('sha256').update(serialized).digest('hex').substring(0, 16);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    return `v1-${year}${month}${day}-${hours}${minutes}${seconds}`;
   }
 
   /**

@@ -95,6 +95,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Devices** | 9 | Dispositivos IoT com conectividade |
 | **Rules** | 10 | Regras de negócio (ALARM, SLA, ESCALATION, MAINTENANCE) |
 | **Alarm Bundles** | 2 | Bundle de regras para integração Node-RED (M2M) |
+| **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./SIMULATOR-MANUAL.md)) |
 | **Customer API Keys** | 4 | Gerenciamento de API Keys por customer |
 | **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
 | **Integrations** | 12 | Marketplace de integrações |
@@ -167,16 +168,50 @@ curl http://localhost:3015/customers/{id}/theme/effective \
 
 #### Obter Bundle de Alarmes (para Node-RED)
 ```bash
-# Bundle completo
-curl http://localhost:3015/customers/{customerId}/alarm-rules/bundle \
+# Bundle simplificado (com centralId e slaveId) - RECOMENDADO
+curl http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules/bundle/simple \
   -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
-  -H "X-API-Key: gcdr_cust_..."
-
-# Bundle simplificado (com centralId e slaveId)
-curl http://localhost:3015/customers/{customerId}/alarm-rules/bundle/simple \
-  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
-  -H "X-API-Key: gcdr_cust_..."
+  -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026"
 ```
+
+**API Key de Teste (seed):** `gcdr_cust_test_bundle_key_myio2026`
+
+**Formato do Bundle Simplificado:**
+```json
+{
+  "versionId": "v1-20260127-214530",
+  "deviceIndex": {
+    "device-uuid": {
+      "deviceName": "Temperature Sensor",
+      "centralId": "central-uuid",
+      "slaveId": 1,
+      "ruleIds": ["rule-uuid-1", "rule-uuid-2"]
+    }
+  },
+  "rules": {
+    "rule-uuid-1": {
+      "id": "rule-uuid-1",
+      "name": "High Temperature Alert",
+      "value": 28,
+      "startAt": "08:00",
+      "endAt": "18:00",
+      "daysOfWeek": {
+        "0": false,
+        "1": true,
+        "2": true,
+        "3": true,
+        "4": true,
+        "5": true,
+        "6": false
+      }
+    }
+  }
+}
+```
+
+**Notas:**
+- `versionId`: Formato amigável `v1-YYYYMMDD-HHmmss`
+- `daysOfWeek`: Objeto com chaves 0-6 (0=Domingo), valores boolean
 
 #### Criar API Key para Customer
 ```bash
@@ -1143,13 +1178,19 @@ curl http://localhost:3015/customers/customer-123/tree \
 
 > **Nota**: As URLs não possuem mais o prefixo `/dev/` como na arquitetura serverless anterior.
 
-### Database Admin UI (Desenvolvimento)
+### Database Admin UI
 
-Em ambiente de desenvolvimento, uma interface web está disponível para gerenciar o banco de dados:
+Uma interface web está disponível para gerenciar o banco de dados:
 
 ```
 http://localhost:3015/admin/db
 ```
+
+**Autenticação:** Requer senha de admin (modal na primeira vez).
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `DB_ADMIN_PASSWORD` | `myio2026` | Senha para acesso ao Admin DB |
 
 **Funcionalidades:**
 
@@ -1165,7 +1206,17 @@ http://localhost:3015/admin/db
 - **Quick Reset**: Clear + Seed em um clique
 - **Verify**: Valida contagem de registros
 
-> **IMPORTANTE**: Esta interface só está disponível em `NODE_ENV !== 'production'`.
+### Alarm Simulator (Premium)
+
+Uma interface completa para testar regras de alarme sem afetar produção:
+
+```
+http://localhost:3015/admin/simulator
+```
+
+**Quick Start:** Clique no botão **🚀 DEMO** para criar automaticamente um ambiente de teste completo com tenant, customer, devices e regras de alarme.
+
+Para documentação completa, veja: [SIMULATOR-MANUAL.md](./SIMULATOR-MANUAL.md)
 
 Para mais detalhes, veja: [RFC-0006-Database-Seed-Scripts.md](./RFC-0006-Database-Seed-Scripts.md) e [RFC-0007-Database-Admin-UI.md](./RFC-0007-Database-Admin-UI.md)
 
@@ -1543,7 +1594,9 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0003: JWT Multiple Audience](./RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
 - [RFC-0004: Migration DynamoDB to PostgreSQL](./RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
 - [RFC-0005: Container Deployment](./RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
+- [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
 - [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
+- [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 
 ### Documentação Externa
 

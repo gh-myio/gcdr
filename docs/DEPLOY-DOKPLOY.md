@@ -117,6 +117,9 @@ JWT_REFRESH_EXPIRES_IN=7d
 
 # CORS (ajustar para seu domínio em produção)
 CORS_ORIGIN=https://gcdr.myio.com.br,https://app.myio.com.br
+
+# Admin UI (opcional - para acesso ao /admin/db em produção)
+DB_ADMIN_PASSWORD=<SENHA_SEGURA>
 ```
 
 ### Gerar JWT_SECRET

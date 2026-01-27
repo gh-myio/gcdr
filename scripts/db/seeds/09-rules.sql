@@ -179,6 +179,90 @@ BEGIN
         1
     );
 
+    -- ALARM_THRESHOLD rule: High Energy Consumption (Business Hours)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000010',
+        v_tenant_id,
+        v_company1_id,
+        'High Energy Consumption Alert',
+        'Alerts when energy consumption exceeds 950 kWh during business hours (Mon-Fri 08:00-18:00)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "energy_consumption", "operator": "GT", "value": 950, "unit": "kWh", "duration": 300, "aggregation": "AVG", "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "ops@acmetech.com"]}, "enabled": true}]',
+        '["energy", "consumption", "business-hours"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Maximum Temperature 26°C
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000011',
+        v_tenant_id,
+        v_company1_id,
+        'Maximum Temperature Alert',
+        'Alerts when ambient temperature exceeds 26°C for comfort control',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "temperature", "operator": "GT", "value": 26, "unit": "°C", "duration": 600, "aggregation": "AVG", "aggregationWindow": 300}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
+        '["temperature", "comfort", "hvac"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Low Water Tank Level
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000012',
+        v_tenant_id,
+        v_company1_id,
+        'Low Water Tank Level Alert',
+        'Alerts when water tank level falls below 15%',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "water_level", "operator": "LT", "value": 15, "unit": "%", "duration": 60, "hysteresis": 5, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["water", "tank", "critical", "level"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Night Water Usage (Leak Detection)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000013',
+        v_tenant_id,
+        v_company1_id,
+        'Night Water Usage Alert',
+        'Alerts when water flow exceeds 10 liters during night hours (22:00-06:00) - possible leak detection',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "water_flow", "operator": "GT", "value": 10, "unit": "L", "duration": 300, "aggregation": "SUM", "aggregationWindow": 300, "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6]}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "security@acmetech.com"]}, "enabled": true}]',
+        '["water", "leak", "night", "security"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
     -- Disabled rule
     INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
@@ -200,7 +284,7 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 9 rules';
+    RAISE NOTICE 'Inserted 13 rules';
 END $$;
 
 -- Verify

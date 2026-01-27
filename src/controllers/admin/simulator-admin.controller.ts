@@ -134,6 +134,276 @@ router.get('/api/queue/stats', (req: Request, res: Response) => {
   }
 });
 
+// =============================================================================
+// DEMO Setup - Creates everything needed for a working demo
+// =============================================================================
+
+const DEMO_TENANT_ID = '11111111-1111-1111-1111-111111111111';
+const DEMO_CUSTOMER_ID = '22222222-2222-2222-2222-222222222222';
+const DEMO_ASSET_ID = '33333333-3333-3333-3333-333333333333';
+const DEMO_CENTRAL_ID = '44444444-4444-4444-4444-444444444444';
+const DEMO_DEVICE_IDS = [
+  '55555555-5555-5555-5555-555555555501',
+  '55555555-5555-5555-5555-555555555502',
+  '55555555-5555-5555-5555-555555555503',
+];
+const DEMO_RULE_IDS = [
+  '66666666-6666-6666-6666-666666666601',
+  '66666666-6666-6666-6666-666666666602',
+];
+
+router.post('/api/demo/setup', async (req: Request, res: Response) => {
+  try {
+    console.log('[Demo Setup] Starting demo environment setup...');
+
+    const { db } = await import('../../infrastructure/database/drizzle/db');
+    const { customers, assets, devices, rules, centrals } = await import('../../infrastructure/database/drizzle/schema');
+    const { eq } = await import('drizzle-orm');
+
+    // Check if demo customer already exists
+    const existingCustomer = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.id, DEMO_CUSTOMER_ID))
+      .limit(1);
+
+    if (existingCustomer.length > 0) {
+      console.log('[Demo Setup] Demo already configured, returning existing IDs');
+      // Demo already setup, just return the IDs
+      return res.json({
+        success: true,
+        message: 'Demo already configured',
+        demo: {
+          tenantId: DEMO_TENANT_ID,
+          customerId: DEMO_CUSTOMER_ID,
+          assetId: DEMO_ASSET_ID,
+          centralId: DEMO_CENTRAL_ID,
+          deviceIds: DEMO_DEVICE_IDS,
+          ruleIds: DEMO_RULE_IDS,
+        }
+      });
+    }
+
+    console.log('[Demo Setup] Creating demo customer...');
+
+    // Create Demo Customer
+    await db.insert(customers).values({
+      id: DEMO_CUSTOMER_ID,
+      tenantId: DEMO_TENANT_ID,
+      name: 'DEMO Corp',
+      displayName: 'DEMO Corporation',
+      code: 'DEMO-001',
+      type: 'COMPANY',
+      path: `/${DEMO_TENANT_ID}/${DEMO_CUSTOMER_ID}`,
+      depth: 1,
+      email: 'demo@example.com',
+      status: 'ACTIVE',
+    });
+
+    console.log('[Demo Setup] Customer created successfully');
+
+    // Create Demo Asset
+    await db.insert(assets).values({
+      id: DEMO_ASSET_ID,
+      tenantId: DEMO_TENANT_ID,
+      customerId: DEMO_CUSTOMER_ID,
+      name: 'Demo Building',
+      displayName: 'Demo Building - Main',
+      code: 'DEMO-BLD-001',
+      type: 'BUILDING',
+      path: `/${DEMO_TENANT_ID}/${DEMO_CUSTOMER_ID}/${DEMO_ASSET_ID}`,
+      depth: 2,
+      status: 'ACTIVE',
+    });
+
+    // Create Demo Central
+    await db.insert(centrals).values({
+      id: DEMO_CENTRAL_ID,
+      tenantId: DEMO_TENANT_ID,
+      customerId: DEMO_CUSTOMER_ID,
+      assetId: DEMO_ASSET_ID,
+      name: 'Demo NodeHub',
+      displayName: 'Demo NodeHub Central',
+      serialNumber: 'DEMO-NH-001',
+      type: 'NODEHUB',
+      status: 'ACTIVE',
+      connectionStatus: 'ONLINE',
+      firmwareVersion: '1.0.0',
+      softwareVersion: '2.0.0',
+    });
+
+    // Create Demo Devices
+    const demoDevices = [
+      {
+        id: DEMO_DEVICE_IDS[0],
+        name: 'Temperature Sensor A',
+        displayName: 'Temp Sensor - Floor 1',
+        serialNumber: 'DEMO-TEMP-001',
+        type: 'SENSOR' as const,
+        slaveId: 1,
+        identifier: 'TEMP-A',
+        deviceProfile: 'TEMPERATURE_SENSOR',
+      },
+      {
+        id: DEMO_DEVICE_IDS[1],
+        name: 'Humidity Sensor B',
+        displayName: 'Humidity Sensor - Floor 1',
+        serialNumber: 'DEMO-HUM-001',
+        type: 'SENSOR' as const,
+        slaveId: 2,
+        identifier: 'HUM-B',
+        deviceProfile: 'HUMIDITY_SENSOR',
+      },
+      {
+        id: DEMO_DEVICE_IDS[2],
+        name: 'Power Meter C',
+        displayName: 'Power Meter - Main Panel',
+        serialNumber: 'DEMO-PWR-001',
+        type: 'METER' as const,
+        slaveId: 3,
+        identifier: 'PWR-C',
+        deviceProfile: 'POWER_METER',
+      },
+    ];
+
+    for (const device of demoDevices) {
+      await db.insert(devices).values({
+        id: device.id,
+        tenantId: DEMO_TENANT_ID,
+        customerId: DEMO_CUSTOMER_ID,
+        assetId: DEMO_ASSET_ID,
+        centralId: DEMO_CENTRAL_ID,
+        name: device.name,
+        displayName: device.displayName,
+        serialNumber: device.serialNumber,
+        type: device.type,
+        slaveId: device.slaveId,
+        identifier: device.identifier,
+        deviceProfile: device.deviceProfile,
+        status: 'ACTIVE',
+        connectivityStatus: 'ONLINE',
+      });
+    }
+
+    // Create Demo Alarm Rules
+    const demoRules = [
+      {
+        id: DEMO_RULE_IDS[0],
+        name: 'High Temperature Alert',
+        description: 'Triggers when temperature exceeds 28°C',
+        type: 'ALARM_THRESHOLD' as const,
+        priority: 'HIGH' as const,
+        alarmConfig: {
+          field: 'temperature',
+          operator: 'gt',
+          threshold: 28,
+          unit: '°C',
+          duration: 60,
+          message: 'Temperature is above normal threshold',
+        },
+      },
+      {
+        id: DEMO_RULE_IDS[1],
+        name: 'High Humidity Warning',
+        description: 'Triggers when humidity exceeds 70%',
+        type: 'ALARM_THRESHOLD' as const,
+        priority: 'MEDIUM' as const,
+        alarmConfig: {
+          field: 'humidity',
+          operator: 'gt',
+          threshold: 70,
+          unit: '%',
+          duration: 120,
+          message: 'Humidity is above comfortable range',
+        },
+      },
+    ];
+
+    for (const rule of demoRules) {
+      await db.insert(rules).values({
+        id: rule.id,
+        tenantId: DEMO_TENANT_ID,
+        customerId: DEMO_CUSTOMER_ID,
+        name: rule.name,
+        description: rule.description,
+        type: rule.type,
+        priority: rule.priority,
+        scopeType: 'CUSTOMER',
+        scopeEntityId: DEMO_CUSTOMER_ID,
+        alarmConfig: rule.alarmConfig,
+        enabled: true,
+        status: 'ACTIVE',
+      });
+    }
+
+    console.log('[Demo Setup] All demo entities created successfully');
+
+    res.json({
+      success: true,
+      message: 'Demo environment created successfully',
+      demo: {
+        tenantId: DEMO_TENANT_ID,
+        customerId: DEMO_CUSTOMER_ID,
+        assetId: DEMO_ASSET_ID,
+        centralId: DEMO_CENTRAL_ID,
+        deviceIds: DEMO_DEVICE_IDS,
+        ruleIds: DEMO_RULE_IDS,
+      }
+    });
+  } catch (error: any) {
+    console.error('[Demo Setup] Error:', error);
+    res.status(500).json({ error: error.message, details: error.toString() });
+  }
+});
+
+// Start demo session automatically
+router.post('/api/demo/start-session', async (req: Request, res: Response) => {
+  try {
+    const sessionName = `Demo Session ${new Date().toLocaleTimeString()}`;
+
+    // Create session with demo devices
+    const session = await simulatorEngine.startSession(
+      DEMO_TENANT_ID,
+      DEMO_CUSTOMER_ID,
+      'demo-user',
+      sessionName,
+      {
+        customerId: DEMO_CUSTOMER_ID,
+        deviceScanIntervalMs: 30000, // 30 seconds for demo
+        bundleRefreshIntervalMs: 60000, // 1 minute
+        devices: [
+          {
+            deviceId: DEMO_DEVICE_IDS[0],
+            telemetryProfile: {
+              temperature: { min: 22, max: 32, unit: '°C' }, // May trigger alarm > 28
+            }
+          },
+          {
+            deviceId: DEMO_DEVICE_IDS[1],
+            telemetryProfile: {
+              humidity: { min: 50, max: 80, unit: '%' }, // May trigger alarm > 70
+            }
+          },
+          {
+            deviceId: DEMO_DEVICE_IDS[2],
+            telemetryProfile: {
+              power: { min: 100, max: 500, unit: 'W' },
+              voltage: { min: 110, max: 130, unit: 'V' },
+            }
+          },
+        ],
+      }
+    );
+
+    res.json({
+      success: true,
+      session: computeSessionStats(session),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get customers for dropdown
 router.get('/api/customers', async (req: Request, res: Response) => {
   try {
@@ -145,16 +415,21 @@ router.get('/api/customers', async (req: Request, res: Response) => {
     // Simple query to get customers
     const { db } = await import('../../infrastructure/database/drizzle/db');
     const { customers } = await import('../../infrastructure/database/drizzle/schema');
-    const { eq } = await import('drizzle-orm');
+    const { eq, and } = await import('drizzle-orm');
 
     const result = await db
       .select({ id: customers.id, name: customers.name })
       .from(customers)
-      .where(eq(customers.tenantId, tenantId))
+      .where(and(
+        eq(customers.tenantId, tenantId),
+        eq(customers.status, 'ACTIVE')
+      ))
       .limit(100);
 
+    console.log(`[Simulator] Loaded ${result.length} customers for tenant ${tenantId}`);
     res.json({ customers: result });
   } catch (error: any) {
+    console.error('[Simulator] Failed to load customers:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -254,6 +529,12 @@ function getHtmlPage(): string {
       font-size: 28px;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .badge {
       font-size: 11px;
       padding: 4px 8px;
@@ -265,6 +546,215 @@ function getHtmlPage(): string {
     .badge-premium {
       background: linear-gradient(135deg, #a855f7, #6366f1);
       color: white;
+    }
+
+    .btn-demo {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-demo:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+    }
+
+    .btn-demo:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-help {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      transition: all 0.2s;
+    }
+
+    .btn-help:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border-color: var(--accent-blue);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      max-width: 900px;
+      max-height: 85vh;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .manual-section {
+      margin-bottom: 32px;
+    }
+
+    .manual-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .manual-section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .manual-section p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .manual-section ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .manual-section li {
+      color: var(--text-secondary);
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .manual-section li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent-green);
+    }
+
+    .manual-code {
+      background: var(--bg-primary);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      color: var(--accent-green);
+      margin: 12px 0;
+      overflow-x: auto;
+    }
+
+    .manual-tip {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 4px solid var(--accent-blue);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+
+    .manual-tip strong {
+      color: var(--accent-blue);
+    }
+
+    .manual-warning {
+      background: rgba(234, 179, 8, 0.1);
+      border-left: 4px solid var(--accent-yellow);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+
+    .manual-warning strong {
+      color: var(--accent-yellow);
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: var(--accent-blue);
+      color: white;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 8px;
     }
 
     .tenant-selector {
@@ -668,10 +1158,18 @@ function getHtmlPage(): string {
         Simulator Cockpit
         <span class="badge badge-premium">Premium</span>
       </h1>
-      <div class="tenant-selector">
-        <label>Tenant ID:</label>
-        <input type="text" id="tenantId" placeholder="Enter tenant UUID..." />
-        <button class="btn btn-primary" onclick="loadData()">Load</button>
+      <div class="header-actions">
+        <button class="btn-help" onclick="openManual()">
+          📖 Manual
+        </button>
+        <button class="btn-demo" id="demoBtn" onclick="runDemo()">
+          🚀 DEMO
+        </button>
+        <div class="tenant-selector">
+          <label>Tenant ID:</label>
+          <input type="text" id="tenantId" placeholder="Enter tenant UUID..." />
+          <button class="btn btn-primary" onclick="loadData()">Load</button>
+        </div>
       </div>
     </header>
 
@@ -816,11 +1314,129 @@ function getHtmlPage(): string {
     </div>
   </div>
 
+  <!-- Manual Modal -->
+  <div class="modal-overlay" id="manualModal" onclick="closeManualOutside(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📖 Simulator Manual</h2>
+        <button class="modal-close" onclick="closeManual()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="manual-section">
+          <h3>🎯 Overview</h3>
+          <p>
+            The <strong>GCDR Simulator Cockpit</strong> is a premium tool for testing alarm rules
+            without affecting production systems. It simulates IoT devices generating telemetry data,
+            evaluates alarm rules, and routes triggered alarms to an <strong>isolated queue</strong>.
+          </p>
+          <div class="manual-tip">
+            <strong>💡 Tip:</strong> All simulated alarms are tagged with <code>source.type: 'SIMULATOR'</code>
+            and sent to a separate queue, ensuring complete isolation from production.
+          </div>
+        </div>
+
+        <div class="manual-section">
+          <h3>🚀 Quick Start with DEMO</h3>
+          <p>Click the <strong>🚀 DEMO</strong> button in the header to:</p>
+          <ul>
+            <li>Automatically create a demo tenant, customer, and devices</li>
+            <li>Set up sample alarm rules (temperature &gt; 28°C, humidity &gt; 70%)</li>
+            <li>Start a simulation session immediately</li>
+            <li>Begin monitoring in real-time</li>
+          </ul>
+          <div class="manual-warning">
+            <strong>⚠️ Note:</strong> Demo mode uses pre-configured UUIDs. Re-clicking DEMO will reuse existing data.
+          </div>
+        </div>
+
+        <div class="manual-section">
+          <h3>📋 Manual Setup (Step by Step)</h3>
+          <p>If you want to use your own data:</p>
+          <ul>
+            <li><span class="step-number">1</span> Enter your <strong>Tenant ID</strong> in the header and click <strong>Load</strong></li>
+            <li><span class="step-number">2</span> In "New Session", enter a <strong>Session Name</strong> (e.g., "QA Test")</li>
+            <li><span class="step-number">3</span> Select a <strong>Customer</strong> from the dropdown</li>
+            <li><span class="step-number">4</span> Add one or more <strong>Devices</strong> to simulate</li>
+            <li><span class="step-number">5</span> Adjust <strong>Scan Interval</strong> (how often devices are scanned)</li>
+            <li><span class="step-number">6</span> Adjust <strong>Bundle Refresh</strong> (how often rules are fetched)</li>
+            <li><span class="step-number">7</span> Click <strong>▶ Start Session</strong></li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h3>📡 Live Monitor</h3>
+          <p>The Live Monitor shows real-time events from your simulation:</p>
+          <ul>
+            <li><strong>📦 Bundle events</strong> - When alarm rules are fetched/updated</li>
+            <li><strong>📡 Scan events</strong> - Device telemetry readings (temp, humidity, etc.)</li>
+            <li><strong>🔔 Alarm events</strong> - When a rule threshold is exceeded</li>
+            <li><strong>ℹ️ Info events</strong> - Session lifecycle (start, stop, expire)</li>
+          </ul>
+          <p>Click <strong>Monitor</strong> on any running session to connect.</p>
+        </div>
+
+        <div class="manual-section">
+          <h3>📊 Understanding Quotas</h3>
+          <p>The Quotas panel shows your limits:</p>
+          <ul>
+            <li><strong>Sessions</strong> - How many concurrent simulations you can run</li>
+            <li><strong>Max Devices</strong> - Devices per session (50 standard, 200 premium)</li>
+            <li><strong>Scans/hr</strong> - Maximum device scans per hour</li>
+          </ul>
+          <div class="manual-code">Standard: 3 sessions, 50 devices, 1000 scans/hr
+Premium: 10 sessions, 200 devices, 10000 scans/hr</div>
+        </div>
+
+        <div class="manual-section">
+          <h3>📈 Metrics Explained</h3>
+          <ul>
+            <li><strong>Active</strong> - Currently running sessions (across all tenants)</li>
+            <li><strong>Scans</strong> - Total device scans performed</li>
+            <li><strong>Alarms</strong> - Total alarm candidates raised</li>
+            <li><strong>Monitors</strong> - Connected SSE monitor clients</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h3>🔧 Telemetry Profiles</h3>
+          <p>Each device generates random values within configured ranges:</p>
+          <div class="manual-code">Temperature: { min: 22, max: 32, unit: '°C' }
+Humidity:    { min: 50, max: 80, unit: '%' }
+Power:       { min: 100, max: 500, unit: 'W' }</div>
+          <p>Rules are evaluated against these values. If a value exceeds the rule threshold, an alarm is raised.</p>
+        </div>
+
+        <div class="manual-section">
+          <h3>🛡️ Isolation & Safety</h3>
+          <p>The simulator is designed with safety in mind:</p>
+          <ul>
+            <li>All alarms go to <code>alarm-candidates:simulated</code> queue (not production)</li>
+            <li>Events are tagged with <code>metadata.simulated: true</code></li>
+            <li>Sessions auto-expire after 24 hours (72h for premium)</li>
+            <li>Rate limiting prevents resource exhaustion</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h3>❓ Troubleshooting</h3>
+          <ul>
+            <li><strong>"No customers found"</strong> - Check if your Tenant ID is correct and has customers</li>
+            <li><strong>"No devices"</strong> - The selected customer needs devices assigned to it</li>
+            <li><strong>"Quota exceeded"</strong> - Stop existing sessions or wait for expiration</li>
+            <li><strong>"Connection lost"</strong> - SSE reconnects automatically, or refresh the page</li>
+            <li><strong>"No alarms triggering"</strong> - Check that rules exist for the customer and telemetry ranges can exceed thresholds</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // State
     let selectedDevices = [];
     let eventSource = null;
     let currentMonitorSession = null;
+    let demoRunning = false;
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
@@ -834,7 +1450,118 @@ function getHtmlPage(): string {
       // Load metrics periodically
       loadMetrics();
       setInterval(loadMetrics, 10000);
+
+      // Close modal on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeManual();
+      });
     });
+
+    // =========================================================================
+    // DEMO Functions
+    // =========================================================================
+
+    async function runDemo() {
+      if (demoRunning) return;
+      demoRunning = true;
+
+      const demoBtn = document.getElementById('demoBtn');
+      demoBtn.disabled = true;
+      demoBtn.innerHTML = '⏳ Setting up...';
+
+      // Clear monitor log first
+      document.getElementById('monitorLog').innerHTML = '';
+
+      try {
+        // Step 1: Setup demo environment
+        addLogEntry('info', '🚀 Starting DEMO setup...');
+        const setupRes = await fetch('/admin/simulator/api/demo/setup', { method: 'POST' });
+        const setupData = await setupRes.json();
+
+        if (!setupData.success) {
+          throw new Error(setupData.error || 'Setup failed');
+        }
+
+        addLogEntry('info', '✅ Demo environment ready: ' + setupData.message);
+
+        // Step 2: Set tenant ID and load data
+        document.getElementById('tenantId').value = setupData.demo.tenantId;
+        localStorage.setItem('simulatorTenantId', setupData.demo.tenantId);
+
+        // Load data and wait a bit for DB to be ready
+        await loadData();
+
+        // Step 3: Auto-select the demo customer
+        const customerSelect = document.getElementById('customerId');
+        customerSelect.value = setupData.demo.customerId;
+
+        // Verify customer was selected
+        if (!customerSelect.value) {
+          addLogEntry('info', '⚠️ Customer not found in dropdown, retrying...');
+          await new Promise(r => setTimeout(r, 500));
+          await loadCustomers();
+          customerSelect.value = setupData.demo.customerId;
+        }
+
+        // Trigger device loading for demo customer
+        if (customerSelect.value) {
+          addLogEntry('info', '📦 Loading demo devices...');
+          customerSelect.dispatchEvent(new Event('change'));
+          await new Promise(r => setTimeout(r, 300)); // Wait for devices to load
+        }
+
+        demoBtn.innerHTML = '⏳ Starting session...';
+
+        // Step 4: Start demo session
+        const sessionRes = await fetch('/admin/simulator/api/demo/start-session', { method: 'POST' });
+        const sessionData = await sessionRes.json();
+
+        if (!sessionData.success) {
+          throw new Error(sessionData.error || 'Failed to start session');
+        }
+
+        addLogEntry('info', '✅ Demo session started: ' + sessionData.session.name);
+
+        // Step 5: Reload sessions and start monitoring
+        await loadSessions();
+        startMonitor(sessionData.session.id, sessionData.session.name);
+
+        demoBtn.innerHTML = '✅ DEMO Running';
+        setTimeout(() => {
+          demoBtn.innerHTML = '🚀 DEMO';
+          demoBtn.disabled = false;
+          demoRunning = false;
+        }, 3000);
+
+      } catch (error) {
+        console.error('Demo error:', error);
+        addLogEntry('info', '❌ Demo failed: ' + error.message);
+        alert('Demo setup failed: ' + error.message);
+        demoBtn.innerHTML = '🚀 DEMO';
+        demoBtn.disabled = false;
+        demoRunning = false;
+      }
+    }
+
+    // =========================================================================
+    // Manual Modal Functions
+    // =========================================================================
+
+    function openManual() {
+      document.getElementById('manualModal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeManual() {
+      document.getElementById('manualModal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function closeManualOutside(event) {
+      if (event.target === document.getElementById('manualModal')) {
+        closeManual();
+      }
+    }
 
     // Load all data
     async function loadData() {
@@ -958,9 +1685,22 @@ function getHtmlPage(): string {
         const res = await fetch(\`/admin/simulator/api/customers?tenantId=\${tenantId}\`);
         const data = await res.json();
 
+        if (data.error) {
+          console.error('API error loading customers:', data.error);
+          return;
+        }
+
         const select = document.getElementById('customerId');
+        if (!data.customers || data.customers.length === 0) {
+          select.innerHTML = '<option value="">No customers found</option>';
+          console.warn('No customers found for tenant:', tenantId);
+          return;
+        }
+
         select.innerHTML = '<option value="">Select customer...</option>' +
           data.customers.map(c => \`<option value="\${c.id}">\${c.name}</option>\`).join('');
+
+        console.log('Loaded', data.customers.length, 'customers');
       } catch (error) {
         console.error('Failed to load customers:', error);
       }
