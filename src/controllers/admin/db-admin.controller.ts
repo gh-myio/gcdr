@@ -49,8 +49,9 @@ function addLog(type: 'info' | 'success' | 'error' | 'warning', message: string,
 // =============================================================================
 
 function devOnlyMiddleware(req: Request, res: Response, next: Function) {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'Not available in production' });
+  const allowInProd = process.env.ENABLE_DB_ADMIN === 'true';
+  if (process.env.NODE_ENV === 'production' && !allowInProd) {
+    return res.status(403).json({ error: 'Not available in production. Set ENABLE_DB_ADMIN=true to enable.' });
   }
   next();
 }
