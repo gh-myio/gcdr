@@ -34,6 +34,8 @@ services:
     volumes:
       # For development: mount source code
       - ${DEV_MOUNT:-/dev/null}:/app/src:ro
+      # Scripts for DB Admin UI
+      - ./scripts:/app/scripts:ro
     depends_on:
       postgres:
         condition: service_healthy

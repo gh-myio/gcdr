@@ -94,6 +94,9 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Assets** | 11 | Ativos com hierarquia (SITE → BUILDING → FLOOR → AREA → EQUIPMENT) |
 | **Devices** | 9 | Dispositivos IoT com conectividade |
 | **Rules** | 10 | Regras de negócio (ALARM, SLA, ESCALATION, MAINTENANCE) |
+| **Alarm Bundles** | 2 | Bundle de regras para integração Node-RED (M2M) |
+| **Customer API Keys** | 4 | Gerenciamento de API Keys por customer |
+| **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
 | **Integrations** | 12 | Marketplace de integrações |
 | **Centrals** | 10 | Centrais IoT (NODEHUB, GATEWAY, EDGE_CONTROLLER) |
 | **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
@@ -158,6 +161,39 @@ curl http://localhost:3015/customers/{id}/assets \
 #### Obter Tema Efetivo (com herança)
 ```bash
 curl http://localhost:3015/customers/{id}/theme/effective \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Obter Bundle de Alarmes (para Node-RED)
+```bash
+# Bundle completo
+curl http://localhost:3015/customers/{customerId}/alarm-rules/bundle \
+  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
+  -H "X-API-Key: gcdr_cust_..."
+
+# Bundle simplificado (com centralId e slaveId)
+curl http://localhost:3015/customers/{customerId}/alarm-rules/bundle/simple \
+  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
+  -H "X-API-Key: gcdr_cust_..."
+```
+
+#### Criar API Key para Customer
+```bash
+curl -X POST http://localhost:3015/customers/{customerId}/api-keys \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "name": "Node-RED Integration",
+    "scopes": ["bundles:read", "rules:read"],
+    "expiresAt": "2027-01-01T00:00:00Z"
+  }'
+```
+
+#### Consultar Audit Logs
+```bash
+curl "http://localhost:3015/audit-logs?userId={userId}&action=UPDATE" \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
 ```

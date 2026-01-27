@@ -55,8 +55,14 @@ BEGIN
         NOW() - INTERVAL '5 minutes'                    -- last_activity_time
     );
 
-    -- Humidity Sensor in Server Room
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Humidity Sensor in Server Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000002',
         v_tenant_id,
@@ -78,7 +84,13 @@ BEGIN
         '{"installationDate": "2023-06-15"}',
         '{"firmware": "2.1.0"}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        3,                                              -- slave_id (Modbus)
+        v_central1_id,                                  -- central_id
+        'HUMIDITY_SENSOR_SERVER_ROOM_01',               -- identifier
+        'SENSOR_HUMIDITY_AMBIENTE',                     -- device_profile
+        'SHT40_HUMIDITY'                                -- device_type
     );
 
     -- Power Meter in Server Room (with RFC-0008 Modbus fields)
@@ -123,8 +135,14 @@ BEGIN
         NOW() - INTERVAL '1 minute'                     -- last_activity_time
     );
 
-    -- Camera in Meeting Room
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Camera in Meeting Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000004',
         v_tenant_id,
@@ -146,11 +164,23 @@ BEGIN
         '{"installationDate": "2023-08-20"}',
         '{"firmware": "10.12.0", "resolution": "1080p", "ptzEnabled": true}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        10,                                             -- slave_id
+        v_central1_id,                                  -- central_id
+        'PTZ_CAMERA_MEETING_ROOM_A',                    -- identifier
+        'CAMERA_IP_PTZ',                                -- device_profile
+        'P5655E_PTZ'                                    -- device_type
     );
 
-    -- AC Controller
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- AC Controller (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000005',
         v_tenant_id,
@@ -172,11 +202,23 @@ BEGIN
         '{"installationDate": "2020-03-15"}',
         '{"firmware": "8.0.2", "mode": "cooling", "setpoint": 22}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        5,                                              -- slave_id
+        v_central1_id,                                  -- central_id
+        'AC_CONTROLLER_SERVER_ROOM_01',                 -- identifier
+        'HVAC_PRECISION_AC',                            -- device_profile
+        'IVU_AC_CONTROLLER'                             -- device_type
     );
 
-    -- Gateway device
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Gateway device (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000006',
         v_tenant_id,
@@ -198,11 +240,23 @@ BEGIN
         '{"installationDate": "2023-06-01"}',
         '{"firmware": "1.5.0", "uptime": 864000, "connectedDevices": 5}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields (Gateway uses high slave_id)
+        247,                                            -- slave_id (247 for gateway/master)
+        v_central1_id,                                  -- central_id
+        'IOT_GATEWAY_SERVER_ROOM_01',                   -- identifier
+        'GATEWAY_EDGE',                                 -- device_profile
+        'UNO2484G_GATEWAY'                              -- device_type
     );
 
-    -- Offline device example
-    INSERT INTO devices (id, tenant_id, asset_id, customer_id, name, display_name, label, type, description, serial_number, external_id, specs, connectivity_status, last_connected_at, last_disconnected_at, credentials, telemetry_config, tags, metadata, attributes, status, version)
+    -- Offline device example (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at, last_disconnected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
     VALUES (
         '11110001-0001-0001-0001-000000000007',
         v_tenant_id,
@@ -225,7 +279,13 @@ BEGIN
         '{"installationDate": "2023-06-15"}',
         '{"firmware": "1.0.0", "battery": 15}',
         'ACTIVE',
-        1
+        1,
+        -- RFC-0008 fields
+        15,                                             -- slave_id
+        v_central1_id,                                  -- central_id
+        'SMOKE_DETECTOR_SERVER_ROOM_01',                -- identifier
+        'SENSOR_SMOKE_FIRE',                            -- device_profile
+        '5808W3_SMOKE'                                  -- device_type
     );
 
     RAISE NOTICE 'Inserted 7 devices';

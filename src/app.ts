@@ -6,6 +6,7 @@ import compression from 'compression';
 import {
   contextMiddleware,
   authMiddleware,
+  hybridAuthMiddleware,
   errorHandler,
   notFoundHandler,
 } from './middleware';
@@ -24,21 +25,25 @@ import {
   rulesController,
   rulesListByCustomerHandler,
   getAlarmBundleHandler,
+  getSimplifiedAlarmBundleHandler,
   integrationsController,
   customerApiKeysController,
+  auditLogsController,
   dbAdminController,
 } from './controllers';
 
+import { initializeAuditLogging } from './infrastructure/audit';
+
 const app: Express = express();
 
+// Initialize audit logging (RFC-0009)
+initializeAuditLogging();
+
 // =============================================================================
-// Global Middleware
+// Global Middleware (order matters!)
 // =============================================================================
 
-// Security headers
-app.use(helmet());
-
-// CORS configuration
+// CORS configuration (must be early for preflight requests)
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
@@ -49,9 +54,23 @@ app.use(cors({
 // Compression
 app.use(compression());
 
-// Body parsing
+// Body parsing (must be before routes that need req.body)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// =============================================================================
+// Routes BEFORE Helmet (need relaxed CSP for external scripts)
+// =============================================================================
+
+// Database Admin UI (development only - needs external scripts for CodeMirror)
+app.use('/admin/db', dbAdminController);
+
+// =============================================================================
+// Security Middleware (after admin routes that need relaxed CSP)
+// =============================================================================
+
+// Security headers
+app.use(helmet());
 
 // Request context
 app.use(contextMiddleware);
@@ -69,15 +88,19 @@ app.use('/docs', docsController);
 // Authentication routes
 app.use('/auth', authController);
 
-// Database Admin UI (development only - has its own protection middleware)
-app.use('/admin/db', dbAdminController);
-
 // =============================================================================
 // Protected Routes (authentication required)
 // =============================================================================
 
-// Customers
-app.use('/customers', authMiddleware, customersController);
+// Customer-specific nested routes MUST come before the general /customers router
+// to ensure proper route matching (more specific routes first)
+
+// Customer Alarm Bundle - Simplified (supports JWT or API Key auth for M2M integration)
+// More specific route MUST come first
+app.get('/customers/:customerId/alarm-rules/bundle/simple', hybridAuthMiddleware('bundles:read'), getSimplifiedAlarmBundleHandler);
+
+// Customer Alarm Bundle - Full (supports JWT or API Key auth for M2M integration)
+app.get('/customers/:customerId/alarm-rules/bundle', hybridAuthMiddleware('bundles:read'), getAlarmBundleHandler);
 
 // Customer API Keys (nested under customers)
 app.use('/customers/:customerId/api-keys', authMiddleware, customerApiKeysController);
@@ -88,8 +111,8 @@ app.get('/customers/:customerId/users', authMiddleware, usersListByCustomerHandl
 // Customer Rules (nested route)
 app.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);
 
-// Customer Alarm Bundle (nested route - supports API Key auth)
-app.get('/customers/:customerId/alarm-rules/bundle', authMiddleware, getAlarmBundleHandler);
+// Customers (general router - must come after specific nested routes)
+app.use('/customers', authMiddleware, customersController);
 
 // Devices
 app.use('/devices', authMiddleware, devicesController);
@@ -111,6 +134,9 @@ app.use('/rules', authMiddleware, rulesController);
 
 // Integrations
 app.use('/integrations', authMiddleware, integrationsController);
+
+// Audit Logs (RFC-0009)
+app.use('/audit-logs', authMiddleware, auditLogsController);
 
 // =============================================================================
 // Error Handling

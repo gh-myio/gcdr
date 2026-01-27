@@ -6,6 +6,10 @@ export interface RequestContext {
   userId: string;
   requestId: string;
   ip: string;
+  // API Key specific fields (optional)
+  customerId?: string;
+  apiKeyId?: string;
+  apiKeyScopes?: string[];
 }
 
 export interface JWTUser {

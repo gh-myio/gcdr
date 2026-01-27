@@ -3,7 +3,7 @@
 - Feature Name: `events_audit_logs`
 - Start Date: 2026-01-23
 - RFC PR: N/A
-- Status: Draft
+- Status: Implemented
 - Related: `alarms-backend/RFC-0002-Events-Audit-Logs.md`
 
 ## Summary
@@ -1039,30 +1039,30 @@ interface AuditLogResponse {
 ## Implementation Plan
 
 ### Fase 1: Schema, Tipos e Config
-- [ ] Criar enums no schema (event_category, actor_type, audit_level)
-- [ ] Adicionar novas colunas em audit_logs
-- [ ] Criar migration
-- [ ] Criar audit.types.ts
-- [ ] Criar pii-sanitizer.ts
-- [ ] Criar audit.config.ts com limites
+- [x] Criar enums no schema (event_category, actor_type, audit_level)
+- [x] Adicionar novas colunas em audit_logs
+- [x] Criar migration
+- [x] Criar audit.types.ts
+- [x] Criar pii-sanitizer.ts
+- [x] Criar audit.config.ts com limites
 
 ### Fase 2: Middleware e Repository
-- [ ] Criar middleware logEvent (interceptando send/json/end)
-- [ ] Criar AuditLogRepository
-- [ ] Configurar audit levels
+- [x] Criar middleware logEvent (interceptando send/json/end)
+- [x] Criar AuditLogRepository
+- [x] Configurar audit levels
 - [ ] Criar job de purge
 
 ### Fase 3: Integracao nos Controllers
-- [ ] Adicionar logEvent em customers
+- [x] Adicionar logEvent em customers
 - [ ] Adicionar logEvent em devices
 - [ ] Adicionar logEvent em users
 - [ ] Adicionar logEvent em rules
 - [ ] Adicionar logEvent em auth
 
 ### Fase 4: API, Seguranca e Documentacao
-- [ ] Criar endpoint GET /audit-logs com RBAC
+- [x] Criar endpoint GET /audit-logs com RBAC
 - [ ] Implementar rate limiting
-- [ ] Validar janela de datas obrigatoria
+- [x] Validar janela de datas obrigatoria
 - [ ] Documentar no OpenAPI
 - [ ] Criar seed com exemplos
 

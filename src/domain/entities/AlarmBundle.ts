@@ -98,3 +98,64 @@ export interface GenerateBundleParams {
   deviceType?: string;
   includeDisabled?: boolean;
 }
+
+// =============================================================================
+// Simplified Bundle Types (for Node-RED consumption)
+// =============================================================================
+
+/**
+ * Simplified alarm rule - minimal fields for Node-RED processing
+ */
+export interface SimpleBundleAlarmRule {
+  id: string;
+  name: string;
+  value: number;
+  valueHigh?: number;
+  duration?: number;
+  hysteresis?: number;
+  aggregation?: 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
+  // Calibration offset (included for temperature metrics)
+  offset?: number;
+  // Schedule fields (always present)
+  startAt: string;      // HH:mm format (default "00:00")
+  endAt: string;        // HH:mm format (default "23:59")
+  daysOfWeek: number[]; // 0-6, where 0 is Sunday (default [0,1,2,3,4,5,6])
+}
+
+/**
+ * Simplified device mapping - minimal fields for Node-RED processing
+ */
+export interface SimpleDeviceMapping {
+  deviceName: string;
+  centralId?: string;
+  slaveId?: number;
+  ruleIds: string[];
+}
+
+/**
+ * Simplified bundle metadata
+ */
+export interface SimpleBundleMeta {
+  version: string;
+  generatedAt: string;
+  customerId: string;
+  customerName: string;
+  tenantId: string;
+  signature: string;
+  algorithm: 'HMAC-SHA256';
+  ttlSeconds: number;
+  rulesCount: number;
+  devicesCount: number;
+}
+
+/**
+ * Simplified Alarm Rules Bundle for Node-RED
+ * - No rulesByDeviceType (redundant)
+ * - Device index includes centralId and slaveId
+ * - Rules without enabled/tags fields
+ */
+export interface SimpleAlarmRulesBundle {
+  meta: SimpleBundleMeta;
+  deviceIndex: Record<string, SimpleDeviceMapping>;
+  rules: Record<string, SimpleBundleAlarmRule>;
+}

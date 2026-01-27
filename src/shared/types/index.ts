@@ -70,3 +70,6 @@ export interface EventLog {
   };
   payload?: Record<string, unknown>;
 }
+
+// Audit types (RFC-0009)
+export * from './audit.types';

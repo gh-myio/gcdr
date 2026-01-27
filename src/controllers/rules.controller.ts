@@ -253,4 +253,68 @@ export const getAlarmBundleHandler = async (req: Request, res: Response, next: N
   }
 };
 
+/**
+ * GET /customers/:customerId/alarm-rules/bundle/simple
+ * Get simplified alarm bundle for customer (mounted in app.ts)
+ * - No meta in body (metadata via HTTP headers)
+ * - No rulesByDeviceType
+ * - Minimal device fields (deviceName, centralId, slaveId, ruleIds)
+ * - Minimal rule fields (id, name, value, duration, hysteresis, aggregation)
+ */
+export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+    const { domain, deviceType, includeDisabled } = req.query;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    // Check for conditional request (If-None-Match header)
+    const ifNoneMatch = req.headers['if-none-match'];
+
+    const bundle = await alarmBundleService.generateSimplifiedBundle({
+      tenantId,
+      customerId,
+      domain: domain as string | undefined,
+      deviceType: deviceType as string | undefined,
+      includeDisabled: includeDisabled === 'true',
+    });
+
+    const etag = `"${bundle.meta.version}"`;
+
+    // Return 304 Not Modified if ETag matches
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      res.set({
+        'ETag': etag,
+        'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+      });
+      res.status(304).send();
+      return;
+    }
+
+    // Set caching headers (metadata goes here instead of body)
+    res.set({
+      'ETag': etag,
+      'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+      'X-Bundle-Version': bundle.meta.version,
+      'X-Bundle-Signature': bundle.meta.signature,
+      'X-Bundle-Rules-Count': String(bundle.meta.rulesCount),
+      'X-Bundle-Devices-Count': String(bundle.meta.devicesCount),
+    });
+
+    // Return simplified payload with versionId, deviceIndex, and rules
+    const simplifiedPayload = {
+      versionId: bundle.meta.version,
+      deviceIndex: bundle.deviceIndex,
+      rules: bundle.rules,
+    };
+
+    sendSuccess(res, simplifiedPayload, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default router;

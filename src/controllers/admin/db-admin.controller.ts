@@ -299,6 +299,67 @@ router.post('/api/query', async (req: Request, res: Response) => {
 router.get('/api/query/examples', (req: Request, res: Response) => {
   const examples = [
     {
+      name: 'All Customers',
+      description: 'List all customers with details',
+      query: `SELECT
+    id,
+    name,
+    display_name,
+    type,
+    status,
+    parent_customer_id,
+    depth,
+    email,
+    phone,
+    created_at
+FROM customers
+ORDER BY depth, name;`,
+    },
+    {
+      name: 'Recent Events (50)',
+      description: 'Last 50 audit log events with metadata',
+      query: `SELECT
+    id,
+    event_type,
+    event_category,
+    action,
+    description,
+    entity_type,
+    entity_id,
+    user_email,
+    actor_type,
+    http_method,
+    http_path,
+    status_code,
+    duration_ms,
+    ip_address,
+    metadata,
+    created_at
+FROM audit_logs
+ORDER BY created_at DESC
+LIMIT 50;`,
+    },
+    {
+      name: 'Event Details (with payload)',
+      description: 'Events with old/new values for auditing changes',
+      query: `SELECT
+    id,
+    event_type,
+    action,
+    description,
+    entity_type,
+    entity_id,
+    user_email,
+    metadata,
+    old_values,
+    new_values,
+    error_message,
+    created_at
+FROM audit_logs
+ORDER BY created_at DESC
+LIMIT 20;`,
+    },
+    {
       name: 'Customer Hierarchy',
       description: 'List customers with hierarchy visualization',
       query: `SELECT
@@ -354,7 +415,24 @@ UNION ALL SELECT 'devices', COUNT(*) FROM devices
 UNION ALL SELECT 'rules', COUNT(*) FROM rules
 UNION ALL SELECT 'centrals', COUNT(*) FROM centrals
 UNION ALL SELECT 'groups', COUNT(*) FROM groups
+UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs
 ORDER BY table_name;`,
+    },
+    {
+      name: 'API Keys',
+      description: 'List all API keys with usage stats',
+      query: `SELECT
+    ak.id,
+    ak.name,
+    ak.key_prefix,
+    ak.scopes,
+    ak.is_active,
+    ak.usage_count,
+    ak.last_used_at,
+    c.name as customer_name
+FROM customer_api_keys ak
+JOIN customers c ON ak.customer_id = c.id
+ORDER BY ak.created_at DESC;`,
     },
   ];
 
@@ -690,6 +768,116 @@ function getHtmlPage(): string {
       margin-right: 8px;
     }
 
+    /* JSON Value Click */
+    .json-value {
+      cursor: pointer;
+      padding: 2px 6px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      display: inline-block;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+      transition: all 0.2s;
+    }
+
+    .json-value:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    .json-value::after {
+      content: ' 👁';
+      font-size: 0.7rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      max-width: 800px;
+      max-height: 80vh;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      padding: 0 5px;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--error);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-body pre {
+      background: var(--bg);
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 15px 20px;
+      border-top: 1px solid var(--border);
+    }
+
     .spinner {
       display: inline-block;
       width: 14px;
@@ -875,6 +1063,23 @@ function getHtmlPage(): string {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSON Modal -->
+  <div id="json-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title">JSON Data</span>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <pre id="modal-content"></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="copyModalContent()">Copy to Clipboard</button>
+        <button class="btn btn-primary" onclick="closeModal()">Close</button>
       </div>
     </div>
   </div>
@@ -1315,10 +1520,55 @@ function getHtmlPage(): string {
 
     function formatValue(val) {
       if (val === null) return '<span style="color: var(--text-secondary);">NULL</span>';
-      if (typeof val === 'object') return JSON.stringify(val).substring(0, 50) + '...';
-      if (typeof val === 'string' && val.length > 50) return val.substring(0, 50) + '...';
+      if (typeof val === 'object') {
+        const json = JSON.stringify(val, null, 2);
+        const preview = JSON.stringify(val).substring(0, 40);
+        const escaped = json.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
+        return \`<span class="json-value" onclick="showModal('JSON Data', '\${escaped}')">\${preview}\${preview.length >= 40 ? '...' : ''}</span>\`;
+      }
+      if (typeof val === 'string' && val.length > 50) {
+        const escaped = val.replace(/'/g, "\\\\'").replace(/"/g, '&quot;').replace(/\\n/g, '\\\\n');
+        return \`<span class="json-value" onclick="showModal('Text Data', '\${escaped}')">\${val.substring(0, 40)}...</span>\`;
+      }
       return String(val);
     }
+
+    // ==========================================================================
+    // Modal Functions
+    // ==========================================================================
+    function showModal(title, content) {
+      document.getElementById('modal-title').textContent = title;
+      // Decode escaped content
+      const decoded = content.replace(/&quot;/g, '"').replace(/\\\\'/g, "'").replace(/\\\\n/g, '\\n');
+      document.getElementById('modal-content').textContent = decoded;
+      document.getElementById('json-modal').classList.add('active');
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('json-modal').classList.remove('active');
+    }
+
+    function copyModalContent() {
+      const content = document.getElementById('modal-content').textContent;
+      navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('btn-success');
+          btn.classList.add('btn-secondary');
+        }, 1500);
+      });
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
 
     // ==========================================================================
     // Initialization

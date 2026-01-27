@@ -9,6 +9,10 @@ import {
   DeviceTypeGroup,
   DeviceRuleMapping,
   GenerateBundleParams,
+  SimpleAlarmRulesBundle,
+  SimpleBundleAlarmRule,
+  SimpleDeviceMapping,
+  SimpleBundleMeta,
 } from '../domain/entities/AlarmBundle';
 import { RuleRepository } from '../repositories/RuleRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
@@ -72,6 +76,142 @@ export class AlarmBundleService {
     bundle.meta.signature = this.signBundle(bundle);
 
     return bundle;
+  }
+
+  /**
+   * Generate a simplified alarm rules bundle for Node-RED
+   * - No rulesByDeviceType
+   * - Includes centralId and slaveId in deviceIndex
+   * - Rules without enabled/tags fields
+   */
+  async generateSimplifiedBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle> {
+    const { tenantId, customerId, domain, deviceType, includeDisabled = false } = params;
+
+    // Validate customer exists
+    const customer = await this.customerRepository.getById(tenantId, customerId);
+    if (!customer) {
+      throw new NotFoundError(`Customer ${customerId} not found`);
+    }
+
+    // Get all devices for this customer
+    const devices = await this.getDevicesByCustomer(tenantId, customerId, domain, deviceType);
+
+    // Get all alarm rules for this customer
+    const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
+
+    // Filter to only ALARM_THRESHOLD rules
+    let alarmRules = allRules.filter(isAlarmRule);
+
+    // Optionally filter disabled rules
+    if (!includeDisabled) {
+      alarmRules = alarmRules.filter(r => r.enabled);
+    }
+
+    // Build simplified bundle
+    const bundle = this.buildSimplifiedBundle(customer, devices, alarmRules, tenantId);
+
+    // Sign the bundle
+    bundle.meta.signature = this.signSimplifiedBundle(bundle);
+
+    return bundle;
+  }
+
+  /**
+   * Build simplified bundle structure
+   */
+  private buildSimplifiedBundle(
+    customer: Customer,
+    devices: Device[],
+    rules: Rule[],
+    tenantId: string
+  ): SimpleAlarmRulesBundle {
+    const generatedAt = new Date().toISOString();
+
+    // Create simplified rules catalog (minimal fields + schedule)
+    const rulesCatalog: Record<string, SimpleBundleAlarmRule> = {};
+    for (const rule of rules) {
+      if (rule.alarmConfig) {
+        const simplifiedRule: SimpleBundleAlarmRule = {
+          id: rule.id,
+          name: rule.name,
+          value: rule.alarmConfig.value,
+          valueHigh: rule.alarmConfig.valueHigh,
+          duration: rule.alarmConfig.duration,
+          hysteresis: rule.alarmConfig.hysteresis,
+          aggregation: rule.alarmConfig.aggregation,
+          // Schedule fields (always present with defaults)
+          startAt: rule.alarmConfig.startAt || '00:00',
+          endAt: rule.alarmConfig.endAt || '23:59',
+          daysOfWeek: rule.alarmConfig.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
+        };
+
+        // Include offset for temperature metrics (default 0 if not set)
+        if (rule.alarmConfig.metric === 'temperature') {
+          simplifiedRule.offset = rule.alarmConfig.offset ?? 0;
+        }
+
+        rulesCatalog[rule.id] = simplifiedRule;
+      }
+    }
+
+    // Build device index (minimal fields: name, centralId, slaveId, ruleIds)
+    const deviceIndex: Record<string, SimpleDeviceMapping> = {};
+
+    for (const device of devices) {
+      const applicableRuleIds = this.getApplicableRules(device, rules);
+
+      deviceIndex[device.id] = {
+        deviceName: device.name,
+        centralId: device.centralId,
+        slaveId: device.slaveId,
+        ruleIds: applicableRuleIds,
+      };
+    }
+
+    // Calculate version hash from content
+    const bundleContent = { deviceIndex, rules: rulesCatalog };
+    const version = this.calculateVersionHash(bundleContent);
+
+    const meta: SimpleBundleMeta = {
+      version,
+      generatedAt,
+      customerId: customer.id,
+      customerName: customer.name,
+      tenantId,
+      signature: '', // Will be filled after
+      algorithm: 'HMAC-SHA256',
+      ttlSeconds: DEFAULT_TTL_SECONDS,
+      rulesCount: Object.keys(rulesCatalog).length,
+      devicesCount: devices.length,
+    };
+
+    return {
+      meta,
+      deviceIndex,
+      rules: rulesCatalog,
+    };
+  }
+
+  /**
+   * Sign the simplified bundle using HMAC-SHA256
+   */
+  private signSimplifiedBundle(bundle: SimpleAlarmRulesBundle): string {
+    const contentToSign = {
+      meta: {
+        version: bundle.meta.version,
+        generatedAt: bundle.meta.generatedAt,
+        customerId: bundle.meta.customerId,
+        tenantId: bundle.meta.tenantId,
+      },
+      rulesCount: bundle.meta.rulesCount,
+      devicesCount: bundle.meta.devicesCount,
+    };
+
+    const serialized = JSON.stringify(contentToSign);
+    return crypto
+      .createHmac('sha256', BUNDLE_SIGNING_SECRET)
+      .update(serialized)
+      .digest('hex');
   }
 
   /**

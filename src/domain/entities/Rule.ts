@@ -16,6 +16,14 @@ export interface AlarmThresholdConfig {
   duration?: number; // Time in seconds the condition must persist
   aggregation?: 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
   aggregationWindow?: number; // Window in seconds for aggregation
+
+  // Calibration offset (for temperature sensors, etc.)
+  offset?: number; // Value to add/subtract for calibration
+
+  // Schedule configuration (when the rule is active)
+  startAt?: string; // HH:mm format (e.g., "08:00")
+  endAt?: string;   // HH:mm format (e.g., "18:00")
+  daysOfWeek?: number[]; // 0-6, where 0 is Sunday (e.g., [1,2,3,4,5] for weekdays)
 }
 
 // SLA Configuration

@@ -107,7 +107,26 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 5 customer API keys';
+    -- Node-RED Bundle API Key (for testing)
+    -- Plaintext Key: gcdr_cust_nodered_test_bundle_key_2024
+    INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
+    VALUES (
+        'cee00001-0001-0001-0001-000000000006',
+        v_tenant_id,
+        v_company1_id,
+        'aae3ce071e3226c15d5bb9702e539830282d325fb5913ca84a65fbbbe6c5cd53',
+        'gcdr_cust_',
+        'Node-RED Bundle Key',
+        'API key for Node-RED alarm bundle integration',
+        '["bundles:read", "rules:read"]',
+        NOW() + INTERVAL '365 days',
+        0,
+        true,
+        v_admin_id,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 6 customer API keys';
 END $$;
 
 -- Verify

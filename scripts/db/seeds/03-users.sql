@@ -2,6 +2,8 @@
 -- SEED: USERS
 -- =============================================================================
 -- Mock data for users table
+-- Password for all test users: Test123!
+-- SHA256 hash: 54de7f606f2523cba8efac173fab42fb7f59d56ceff974c8fdb7342cf2cfe345
 -- =============================================================================
 
 DO $$
@@ -10,6 +12,7 @@ DECLARE
     v_holding_id UUID := '22222222-2222-2222-2222-222222222222';
     v_company1_id UUID := '33333333-3333-3333-3333-333333333333';
     v_partner1_id UUID := 'aaaa1111-1111-1111-1111-111111111111';
+    v_password_hash TEXT := '54de7f606f2523cba8efac173fab42fb7f59d56ceff974c8fdb7342cf2cfe345';
 BEGIN
     -- Admin User (Internal)
     INSERT INTO users (id, tenant_id, customer_id, email, email_verified, username, type, status, profile, security, preferences, tags, version)
@@ -23,7 +26,7 @@ BEGIN
         'INTERNAL',
         'ACTIVE',
         '{"firstName": "System", "lastName": "Administrator", "displayName": "Admin", "phone": "+55 11 99999-9999", "avatar": null}',
-        '{"mfaEnabled": true, "mfaMethod": "TOTP", "lastLoginAt": null, "failedLoginAttempts": 0}',
+        jsonb_build_object('mfaEnabled', false, 'mfaMethod', null, 'lastLoginAt', null, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
         '{"language": "pt-BR", "timezone": "America/Sao_Paulo", "dateFormat": "DD/MM/YYYY", "theme": "light", "notifications": {"email": true, "push": true, "sms": false}}',
         '["admin", "super-user"]',
         1
@@ -41,7 +44,7 @@ BEGIN
         'CUSTOMER',
         'ACTIVE',
         '{"firstName": "João", "lastName": "Silva", "displayName": "João Silva", "phone": "+55 11 98888-0001", "jobTitle": "Operations Manager"}',
-        '{"mfaEnabled": false, "lastLoginAt": null, "failedLoginAttempts": 0}',
+        jsonb_build_object('mfaEnabled', false, 'lastLoginAt', null, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
         '{"language": "pt-BR", "timezone": "America/Sao_Paulo", "dateFormat": "DD/MM/YYYY", "theme": "light"}',
         '["operations", "manager"]',
         1
@@ -59,7 +62,7 @@ BEGIN
         'CUSTOMER',
         'ACTIVE',
         '{"firstName": "Maria", "lastName": "Santos", "displayName": "Maria Santos", "phone": "+55 11 98888-0002", "jobTitle": "Technical Lead"}',
-        '{"mfaEnabled": true, "mfaMethod": "TOTP", "lastLoginAt": null, "failedLoginAttempts": 0}',
+        jsonb_build_object('mfaEnabled', false, 'mfaMethod', null, 'lastLoginAt', null, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
         '{"language": "pt-BR", "timezone": "America/Sao_Paulo", "dateFormat": "DD/MM/YYYY", "theme": "dark"}',
         '["technical", "lead"]',
         1
@@ -77,7 +80,7 @@ BEGIN
         'PARTNER',
         'ACTIVE',
         '{"firstName": "Developer", "lastName": "TechPartner", "displayName": "TechPartner Dev", "phone": "+55 11 98888-0003"}',
-        '{"mfaEnabled": false, "lastLoginAt": null, "failedLoginAttempts": 0}',
+        jsonb_build_object('mfaEnabled', false, 'lastLoginAt', null, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
         '{"language": "en-US", "timezone": "America/Sao_Paulo", "dateFormat": "MM/DD/YYYY", "theme": "light"}',
         '["partner", "developer"]',
         1
@@ -95,7 +98,7 @@ BEGIN
         'SERVICE_ACCOUNT',
         'ACTIVE',
         '{"firstName": "Service", "lastName": "Account", "displayName": "Integration Service"}',
-        '{"mfaEnabled": false}',
+        jsonb_build_object('mfaEnabled', false, 'passwordHash', v_password_hash),
         '{"language": "en-US", "timezone": "UTC"}',
         '["service", "integration"]',
         1
@@ -113,7 +116,7 @@ BEGIN
         'CUSTOMER',
         'PENDING_VERIFICATION',
         '{"firstName": "New", "lastName": "User", "displayName": "New User"}',
-        '{"mfaEnabled": false, "failedLoginAttempts": 0}',
+        jsonb_build_object('mfaEnabled', false, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
         '{"language": "pt-BR", "timezone": "America/Sao_Paulo"}',
         'bbbb1111-1111-1111-1111-111111111111',
         NOW(),

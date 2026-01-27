@@ -65,6 +65,31 @@ export const packageStatusEnum = pgEnum('package_status', ['DRAFT', 'PENDING_REV
 
 export const pricingModelEnum = pgEnum('pricing_model', ['FREE', 'PER_REQUEST', 'MONTHLY', 'ANNUAL', 'CUSTOM']);
 
+// Audit enums (RFC-0009)
+export const eventCategoryEnum = pgEnum('event_category', [
+  'ENTITY_CHANGE',
+  'USER_ACTION',
+  'SYSTEM_EVENT',
+  'QUERY',
+  'AUTH',
+  'INTEGRATION',
+]);
+
+export const actorTypeEnum = pgEnum('actor_type', [
+  'USER',
+  'SYSTEM',
+  'API_KEY',
+  'SERVICE_ACCOUNT',
+  'ANONYMOUS',
+]);
+
+export const auditLevelEnum = pgEnum('audit_level', [
+  'MINIMAL',
+  'STANDARD',
+  'VERBOSE',
+  'DEBUG',
+]);
+
 // =============================================================================
 // CUSTOMERS
 // =============================================================================
@@ -808,38 +833,60 @@ export const packageSubscriptions = pgTable('package_subscriptions', {
 }));
 
 // =============================================================================
-// AUDIT LOGS
+// AUDIT LOGS (RFC-0009)
 // =============================================================================
 
 export const auditLogs = pgTable('audit_logs', {
+  // === Identification ===
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull(),
 
-  // Event info
+  // === Event ===
   eventType: varchar('event_type', { length: 100 }).notNull(),
-  entityType: varchar('entity_type', { length: 50 }).notNull(),
-  entityId: uuid('entity_id').notNull(),
+  eventCategory: eventCategoryEnum('event_category').notNull(),
+  auditLevel: auditLevelEnum('audit_level').notNull().default('STANDARD'),
+  description: varchar('description', { length: 500 }),
   action: varchar('action', { length: 20 }).notNull(),
 
-  // Actor
+  // === Entity (target of action) ===
+  entityType: varchar('entity_type', { length: 50 }).notNull(),
+  entityId: uuid('entity_id'),
+  customerId: uuid('customer_id'),
+
+  // === Actor (who performed) ===
   userId: uuid('user_id'),
   userEmail: varchar('user_email', { length: 255 }),
-  ipAddress: varchar('ip_address', { length: 45 }),
-  userAgent: text('user_agent'),
+  actorType: actorTypeEnum('actor_type').notNull().default('USER'),
 
-  // Changes
+  // === State before/after (sanitized) ===
   oldValues: jsonb('old_values'),
   newValues: jsonb('new_values'),
 
-  // Context
+  // === Request context ===
   requestId: uuid('request_id'),
-  metadata: jsonb('metadata').notNull().default({}),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: varchar('user_agent', { length: 500 }),
+  httpMethod: varchar('http_method', { length: 10 }),
+  httpPath: varchar('http_path', { length: 500 }),
 
-  // Timestamp
+  // === Result ===
+  statusCode: integer('status_code'),
+  errorMessage: varchar('error_message', { length: 2000 }),
+  durationMs: integer('duration_ms'),
+
+  // === Flexible metadata ===
+  metadata: jsonb('metadata').notNull().default({}),
+  externalLink: varchar('external_link', { length: 255 }),
+
+  // === Timestamp ===
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tenantEntityIdx: index('audit_logs_tenant_entity_idx').on(table.tenantId, table.entityType, table.entityId),
   tenantUserIdx: index('audit_logs_tenant_user_idx').on(table.tenantId, table.userId),
   tenantCreatedIdx: index('audit_logs_tenant_created_idx').on(table.tenantId, table.createdAt),
   tenantEventTypeIdx: index('audit_logs_tenant_event_type_idx').on(table.tenantId, table.eventType),
+  tenantCustomerIdx: index('audit_logs_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantCategoryIdx: index('audit_logs_tenant_category_idx').on(table.tenantId, table.eventCategory),
+  tenantActionIdx: index('audit_logs_tenant_action_idx').on(table.tenantId, table.action),
+  tenantLevelIdx: index('audit_logs_tenant_level_idx').on(table.tenantId, table.auditLevel),
 }));
