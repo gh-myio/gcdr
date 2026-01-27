@@ -5,6 +5,7 @@
 - **Updated**: 2026-01-27
 - **Author**: GCDR Team
 - **Review**: [RFC-0010-Premium-Alarm-Simulator.review.md](./RFC-0010-Premium-Alarm-Simulator.review.md)
+- **User Manual**: [SIMULATOR-MANUAL.md](./SIMULATOR-MANUAL.md)
 
 ## Summary
 
