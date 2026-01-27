@@ -1,0 +1,186 @@
+<mxfile host="app.diagrams.net" modified="2026-01-21T00:00:00.000Z" agent="chatgpt" version="24.7.8" type="device">
+  <diagram id="ecosystem" name="MYIO Ecosystem (Onboarding)">
+    <mxGraphModel dx="1440" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ====== TITLE ====== -->
+        <mxCell id="title" value="MYIO / GCDR — Visão Geral do Ecossistema (Onboarding)" style="text;html=1;fontSize=26;fontStyle=1;align=left;verticalAlign=top;spacingTop=10;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Responsabilidades e fluxo: Apps → GCDR (cadastro/identidade) → Processamento/Orquestração → Canais → Campo (Centrais/Devices)" style="text;html=1;fontSize=14;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;opacity=80;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="1500" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== BACKGROUND LANES ====== -->
+        <mxCell id="laneApps" value="Camada 1 — Usuários & Aplicações" style="swimlane;html=1;rounded=1;startSize=30;horizontal=1;collapsible=0;strokeWidth=1;fillColor=#F3F4F6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="1840" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="laneGCDR" value="Camada 2 — GCDR (Single Source of Truth)" style="swimlane;html=1;rounded=1;startSize=30;horizontal=1;collapsible=0;strokeWidth=1;fillColor=#FFF1F2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="1840" height="210" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="laneCore" value="Camada 3 — Processamento & Orquestração" style="swimlane;html=1;rounded=1;startSize=30;horizontal=1;collapsible=0;strokeWidth=1;fillColor=#ECFDF5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="1840" height="260" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="laneField" value="Camada 4 — Campo / Edge (Centrais & Devices)" style="swimlane;html=1;rounded=1;startSize=30;horizontal=1;collapsible=0;strokeWidth=1;fillColor=#EFF6FF;" vertex="1" parent="1">
+          <mxGeometry x="40" y="800" width="1840" height="240" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== APPS BOXES ====== -->
+        <mxCell id="apps" value="Web App GCDR&#10;• Admin / Operador&#10;• Gestão (CRUD)&#10;• Visualização / Console" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneApps">
+          <mxGeometry x="40" y="60" width="300" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="dashboards" value="Dashboards / Portais&#10;• Head Office&#10;• RedOffice&#10;• Kiosk / Totem" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneApps">
+          <mxGeometry x="380" y="60" width="300" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="externalApps" value="Sistemas Externos&#10;• ERP / CRM&#10;• Parceiros&#10;• Apps instaladores" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneApps">
+          <mxGeometry x="720" y="60" width="300" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== GCDR MAIN ====== -->
+        <mxCell id="gcdr" value="GCDR&#10;(Base Única de Cadastro / Identidade)&#10;&#10;• Customers (hierarquia)&#10;• Centrais (gateways)&#10;• Devices & Assets&#10;• Users / Groups / Roles / Policies&#10;• Regras / Thresholds / Bundles&#10;• API Keys / JWT (multi-audience)&#10;• Marketplace de integrações" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#B91C1C;fillColor=#FFFFFF;fontStyle=1;" vertex="1" parent="laneGCDR">
+          <mxGeometry x="40" y="60" width="620" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gcdrNot" value="O que o GCDR NÃO é&#10;• Não processa telemetria&#10;• Não decide alarmes&#10;• Não faz dispatch&#10;• Não substitui orquestradores" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#EF4444;fillColor=#FFF7ED;" vertex="1" parent="laneGCDR">
+          <mxGeometry x="700" y="60" width="360" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="openapi" value="OpenAPI / Swagger&#10;• /docs&#10;• openapi.yaml&#10;• 140+ endpoints" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#B91C1C;fillColor=#FFFFFF;opacity=95;" vertex="1" parent="laneGCDR">
+          <mxGeometry x="1100" y="60" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== CORE / ORCHESTRATION ====== -->
+        <mxCell id="ingestion" value="Ingestion / Telemetry Processor&#10;• Recebe MQTT / HTTP&#10;• Normaliza eventos&#10;• Gera candidatos a alarme" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#065F46;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="40" y="70" width="360" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="sqs" value="SQS (Filas)&#10;• alarm-events (+ DLQ)&#10;• telegram (+ DLQ)&#10;• workorder (+ DLQ)&#10;• webhook (+ DLQ)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#374151;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="430" y="70" width="360" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="orchestrator" value="Alarm Orchestrator (o cérebro)&#10;• Decision Engine + Guards&#10;• State Machine&#10;• Dedup / Cooldown / Hysteresis&#10;• Cria ações de dispatch" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#16A34A;fillColor=#FFFFFF;fontStyle=1;" vertex="1" parent="laneCore">
+          <mxGeometry x="820" y="60" width="420" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="dispatcher" value="Dispatcher Worker&#10;• Consome filas de canais&#10;• Renderiza templates&#10;• Executa handlers" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#16A34A;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="1270" y="70" width="300" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="channels" value="Canais de Ação&#10;• Telegram&#10;• Ordem de Serviço&#10;• Webhook&#10;• Notificações no Painel&#10;• E-mail / SMS (futuro)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#F59E0B;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="1600" y="70" width="220" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="coreDB" value="DynamoDB&#10;• GCDR Tables (cadastro)&#10;• Orchestrator Single-table (alarmes/logs)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="820" y="230" width="420" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="eventbridge" value="EventBridge&#10;• gcdr-events&#10;• customer.* partner.* authz.*&#10;• sincronização entre sistemas" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneCore">
+          <mxGeometry x="430" y="230" width="360" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== FIELD / EDGE ====== -->
+        <mxCell id="centrals" value="Centrais (Gateways)&#10;• Orange Pi / Linux&#10;• Node-RED&#10;• Cache local&#10;• Download de bundles (GCDR)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3;strokeColor=#1D4ED8;fillColor=#FFFFFF;fontStyle=1;" vertex="1" parent="laneField">
+          <mxGeometry x="40" y="70" width="520" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="devices" value="Devices & Sensores&#10;• Energia (3F 001 / 002 / 003...)&#10;• Água (Caixa d'água)&#10;• Temperatura&#10;• Equipamentos críticos" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#1D4ED8;fillColor=#FFFFFF;" vertex="1" parent="laneField">
+          <mxGeometry x="600" y="70" width="420" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="tb" value="ThingsBoard&#10;• Dashboards / Widgets&#10;• Visualização / Telemetria&#10;(não é o SSoT)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#7C3AED;fillColor=#FFFFFF;" vertex="1" parent="laneField">
+          <mxGeometry x="1060" y="70" width="300" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="nodehub" value="NodeHub / Serviços Edge&#10;• roteamento local&#10;• integrações de campo" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneField">
+          <mxGeometry x="1390" y="70" width="260" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="os" value="OS / Manutenção&#10;• abertura/fechamento&#10;• SLA / escalonamento" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#111827;fillColor=#FFFFFF;" vertex="1" parent="laneField">
+          <mxGeometry x="1680" y="70" width="180" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- ====== EDGES / FLOW ====== -->
+        <!-- Apps -> GCDR -->
+        <mxCell id="e_apps_gcdr" value="01  Gestão • Auth • Config" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#111827;fontSize=12;" edge="1" parent="1" source="apps" target="gcdr">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ext_gcdr" value="01  APIs (JWT / API Key)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#111827;fontSize=12;" edge="1" parent="1" source="externalApps" target="gcdr">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- GCDR -> Centrals -->
+        <mxCell id="e_gcdr_centrals" value="02  Provisionamento • Bundles • Regras" style="endArrow=block;html=1;strokeWidth=3;strokeColor=#B91C1C;fontSize=12;" edge="1" parent="1" source="gcdr" target="centrals">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Devices -> Ingestion -->
+        <mxCell id="e_devices_ingestion" value="03  Telemetria (MQTT/HTTP)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#1D4ED8;fontSize=12;" edge="1" parent="1" source="devices" target="ingestion">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Ingestion -> SQS -->
+        <mxCell id="e_ingestion_sqs" value="04  AlarmCandidateRaised" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#065F46;fontSize=12;" edge="1" parent="1" source="ingestion" target="sqs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS -> Orchestrator -->
+        <mxCell id="e_sqs_orch" value="05  Consume alarm-events" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#374151;fontSize=12;" edge="1" parent="1" source="sqs" target="orchestrator">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- GCDR -> Orchestrator (rules bundle) -->
+        <mxCell id="e_gcdr_orch" value="06  Rules Bundle (ETag/HMAC) + JWT audience" style="endArrow=block;html=1;strokeWidth=3;strokeColor=#B91C1C;fontSize=12;dashed=1;" edge="1" parent="1" source="gcdr" target="orchestrator">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Orchestrator -> DynamoDB -->
+        <mxCell id="e_orch_db" value="07  Persistência (alarmes/logs)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#16A34A;fontSize=12;" edge="1" parent="1" source="orchestrator" target="coreDB">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- GCDR -> EventBridge -->
+        <mxCell id="e_gcdr_eventbridge" value="08  Eventos: customer.* partner.* authz.*" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#B91C1C;fontSize=12;" edge="1" parent="1" source="gcdr" target="eventbridge">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Orchestrator -> Dispatcher -->
+        <mxCell id="e_orch_dispatcher" value="09  Dispatch Requests" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#16A34A;fontSize=12;" edge="1" parent="1" source="orchestrator" target="dispatcher">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Dispatcher -> Channels -->
+        <mxCell id="e_dispatcher_channels" value="10  Telegram/OS/Webhook" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#16A34A;fontSize=12;" edge="1" parent="1" source="dispatcher" target="channels">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Channels -> OS (field) -->
+        <mxCell id="e_channels_os" value="11  Ações (abrir OS / notificar)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#F59E0B;fontSize=12;" edge="1" parent="1" source="channels" target="os">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ThingsBoard relation (dashed) -->
+        <mxCell id="e_devices_tb" value="12  Visualização (telemetria)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#7C3AED;fontSize=12;dashed=1;" edge="1" parent="1" source="devices" target="tb">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Centrals -> NodeHub -->
+        <mxCell id="e_centrals_nodehub" value="13  Integrações Edge" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#1D4ED8;fontSize=12;dashed=1;" edge="1" parent="1" source="centrals" target="nodehub">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Small callout -->
+        <mxCell id="callout" value="💡 Leitura rápida&#10;• GCDR = cadastro + identidade + regras&#10;• Ingestion/Orchestrator = inteligência operacional&#10;• Centrais/Devices = campo (origem dos dados)" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1;strokeColor=#111827;fillColor=#FFFFFF;opacity=92;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="300" width="420" height="120" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

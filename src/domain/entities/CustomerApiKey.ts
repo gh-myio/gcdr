@@ -9,6 +9,9 @@ export type ApiKeyScope =
   | 'rules:read'        // Read rules
   | 'assets:read'       // Read assets
   | 'groups:read'       // Read groups
+  | 'simulator:read'    // Read simulator bundles (RFC-0010)
+  | 'simulator:write'   // Start/stop simulations (RFC-0010)
+  | 'simulator:admin'   // Manage all tenant simulations (RFC-0010)
   | '*:read';           // Read all resources
 
 /**
@@ -81,6 +84,12 @@ export function hasScope(grantedScopes: ApiKeyScope[], requiredScope: ApiKeyScop
   if (grantedScopes.includes('*:read') && requiredScope.endsWith(':read')) {
     return true;
   }
+
+  // Check for simulator:admin (grants all simulator:* scopes)
+  if (grantedScopes.includes('simulator:admin') && requiredScope.startsWith('simulator:')) {
+    return true;
+  }
+
   // Check for exact match
   return grantedScopes.includes(requiredScope);
 }

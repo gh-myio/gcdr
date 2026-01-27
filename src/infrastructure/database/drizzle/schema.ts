@@ -65,6 +65,15 @@ export const packageStatusEnum = pgEnum('package_status', ['DRAFT', 'PENDING_REV
 
 export const pricingModelEnum = pgEnum('pricing_model', ['FREE', 'PER_REQUEST', 'MONTHLY', 'ANNUAL', 'CUSTOM']);
 
+// Simulator enums (RFC-0010)
+export const simulatorSessionStatusEnum = pgEnum('simulator_session_status', [
+  'PENDING',
+  'RUNNING',
+  'STOPPED',
+  'EXPIRED',
+  'ERROR',
+]);
+
 // Audit enums (RFC-0009)
 export const eventCategoryEnum = pgEnum('event_category', [
   'ENTITY_CHANGE',
@@ -889,4 +898,71 @@ export const auditLogs = pgTable('audit_logs', {
   tenantCategoryIdx: index('audit_logs_tenant_category_idx').on(table.tenantId, table.eventCategory),
   tenantActionIdx: index('audit_logs_tenant_action_idx').on(table.tenantId, table.action),
   tenantLevelIdx: index('audit_logs_tenant_level_idx').on(table.tenantId, table.auditLevel),
+}));
+
+// =============================================================================
+// SIMULATOR (RFC-0010)
+// =============================================================================
+
+/**
+ * Simulator Sessions - Tracks active simulation sessions
+ */
+export const simulatorSessions = pgTable('simulator_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id').notNull(),
+  createdBy: uuid('created_by').notNull(),
+
+  // Session info
+  name: varchar('name', { length: 100 }).notNull(),
+  status: simulatorSessionStatusEnum('status').notNull().default('PENDING'),
+
+  // Configuration
+  config: jsonb('config').notNull().default({}),
+
+  // Quotas tracking
+  scansCount: integer('scans_count').notNull().default(0),
+  scansLimit: integer('scans_limit').notNull(),
+
+  // Bundle state
+  bundleVersion: varchar('bundle_version', { length: 50 }),
+  bundleSignature: varchar('bundle_signature', { length: 128 }),
+  bundleFetchedAt: timestamp('bundle_fetched_at', { withTimezone: true }),
+
+  // Statistics
+  alarmsTriggeredCount: integer('alarms_triggered_count').notNull().default(0),
+  lastScanAt: timestamp('last_scan_at', { withTimezone: true }),
+
+  // Lifecycle
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  stoppedAt: timestamp('stopped_at', { withTimezone: true }),
+
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantIdx: index('sim_sessions_tenant_idx').on(table.tenantId),
+  statusIdx: index('sim_sessions_status_idx').on(table.status),
+  tenantStatusIdx: index('sim_sessions_tenant_status_idx').on(table.tenantId, table.status),
+  expiresIdx: index('sim_sessions_expires_idx').on(table.expiresAt),
+}));
+
+/**
+ * Simulator Events - Audit trail of simulation events
+ */
+export const simulatorEvents = pgTable('simulator_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id').notNull().references(() => simulatorSessions.id, { onDelete: 'cascade' }),
+
+  // Event info
+  eventType: varchar('event_type', { length: 50 }).notNull(),
+  eventData: jsonb('event_data').notNull().default({}),
+
+  // Timestamp
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index('sim_events_session_idx').on(table.sessionId),
+  createdIdx: index('sim_events_created_idx').on(table.createdAt),
+  sessionTypeIdx: index('sim_events_session_type_idx').on(table.sessionId, table.eventType),
 }));

@@ -7,4 +7,5 @@ export * from './PolicyRepository';
 export * from './RoleAssignmentRepository';
 export * from './RuleRepository';
 export * from './AuditLogRepository';
+export * from './SimulatorRepository';
 export * from './interfaces';

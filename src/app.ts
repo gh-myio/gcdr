@@ -29,10 +29,14 @@ import {
   integrationsController,
   customerApiKeysController,
   auditLogsController,
+  simulatorController,
   dbAdminController,
 } from './controllers';
 
+import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
+
 import { initializeAuditLogging } from './infrastructure/audit';
+import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
 
 const app: Express = express();
 
@@ -64,6 +68,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Database Admin UI (development only - needs external scripts for CodeMirror)
 app.use('/admin/db', dbAdminController);
+
+// Simulator Cockpit UI (RFC-0010)
+app.use('/admin/simulator', simulatorAdminController);
 
 // =============================================================================
 // Security Middleware (after admin routes that need relaxed CSP)
@@ -138,6 +145,9 @@ app.use('/integrations', authMiddleware, integrationsController);
 // Audit Logs (RFC-0009)
 app.use('/audit-logs', authMiddleware, auditLogsController);
 
+// Simulator (RFC-0010)
+app.use('/simulator', authMiddleware, simulatorController);
+
 // =============================================================================
 // Error Handling
 // =============================================================================
@@ -156,7 +166,7 @@ const PORT = parseInt(process.env.PORT || '3015', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 if (require.main === module) {
-  app.listen(PORT, HOST, () => {
+  app.listen(PORT, HOST, async () => {
     const isDev = process.env.NODE_ENV !== 'production';
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
@@ -166,9 +176,18 @@ if (require.main === module) {
 ║  Server:      http://${HOST}:${PORT.toString().padEnd(33)}║
 ║  Health:      http://${HOST}:${PORT}/health${' '.repeat(26)}║
 ║  Docs:        http://${HOST}:${PORT}/docs${' '.repeat(28)}║${isDev ? `
-║  DB Admin:    http://${HOST}:${PORT}/admin/db${' '.repeat(22)}║` : ''}
+║  DB Admin:    http://${HOST}:${PORT}/admin/db${' '.repeat(22)}║
+║  Simulator:   http://${HOST}:${PORT}/admin/simulator${' '.repeat(15)}║` : ''}
 ╚════════════════════════════════════════════════════════════╝
     `);
+
+    // Initialize simulator subsystem (RFC-0010)
+    try {
+      await initializeSimulator();
+      registerShutdownHandlers();
+    } catch (error) {
+      console.error('Failed to initialize simulator subsystem:', error);
+    }
   });
 }
 

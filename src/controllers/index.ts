@@ -16,3 +16,4 @@ export { default as rulesController, listByCustomerHandler as rulesListByCustome
 export { default as integrationsController } from './integrations.controller';
 export { default as customerApiKeysController } from './customer-api-keys.controller';
 export { auditLogsController } from './audit-logs.controller';
+export { simulatorController } from './simulator.controller';
