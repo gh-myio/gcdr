@@ -167,46 +167,73 @@ Em **"Health Check"**:
 
 ## Migrations e Seeds
 
-### 1. Acessar Terminal do Container
+### IMPORTANTE: Migrations via PostgreSQL Container
 
-No Dokploy, acesse o terminal do container `gcdr-api`:
+A imagem de produção não inclui `drizzle-kit` (é uma devDependency). Para rodar migrations, use uma das opções abaixo:
 
-1. Clique no serviço `gcdr-api`
-2. Vá em **"Terminal"** ou **"Console"**
+### Opção 1: Via PostgreSQL Container Terminal (Recomendado)
 
-### 2. Executar Migrations
-
-```bash
-cd /app
-npm run db:migrate
+1. No Dokploy, vá para o serviço **PostgreSQL** (não a API)
+2. Abra **"Terminal"** ou **"Console"**
+3. Conecte ao banco:
+```sh
+psql -U postgres -d db_gcdr_prod
 ```
 
-### 3. Executar Seeds (apenas primeira vez)
+4. Execute o SQL combinado disponível em `drizzle/migrations/combined-production.sql`:
+   - Copie todo o conteúdo do arquivo e cole no terminal psql
+   - Ou, se tiver acesso ao arquivo no container:
+   ```sh
+   psql -U postgres -d db_gcdr_prod -f /path/to/combined-production.sql
+   ```
 
-```bash
-npm run db:seed
-```
-
-### Alternativa: Via SSH no Servidor
+### Opção 2: Via SSH no Servidor
 
 ```bash
 # Conectar ao servidor
 ssh root@13.218.248.206
 
-# Encontrar o container
+# Encontrar o container PostgreSQL
+docker ps | grep postgres
+
+# Executar psql dentro do container PostgreSQL
+docker exec -it <postgres_container_id> psql -U postgres -d db_gcdr_prod
+
+# Dentro do psql, cole o conteúdo de combined-production.sql
+# ou execute cada statement do arquivo de migração
+```
+
+### Verificar se migrations foram executadas
+
+```sql
+-- No psql, verificar tabelas criadas:
+\dt
+
+-- Verificar histórico de migrations:
+SELECT * FROM __drizzle_migrations;
+```
+
+### Executar Seeds
+
+Após as migrations, execute os seeds via API container:
+
+```bash
+# Via SSH no servidor
+ssh root@13.218.248.206
+
+# Encontrar o container da API
 docker ps | grep gcdr-api
 
-# Executar migrations
-docker exec -it <container_id> npm run db:migrate
-
-# Executar seeds
-docker exec -it <container_id> npm run db:seed
+# Executar seeds (use sh, não bash - Alpine Linux)
+docker exec -it <api_container_id> sh -c "npm run db:seed"
 ```
+
+**Nota:** O container usa Alpine Linux que não tem `bash`, use `sh`.
 
 ### Alternativa: Conectar diretamente ao banco (debug)
 
 ```bash
-# Via psql local
+# Via psql local (requer porta 5455 acessível externamente)
 psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_prod"
 
 # Ou via Docker no servidor

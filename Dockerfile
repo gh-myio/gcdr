@@ -56,6 +56,9 @@ COPY --from=builder --chown=gcdr:nodejs /app/package*.json ./
 # Copy OpenAPI documentation
 COPY --chown=gcdr:nodejs docs/openapi.yaml ./docs/
 
+# Copy drizzle migrations (SQL files for manual migration if needed)
+COPY --chown=gcdr:nodejs drizzle/migrations ./drizzle/migrations
+
 # Switch to non-root user
 USER gcdr
 
