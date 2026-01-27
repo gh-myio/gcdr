@@ -145,3 +145,18 @@ stacks-map.js
 docker/.env
 scripts/.env
 load-test-results-*.json
+Copia.env.txt
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Test outputs (generated dynamically)
+tests/get_bundles/simple_bundle_output.json
+tests/get_bundles/*.jpeg
+
+# Temporary documentation files
+docs/toCheck*.txt
+docs/*.png
+
+# Windows artifacts
+nul
