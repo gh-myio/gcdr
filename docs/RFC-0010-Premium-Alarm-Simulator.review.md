@@ -1,43 +1,43 @@
-# Review — RFC-0010: Premium Alarm Simulator
+# Review ï¿½ RFC-0010: Premium Alarm Simulator
 
 - **Arquivo avaliado**: `docs/RFC-0010-Premium-Alarm-Simulator.md`
 - **Data do review**: 2026-01-27
-- **Status do RFC**: Draft
+- **Status do RFC**: Implemented (MVP)
 
 ## Resumo
-A proposta descreve um simulador premium de alarmes com componentes bem definidos (busca de bundle, refresh, geração de telemetria, avaliação de regras e monitor). A arquitetura e os fluxos principais estão claros, porém faltam critérios operacionais e de segurança para evitar poluição de dados e abuso de recursos, além de detalhes de multi-tenant e observabilidade.
+A proposta descreve um simulador premium de alarmes com componentes bem definidos (busca de bundle, refresh, geraï¿½ï¿½o de telemetria, avaliaï¿½ï¿½o de regras e monitor). A arquitetura e os fluxos principais estï¿½o claros, porï¿½m faltam critï¿½rios operacionais e de seguranï¿½a para evitar poluiï¿½ï¿½o de dados e abuso de recursos, alï¿½m de detalhes de multi-tenant e observabilidade.
 
 ## Pontos fortes
-- Objetivo e motivação claros, com valor para dev/QA/demo/treinamento.
+- Objetivo e motivaï¿½ï¿½o claros, com valor para dev/QA/demo/treinamento.
 - Fluxo fim a fim bem delineado (bundle ? regras ? eventos ? orquestrador).
-- Especificação de endpoints, eventos WS e schemas auxiliares úteis para implementação.
-- Checklist de implementação estruturado por fases.
+- Especificaï¿½ï¿½o de endpoints, eventos WS e schemas auxiliares ï¿½teis para implementaï¿½ï¿½o.
+- Checklist de implementaï¿½ï¿½o estruturado por fases.
 
 ## Riscos e lacunas
-1. **Isolamento de dados simulados**: não há estratégia concreta para impedir mistura com alarmes reais (tags, tenant isolado, canal separado, cleanup automático). Isso é citado como risco, mas sem mitigação.
-2. **Rate limiting e custo**: o RFC não define limites por tenant/usuário, quota de sessões ou custos de CPU/memória; pode gerar abuso e impacto em produção.
-3. **Segurança do endpoint de bundle**: uso de API key fixa; não há política de rotação, expiração, escopo por tenant ou auditoria.
-4. **Multi-tenant e autorização**: falta detalhar como o `simulationId` se relaciona com `tenantId` e quais garantias de isolamento existem nos endpoints e WS.
-5. **Observabilidade**: faltam métricas sugeridas (latência de scan, fila, taxa de candidatos, erros), logs estruturados e tracing.
-6. **Compatibilidade com regras reais**: não está claro se o simulador usa exatamente o mesmo motor de regras do Central/Orchestrator ou uma implementação paralela (risco de drift).
-7. **Persistência x memória**: `activeSessions` em memória pode perder estado em restart; falta estratégia de recovery/replay a partir de `simulator_sessions` e `simulator_events`.
-8. **Privacidade e dados sensíveis**: eventos de telemetria simulada podem conter dados semelhantes a dados reais; faltam diretrizes de retenção e masking.
-9. **Diagrama com encoding quebrado**: o diagrama ASCII aparece ilegível (caracteres `â”€` etc.), dificultando leitura.
+1. **Isolamento de dados simulados**: nï¿½o hï¿½ estratï¿½gia concreta para impedir mistura com alarmes reais (tags, tenant isolado, canal separado, cleanup automï¿½tico). Isso ï¿½ citado como risco, mas sem mitigaï¿½ï¿½o.
+2. **Rate limiting e custo**: o RFC nï¿½o define limites por tenant/usuï¿½rio, quota de sessï¿½es ou custos de CPU/memï¿½ria; pode gerar abuso e impacto em produï¿½ï¿½o.
+3. **Seguranï¿½a do endpoint de bundle**: uso de API key fixa; nï¿½o hï¿½ polï¿½tica de rotaï¿½ï¿½o, expiraï¿½ï¿½o, escopo por tenant ou auditoria.
+4. **Multi-tenant e autorizaï¿½ï¿½o**: falta detalhar como o `simulationId` se relaciona com `tenantId` e quais garantias de isolamento existem nos endpoints e WS.
+5. **Observabilidade**: faltam mï¿½tricas sugeridas (latï¿½ncia de scan, fila, taxa de candidatos, erros), logs estruturados e tracing.
+6. **Compatibilidade com regras reais**: nï¿½o estï¿½ claro se o simulador usa exatamente o mesmo motor de regras do Central/Orchestrator ou uma implementaï¿½ï¿½o paralela (risco de drift).
+7. **Persistï¿½ncia x memï¿½ria**: `activeSessions` em memï¿½ria pode perder estado em restart; falta estratï¿½gia de recovery/replay a partir de `simulator_sessions` e `simulator_events`.
+8. **Privacidade e dados sensï¿½veis**: eventos de telemetria simulada podem conter dados semelhantes a dados reais; faltam diretrizes de retenï¿½ï¿½o e masking.
+9. **Diagrama com encoding quebrado**: o diagrama ASCII aparece ilegï¿½vel (caracteres `â”€` etc.), dificultando leitura.
 
-## Questões em aberto (sugestões de decisão)
-- O simulador deve operar em ambiente isolado (cluster separado) ou compartilhar infraestrutura com produção?
-- Como será o modelo de cobrança: por sessão ativa, por volume de scans, ou por tempo de execução?
-- Qual o limite padrão de sessões simultâneas por tenant e o mecanismo de override para clientes premium?
-- O `AlarmCandidateRaised` de simulação deve ir para uma fila/namespace separada?
-- Qual política de expiração/cleanup de sessões e eventos? (ex.: 7/30 dias)
+## Questï¿½es em aberto (sugestï¿½es de decisï¿½o)
+- O simulador deve operar em ambiente isolado (cluster separado) ou compartilhar infraestrutura com produï¿½ï¿½o?
+- Como serï¿½ o modelo de cobranï¿½a: por sessï¿½o ativa, por volume de scans, ou por tempo de execuï¿½ï¿½o?
+- Qual o limite padrï¿½o de sessï¿½es simultï¿½neas por tenant e o mecanismo de override para clientes premium?
+- O `AlarmCandidateRaised` de simulaï¿½ï¿½o deve ir para uma fila/namespace separada?
+- Qual polï¿½tica de expiraï¿½ï¿½o/cleanup de sessï¿½es e eventos? (ex.: 7/30 dias)
 
-## Recomendações
-- Definir **política de isolamento** (tags/tenant/namespace) e **cleanup automático** para evitar poluição de dados.
-- Adicionar **rate limits** e **quotas** por tenant/usuário; incluir no checklist.
-- Especificar **authn/authz** para API key e endpoints de controle (escopo, rotação, auditoria).
-- Padronizar **métricas e logs**: contadores de scans, latência, erro de bundle, backlog da fila, taxa de alarmes.
-- Corrigir o **diagrama** para UTF-8 válido ou substituir por Mermaid.
-- Definir estratégia de **state recovery** para reinícios (recarregar sessões a partir do banco).
+## Recomendaï¿½ï¿½es
+- Definir **polï¿½tica de isolamento** (tags/tenant/namespace) e **cleanup automï¿½tico** para evitar poluiï¿½ï¿½o de dados.
+- Adicionar **rate limits** e **quotas** por tenant/usuï¿½rio; incluir no checklist.
+- Especificar **authn/authz** para API key e endpoints de controle (escopo, rotaï¿½ï¿½o, auditoria).
+- Padronizar **mï¿½tricas e logs**: contadores de scans, latï¿½ncia, erro de bundle, backlog da fila, taxa de alarmes.
+- Corrigir o **diagrama** para UTF-8 vï¿½lido ou substituir por Mermaid.
+- Definir estratï¿½gia de **state recovery** para reinï¿½cios (recarregar sessï¿½es a partir do banco).
 
-## Decisão sugerida
-Aprovar a direção geral **com pendências**; exigir resolução dos itens de isolamento, rate limiting, segurança e observabilidade antes de iniciar Fase 3.
+## Decisï¿½o sugerida
+Aprovar a direï¿½ï¿½o geral **com pendï¿½ncias**; exigir resoluï¿½ï¿½o dos itens de isolamento, rate limiting, seguranï¿½a e observabilidade antes de iniciar Fase 3.
