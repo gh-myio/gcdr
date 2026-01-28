@@ -127,7 +127,29 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 6 customer API keys';
+    -- ==========================================================================
+    -- Alarm System Integration Key (for Central/Orchestrator)
+    -- ==========================================================================
+    -- Plaintext Key: gcdr_alarm_integration_key_2026
+    -- Hash: SHA256('gcdr_alarm_integration_key_2026')
+    INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
+    VALUES (
+        'cee00001-0001-0001-0001-000000000007',
+        v_tenant_id,
+        v_company1_id,
+        'eda8d751f85a9dcc444739182732086905bfb5d2e4686f30cafbe86902cbb5f4',
+        'gcdr_alarm_',
+        'Alarm System Integration',
+        'Full access API key for alarm orchestrator and central integration - TEST KEY: gcdr_alarm_integration_key_2026',
+        '["bundles:read", "rules:read", "rules:write", "devices:read", "devices:write", "alarms:read", "alarms:write", "alarms:acknowledge", "telemetry:read", "telemetry:write", "simulator:read", "simulator:write"]',
+        NOW() + INTERVAL '365 days',
+        0,
+        true,
+        v_admin_id,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 7 customer API keys';
 END $$;
 
 -- Verify
