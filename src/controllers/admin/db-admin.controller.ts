@@ -106,32 +106,28 @@ router.post('/api/scripts/:name/run', async (req: Request, res: Response) => {
 
   try {
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
-    const command = `docker exec -i gcdr-postgres psql -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1`;
 
-    const output = execSync(command, {
-      input: sqlContent,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    // Execute SQL directly using database connection
+    await db.execute(sql.raw(sqlContent));
 
     const duration = Date.now() - startTime;
-    addLog('success', `${name} - Done (${duration}ms)`, output);
+    addLog('success', `${name} - Done (${duration}ms)`);
 
     res.json({
       success: true,
       script: name,
       duration,
-      output,
+      output: 'Script executed successfully',
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `${name} - Failed (${duration}ms)`, error.stderr || error.message);
+    addLog('error', `${name} - Failed (${duration}ms)`, error.message);
 
     res.status(500).json({
       success: false,
       script: name,
       duration,
-      error: error.stderr || error.message,
+      error: error.message,
     });
   }
 });
@@ -154,21 +150,17 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
 
       try {
         const sqlContent = fs.readFileSync(filepath, 'utf-8');
-        const command = `docker exec -i gcdr-postgres psql -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1`;
 
-        execSync(command, {
-          input: sqlContent,
-          encoding: 'utf-8',
-          maxBuffer: 10 * 1024 * 1024,
-        });
+        // Execute SQL directly using database connection
+        await db.execute(sql.raw(sqlContent));
 
         const duration = Date.now() - scriptStart;
         addLog('success', `${file} - Done (${duration}ms)`);
         results.push({ script: file, success: true, duration });
       } catch (error: any) {
         const duration = Date.now() - scriptStart;
-        addLog('error', `${file} - Failed (${duration}ms)`, error.stderr || error.message);
-        results.push({ script: file, success: false, duration, error: error.stderr || error.message });
+        addLog('error', `${file} - Failed (${duration}ms)`, error.message);
+        results.push({ script: file, success: false, duration, error: error.message });
       }
     }
 
@@ -199,22 +191,18 @@ router.post('/api/clear', async (req: Request, res: Response) => {
   try {
     const filepath = path.join(SEEDS_DIR, '00-clear-all.sql');
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
-    const command = `docker exec -i gcdr-postgres psql -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1`;
 
-    const output = execSync(command, {
-      input: sqlContent,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    // Execute SQL directly using database connection
+    await db.execute(sql.raw(sqlContent));
 
     const duration = Date.now() - startTime;
     addLog('success', `Data cleared (${duration}ms)`);
 
-    res.json({ success: true, duration, output });
+    res.json({ success: true, duration, output: 'Data cleared successfully' });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `Clear failed (${duration}ms)`, error.stderr || error.message);
-    res.status(500).json({ success: false, error: error.stderr || error.message });
+    addLog('error', `Clear failed (${duration}ms)`, error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -226,22 +214,18 @@ router.post('/api/verify', async (req: Request, res: Response) => {
   try {
     const filepath = path.join(SEEDS_DIR, '99-verify-all.sql');
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
-    const command = `docker exec -i gcdr-postgres psql -U ${DB_USER} -d ${DB_NAME}`;
 
-    const output = execSync(command, {
-      input: sqlContent,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    // Execute SQL directly using database connection
+    const result = await db.execute(sql.raw(sqlContent));
 
     const duration = Date.now() - startTime;
     addLog('success', `Verification complete (${duration}ms)`);
 
-    res.json({ success: true, duration, output });
+    res.json({ success: true, duration, output: JSON.stringify(result, null, 2) });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `Verification failed (${duration}ms)`, error.stderr || error.message);
-    res.status(500).json({ success: false, error: error.stderr || error.message });
+    addLog('error', `Verification failed (${duration}ms)`, error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
