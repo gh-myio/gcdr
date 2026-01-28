@@ -58,9 +58,9 @@ export const UpdateUserSchema = z.object({
 
 export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>;
 
-// Update User Status DTO
+// Update User Status DTO (RFC-0011: Updated status values)
 export const UpdateUserStatusSchema = z.object({
-  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
+  status: z.enum(['UNVERIFIED', 'PENDING_APPROVAL', 'ACTIVE', 'INACTIVE', 'LOCKED']),
   reason: z.string().max(500).optional(),
 });
 
@@ -128,12 +128,12 @@ export const AcceptInvitationSchema = z.object({
 
 export type AcceptInvitationDTO = z.infer<typeof AcceptInvitationSchema>;
 
-// List Users Query
+// List Users Query (RFC-0011: Updated status values)
 export const ListUsersSchema = z.object({
   customerId: z.string().uuid().optional(),
   partnerId: z.string().uuid().optional(),
   type: z.enum(['INTERNAL', 'CUSTOMER', 'PARTNER', 'SERVICE_ACCOUNT']).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION', 'LOCKED']).optional(),
+  status: z.enum(['UNVERIFIED', 'PENDING_APPROVAL', 'ACTIVE', 'INACTIVE', 'LOCKED']).optional(),
   search: z.string().max(100).optional(), // Search by name or email
   limit: z.number().min(1).max(100).optional(),
   cursor: z.string().optional(),

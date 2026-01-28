@@ -464,8 +464,8 @@ export class UserService {
     token: string,
     password: string
   ): Promise<User> {
-    // Find user by invitation token
-    const users = await this.repository.list(tenantId, { status: 'PENDING_VERIFICATION', limit: 100 });
+    // Find user by invitation token (RFC-0011: UNVERIFIED replaces PENDING_VERIFICATION)
+    const users = await this.repository.list(tenantId, { status: 'UNVERIFIED', limit: 100 });
     const user = users.items.find((u) => u.security.emailVerificationToken === token);
 
     if (!user) {
