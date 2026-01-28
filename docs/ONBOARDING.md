@@ -51,9 +51,8 @@ Esta seção contém todas as informações necessárias para a equipe de fronte
 
 | Ambiente | URL Base | Uso |
 |----------|----------|-----|
+| **Production** | `https://gcdr-server.apps.myio-bas.com` | Produção (Dokploy) |
 | **Local** | `http://localhost:3015` | Desenvolvimento local (Docker) |
-| **Staging** | `https://api-staging.gcdr.myio.com.br` | Homologação (Dokploy) |
-| **Production** | `https://api.gcdr.myio.com.br` | Produção (Dokploy) |
 
 ### Headers Obrigatórios
 
@@ -98,6 +97,8 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./SIMULATOR-MANUAL.md)) |
 | **Customer API Keys** | 4 | Gerenciamento de API Keys por customer |
 | **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
+| **Registration** | 6 | Auto-cadastro de usuários com aprovação (RFC-0011) |
+| **Admin Users** | 4 | Aprovação, rejeição e desbloqueio de usuários (RFC-0011) |
 | **Integrations** | 12 | Marketplace de integrações |
 | **Centrals** | 10 | Centrais IoT (NODEHUB, GATEWAY, EDGE_CONTROLLER) |
 | **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
@@ -403,8 +404,21 @@ Veja detalhes completos em: [ONBOARDING-NODERED-ALARM-BUNDLE.md](./ONBOARDING-NO
 | **Refresh Token** | Implementado | `POST /auth/refresh` |
 | **MFA Verification** | Implementado | `POST /auth/mfa/verify` |
 | **Logout** | Implementado | `POST /auth/logout` |
-| **Forgot Password** | Implementado | `POST /auth/password/forgot` |
-| **Reset Password** | Implementado | `POST /auth/password/reset` |
+| **Forgot Password** | Implementado | `POST /auth/forgot-password` |
+| **Reset Password** | Implementado | `POST /auth/reset-password` |
+| **Self Registration (RFC-0011)** | Implementado | `POST /auth/register` |
+| **Email Verification (RFC-0011)** | Implementado | `POST /auth/verify-email` |
+| **Resend Verification (RFC-0011)** | Implementado | `POST /auth/resend-verification` |
+
+### Estados do Usuário (RFC-0011)
+
+| Status | Descrição | Transições |
+|--------|-----------|------------|
+| `UNVERIFIED` | Novo cadastro, email não verificado | → PENDING_APPROVAL (após verificar email) |
+| `PENDING_APPROVAL` | Email verificado, aguardando aprovação do admin | → ACTIVE (aprovado) ou INACTIVE (rejeitado) |
+| `ACTIVE` | Usuário ativo e aprovado | → INACTIVE (desativado) ou LOCKED (6 falhas de login) |
+| `INACTIVE` | Desativado pelo admin ou rejeitado | → ACTIVE (reativado) |
+| `LOCKED` | Bloqueado por tentativas de login | → ACTIVE (admin desbloqueia ou reset de senha) |
 
 ### Endpoints de Autenticacao
 
@@ -413,8 +427,20 @@ POST /auth/login              -> Autentica usuario e emite JWT
 POST /auth/refresh            -> Renova token expirado
 POST /auth/logout             -> Invalida token
 POST /auth/mfa/verify         -> Verifica codigo MFA
-POST /auth/password/forgot    -> Solicita reset de senha
-POST /auth/password/reset     -> Reseta senha com token
+POST /auth/forgot-password    -> Solicita reset de senha (envia código de 6 dígitos)
+POST /auth/reset-password     -> Reseta senha com código de 6 dígitos
+
+# RFC-0011: Self-Registration
+POST /auth/register           -> Auto-cadastro de novo usuário
+POST /auth/verify-email       -> Verifica email com código de 6 dígitos
+POST /auth/resend-verification-> Reenvia código de verificação
+
+# RFC-0011: Admin User Management
+GET  /admin/users/pending-approval -> Lista usuários aguardando aprovação
+POST /admin/users/:id/approve      -> Aprova cadastro de usuário
+POST /admin/users/:id/reject       -> Rejeita cadastro de usuário
+POST /admin/users/:id/unlock       -> Desbloqueia usuário bloqueado
+GET  /admin/users/locked           -> Lista usuários bloqueados
 ```
 
 ### Exemplos de Uso
@@ -1595,6 +1621,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0004: Migration DynamoDB to PostgreSQL](./RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
 - [RFC-0005: Container Deployment](./RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
 - [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
+- [RFC-0011: User Registration Workflow](./RFC-0011-User-Registration-Approval-Workflow.md) - Auto-cadastro e aprovação de usuários
 - [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 

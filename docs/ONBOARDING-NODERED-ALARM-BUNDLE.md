@@ -58,7 +58,7 @@ For M2M (Machine-to-Machine) integration like Node-RED, we recommend using **API
 
 ```bash
 curl -X POST \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys" \
+  "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/api-keys" \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: <tenant-uuid>" \
   -H "Authorization: Bearer <jwt-admin-token>" \
@@ -107,7 +107,7 @@ Instead of using `Authorization: Bearer <jwt>`, use the `X-API-Key` header:
 
 ```bash
 curl -X GET \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/alarm-rules/bundle" \
+  "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/alarm-rules/bundle" \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: <tenant-uuid>" \
   -H "X-API-Key: gcdr_cust_a1b2c3d4..."
@@ -133,7 +133,7 @@ return msg;
 
 ```bash
 curl -X GET \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys" \
+  "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/api-keys" \
   -H "Authorization: Bearer <jwt-admin-token>"
 ```
 
@@ -141,7 +141,7 @@ curl -X GET \
 
 ```bash
 curl -X DELETE \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys/{keyId}" \
+  "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/api-keys/{keyId}" \
   -H "Authorization: Bearer <jwt-admin-token>"
 ```
 
@@ -149,7 +149,7 @@ curl -X DELETE \
 
 ```bash
 curl -X PUT \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/api-keys/{keyId}" \
+  "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/api-keys/{keyId}" \
   -H "Authorization: Bearer <jwt-admin-token>" \
   -d '{"isActive": false}'
 ```
@@ -167,7 +167,7 @@ GET /customers/{customerId}/alarm-rules/bundle
 ### Development Environment
 
 ```
-https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/{customerId}/alarm-rules/bundle
+https://gcdr-server.apps.myio-bas.com/customers/{customerId}/alarm-rules/bundle
 ```
 
 ### Required Headers
@@ -202,7 +202,7 @@ Authorization: Bearer <jwt-token>
 
 ```bash
 curl -X GET \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/cust-123/alarm-rules/bundle?domain=energy" \
+  "https://gcdr-server.apps.myio-bas.com/customers/cust-123/alarm-rules/bundle?domain=energy" \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: tenant-uuid" \
   -H "X-API-Key: gcdr_cust_a1b2c3d4e5f67890abcdef..."
@@ -212,7 +212,7 @@ curl -X GET \
 
 ```bash
 curl -X GET \
-  "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/customers/cust-123/alarm-rules/bundle?domain=energy" \
+  "https://gcdr-server.apps.myio-bas.com/customers/cust-123/alarm-rules/bundle?domain=energy" \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: tenant-uuid" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
@@ -774,7 +774,7 @@ curl -X GET "https://api.gcdr.io/dev/customers/{customerId}/assets" \
 
 - **GCDR Team**: gcdr-team@myio.com.br
 - **Slack**: #gcdr-support
-- **API Documentation**: https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs
+- **API Documentation**: https://gcdr-server.apps.myio-bas.com/docs
 
 ---
 

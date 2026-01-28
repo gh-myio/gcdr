@@ -11,12 +11,10 @@ info:
     name: Proprietary
 
 servers:
-  - url: https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev
-    description: Development
-  - url: https://api.gcdr.io/staging
-    description: Staging
-  - url: https://api.gcdr.io
+  - url: https://gcdr-server.apps.myio-bas.com
     description: Production
+  - url: http://localhost:3015
+    description: Local Development
 
 tags:
   - name: Health
@@ -55,6 +53,10 @@ tags:
     description: Audit logs for compliance and traceability
   - name: Customer API Keys
     description: API key management for customer integrations
+  - name: Registration
+    description: User self-registration and email verification (RFC-0011)
+  - name: Admin Users
+    description: Admin user management - approval, rejection, unlock (RFC-0011)
 
 security:
   - bearerAuth: []
@@ -3292,11 +3294,510 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessMessageResponse'
 
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request password reset (RFC-0011)
+      description: |
+        Sends a 6-digit verification code to the user's email.
+        Code expires in 15 minutes. Always returns success to prevent email enumeration.
+      operationId: authForgotPasswordV2
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset code sent (if user exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password with 6-digit code (RFC-0011)
+      description: |
+        Resets the user password using a 6-digit code received via email.
+        If the account was locked, it will be automatically unlocked.
+      operationId: authResetPasswordV2
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, newPassword]
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: '123456'
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      unlocked:
+                        type: boolean
+        '401':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # RFC-0011: User Registration
+  /auth/register:
+    post:
+      tags: [Registration]
+      summary: Self-service user registration
+      description: |
+        Creates a new user account with UNVERIFIED status.
+        A 6-digit verification code is sent to the email (valid for 15 minutes).
+      operationId: authRegister
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  description: Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+                firstName:
+                  type: string
+                  minLength: 2
+                lastName:
+                  type: string
+                  minLength: 2
+                phone:
+                  type: string
+                customerId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: User created, verification code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                      status:
+                        type: string
+                        enum: [UNVERIFIED]
+                      message:
+                        type: string
+                      expiresIn:
+                        type: integer
+                        description: Code expiry in seconds
+        '400':
+          description: Validation error or email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    post:
+      tags: [Registration]
+      summary: Verify email with 6-digit code
+      description: |
+        Verifies the user's email address using the 6-digit code sent during registration.
+        On success, user status changes from UNVERIFIED to PENDING_APPROVAL.
+      operationId: authVerifyEmail
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: '123456'
+      responses:
+        '200':
+          description: Email verified, awaiting approval
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [PENDING_APPROVAL]
+                      message:
+                        type: string
+        '401':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/resend-verification:
+    post:
+      tags: [Registration]
+      summary: Resend verification code
+      description: |
+        Resends the 6-digit verification code to the user's email.
+        Rate limited to 3 resends per hour.
+      operationId: authResendVerification
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Code resent (if user exists and is unverified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # RFC-0011: Admin User Management
+  /admin/users/pending-approval:
+    get:
+      tags: [Admin Users]
+      summary: List users pending approval
+      description: Returns all users with PENDING_APPROVAL status
+      operationId: adminListPendingApproval
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: List of pending users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            email:
+                              type: string
+                            firstName:
+                              type: string
+                            lastName:
+                              type: string
+                            registeredAt:
+                              type: string
+                              format: date-time
+                            emailVerifiedAt:
+                              type: string
+                              format: date-time
+                            registrationIp:
+                              type: string
+                      total:
+                        type: integer
+
+  /admin/users/locked:
+    get:
+      tags: [Admin Users]
+      summary: List locked users
+      description: Returns all users with LOCKED status
+      operationId: adminListLocked
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: List of locked users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            email:
+                              type: string
+                            firstName:
+                              type: string
+                            lastName:
+                              type: string
+                            lockedAt:
+                              type: string
+                              format: date-time
+                            lockedReason:
+                              type: string
+                            lockoutCount:
+                              type: integer
+                            failedLoginAttempts:
+                              type: integer
+                      total:
+                        type: integer
+
+  /admin/users/{userId}/approve:
+    post:
+      tags: [Admin Users]
+      summary: Approve user registration
+      description: Changes user status from PENDING_APPROVAL to ACTIVE
+      operationId: adminApproveUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assignRoles:
+                  type: array
+                  items:
+                    type: string
+                customerId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: User approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum: [ACTIVE]
+                      message:
+                        type: string
+
+  /admin/users/{userId}/reject:
+    post:
+      tags: [Admin Users]
+      summary: Reject user registration
+      description: Changes user status from PENDING_APPROVAL to INACTIVE
+      operationId: adminRejectUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: User rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum: [INACTIVE]
+                      message:
+                        type: string
+
+  /admin/users/{userId}/unlock:
+    post:
+      tags: [Admin Users]
+      summary: Unlock user account
+      description: Changes user status from LOCKED to ACTIVE and resets failed login attempts
+      operationId: adminUnlockUser
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User unlocked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum: [ACTIVE]
+                      failedLoginAttempts:
+                        type: integer
+                        example: 0
+                      message:
+                        type: string
+
+  # Legacy endpoints (deprecated)
+  /auth/password/forgot:
+    post:
+      tags: [Authentication]
+      summary: Request password reset (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED**: Use `/auth/forgot-password` instead.
+        Sends a password reset email to the user.
+      operationId: authForgotPassword
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Password reset email sent (if user exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+
   /auth/password/reset:
     post:
       tags: [Authentication]
-      summary: Reset password with token
+      summary: Reset password with token (deprecated)
+      deprecated: true
       description: |
+        **DEPRECATED**: Use `/auth/reset-password` instead.
         Resets the user password using a token received via email.
       operationId: authResetPassword
       security: []

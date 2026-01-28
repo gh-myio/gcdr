@@ -31,7 +31,7 @@ export class UserRepository implements IUserRepository {
       emailVerified: false,
       username: data.username,
       type: data.type,
-      status: 'PENDING_VERIFICATION',
+      status: 'UNVERIFIED',  // RFC-0011: New users start as UNVERIFIED
       profile: data.profile
         ? { ...createDefaultProfile(data.profile.firstName, data.profile.lastName), ...data.profile }
         : createDefaultProfile('', ''),
@@ -49,6 +49,250 @@ export class UserRepository implements IUserRepository {
       updatedAt: new Date(timestamp),
       createdBy,
     }).returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: Create a self-registered user
+   */
+  async createSelfRegistered(
+    tenantId: string,
+    email: string,
+    passwordHash: string,
+    firstName: string,
+    lastName: string,
+    phone?: string,
+    customerId?: string,
+    ipAddress?: string
+  ): Promise<User> {
+    const id = generateId();
+    const timestamp = now();
+
+    const profile = {
+      ...createDefaultProfile(firstName, lastName),
+      phone,
+    };
+
+    const security = {
+      ...createDefaultSecurity(),
+      passwordHash,
+      registeredAt: timestamp,
+      registrationIp: ipAddress,
+      failedLoginAttempts: 0,
+      lockoutCount: 0,
+    };
+
+    const [result] = await db.insert(users).values({
+      id,
+      tenantId,
+      customerId: customerId || null,
+      email: email.toLowerCase(),
+      emailVerified: false,
+      type: 'CUSTOMER',
+      status: 'UNVERIFIED',  // RFC-0011: Starts as UNVERIFIED
+      profile,
+      security,
+      preferences: createDefaultPreferences(),
+      activeSessions: 0,
+      tags: [],
+      metadata: { selfRegistered: true },
+      version: 1,
+      createdAt: new Date(timestamp),
+      updatedAt: new Date(timestamp),
+    }).returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: Set email verified and move to PENDING_APPROVAL
+   */
+  async setEmailVerifiedPendingApproval(tenantId: string, id: string): Promise<User> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    const timestamp = now();
+    const security = {
+      ...existing.security,
+      emailVerifiedAt: timestamp,
+    };
+
+    const [result] = await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        security,
+        status: 'PENDING_APPROVAL',  // RFC-0011: Move to PENDING_APPROVAL after email verification
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.id, id)
+      ))
+      .returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: Approve user registration
+   */
+  async approveUser(tenantId: string, id: string, approvedBy: string): Promise<User> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    const timestamp = now();
+    const security = {
+      ...existing.security,
+      approvedAt: timestamp,
+      approvedBy,
+    };
+
+    const [result] = await db
+      .update(users)
+      .set({
+        security,
+        status: 'ACTIVE',
+        updatedAt: new Date(timestamp),
+        updatedBy: approvedBy,
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.id, id)
+      ))
+      .returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: Reject user registration
+   */
+  async rejectUser(tenantId: string, id: string, rejectedBy: string, reason?: string): Promise<User> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    const timestamp = now();
+    const security = {
+      ...existing.security,
+      rejectedAt: timestamp,
+      rejectedBy,
+      rejectionReason: reason,
+    };
+
+    const [result] = await db
+      .update(users)
+      .set({
+        security,
+        status: 'INACTIVE',
+        updatedAt: new Date(timestamp),
+        updatedBy: rejectedBy,
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.id, id)
+      ))
+      .returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: List users pending approval
+   */
+  async listPendingApproval(tenantId: string): Promise<User[]> {
+    const results = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.status, 'PENDING_APPROVAL')
+      ))
+      .orderBy(users.createdAt);
+
+    return results.map(this.mapToEntity);
+  }
+
+  /**
+   * RFC-0011: Lock user account due to failed attempts
+   */
+  async lockAccountDueToFailedAttempts(tenantId: string, id: string, reason: string): Promise<User> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    const timestamp = now();
+    const security = {
+      ...existing.security,
+      lockedAt: timestamp,
+      lockedReason: reason,
+      lockoutCount: (existing.security.lockoutCount || 0) + 1,
+    };
+
+    const [result] = await db
+      .update(users)
+      .set({
+        security,
+        status: 'LOCKED',
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.id, id)
+      ))
+      .returning();
+
+    return this.mapToEntity(result);
+  }
+
+  /**
+   * RFC-0011: Reset password and unlock account if locked
+   */
+  async resetPasswordAndUnlock(tenantId: string, id: string, passwordHash: string): Promise<User> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    const timestamp = now();
+    const security = {
+      ...existing.security,
+      passwordHash,
+      passwordChangedAt: timestamp,
+      failedLoginAttempts: 0,
+    };
+    delete security.lockedUntil;
+    delete security.lockedAt;
+    delete security.lockedReason;
+
+    // If user was locked, unlock them
+    const newStatus = existing.status === 'LOCKED' ? 'ACTIVE' : existing.status;
+
+    const [result] = await db
+      .update(users)
+      .set({
+        security,
+        status: newStatus,
+        updatedAt: new Date(timestamp),
+        version: existing.version + 1,
+      })
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.id, id)
+      ))
+      .returning();
 
     return this.mapToEntity(result);
   }

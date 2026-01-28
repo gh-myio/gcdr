@@ -2,11 +2,13 @@
 
 ## URLs disponíveis
 
-| Recurso       | URL                                                                              |
-|---------------|----------------------------------------------------------------------------------|
-| Swagger UI    | https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs                  |
-| OpenAPI JSON  | https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/docs/openapi.json     |
-| Health Check  | https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/health                |
+| Recurso       | URL                                                              |
+|---------------|------------------------------------------------------------------|
+| Swagger UI    | https://gcdr-server.apps.myio-bas.com/docs                       |
+| OpenAPI JSON  | https://gcdr-server.apps.myio-bas.com/docs/openapi.json          |
+| Health Check  | https://gcdr-server.apps.myio-bas.com/health                     |
+| DB Admin      | https://gcdr-server.apps.myio-bas.com/admin/db                   |
+| Simulator     | https://gcdr-server.apps.myio-bas.com/admin/simulator            |
 
 ### A documentacao inclui
 
@@ -25,6 +27,8 @@
 - Endpoints de Centrals (CRUD, heartbeat, status)
 - Endpoints de Themes (CRUD, compile, effective)
 - Endpoints de Users (CRUD, MFA, convites, password reset)
+- Endpoints de Simulator (RFC-0010)
+- Endpoints de Registration (RFC-0011)
 - Health checks
 - Schemas completos (140+ endpoints documentados)
 
@@ -32,9 +36,8 @@
 
 | Ambiente    | URL                                                              |
 |-------------|------------------------------------------------------------------|
-| Development | https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev       |
-| Staging     | https://api.gcdr.io/staging (em breve)                           |
-| Production  | https://api.gcdr.io (em breve)                                   |
+| Production  | https://gcdr-server.apps.myio-bas.com                            |
+| Local Dev   | http://localhost:3015                                            |
 
 ## Headers obrigatorios
 

@@ -29,7 +29,14 @@ export const entityStatusEnum = pgEnum('entity_status', ['ACTIVE', 'INACTIVE', '
 
 export const customerTypeEnum = pgEnum('customer_type', ['HOLDING', 'COMPANY', 'BRANCH', 'FRANCHISE']);
 
-export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION', 'LOCKED']);
+// RFC-0011: Updated user status enum with full lifecycle
+export const userStatusEnum = pgEnum('user_status', [
+  'UNVERIFIED',        // New registration, email not verified
+  'PENDING_APPROVAL',  // Email verified, awaiting admin approval
+  'ACTIVE',            // Fully active user
+  'INACTIVE',          // Deactivated by admin or rejected
+  'LOCKED',            // Locked due to failed login attempts
+]);
 
 export const userTypeEnum = pgEnum('user_type', ['INTERNAL', 'CUSTOMER', 'PARTNER', 'SERVICE_ACCOUNT']);
 
@@ -72,6 +79,13 @@ export const simulatorSessionStatusEnum = pgEnum('simulator_session_status', [
   'STOPPED',
   'EXPIRED',
   'ERROR',
+]);
+
+// Verification token types (RFC-0011)
+export const verificationTokenTypeEnum = pgEnum('verification_token_type', [
+  'EMAIL_VERIFICATION',
+  'PASSWORD_RESET',
+  'ACCOUNT_UNLOCK',
 ]);
 
 // Audit enums (RFC-0009)
@@ -163,7 +177,7 @@ export const users = pgTable('users', {
 
   // Type and Status
   type: userTypeEnum('type').notNull().default('CUSTOMER'),
-  status: userStatusEnum('status').notNull().default('PENDING_VERIFICATION'),
+  status: userStatusEnum('status').notNull().default('UNVERIFIED'),
 
   // Profile, Security, Preferences (JSONB for flexibility)
   profile: jsonb('profile').notNull().default({}),
@@ -965,4 +979,41 @@ export const simulatorEvents = pgTable('simulator_events', {
   sessionIdx: index('sim_events_session_idx').on(table.sessionId),
   createdIdx: index('sim_events_created_idx').on(table.createdAt),
   sessionTypeIdx: index('sim_events_session_type_idx').on(table.sessionId, table.eventType),
+}));
+
+// =============================================================================
+// VERIFICATION TOKENS (RFC-0011)
+// =============================================================================
+
+/**
+ * Verification Tokens - For email verification, password reset, account unlock
+ */
+export const verificationTokens = pgTable('verification_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  // Token data
+  tokenType: verificationTokenTypeEnum('token_type').notNull(),
+  codeHash: varchar('code_hash', { length: 64 }).notNull(),  // SHA256 hash of 6-digit code
+
+  // Expiration
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+
+  // Usage tracking
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  attempts: integer('attempts').notNull().default(0),
+  maxAttempts: integer('max_attempts').notNull().default(5),
+
+  // Metadata
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: varchar('user_agent', { length: 500 }),
+
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index('verification_tokens_user_idx').on(table.userId),
+  typeIdx: index('verification_tokens_type_idx').on(table.tokenType),
+  expiresIdx: index('verification_tokens_expires_idx').on(table.expiresAt),
+  tenantUserTypeIdx: index('verification_tokens_tenant_user_type_idx').on(table.tenantId, table.userId, table.tokenType),
 }));

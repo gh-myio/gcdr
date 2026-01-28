@@ -104,27 +104,63 @@ BEGIN
         1
     );
 
-    -- Pending User
-    INSERT INTO users (id, tenant_id, customer_id, email, email_verified, username, type, status, profile, security, preferences, invited_by, invited_at, tags, version)
+    -- RFC-0011: Unverified User (email not yet verified)
+    INSERT INTO users (id, tenant_id, customer_id, email, email_verified, username, type, status, profile, security, preferences, tags, metadata, version)
     VALUES (
         'bbbb6666-6666-6666-6666-666666666666',
         v_tenant_id,
         v_company1_id,
-        'newuser@acmetech.com',
+        'unverified@acmetech.com',
         false,
         NULL,
         'CUSTOMER',
-        'PENDING_VERIFICATION',
-        '{"firstName": "New", "lastName": "User", "displayName": "New User"}',
-        jsonb_build_object('mfaEnabled', false, 'failedLoginAttempts', 0, 'passwordHash', v_password_hash),
+        'UNVERIFIED',
+        '{"firstName": "Unverified", "lastName": "User", "displayName": "Unverified User"}',
+        jsonb_build_object('mfaEnabled', false, 'failedLoginAttempts', 0, 'lockoutCount', 0, 'passwordHash', v_password_hash, 'registeredAt', NOW()::text, 'registrationIp', '192.168.1.100'),
         '{"language": "pt-BR", "timezone": "America/Sao_Paulo"}',
-        'bbbb1111-1111-1111-1111-111111111111',
-        NOW(),
+        '[]',
+        '{"selfRegistered": true}',
+        1
+    );
+
+    -- RFC-0011: Pending Approval User (email verified, awaiting admin approval)
+    INSERT INTO users (id, tenant_id, customer_id, email, email_verified, username, type, status, profile, security, preferences, tags, metadata, version)
+    VALUES (
+        'bbbb7777-7777-7777-7777-777777777777',
+        v_tenant_id,
+        v_company1_id,
+        'pending@acmetech.com',
+        true,
+        NULL,
+        'CUSTOMER',
+        'PENDING_APPROVAL',
+        '{"firstName": "Pending", "lastName": "Approval", "displayName": "Pending Approval"}',
+        jsonb_build_object('mfaEnabled', false, 'failedLoginAttempts', 0, 'lockoutCount', 0, 'passwordHash', v_password_hash, 'registeredAt', (NOW() - INTERVAL '1 day')::text, 'emailVerifiedAt', NOW()::text),
+        '{"language": "pt-BR", "timezone": "America/Sao_Paulo"}',
+        '[]',
+        '{"selfRegistered": true}',
+        1
+    );
+
+    -- RFC-0011: Locked User (account locked due to failed login attempts)
+    INSERT INTO users (id, tenant_id, customer_id, email, email_verified, username, type, status, profile, security, preferences, tags, version)
+    VALUES (
+        'bbbb8888-8888-8888-8888-888888888888',
+        v_tenant_id,
+        v_company1_id,
+        'locked@acmetech.com',
+        true,
+        'locked.user',
+        'CUSTOMER',
+        'LOCKED',
+        '{"firstName": "Locked", "lastName": "User", "displayName": "Locked User"}',
+        jsonb_build_object('mfaEnabled', false, 'failedLoginAttempts', 6, 'lockoutCount', 1, 'passwordHash', v_password_hash, 'lockedAt', NOW()::text, 'lockedReason', 'Conta bloqueada após 6 tentativas de login incorretas'),
+        '{"language": "pt-BR", "timezone": "America/Sao_Paulo"}',
         '[]',
         1
     );
 
-    RAISE NOTICE 'Inserted 6 users';
+    RAISE NOTICE 'Inserted 8 users';
 END $$;
 
 -- Verify

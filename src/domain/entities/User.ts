@@ -1,6 +1,7 @@
 import { BaseEntity } from '../../shared/types';
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION' | 'LOCKED';
+// RFC-0011: Updated user status with full lifecycle
+export type UserStatus = 'UNVERIFIED' | 'PENDING_APPROVAL' | 'ACTIVE' | 'INACTIVE' | 'LOCKED';
 export type UserType = 'INTERNAL' | 'CUSTOMER' | 'PARTNER' | 'SERVICE_ACCOUNT';
 
 export interface UserPreferences {
@@ -31,20 +32,45 @@ export interface UserProfile {
 }
 
 export interface UserSecurity {
+  // Password
   passwordHash?: string;
   passwordChangedAt?: string;
+
+  // MFA
   mfaEnabled: boolean;
   mfaMethod?: 'totp' | 'sms' | 'email';
   mfaSecret?: string;
   mfaBackupCodes?: string[];
+
+  // Login tracking
   lastLoginAt?: string;
   lastLoginIp?: string;
   failedLoginAttempts: number;
+
+  // Account lockout (RFC-0011)
   lockedUntil?: string;
+  lockedAt?: string;
+  lockedReason?: string;
+  lockoutCount?: number;
+
+  // Legacy tokens (deprecated - use verification_tokens table)
   passwordResetToken?: string;
   passwordResetExpiresAt?: string;
   emailVerificationToken?: string;
+
+  // Email verification
   emailVerifiedAt?: string;
+
+  // RFC-0011: Registration tracking
+  registeredAt?: string;
+  registrationIp?: string;
+
+  // RFC-0011: Approval tracking
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
 }
 
 export interface UserSession {
@@ -114,6 +140,7 @@ export function createDefaultSecurity(): UserSecurity {
   return {
     mfaEnabled: false,
     failedLoginAttempts: 0,
+    lockoutCount: 0,
   };
 }
 

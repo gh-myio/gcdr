@@ -4,6 +4,10 @@ import { UserService, userService as defaultUserService } from './UserService';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
 import { eventService } from '../infrastructure/events/EventService';
 import { EventType } from '../shared/events/eventTypes';
+import { registrationService } from './RegistrationService';
+
+// RFC-0011: Configuration for account lockout
+const MAX_FAILED_LOGIN_ATTEMPTS = 6;
 import {
   LoginResponse,
   MfaRequiredResponse,
@@ -206,7 +210,31 @@ export class AuthService {
       throw new UnauthorizedError('Credenciais inválidas');
     }
 
-    // Check if user is locked
+    // RFC-0011: Check user status with new states
+    switch (user.status) {
+      case 'UNVERIFIED':
+        throw new UnauthorizedError('Email não verificado. Por favor, verifique seu email.');
+
+      case 'PENDING_APPROVAL':
+        throw new UnauthorizedError('Seu cadastro está aguardando aprovação.');
+
+      case 'INACTIVE':
+        throw new UnauthorizedError('Conta desativada. Entre em contato com o suporte.');
+
+      case 'LOCKED':
+        throw new UnauthorizedError(
+          'Conta bloqueada devido a tentativas de login incorretas. Redefina sua senha para desbloquear.'
+        );
+
+      case 'ACTIVE':
+        // Continue with login
+        break;
+
+      default:
+        throw new UnauthorizedError('Status de conta inválido');
+    }
+
+    // Legacy check for lockedUntil (backward compatibility)
     if (user.security.lockedUntil) {
       const lockedUntil = new Date(user.security.lockedUntil);
       if (lockedUntil > new Date()) {
@@ -216,21 +244,28 @@ export class AuthService {
       }
     }
 
-    // Check user status
-    if (user.status === 'INACTIVE') {
-      throw new UnauthorizedError('Conta desativada');
-    }
-    if (user.status === 'SUSPENDED') {
-      throw new UnauthorizedError('Conta suspensa');
-    }
-    if (user.status === 'PENDING_VERIFICATION') {
-      throw new UnauthorizedError('Email não verificado');
-    }
-
     // Verify password
     if (!user.security.passwordHash || !verifyPassword(password, user.security.passwordHash)) {
-      await this.userService.recordLoginAttempt(tenantId, email, false, ip || 'unknown');
-      throw new UnauthorizedError('Credenciais inválidas');
+      // RFC-0011: Record failed attempt with lockout logic
+      try {
+        const attempts = await registrationService.recordFailedLogin(tenantId, user.id, ip || 'unknown');
+        const remaining = MAX_FAILED_LOGIN_ATTEMPTS - attempts;
+
+        if (remaining <= 0) {
+          throw new UnauthorizedError(
+            'Conta bloqueada devido a tentativas de login incorretas. Redefina sua senha para desbloquear.'
+          );
+        }
+
+        throw new UnauthorizedError(`Credenciais inválidas. ${remaining} tentativas restantes.`);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          throw err;
+        }
+        // Fallback to original behavior
+        await this.userService.recordLoginAttempt(tenantId, email, false, ip || 'unknown');
+        throw new UnauthorizedError('Credenciais inválidas');
+      }
     }
 
     // Check MFA if enabled
@@ -253,8 +288,8 @@ export class AuthService {
       }
     }
 
-    // Record successful login
-    await this.userService.recordLoginAttempt(tenantId, email, true, ip || 'unknown');
+    // RFC-0011: Record successful login (resets failed attempts)
+    await registrationService.recordSuccessfulLogin(tenantId, user.id, ip || 'unknown');
 
     // Generate tokens
     const tokens = await this.generateTokens(user, tenantId);

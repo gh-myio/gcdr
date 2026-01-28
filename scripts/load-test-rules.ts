@@ -17,7 +17,7 @@ import http from 'http';
 
 const CONFIG = {
   // API Base URL
-  apiUrl: process.env.API_URL || 'https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev',
+  apiUrl: process.env.API_URL || 'https://gcdr-server.apps.myio-bas.com',
 
   // Autenticacao
   tenantId: process.env.TENANT_ID || 'YOUR_TENANT_ID',

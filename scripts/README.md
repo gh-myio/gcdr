@@ -20,7 +20,7 @@ cp .env.example .env
 2. Edite o `.env` com suas credenciais:
 
 ```env
-API_URL=https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev
+API_URL=https://gcdr-server.apps.myio-bas.com
 TENANT_ID=seu-tenant-id
 AUTH_TOKEN=seu-jwt-token
 CUSTOMER_ID=seu-customer-id
@@ -32,7 +32,7 @@ CONCURRENCY=5
 ### Como obter o JWT Token
 
 ```bash
-curl -X POST https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/auth/login \
+curl -X POST https://gcdr-server.apps.myio-bas.com/auth/login \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: SEU_TENANT_ID" \
   -d '{
@@ -57,7 +57,7 @@ API_URL=https://... TENANT_ID=... AUTH_TOKEN=... CUSTOMER_ID=... npx ts-node loa
 
 | Variavel | Descricao | Default |
 |----------|-----------|---------|
-| `API_URL` | URL base da API GCDR | `https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev` |
+| `API_URL` | URL base da API GCDR | `https://gcdr-server.apps.myio-bas.com` |
 | `TENANT_ID` | ID do tenant | - |
 | `AUTH_TOKEN` | JWT token de autenticacao | - |
 | `CUSTOMER_ID` | ID do customer para criar rules | - |
@@ -81,7 +81,7 @@ SCRIPT DE CARGA DE TESTES - RULES
 ============================================================
 
 Configuracao:
-  API URL:      https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev
+  API URL:      https://gcdr-server.apps.myio-bas.com
   Tenant ID:    abc12345...
   Customer ID:  cust1234...
   Total Rules:  50
@@ -127,7 +127,7 @@ Para remover as rules criadas pelo teste:
 
 ```bash
 # Listar rules com tag load-test
-curl -X GET "https://9gc49yiru7.execute-api.sa-east-1.amazonaws.com/dev/rules?tags=load-test" \
+curl -X GET "https://gcdr-server.apps.myio-bas.com/rules?tags=load-test" \
   -H "x-tenant-id: SEU_TENANT_ID" \
   -H "Authorization: Bearer SEU_TOKEN"
 ```

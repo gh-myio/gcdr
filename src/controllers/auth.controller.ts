@@ -5,12 +5,16 @@ import {
   RefreshTokenRequestSchema,
   MfaVerifyRequestSchema,
   PasswordResetRequestSchema,
-  PasswordResetConfirmSchema,
-  LogoutRequestSchema
+  PasswordResetWithCodeSchema,
+  LogoutRequestSchema,
+  RegisterRequestSchema,
+  VerifyEmailRequestSchema,
+  ResendVerificationRequestSchema,
 } from '../dto/request/AuthDTO';
-import { sendSuccess, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
 import { ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT } from '../middleware/context';
+import { registrationService } from '../services/RegistrationService';
 
 const router = Router();
 
@@ -120,13 +124,103 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+// =============================================================================
+// RFC-0011: User Registration and Approval Workflow
+// =============================================================================
+
+/**
+ * POST /auth/register
+ * Self-service user registration
+ */
+router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, ip, requestId } = req.context;
+
+    const result = RegisterRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      throw new ValidationError('Dados de registro inválidos', {
+        validation: result.error.errors.map((e) => e.message),
+      });
+    }
+
+    const { email, password, firstName, lastName, phone, customerId } = result.data;
+    const userAgent = req.headers['user-agent'];
+
+    const response = await registrationService.register(
+      tenantId,
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      customerId,
+      ip,
+      userAgent
+    );
+
+    sendCreated(res, response, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/verify-email
+ * Verify email with 6-digit code
+ */
+router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+
+    const result = VerifyEmailRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      throw new ValidationError('Dados de verificação inválidos', {
+        validation: result.error.errors.map((e) => e.message),
+      });
+    }
+
+    const { email, code } = result.data;
+    const response = await registrationService.verifyEmail(tenantId, email, code);
+
+    sendSuccess(res, response, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/resend-verification
+ * Resend email verification code
+ */
+router.post('/resend-verification', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, ip, requestId } = req.context;
+
+    const result = ResendVerificationRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      throw new ValidationError('Email inválido', {
+        validation: result.error.errors.map((e) => e.message),
+      });
+    }
+
+    const { email } = result.data;
+    const userAgent = req.headers['user-agent'];
+
+    const response = await registrationService.resendVerificationCode(tenantId, email, ip, userAgent);
+
+    sendSuccess(res, response, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /**
  * POST /auth/forgot-password
- * Request password reset
+ * Request password reset - sends 6-digit code
  */
 router.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { requestId } = req.context;
+    const { tenantId, ip, requestId } = req.context;
 
     const result = PasswordResetRequestSchema.safeParse(req.body);
     if (!result.success) {
@@ -135,37 +229,46 @@ router.post('/forgot-password', async (req: Request, res: Response, next: NextFu
       });
     }
 
-    // Note: forgotPassword is not implemented in AuthService yet
-    // const { email } = result.data;
-    // await authService.forgotPassword(tenantId, email);
+    const { email } = result.data;
+    const userAgent = req.headers['user-agent'];
 
     // Always return success to prevent email enumeration
-    sendSuccess(res, { message: 'Se o email existir, você receberá um link de recuperação' }, 200, requestId);
+    await registrationService.requestPasswordReset(tenantId, email, ip, userAgent);
+
+    sendSuccess(res, {
+      message: 'Se o email existir, você receberá um código de recuperação',
+      expiresIn: 900,  // 15 minutes
+    }, 200, requestId);
   } catch (err) {
-    next(err);
+    // Log the error but don't expose to user (prevent enumeration)
+    console.error('Password reset request error:', err);
+    const { requestId } = req.context;
+    sendSuccess(res, {
+      message: 'Se o email existir, você receberá um código de recuperação',
+      expiresIn: 900,
+    }, 200, requestId);
   }
 });
 
 /**
  * POST /auth/reset-password
- * Reset password with token
+ * Reset password with 6-digit code
  */
 router.post('/reset-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { requestId } = req.context;
+    const { tenantId, requestId } = req.context;
 
-    const result = PasswordResetConfirmSchema.safeParse(req.body);
+    const result = PasswordResetWithCodeSchema.safeParse(req.body);
     if (!result.success) {
       throw new ValidationError('Dados de reset inválidos', {
         validation: result.error.errors.map((e) => e.message),
       });
     }
 
-    // Note: resetPassword is not implemented in AuthService yet
-    // const { token, newPassword } = result.data;
-    // await authService.resetPassword(tenantId, token, newPassword);
+    const { email, code, newPassword } = result.data;
+    const response = await registrationService.resetPassword(tenantId, email, code, newPassword);
 
-    sendSuccess(res, { message: 'Senha alterada com sucesso' }, 200, requestId);
+    sendSuccess(res, response, 200, requestId);
   } catch (err) {
     next(err);
   }

@@ -31,9 +31,16 @@ import {
   auditLogsController,
   simulatorController,
   dbAdminController,
+  centralsController,
+  centralsListByCustomerHandler,
+  centralsListByAssetHandler,
+  themesController,
+  themesListByCustomerHandler,
+  themesGetDefaultByCustomerHandler,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
+import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
@@ -118,6 +125,13 @@ app.get('/customers/:customerId/users', authMiddleware, usersListByCustomerHandl
 // Customer Rules (nested route)
 app.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);
 
+// Customer Centrals (nested route)
+app.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
+
+// Customer Themes (nested routes)
+app.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
+app.get('/customers/:customerId/themes', authMiddleware, themesListByCustomerHandler);
+
 // Customers (general router - must come after specific nested routes)
 app.use('/customers', authMiddleware, customersController);
 
@@ -126,6 +140,15 @@ app.use('/devices', authMiddleware, devicesController);
 
 // Asset Devices (nested route)
 app.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
+
+// Asset Centrals (nested route)
+app.get('/assets/:assetId/centrals', authMiddleware, centralsListByAssetHandler);
+
+// Centrals
+app.use('/centrals', authMiddleware, centralsController);
+
+// Themes (Look and Feel)
+app.use('/themes', authMiddleware, themesController);
 
 // Users
 app.use('/users', authMiddleware, usersController);
@@ -147,6 +170,9 @@ app.use('/audit-logs', authMiddleware, auditLogsController);
 
 // Simulator (RFC-0010)
 app.use('/simulator', authMiddleware, simulatorController);
+
+// Admin User Management (RFC-0011)
+app.use('/admin/users', userAdminController);
 
 // =============================================================================
 // Error Handling

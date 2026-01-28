@@ -17,3 +17,5 @@ export { default as integrationsController } from './integrations.controller';
 export { default as customerApiKeysController } from './customer-api-keys.controller';
 export { auditLogsController } from './audit-logs.controller';
 export { simulatorController } from './simulator.controller';
+export { default as centralsController, listByCustomerHandler as centralsListByCustomerHandler, listByAssetHandler as centralsListByAssetHandler } from './centrals.controller';
+export { default as themesController, listByCustomerHandler as themesListByCustomerHandler, getDefaultByCustomerHandler as themesGetDefaultByCustomerHandler } from './themes.controller';
