@@ -167,7 +167,50 @@ Em **"Health Check"**:
 
 ## Migrations e Seeds
 
-### IMPORTANTE: Migrations via PostgreSQL Container
+### IMPORTANTE: Pós-Deploy Manual
+
+Após cada deploy/rebuild no Dokploy, é necessário executar alguns passos manuais:
+
+#### 1. Copiar Scripts de Seed para o Container
+
+O Dockerfile copia os scripts, mas se o build context não estiver correto, pode ser necessário copiar manualmente:
+
+```bash
+# Conectar ao servidor
+ssh root@13.218.248.206
+
+# Verificar nome do container da API
+sudo docker ps | grep gcdr-app
+
+# Clonar repo (se não existir)
+cd /tmp && sudo git clone --depth 1 https://github.com/gh-myio/gcdr.git
+
+# Ou atualizar se já existir
+cd /tmp/gcdr && sudo git pull
+
+# Criar pasta e copiar scripts
+sudo docker exec --user root <CONTAINER_ID> mkdir -p /app/scripts/db/seeds
+sudo docker cp /tmp/gcdr/scripts/db/seeds/. <CONTAINER_ID>:/app/scripts/db/seeds/
+sudo docker exec --user root <CONTAINER_ID> chown -R gcdr:nodejs /app/scripts
+
+# Verificar
+sudo docker exec <CONTAINER_ID> ls -la /app/scripts/db/seeds/
+```
+
+#### 2. Acessar Admin/DB
+
+Acesse `https://gcdr-server.apps.myio-bas.com/admin/db` com senha `myio2026` (ou valor de `DB_ADMIN_PASSWORD`).
+
+#### 3. Rodar Seeds via Admin/DB
+
+1. Clique em **"Run All Seeds"** para popular o banco com dados de teste
+2. Ou rode seeds individuais conforme necessário
+
+**Nota:** O "Run All Seeds" executa os scripts 01-14, pulando 00-clear-all e 99-verify.
+
+---
+
+### Migrations via PostgreSQL Container
 
 A imagem de produção não inclui `drizzle-kit` (é uma devDependency). Para rodar migrations, use uma das opções abaixo:
 
@@ -385,14 +428,15 @@ psql "postgresql://postgres:iZ4_4XTcMZEcoXthvHXJ@13.218.248.206:5455/db_gcdr_pro
 - [x] Dokploy instalado e acessível
 - [x] Projeto criado (`myio-gcdr`)
 - [x] PostgreSQL deployado e rodando
-- [ ] API deployada e rodando
-- [ ] Variáveis de ambiente configuradas
-- [ ] Migrations executadas
-- [ ] Seeds executados
-- [ ] Domínio configurado
-- [ ] SSL ativo
-- [ ] Health check passando
-- [ ] Login funcionando
+- [x] API deployada e rodando
+- [x] Variáveis de ambiente configuradas
+- [x] Migrations executadas
+- [x] Seeds executados
+- [x] Domínio configurado (`gcdr-server.apps.myio-bas.com`)
+- [x] SSL ativo
+- [x] Health check passando
+- [x] Login funcionando
+- [x] Admin/DB acessível (`/admin/db` com senha `myio2026`)
 
 ---
 
