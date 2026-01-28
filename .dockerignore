@@ -42,7 +42,6 @@ jest.config.js
 serverless.yml
 
 # Docker
-Dockerfile
 docker-compose*.yml
 dokploy.yml
 .dockerignore
