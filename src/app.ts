@@ -76,6 +76,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Routes BEFORE Helmet (need relaxed CSP for external scripts)
 // =============================================================================
 
+// API Documentation (Swagger UI - needs external scripts)
+app.use('/docs', docsController);
+
 // Database Admin UI (development only - needs external scripts for CodeMirror)
 app.use('/admin/db', dbAdminController);
 
@@ -98,9 +101,6 @@ app.use(contextMiddleware);
 
 // Health checks
 app.use('/health', healthController);
-
-// API Documentation (Swagger UI)
-app.use('/docs', docsController);
 
 // Authentication routes
 app.use('/auth', authController);
