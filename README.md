@@ -53,6 +53,23 @@ curl http://localhost:3015/health/ready
 # Response: {"status":"ready"}
 ```
 
+## Environments
+
+| Environment | URL | Description |
+|-------------|-----|-------------|
+| **Production** | https://gcdr-server.apps.myio-bas.com | Dokploy deployment |
+| **Local** | http://localhost:3015 | Docker development |
+
+### Production Resources
+
+| Resource | URL |
+|----------|-----|
+| Swagger UI | https://gcdr-server.apps.myio-bas.com/docs |
+| OpenAPI JSON | https://gcdr-server.apps.myio-bas.com/docs/openapi.json |
+| Health Check | https://gcdr-server.apps.myio-bas.com/health |
+| DB Admin | https://gcdr-server.apps.myio-bas.com/admin/db |
+| Alarm Simulator | https://gcdr-server.apps.myio-bas.com/admin/simulator |
+
 ## Architecture
 
 ```
@@ -193,7 +210,15 @@ npm run test:coverage    # Tests with coverage
 - [RFC-0003](docs/RFC-0003-Refactoring-Multiple-Audience.md) - JWT Multiple Audience
 - [RFC-0004](docs/RFC-0004-Migration-DynamoDB-to-Postgres.md) - PostgreSQL Migration
 - [RFC-0005](docs/RFC-0005-Container-Deployment-Migration.md) - Container Deployment
+- [RFC-0006](docs/RFC-0006-Database-Seed-Scripts.md) - Database Seed Scripts
+- [RFC-0007](docs/RFC-0007-Database-Admin-UI.md) - Database Admin UI
+- [RFC-0008](docs/RFC-0008-Device-Attributes-Extension.md) - Device Attributes Extension
+- [RFC-0009](docs/RFC-0009-Events-Audit-Logs.md) - Events & Audit Logs
+- [RFC-0010](docs/RFC-0010-Premium-Alarm-Simulator.md) - Premium Alarm Simulator
+- [RFC-0011](docs/RFC-0011-User-Registration-Approval-Workflow.md) - User Registration & Approval Workflow
 - [RULE-ENTITY.md](docs/RULE-ENTITY.md) - Rules Engine Documentation
+- [SIMULATOR-MANUAL.md](docs/SIMULATOR-MANUAL.md) - Alarm Simulator Manual
+- [DEPLOY-DOKPLOY.md](docs/DEPLOY-DOKPLOY.md) - Dokploy Deployment Guide
 
 ## Deployment
 
