@@ -17,7 +17,8 @@ import { customerRepository, CustomerRepository } from '../repositories/Customer
 import { maintenanceGroupRepository, MaintenanceGroupRepository } from '../repositories/MaintenanceGroupRepository';
 import { bundleCacheRepository, BundleCacheRepository } from '../repositories/BundleCacheRepository';
 import { authorizationService, AuthorizationService } from './AuthorizationService';
-import { eventService, EventType } from '../shared/events';
+import { eventService } from '../infrastructure/events/EventService';
+import { EventType } from '../shared/events/eventTypes';
 import { AppError } from '../shared/errors/AppError';
 
 // Feature configuration (could be moved to database/config later)
@@ -124,8 +125,9 @@ export class BundleGeneratorService {
       tenantId,
       entityType: 'user_bundle',
       entityId: userId,
-      action: 'INVALIDATE',
-      newValues: { reason, scope },
+      action: 'invalidated',
+      data: { reason, scope },
+      actor: { type: 'system' },
     });
   }
 
@@ -227,9 +229,11 @@ export class BundleGeneratorService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + options.ttlSeconds * 1000);
 
-    // Get source roles and policies
-    const sourceRoles = [...new Set(effectivePermissions.map(p => p.grantedByRole).filter(Boolean))] as string[];
-    const sourcePolicies = [...new Set(effectivePermissions.map(p => p.grantedByPolicy).filter(Boolean))] as string[];
+    // Get source roles and policies from the source property
+    // source format is like "role:admin" or "policy:readonly-access"
+    const sources = effectivePermissions.map(p => p.source);
+    const sourceRoles = [...new Set(sources.filter(s => s.startsWith('role:')).map(s => s.replace('role:', '')))];
+    const sourcePolicies = [...new Set(sources.filter(s => s.startsWith('policy:')).map(s => s.replace('policy:', '')))];
 
     // Build bundle without checksum first
     const bundleData = {

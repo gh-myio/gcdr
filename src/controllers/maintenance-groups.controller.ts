@@ -9,7 +9,7 @@ import {
   RemoveGroupMembersSchema,
 } from '../dto/request/MaintenanceGroupDTO';
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
-import { ValidationError } from '../shared/errors/AppError';
+import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 
 const router = Router();
 
@@ -62,7 +62,7 @@ router.get('/:groupId', async (req: Request, res: Response, next: NextFunction) 
 
     const group = await maintenanceGroupService.getGroupById(tenantId, groupId);
     if (!group) {
-      throw new ValidationError('Maintenance group not found', 404);
+      throw new NotFoundError('Maintenance group not found');
     }
 
     sendSuccess(res, group, 200, requestId);
@@ -86,7 +86,7 @@ router.get('/:groupId/details', async (req: Request, res: Response, next: NextFu
 
     const group = await maintenanceGroupService.getGroupWithMembers(tenantId, groupId);
     if (!group) {
-      throw new ValidationError('Maintenance group not found', 404);
+      throw new NotFoundError('Maintenance group not found');
     }
 
     sendSuccess(res, group, 200, requestId);
@@ -110,7 +110,7 @@ router.get('/key/:key', async (req: Request, res: Response, next: NextFunction) 
 
     const group = await maintenanceGroupService.getGroupByKey(tenantId, key);
     if (!group) {
-      throw new ValidationError('Maintenance group not found', 404);
+      throw new NotFoundError('Maintenance group not found');
     }
 
     sendSuccess(res, group, 200, requestId);

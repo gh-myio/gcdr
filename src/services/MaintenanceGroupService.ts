@@ -15,7 +15,8 @@ import {
 import { userRepository, UserRepository } from '../repositories/UserRepository';
 import { PaginatedResult } from '../shared/types';
 import { AppError } from '../shared/errors/AppError';
-import { eventService, EventType } from '../shared/events';
+import { eventService } from '../infrastructure/events/EventService';
+import { EventType } from '../shared/events/eventTypes';
 
 export class MaintenanceGroupService {
   constructor(
@@ -38,9 +39,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'maintenance_group',
       entityId: group.id,
-      action: 'CREATE',
-      userId: createdBy,
-      newValues: { key: group.key, name: group.name },
+      action: 'created',
+      data: { key: group.key, name: group.name },
+      actor: { userId: createdBy, type: 'user' },
     });
 
     return group;
@@ -70,9 +71,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'maintenance_group',
       entityId: group.id,
-      action: 'UPDATE',
-      userId: updatedBy,
-      newValues: data,
+      action: 'updated',
+      data: { updatedFields: Object.keys(data) },
+      actor: { userId: updatedBy, type: 'user' },
     });
 
     return group;
@@ -90,9 +91,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'maintenance_group',
       entityId: id,
-      action: 'DELETE',
-      userId: deletedBy,
-      oldValues: { key: group.key, name: group.name },
+      action: 'deleted',
+      data: { key: group.key, name: group.name },
+      actor: { userId: deletedBy, type: 'user' },
     });
   }
 
@@ -126,9 +127,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'user_maintenance_group',
       entityId: `${groupId}:${userId}`,
-      action: 'MEMBER_ADDED',
-      userId: assignedBy,
-      newValues: { groupId, userId, expiresAt },
+      action: 'member_added',
+      data: { groupId, memberId: userId, expiresAt },
+      actor: { userId: assignedBy, type: 'user' },
     });
   }
 
@@ -153,9 +154,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'user_maintenance_group',
       entityId: groupId,
-      action: 'MEMBERS_ADDED',
-      userId: assignedBy,
-      newValues: { groupId, userIds, count: userIds.length },
+      action: 'members_added',
+      data: { groupId, memberIds: userIds, count: userIds.length },
+      actor: { userId: assignedBy, type: 'user' },
     });
   }
 
@@ -166,9 +167,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'user_maintenance_group',
       entityId: `${groupId}:${userId}`,
-      action: 'MEMBER_REMOVED',
-      userId: removedBy,
-      oldValues: { groupId, userId },
+      action: 'member_removed',
+      data: { groupId, memberId: userId },
+      actor: { userId: removedBy, type: 'user' },
     });
   }
 
@@ -184,9 +185,9 @@ export class MaintenanceGroupService {
       tenantId,
       entityType: 'user_maintenance_group',
       entityId: groupId,
-      action: 'MEMBERS_REMOVED',
-      userId: removedBy,
-      oldValues: { groupId, userIds, count: userIds.length },
+      action: 'members_removed',
+      data: { groupId, memberIds: userIds, count: userIds.length },
+      actor: { userId: removedBy, type: 'user' },
     });
   }
 

@@ -102,9 +102,10 @@ export class BundleCacheRepository {
         eq(userBundleCache.tenantId, tenantId),
         eq(userBundleCache.userId, userId),
         isNull(userBundleCache.invalidatedAt)
-      ));
+      ))
+      .returning({ id: userBundleCache.id });
 
-    return result.rowCount || 0;
+    return result.length;
   }
 
   async invalidateByScope(tenantId: string, userId: string, scope: string, reason?: string): Promise<boolean> {
@@ -122,9 +123,10 @@ export class BundleCacheRepository {
         eq(userBundleCache.userId, userId),
         eq(userBundleCache.scope, scope),
         isNull(userBundleCache.invalidatedAt)
-      ));
+      ))
+      .returning({ id: userBundleCache.id });
 
-    return (result.rowCount || 0) > 0;
+    return result.length > 0;
   }
 
   async invalidateAllForTenant(tenantId: string, reason?: string): Promise<number> {
@@ -140,9 +142,10 @@ export class BundleCacheRepository {
       .where(and(
         eq(userBundleCache.tenantId, tenantId),
         isNull(userBundleCache.invalidatedAt)
-      ));
+      ))
+      .returning({ id: userBundleCache.id });
 
-    return result.rowCount || 0;
+    return result.length;
   }
 
   async delete(tenantId: string, userId: string, scope?: string): Promise<number> {
@@ -157,17 +160,19 @@ export class BundleCacheRepository {
 
     const result = await db
       .delete(userBundleCache)
-      .where(and(...conditions));
+      .where(and(...conditions))
+      .returning({ id: userBundleCache.id });
 
-    return result.rowCount || 0;
+    return result.length;
   }
 
   async cleanupExpired(): Promise<number> {
     const result = await db
       .delete(userBundleCache)
-      .where(lt(userBundleCache.expiresAt, new Date()));
+      .where(lt(userBundleCache.expiresAt, new Date()))
+      .returning({ id: userBundleCache.id });
 
-    return result.rowCount || 0;
+    return result.length;
   }
 
   async cleanupInvalidated(olderThanDays = 7): Promise<number> {
@@ -176,11 +181,10 @@ export class BundleCacheRepository {
 
     const result = await db
       .delete(userBundleCache)
-      .where(and(
-        lt(userBundleCache.invalidatedAt, cutoffDate)
-      ));
+      .where(lt(userBundleCache.invalidatedAt, cutoffDate))
+      .returning({ id: userBundleCache.id });
 
-    return result.rowCount || 0;
+    return result.length;
   }
 
   private mapToEntity(row: typeof userBundleCache.$inferSelect): UserBundleCache {
