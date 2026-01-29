@@ -86,6 +86,23 @@ export const EventType = {
 
   // Health
   HEALTH_CHECK: { code: 'HEALTH_CHECK', description: 'Health check performed' },
+
+  // RFC-0013: User Access Profile Bundle
+  // Maintenance Group Operations
+  MAINTENANCE_GROUP_CREATED: { code: 'MAINTENANCE_GROUP_CREATED', description: 'Maintenance group created' },
+  MAINTENANCE_GROUP_UPDATED: { code: 'MAINTENANCE_GROUP_UPDATED', description: 'Maintenance group updated' },
+  MAINTENANCE_GROUP_DELETED: { code: 'MAINTENANCE_GROUP_DELETED', description: 'Maintenance group deleted' },
+  USER_GROUP_CHANGED: { code: 'USER_GROUP_CHANGED', description: 'User maintenance group assignment changed' },
+
+  // Bundle Operations
+  BUNDLE_GENERATED: { code: 'BUNDLE_GENERATED', description: 'Access bundle generated' },
+  BUNDLE_INVALIDATED: { code: 'BUNDLE_INVALIDATED', description: 'Access bundle invalidated' },
+  BUNDLE_REFRESHED: { code: 'BUNDLE_REFRESHED', description: 'Access bundle refreshed' },
+
+  // Generic Entity Operations (for services that use generic patterns)
+  ENTITY_CREATED: { code: 'ENTITY_CREATED', description: 'Entity created' },
+  ENTITY_UPDATED: { code: 'ENTITY_UPDATED', description: 'Entity updated' },
+  ENTITY_DELETED: { code: 'ENTITY_DELETED', description: 'Entity deleted' },
 } as const;
 
 export type EventTypeCode = keyof typeof EventType;

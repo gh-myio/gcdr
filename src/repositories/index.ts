@@ -9,3 +9,8 @@ export * from './RuleRepository';
 export * from './AuditLogRepository';
 export * from './SimulatorRepository';
 export * from './interfaces';
+
+// RFC-0013: User Access Profile Bundle
+export * from './MaintenanceGroupRepository';
+export * from './DomainPermissionRepository';
+export * from './BundleCacheRepository';

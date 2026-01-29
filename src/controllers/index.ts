@@ -19,3 +19,7 @@ export { auditLogsController } from './audit-logs.controller';
 export { simulatorController } from './simulator.controller';
 export { default as centralsController, listByCustomerHandler as centralsListByCustomerHandler, listByAssetHandler as centralsListByAssetHandler } from './centrals.controller';
 export { default as themesController, listByCustomerHandler as themesListByCustomerHandler, getDefaultByCustomerHandler as themesGetDefaultByCustomerHandler } from './themes.controller';
+
+// RFC-0013: User Access Profile Bundle
+export { default as maintenanceGroupsController } from './maintenance-groups.controller';
+export { default as accessBundleController } from './access-bundle.controller';

@@ -39,6 +39,15 @@ UNION ALL
 SELECT 'integration_packages', COUNT(*), COUNT(*) FILTER (WHERE status = 'PUBLISHED') FROM integration_packages
 UNION ALL
 SELECT 'package_subscriptions', COUNT(*), COUNT(*) FILTER (WHERE status = 'ACTIVE') FROM package_subscriptions
+-- RFC-0013: User Access Profile Bundle
+UNION ALL
+SELECT 'domain_permissions', COUNT(*), COUNT(*) FILTER (WHERE tenant_id IS NULL) FROM domain_permissions
+UNION ALL
+SELECT 'maintenance_groups', COUNT(*), COUNT(*) FILTER (WHERE is_active = true) FROM maintenance_groups
+UNION ALL
+SELECT 'user_maintenance_groups', COUNT(*), COUNT(*) FILTER (WHERE expires_at IS NULL OR expires_at > NOW()) FROM user_maintenance_groups
+UNION ALL
+SELECT 'user_bundle_cache', COUNT(*), COUNT(*) FILTER (WHERE expires_at > NOW()) FROM user_bundle_cache
 ORDER BY table_name;
 
 -- Check rules CHECK constraints are working
@@ -72,5 +81,30 @@ SELECT
     depth
 FROM assets
 ORDER BY path;
+
+-- RFC-0013: Domain Permissions Summary
+SELECT '==================== DOMAIN PERMISSIONS (RFC-0013) ====================' as info;
+SELECT
+    domain,
+    COUNT(*) as total_permissions,
+    COUNT(DISTINCT equipment) as equipment_types,
+    COUNT(DISTINCT location) as location_types,
+    string_agg(DISTINCT action, ', ' ORDER BY action) as actions
+FROM domain_permissions
+GROUP BY domain
+ORDER BY domain;
+
+-- RFC-0013: Maintenance Groups Summary
+SELECT '==================== MAINTENANCE GROUPS (RFC-0013) ====================' as info;
+SELECT
+    mg.name as group_name,
+    mg.key,
+    c.name as customer_name,
+    mg.member_count,
+    mg.is_active,
+    (SELECT COUNT(*) FROM user_maintenance_groups umg WHERE umg.group_id = mg.id) as actual_members
+FROM maintenance_groups mg
+LEFT JOIN customers c ON c.id = mg.customer_id
+ORDER BY mg.name;
 
 SELECT '==================== VERIFICATION COMPLETE ====================' as info;

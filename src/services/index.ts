@@ -15,3 +15,7 @@ export * from './SimulatorQueueService';
 export * from './SimulatorStartup';
 export * from './SimulatorMonitor';
 export * from './SimulatorMetrics';
+
+// RFC-0013: User Access Profile Bundle
+export * from './MaintenanceGroupService';
+export * from './BundleGeneratorService';

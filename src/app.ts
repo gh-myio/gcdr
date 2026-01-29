@@ -37,6 +37,9 @@ import {
   themesController,
   themesListByCustomerHandler,
   themesGetDefaultByCustomerHandler,
+  // RFC-0013: User Access Profile Bundle
+  maintenanceGroupsController,
+  accessBundleController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -173,6 +176,10 @@ app.use('/simulator', authMiddleware, simulatorController);
 
 // Admin User Management (RFC-0011)
 app.use('/admin/users', userAdminController);
+
+// RFC-0013: User Access Profile Bundle
+app.use('/maintenance-groups', authMiddleware, maintenanceGroupsController);
+app.use('/access-bundle', authMiddleware, accessBundleController);
 
 // =============================================================================
 // Error Handling

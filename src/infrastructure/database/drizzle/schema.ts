@@ -88,6 +88,38 @@ export const verificationTokenTypeEnum = pgEnum('verification_token_type', [
   'ACCOUNT_UNLOCK',
 ]);
 
+// RFC-0013: Access Bundle enums
+export const equipmentTypeEnum = pgEnum('equipment_type', [
+  'hidrometro',
+  'medidor',
+  'sensor',
+  'termometro',
+  'analisador',
+  'controlador',
+  'gateway',
+  'other',
+]);
+
+export const locationTypeEnum = pgEnum('location_type', [
+  'entry',
+  'common_area',
+  'stores',
+  'internal',
+  'external',
+  'parking',
+  'roof',
+  'basement',
+  'other',
+]);
+
+export const featureAccessTypeEnum = pgEnum('feature_access_type', [
+  'guaranteed',
+  'granted',
+  'conditional',
+  'denied',
+  'not_granted',
+]);
+
 // Audit enums (RFC-0009)
 export const eventCategoryEnum = pgEnum('event_category', [
   'ENTITY_CHANGE',
@@ -1016,4 +1048,127 @@ export const verificationTokens = pgTable('verification_tokens', {
   typeIdx: index('verification_tokens_type_idx').on(table.tokenType),
   expiresIdx: index('verification_tokens_expires_idx').on(table.expiresAt),
   tenantUserTypeIdx: index('verification_tokens_tenant_user_type_idx').on(table.tenantId, table.userId, table.tokenType),
+}));
+
+// =============================================================================
+// RFC-0013: USER ACCESS PROFILE BUNDLE
+// =============================================================================
+
+/**
+ * Maintenance Groups - Groups of users for maintenance operations
+ */
+export const maintenanceGroups = pgTable('maintenance_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+
+  // Identification
+  key: varchar('key', { length: 100 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+
+  // Scope
+  customerId: uuid('customer_id').references(() => customers.id),
+
+  // Members (denormalized for performance)
+  memberCount: integer('member_count').notNull().default(0),
+
+  // Status
+  isActive: boolean('is_active').notNull().default(true),
+
+  // Audit
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+  version: integer('version').notNull().default(1),
+}, (table) => ({
+  tenantKeyUnique: uniqueIndex('maintenance_groups_tenant_key_unique').on(table.tenantId, table.key),
+  tenantCustomerIdx: index('maintenance_groups_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantActiveIdx: index('maintenance_groups_tenant_active_idx').on(table.tenantId, table.isActive),
+}));
+
+/**
+ * User Maintenance Groups - Junction table for user-group assignments
+ */
+export const userMaintenanceGroups = pgTable('user_maintenance_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  groupId: uuid('group_id').notNull().references(() => maintenanceGroups.id, { onDelete: 'cascade' }),
+
+  // Assignment metadata
+  assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  assignedBy: uuid('assigned_by'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+
+  // Audit
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userGroupUnique: uniqueIndex('user_maintenance_groups_unique').on(table.userId, table.groupId),
+  tenantUserIdx: index('user_maintenance_groups_tenant_user_idx').on(table.tenantId, table.userId),
+  tenantGroupIdx: index('user_maintenance_groups_tenant_group_idx').on(table.tenantId, table.groupId),
+}));
+
+/**
+ * Domain Permissions - Hierarchical permission definitions
+ * Format: domain.equipment.location:action
+ */
+export const domainPermissions = pgTable('domain_permissions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id'),  // NULL for system-wide permissions
+
+  // Permission components
+  domain: varchar('domain', { length: 50 }).notNull(),
+  equipment: varchar('equipment', { length: 50 }).notNull(),
+  location: varchar('location', { length: 50 }).notNull(),
+  action: varchar('action', { length: 50 }).notNull(),
+
+  // Metadata
+  displayName: varchar('display_name', { length: 255 }),
+  description: text('description'),
+  riskLevel: riskLevelEnum('risk_level').notNull().default('low'),
+
+  // Status
+  isActive: boolean('is_active').notNull().default(true),
+
+  // Audit
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  permissionUnique: uniqueIndex('domain_permissions_unique').on(table.tenantId, table.domain, table.equipment, table.location, table.action),
+  domainIdx: index('domain_permissions_domain_idx').on(table.domain),
+  equipmentIdx: index('domain_permissions_equipment_idx').on(table.equipment),
+  locationIdx: index('domain_permissions_location_idx').on(table.location),
+  tenantActiveIdx: index('domain_permissions_tenant_active_idx').on(table.tenantId, table.isActive),
+}));
+
+/**
+ * User Bundle Cache - Cached access bundles for performance
+ */
+export const userBundleCache = pgTable('user_bundle_cache', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  scope: varchar('scope', { length: 255 }).notNull(),
+
+  // Cached bundle
+  bundle: jsonb('bundle').notNull(),
+  checksum: varchar('checksum', { length: 64 }).notNull(),
+
+  // Validity
+  generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+
+  // Invalidation tracking
+  invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
+  invalidationReason: varchar('invalidation_reason', { length: 255 }),
+
+  // Audit
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userScopeUnique: uniqueIndex('user_bundle_cache_unique').on(table.tenantId, table.userId, table.scope),
+  tenantUserIdx: index('user_bundle_cache_tenant_user_idx').on(table.tenantId, table.userId),
+  expiresIdx: index('user_bundle_cache_expires_idx').on(table.expiresAt),
+  invalidatedIdx: index('user_bundle_cache_invalidated_idx').on(table.invalidatedAt),
 }));

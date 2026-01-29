@@ -24,6 +24,12 @@ TRUNCATE TABLE rules CASCADE;
 TRUNCATE TABLE role_assignments CASCADE;
 TRUNCATE TABLE roles CASCADE;
 TRUNCATE TABLE policies CASCADE;
+-- RFC-0013: User Access Profile Bundle
+TRUNCATE TABLE user_bundle_cache CASCADE;
+TRUNCATE TABLE user_maintenance_groups CASCADE;
+TRUNCATE TABLE maintenance_groups CASCADE;
+TRUNCATE TABLE domain_permissions CASCADE;
+-- End RFC-0013
 TRUNCATE TABLE users CASCADE;
 TRUNCATE TABLE partners CASCADE;
 TRUNCATE TABLE customers CASCADE;
@@ -50,4 +56,9 @@ UNION ALL SELECT 'customer_api_keys', COUNT(*) FROM customer_api_keys
 UNION ALL SELECT 'integration_packages', COUNT(*) FROM integration_packages
 UNION ALL SELECT 'package_subscriptions', COUNT(*) FROM package_subscriptions
 UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs
+-- RFC-0013
+UNION ALL SELECT 'domain_permissions', COUNT(*) FROM domain_permissions
+UNION ALL SELECT 'maintenance_groups', COUNT(*) FROM maintenance_groups
+UNION ALL SELECT 'user_maintenance_groups', COUNT(*) FROM user_maintenance_groups
+UNION ALL SELECT 'user_bundle_cache', COUNT(*) FROM user_bundle_cache
 ORDER BY table_name;
