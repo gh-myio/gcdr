@@ -217,6 +217,7 @@ npm run test:coverage    # Tests with coverage
 - [RFC-0009](docs/RFC-0009-Events-Audit-Logs.md) - Events & Audit Logs
 - [RFC-0010](docs/RFC-0010-Premium-Alarm-Simulator.md) - Premium Alarm Simulator
 - [RFC-0011](docs/RFC-0011-User-Registration-Approval-Workflow.md) - User Registration & Approval Workflow
+- [RFC-0012](docs/RFC-0012-Features-Registry.md) - Features Registry (Draft)
 - [RULE-ENTITY.md](docs/RULE-ENTITY.md) - Rules Engine Documentation
 - [SIMULATOR-MANUAL.md](docs/SIMULATOR-MANUAL.md) - Alarm Simulator Manual
 - [DEPLOY-DOKPLOY.md](docs/DEPLOY-DOKPLOY.md) - Dokploy Deployment Guide
