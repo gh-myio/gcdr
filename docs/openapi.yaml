@@ -3764,65 +3764,6 @@ paths:
                       message:
                         type: string
 
-  # Legacy endpoints (deprecated)
-  /auth/password/forgot:
-    post:
-      tags: [Authentication]
-      summary: Request password reset (deprecated)
-      deprecated: true
-      description: |
-        **DEPRECATED**: Use `/auth/forgot-password` instead.
-        Sends a password reset email to the user.
-      operationId: authForgotPassword
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PasswordResetRequest'
-      responses:
-        '200':
-          description: Password reset email sent (if user exists)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessMessageResponse'
-
-  /auth/password/reset:
-    post:
-      tags: [Authentication]
-      summary: Reset password with token (deprecated)
-      deprecated: true
-      description: |
-        **DEPRECATED**: Use `/auth/reset-password` instead.
-        Resets the user password using a token received via email.
-      operationId: authResetPassword
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PasswordResetConfirm'
-      responses:
-        '200':
-          description: Password reset successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessMessageResponse'
-        '400':
-          description: Invalid or expired token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
   # Customers
   /customers:
     post:
