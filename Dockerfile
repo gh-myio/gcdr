@@ -78,7 +78,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3015/health || exit 1
 
 # Start application (run migrations first, then start server)
-CMD ["sh", "-c", "node dist/scripts/migrate.js && node dist/app.js"]
+# Migration errors are logged but don't prevent startup (for cases where DB is already migrated)
+CMD ["sh", "-c", "node dist/scripts/migrate.js || echo 'Migration warning: check logs above'; node dist/app.js"]
 
 # -----------------------------------------------------------------------------
 # Stage 4: Development (optional, for local development)
