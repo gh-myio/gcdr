@@ -1,5 +1,7 @@
 # Problemas de Deploy no Dokploy - GCDR
 
+> **Quick Reference Runbook** - Para analise detalhada e post-mortem, veja [RFC-DOCKERFILE-DOKPLOY-LOOP.md](./RFC-DOCKERFILE-DOKPLOY-LOOP.md)
+
 ## Data: 2026-01-29
 
 ---
@@ -139,6 +141,29 @@ docker system prune -f
 ## Arquivos de Backup
 
 - `Dockerfile.backup` - Dockerfile original multi-stage com migrations
+
+---
+
+## Problema 5: Container reinicia rapido e nao gera log
+
+### Sintoma
+Container reinicia em loop e morre rapido demais para coletar logs no Dokploy.
+
+### Causa
+Variaveis obrigatorias ausentes no runtime (ex: `DATABASE_URL`).
+O script de migration encerra com `exit 1`, ou a inicializacao do DB falha, e o processo termina.
+
+### Solucao
+- Garantir `DATABASE_URL` valida no Dokploy (host/porta/credenciais corretos)
+- Validar conexao com Postgres antes do deploy
+- (Debug) sobrescrever o comando temporariamente para manter o container vivo:
+
+```sh
+sh -c "node dist/scripts/migrate.js || true; node dist/app.js || true; sleep 600"
+```
+
+### Observacoes
+- `DATABASE_URL` ausente causa crash instantaneo no `migrate.js` e no `db.ts`.
 
 ---
 
