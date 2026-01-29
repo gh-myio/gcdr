@@ -206,7 +206,8 @@ npm run test:coverage    # Tests with coverage
 
 - [ONBOARDING.md](docs/ONBOARDING.md) - Developer onboarding guide
 - [RFC-0001](docs/RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Integration Marketplace
-- [RFC-0002](docs/RFC-0002-GCDR-Authorization-Model.md) - Authorization Model
+- [RFC-0002](docs/RFC-0002-GCDR-Authorization-Model.md) - Authorization Model (RFC)
+- [AUTHORIZATION-MODEL.md](docs/AUTHORIZATION-MODEL.md) - Authorization Implementation Guide
 - [RFC-0003](docs/RFC-0003-Refactoring-Multiple-Audience.md) - JWT Multiple Audience
 - [RFC-0004](docs/RFC-0004-Migration-DynamoDB-to-Postgres.md) - PostgreSQL Migration
 - [RFC-0005](docs/RFC-0005-Container-Deployment-Migration.md) - Container Deployment
