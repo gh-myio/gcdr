@@ -98,6 +98,12 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 
+# Copy OpenAPI documentation
+COPY docs/openapi.yaml ./docs/
+
+# Copy database seed scripts (for admin/db UI)
+COPY scripts/db/seeds ./scripts/db/seeds
+
 # Expose port
 EXPOSE 3015
 
