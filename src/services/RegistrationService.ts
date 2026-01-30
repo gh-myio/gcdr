@@ -8,6 +8,7 @@ import { verificationTokenRepository, VerificationTokenType } from '../repositor
 import { ValidationError, UnauthorizedError, AppError } from '../shared/errors/AppError';
 import { eventService } from '../infrastructure/events/EventService';
 import { EventType } from '../shared/events/eventTypes';
+import { emailService } from './EmailService';
 
 // Configuration
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;
@@ -90,9 +91,9 @@ export class RegistrationService {
       userAgent
     );
 
-    // TODO: Send email with verification code
-    // For now, log it (in production, use email service)
-    console.log(`[REGISTRATION] Verification code for ${email}: ${code}`);
+    // Send email with verification code
+    await emailService.sendVerificationCode(email, code, firstName);
+    console.log(`[REGISTRATION] Verification code sent to ${email}`);
 
     // Publish registration event
     await eventService.publish(EventType.USER_CREATED, {
@@ -218,8 +219,9 @@ export class RegistrationService {
       userAgent
     );
 
-    // TODO: Send email with verification code
-    console.log(`[REGISTRATION] New verification code for ${email}: ${code}`);
+    // Send email with verification code
+    await emailService.sendVerificationCode(email, code, user.profile.firstName);
+    console.log(`[REGISTRATION] New verification code sent to ${email}`);
 
     return {
       message: 'Se o email existir e não estiver verificado, um novo código será enviado',
@@ -258,8 +260,9 @@ export class RegistrationService {
       userAgent
     );
 
-    // TODO: Send email with reset code
-    console.log(`[PASSWORD_RESET] Reset code for ${email}: ${code}`);
+    // Send email with reset code
+    await emailService.sendPasswordResetCode(email, code, user.profile.firstName);
+    console.log(`[PASSWORD_RESET] Reset code sent to ${email}`);
 
     // Publish event
     await eventService.publish(EventType.USER_UPDATED, {
@@ -394,7 +397,8 @@ export class RegistrationService {
 
     await userRepository.approveUser(tenantId, userId, approvedBy);
 
-    // TODO: Send approval notification email
+    // Send approval notification email
+    await emailService.sendAccountApproved(user.email, user.profile.firstName);
     console.log(`[REGISTRATION] User ${user.email} approved by ${approvedBy}`);
 
     // Publish event
@@ -426,7 +430,8 @@ export class RegistrationService {
 
     await userRepository.rejectUser(tenantId, userId, rejectedBy, reason);
 
-    // TODO: Send rejection notification email
+    // Send rejection notification email
+    await emailService.sendAccountRejected(user.email, user.profile.firstName, reason);
     console.log(`[REGISTRATION] User ${user.email} rejected by ${rejectedBy}: ${reason}`);
 
     // Publish event
@@ -459,7 +464,8 @@ export class RegistrationService {
 
     await userRepository.unlockUser(tenantId, userId);
 
-    // TODO: Send unlock notification email
+    // Send unlock notification email
+    await emailService.sendAccountUnlocked(user.email, user.profile.firstName);
     console.log(`[REGISTRATION] User ${user.email} unlocked by ${unlockedBy}`);
 
     // Publish event
