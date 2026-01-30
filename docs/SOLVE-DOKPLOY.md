@@ -167,9 +167,90 @@ sh -c "node dist/scripts/migrate.js || true; node dist/app.js || true; sleep 600
 
 ---
 
+## Problema 6: Dockerfile development stage sem assets
+
+### Sintoma
+`/admin/db` retorna erro 500: `ENOENT: no such file or directory, scandir '/app/scripts/db/seeds'`
+
+### Causa
+O Dokploy estava buildando o stage `development` do Dockerfile, que não copiava:
+- `docs/openapi.yaml`
+- `scripts/db/seeds/`
+
+### Erro
+```
+GET /admin/db/api/scripts 500 (Internal Server Error)
+{"error":"ENOENT: no such file or directory, scandir '/app/scripts/db/seeds'"}
+```
+
+### Solução
+Adicionar os COPY no stage development do Dockerfile:
+
+```dockerfile
+# Copy OpenAPI documentation
+COPY docs/openapi.yaml ./docs/
+
+# Copy database seed scripts (for admin/db UI)
+COPY scripts/db/seeds ./scripts/db/seeds
+```
+
+Commit: `322de77`
+
+---
+
+## Problema 7: Migration 0002 não aplicada
+
+### Sintoma
+Seeds 15 e 16 falham. Tabelas `domain_permissions`, `maintenance_groups`, `user_maintenance_groups` não existem.
+
+### Causa
+Apenas migrations 0000 e 0001 foram aplicadas. A migration 0002 (`0002_misty_unicorn.sql`) não foi executada.
+
+### Verificação
+```sql
+SELECT * FROM __drizzle_migrations ORDER BY created_at;
+-- Mostra apenas 0000 e 0001
+```
+
+### Solução
+Rodar migration 0002 manualmente via Query Console ou SSH:
+
+```bash
+cd /app
+node dist/scripts/migrate.js
+```
+
+Ou aplicar o SQL da migration `drizzle/migrations/0002_misty_unicorn.sql` diretamente.
+
+---
+
+## Problema 8: Seed maintenance-groups com IDs incorretos
+
+### Sintoma
+Seed `16-maintenance-groups.sql` falha mesmo com tabela existente.
+
+### Causa
+O seed usava customer IDs que não existem:
+- `v_myio_holding_id := 'aaaa1111-...'` ❌
+- `v_acme_company_id := 'aaaa2222-...'` ❌
+
+Mas os customers reais têm IDs diferentes (de `01-customers.sql`):
+- `v_holding_id := '22222222-...'` ✅
+- `v_company_id := '33333333-...'` ✅
+
+### Solução
+Corrigido o seed para usar os IDs consistentes com `01-customers.sql`.
+
+Commit: `43187b3`
+
+---
+
 ## Status Atual
 
 - [x] Migration loop resolvido (journal corrigido no banco)
 - [x] Swagger UI carregando localmente
-- [ ] Swagger UI em produção (aguardando redeploy com Dockerfile simplificado)
-- [ ] Restaurar Dockerfile otimizado após estabilizar
+- [x] Swagger UI em produção
+- [x] Dockerfile development stage corrigido
+- [x] Migration 0002 aplicada
+- [x] Seed maintenance-groups corrigido
+- [x] Banco populado com todos os seeds
