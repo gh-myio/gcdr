@@ -4,7 +4,8 @@
 # Configuration - Change API_URL for different environments
 # Local: http://localhost:3015
 # Production: https://gcdr-server.apps.myio-bas.com
-API_URL="http://localhost:3015"
+#API_URL="http://localhost:3015"
+API_URL="https://gcdr-server.apps.myio-bas.com"
 CUSTOMER_ID="33333333-3333-3333-3333-333333333333"
 # Fixed test API key (seeded in database)
 API_KEY="gcdr_cust_test_bundle_key_myio2026"

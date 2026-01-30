@@ -97,6 +97,7 @@ RUN npm ci
 # Copy source files
 COPY tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
 
 # Copy OpenAPI documentation
 COPY docs/openapi.yaml ./docs/
