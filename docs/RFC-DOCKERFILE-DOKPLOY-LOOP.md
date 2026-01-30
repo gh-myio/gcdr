@@ -26,6 +26,10 @@ incident response.
 | 2 | Migration loop | drizzle.__drizzle_migrations table empty/stale | Resolved |
 | 3 | Swagger UI not loading | Duplicate YAML key in openapi.yaml | Resolved |
 | 4 | Swagger scripts blocked | Helmet CSP blocking external resources | Resolved |
+| 5 | Container restarts too fast | Missing env vars cause instant crash | Resolved |
+| 6 | Dev stage missing assets | Dockerfile dev stage lacks docs/seeds | Resolved |
+| 7 | Migration 0002 not applied | Only 0000+0001 were run on fresh install | Resolved |
+| 8 | Seed IDs mismatch | maintenance-groups.sql had wrong customer IDs | Resolved |
 
 ## Guide-level explanation
 What happens during startup:
@@ -180,6 +184,98 @@ app.use(helmet());
 ### Prevention
 - Document middleware ordering requirements
 - Consider self-hosting Swagger UI assets to avoid CSP issues
+
+---
+
+## Issue 5: Container Restarts Too Fast for Logs
+
+### Symptom
+Container restarts in loop and dies too fast to capture logs in Dokploy.
+
+### Root Cause
+Missing required environment variables (e.g., `DATABASE_URL`) cause instant crash.
+The migration script exits with code 1, or DB initialization fails, and the process terminates.
+
+### Solution Applied
+- Ensure valid `DATABASE_URL` in Dokploy (correct host/port/credentials)
+- Validate Postgres connection before deploy
+- (Debug) Temporarily override command to keep container alive:
+
+```sh
+sh -c "node dist/scripts/migrate.js || true; node dist/app.js || true; sleep 600"
+```
+
+---
+
+## Issue 6: Dockerfile Development Stage Missing Assets
+
+### Symptom
+`/admin/db` returns 500 error: `ENOENT: no such file or directory, scandir '/app/scripts/db/seeds'`
+
+### Root Cause
+Dokploy was building the `development` stage of the Dockerfile, which didn't copy:
+- `docs/openapi.yaml`
+- `scripts/db/seeds/`
+
+### Solution Applied
+Added COPY commands to development stage in Dockerfile:
+
+```dockerfile
+# Copy OpenAPI documentation
+COPY docs/openapi.yaml ./docs/
+
+# Copy database seed scripts (for admin/db UI)
+COPY scripts/db/seeds ./scripts/db/seeds
+```
+
+**Commit**: `322de77`
+
+---
+
+## Issue 7: Migration 0002 Not Applied
+
+### Symptom
+Seeds 15 and 16 fail. Tables `domain_permissions`, `maintenance_groups`, `user_maintenance_groups` do not exist.
+
+### Root Cause
+Only migrations 0000 and 0001 were applied. Migration 0002 (`0002_misty_unicorn.sql`) was not executed.
+
+### Verification
+```sql
+SELECT * FROM __drizzle_migrations ORDER BY created_at;
+-- Shows only 0000 and 0001
+```
+
+### Solution Applied
+Run migration 0002 manually via Query Console or SSH:
+
+```bash
+cd /app
+node dist/scripts/migrate.js
+```
+
+Or apply the SQL from `drizzle/migrations/0002_misty_unicorn.sql` directly.
+
+---
+
+## Issue 8: Seed maintenance-groups with Wrong IDs
+
+### Symptom
+Seed `16-maintenance-groups.sql` fails even with table existing.
+
+### Root Cause
+The seed used customer IDs that don't exist:
+- `v_myio_holding_id := 'aaaa1111-...'` ❌
+- `v_acme_company_id := 'aaaa2222-...'` ❌
+
+But actual customers have different IDs (from `01-customers.sql`):
+- `v_holding_id := '22222222-...'` ✅
+- `v_company_id := '33333333-...'` ✅
+
+### Solution Applied
+Fixed the seed to use consistent IDs matching `01-customers.sql`.
+
+**Commit**: `43187b3`
 
 ---
 
