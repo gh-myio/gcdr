@@ -7,8 +7,8 @@
 DO $$
 DECLARE
     v_tenant_id UUID := '11111111-1111-1111-1111-111111111111';
-    v_myio_holding_id UUID := 'aaaa1111-1111-1111-1111-111111111111';
-    v_acme_company_id UUID := 'aaaa2222-2222-2222-2222-222222222222';
+    v_holding_id UUID := '22222222-2222-2222-2222-222222222222';      -- ACME Holdings (from 01-customers.sql)
+    v_company_id UUID := '33333333-3333-3333-3333-333333333333';      -- ACME Tech (from 01-customers.sql)
     v_admin_id UUID := 'bbbb1111-1111-1111-1111-111111111111';
     v_joao_id UUID := 'bbbb2222-2222-2222-2222-222222222222';
     v_maria_id UUID := 'bbbb3333-3333-3333-3333-333333333333';
@@ -28,7 +28,7 @@ BEGIN
         'group:maintenance-team-alpha',
         'Equipe de Manutencao Alpha',
         'Equipe interna responsavel pela regiao Sul - Shopping centers e edificios comerciais',
-        v_myio_holding_id,
+        v_holding_id,
         2,
         true,
         1
@@ -42,7 +42,7 @@ BEGIN
         'group:maintenance-team-beta',
         'Equipe de Manutencao Beta',
         'Equipe interna responsavel pela regiao Norte - Industrias e armazens',
-        v_myio_holding_id,
+        v_holding_id,
         0,
         true,
         1
@@ -56,7 +56,7 @@ BEGIN
         'group:maintenance-external',
         'Terceirizados',
         'Equipe de manutencao terceirizada - Acesso limitado',
-        v_acme_company_id,
+        v_company_id,
         1,
         true,
         1
