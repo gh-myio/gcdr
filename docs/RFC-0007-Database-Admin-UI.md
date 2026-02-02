@@ -24,19 +24,27 @@ Uma interface web simples resolve esses problemas e acelera o onboarding de dese
 
 ### Funcionalidades Principais
 
-1. **Painel de Seed Scripts**
+1. **Dashboard (default tab)**
+   - Estatísticas de todas as tabelas do banco
+   - Breakdown de usuários por status (ACTIVE, PENDING, LOCKED, etc.)
+   - Breakdown de customers por tipo (HOLDING, COMPANY, BRANCH)
+   - Breakdown de devices por status
+   - Quick actions para seed/clear/reset/verify
+   - Auto-refresh após operações
+
+2. **Painel de Seed Scripts**
    - Lista todos os scripts disponíveis
    - Botões para executar individual ou todos
    - Indicador de status (pending, running, success, error)
    - Botão de "Quick Reset" (clear + seed)
 
-2. **Visualizador de Logs**
+3. **Visualizador de Logs**
    - Log em tempo real da execução
    - Histórico de execuções anteriores
    - Filtro por tipo (info, success, error)
    - Exportar logs
 
-3. **Query Console**
+4. **Query Console**
    - Editor SQL com syntax highlighting
    - Execução de queries SELECT (read-only por padrão)
    - Resultados em tabela formatada
@@ -74,22 +82,26 @@ src/
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/admin/db` | Página principal da UI |
-| GET | `/admin/db/scripts` | Lista scripts disponíveis |
-| POST | `/admin/db/scripts/:name/run` | Executa um script |
-| POST | `/admin/db/seed-all` | Executa todos os seeds |
-| POST | `/admin/db/clear` | Limpa todos os dados |
-| POST | `/admin/db/verify` | Verifica dados |
-| GET | `/admin/db/logs` | Histórico de logs |
-| POST | `/admin/db/query` | Executa query SQL |
-| GET | `/admin/db/query/examples` | Queries de exemplo |
+| GET | `/admin/db/api/stats` | Estatísticas do banco (table counts, breakdowns) |
+| GET | `/admin/db/api/scripts` | Lista scripts disponíveis |
+| POST | `/admin/db/api/scripts/:name/run` | Executa um script |
+| POST | `/admin/db/api/seed-all` | Executa todos os seeds |
+| POST | `/admin/db/api/clear` | Limpa todos os dados |
+| POST | `/admin/db/api/verify` | Verifica dados |
+| GET | `/admin/db/api/logs` | Histórico de logs |
+| DELETE | `/admin/db/api/logs` | Limpar logs |
+| POST | `/admin/db/api/query` | Executa query SQL |
+| GET | `/admin/db/api/query/examples` | Queries de exemplo |
+
+> **Nota**: Todas as rotas `/api/*` requerem header `X-Admin-Password` para autenticação.
 
 ### Interface Visual
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  GCDR Database Admin                              [DEV ONLY]    │
+│  GCDR Database Admin                         [ADMIN] [🌙/☀]    │
 ├─────────────────────────────────────────────────────────────────┤
-│  [Scripts] [Logs] [Query Console]                               │
+│  [Dashboard] [Scripts] [Logs] [Query Console]                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─ Seed Scripts ─────────────────────────────────────────────┐ │
@@ -249,6 +261,15 @@ Nenhuma nova dependência necessária. Usa apenas:
 - [x] Exportar resultados CSV
 - [x] Histórico de queries (localStorage, últimas 20)
 - [x] Temas (light/dark toggle com persistência)
+
+### Fase 5 - Dashboard (Inspired by alarms-backend) ✅
+- [x] Dashboard tab como default view
+- [x] Endpoint `/api/stats` com contagem de tabelas
+- [x] Breakdown de usuários por status
+- [x] Breakdown de customers por tipo
+- [x] Breakdown de devices por status
+- [x] Auto-refresh stats após operações (seed, clear, verify)
+- [x] Query safety: bloqueio de GRANT/REVOKE
 
 ## Drawbacks
 

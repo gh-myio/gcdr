@@ -446,15 +446,28 @@ GET  /admin/users/locked           -> Lista usuários bloqueados
 ### Exemplos de Uso
 
 #### Login Simples
+
+> **IMPORTANTE**: O header `X-Tenant-Id` é obrigatório para login. Use o tenant default: `11111111-1111-1111-1111-111111111111`
+
 ```bash
-curl -X POST https://api.gcdr.io/dev/auth/login \
+curl -X POST http://localhost:3015/auth/login \
   -H "Content-Type: application/json" \
-  -H "x-tenant-id: tenant-uuid" \
+  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
   -d '{
-    "email": "usuario@empresa.com",
-    "password": "senha123"
+    "email": "admin@gcdr.io",
+    "password": "Test123!"
   }'
 ```
+
+**Usuários de Teste (seed):**
+
+| Email | Senha | Role | Status |
+|-------|-------|------|--------|
+| admin@gcdr.io | Test123! | Admin | ACTIVE |
+| joao.silva@acmetech.com | Test123! | User | ACTIVE |
+| maria.santos@acmetech.com | Test123! | User | ACTIVE |
+| dev@techpartner.com | Test123! | Partner | ACTIVE |
+| service@gcdr.io | Test123! | Service | ACTIVE |
 
 Resposta:
 ```json
@@ -1222,6 +1235,7 @@ http://localhost:3015/admin/db
 
 | Aba | Descrição |
 |-----|-----------|
+| **Dashboard** | Estatísticas do banco (table counts, users by status, customers by type, devices by status) |
 | **Scripts** | Executa seed scripts individualmente ou todos de uma vez |
 | **Logs** | Visualiza histórico de execuções com filtros |
 | **Query Console** | Executa queries SQL ad-hoc com exemplos prontos |
@@ -1231,6 +1245,7 @@ http://localhost:3015/admin/db
 - **Clear All**: Limpa todos os dados (com confirmação)
 - **Quick Reset**: Clear + Seed em um clique
 - **Verify**: Valida contagem de registros
+- **Refresh Stats**: Atualiza estatísticas do Dashboard (auto-refresh após operações)
 
 ### Alarm Simulator (Premium)
 

@@ -69,6 +69,82 @@ router.use('/api', verifyPasswordMiddleware);
 // API Routes
 // =============================================================================
 
+// Get database statistics
+router.get('/api/stats', async (req: Request, res: Response) => {
+  try {
+    // Tables to count
+    const tables = [
+      'customers', 'partners', 'users', 'assets', 'devices', 'rules',
+      'centrals', 'groups', 'role_assignments', 'customer_api_keys',
+      'audit_logs', 'maintenance_groups', 'user_maintenance_groups'
+    ];
+
+    // Get counts for each table individually (handles missing tables gracefully)
+    const tableCounts: Array<{ table_name: string; count: number }> = [];
+    for (const table of tables) {
+      try {
+        const result = await db.execute(sql`SELECT COUNT(*)::int as count FROM ${sql.identifier(table)}`);
+        const count = Array.isArray(result) && result[0] ? (result[0] as any).count : 0;
+        tableCounts.push({ table_name: table, count });
+      } catch {
+        tableCounts.push({ table_name: table, count: 0 });
+      }
+    }
+
+    // Get users by status
+    let usersByStatus: Array<{ status: string; count: number }> = [];
+    try {
+      const result = await db.execute(sql`
+        SELECT status, COUNT(*)::int as count
+        FROM users
+        GROUP BY status
+        ORDER BY status
+      `);
+      usersByStatus = Array.isArray(result) ? result as any : [];
+    } catch {
+      // Table might not exist
+    }
+
+    // Get customers by type
+    let customersByType: Array<{ type: string; count: number }> = [];
+    try {
+      const result = await db.execute(sql`
+        SELECT type, COUNT(*)::int as count
+        FROM customers
+        GROUP BY type
+        ORDER BY type
+      `);
+      customersByType = Array.isArray(result) ? result as any : [];
+    } catch {
+      // Table might not exist
+    }
+
+    // Get devices by status
+    let devicesByStatus: Array<{ status: string; count: number }> = [];
+    try {
+      const result = await db.execute(sql`
+        SELECT status, COUNT(*)::int as count
+        FROM devices
+        GROUP BY status
+        ORDER BY status
+      `);
+      devicesByStatus = Array.isArray(result) ? result as any : [];
+    } catch {
+      // Table might not exist
+    }
+
+    res.json({
+      tableCounts: tableCounts.sort((a, b) => a.table_name.localeCompare(b.table_name)),
+      usersByStatus,
+      customersByType,
+      devicesByStatus,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // List available scripts
 router.get('/api/scripts', (req: Request, res: Response) => {
   try {
@@ -251,12 +327,13 @@ router.post('/api/query', async (req: Request, res: Response) => {
 
   // Security: block write operations unless explicitly allowed
   const upperQuery = query.toUpperCase().trim();
-  const isWriteOperation = /^(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE)\b/.test(upperQuery);
+  const isWriteOperation = /^(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE)\b/.test(upperQuery);
 
   if (isWriteOperation && !allowWrite) {
     return res.status(403).json({
       error: 'Write operations are disabled. Use allowWrite: true to enable.',
       hint: 'For safety, only SELECT queries are allowed by default.',
+      blockedKeywords: ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'CREATE', 'GRANT', 'REVOKE'],
     });
   }
 
@@ -948,6 +1025,81 @@ function getHtmlPage(): string {
       to { transform: rotate(360deg); }
     }
 
+    /* Dashboard Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-breakdown {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .breakdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .breakdown-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .breakdown-badge.active { background: var(--success); color: white; }
+    .breakdown-badge.inactive { background: var(--text-secondary); color: white; }
+    .breakdown-badge.pending { background: var(--warning); color: black; }
+    .breakdown-badge.locked { background: var(--error); color: white; }
+    .breakdown-badge.unverified { background: var(--info); color: white; }
+    .breakdown-badge.holding { background: #8b5cf6; color: white; }
+    .breakdown-badge.company { background: #3b82f6; color: white; }
+    .breakdown-badge.branch { background: #10b981; color: white; }
+    .breakdown-badge.enabled { background: var(--success); color: white; }
+    .breakdown-badge.disabled { background: var(--text-secondary); color: white; }
+    .breakdown-badge.maintenance { background: var(--warning); color: black; }
+    .breakdown-badge.default { background: var(--bg-tertiary); color: var(--text); }
+
     .flex { display: flex; }
     .gap-10 { gap: 10px; }
     .gap-20 { gap: 20px; }
@@ -1020,14 +1172,69 @@ function getHtmlPage(): string {
   </header>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('scripts')">Scripts</button>
+    <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
+    <button class="tab" onclick="showTab('scripts')">Scripts</button>
     <button class="tab" onclick="showTab('logs')">Logs</button>
     <button class="tab" onclick="showTab('query')">Query Console</button>
   </div>
 
   <div class="container">
+    <!-- Dashboard Panel -->
+    <div id="dashboard-panel" class="panel active">
+      <div class="card">
+        <div class="card-title">
+          <span>Database Statistics</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadStats()">Refresh</button>
+        </div>
+        <div id="stats-grid" class="stats-grid">
+          <p style="color: var(--text-secondary);">Loading statistics...</p>
+        </div>
+      </div>
+
+      <div class="flex gap-20" style="flex-wrap: wrap;">
+        <div class="card flex-1" style="min-width: 300px;">
+          <div class="card-title">Users by Status</div>
+          <div id="users-by-status" class="stats-breakdown">
+            <p style="color: var(--text-secondary);">Loading...</p>
+          </div>
+        </div>
+
+        <div class="card flex-1" style="min-width: 300px;">
+          <div class="card-title">Customers by Type</div>
+          <div id="customers-by-type" class="stats-breakdown">
+            <p style="color: var(--text-secondary);">Loading...</p>
+          </div>
+        </div>
+
+        <div class="card flex-1" style="min-width: 300px;">
+          <div class="card-title">Devices by Status</div>
+          <div id="devices-by-status" class="stats-breakdown">
+            <p style="color: var(--text-secondary);">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Quick Actions</div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="showTab('scripts'); runAllSeeds();">
+            <span>&#9654;</span> Run All Seeds
+          </button>
+          <button class="btn btn-danger" onclick="showTab('scripts'); clearAll();">
+            <span>&#128465;</span> Clear All
+          </button>
+          <button class="btn btn-warning" onclick="showTab('scripts'); quickReset();">
+            <span>&#8635;</span> Quick Reset
+          </button>
+          <button class="btn btn-primary" onclick="showTab('scripts'); verify();">
+            <span>&#10003;</span> Verify
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Scripts Panel -->
-    <div id="scripts-panel" class="panel active">
+    <div id="scripts-panel" class="panel">
       <div class="card">
         <div class="card-title">Quick Actions</div>
         <div class="btn-group">
@@ -1286,6 +1493,72 @@ function getHtmlPage(): string {
     }
 
     // ==========================================================================
+    // Dashboard Statistics
+    // ==========================================================================
+    async function loadStats() {
+      try {
+        const res = await fetch(\`\${API_BASE}/stats\`);
+        const data = await res.json();
+
+        // Render table counts grid
+        const statsGrid = document.getElementById('stats-grid');
+        if (data.tableCounts && data.tableCounts.length > 0) {
+          statsGrid.innerHTML = data.tableCounts.map(t => \`
+            <div class="stat-card">
+              <div class="stat-value">\${t.count.toLocaleString()}</div>
+              <div class="stat-label">\${t.table_name.replace(/_/g, ' ')}</div>
+            </div>
+          \`).join('');
+        } else {
+          statsGrid.innerHTML = '<p style="color: var(--text-secondary);">No data available</p>';
+        }
+
+        // Render users by status
+        const usersByStatus = document.getElementById('users-by-status');
+        if (data.usersByStatus && data.usersByStatus.length > 0) {
+          usersByStatus.innerHTML = data.usersByStatus.map(u => \`
+            <div class="breakdown-item">
+              <span class="breakdown-badge \${u.status.toLowerCase()}">\${u.count}</span>
+              <span>\${u.status}</span>
+            </div>
+          \`).join('');
+        } else {
+          usersByStatus.innerHTML = '<p style="color: var(--text-secondary);">No users</p>';
+        }
+
+        // Render customers by type
+        const customersByType = document.getElementById('customers-by-type');
+        if (data.customersByType && data.customersByType.length > 0) {
+          customersByType.innerHTML = data.customersByType.map(c => \`
+            <div class="breakdown-item">
+              <span class="breakdown-badge \${c.type.toLowerCase()}">\${c.count}</span>
+              <span>\${c.type}</span>
+            </div>
+          \`).join('');
+        } else {
+          customersByType.innerHTML = '<p style="color: var(--text-secondary);">No customers</p>';
+        }
+
+        // Render devices by status
+        const devicesByStatus = document.getElementById('devices-by-status');
+        if (data.devicesByStatus && data.devicesByStatus.length > 0) {
+          devicesByStatus.innerHTML = data.devicesByStatus.map(d => \`
+            <div class="breakdown-item">
+              <span class="breakdown-badge \${d.status.toLowerCase()}">\${d.count}</span>
+              <span>\${d.status}</span>
+            </div>
+          \`).join('');
+        } else {
+          devicesByStatus.innerHTML = '<p style="color: var(--text-secondary);">No devices</p>';
+        }
+
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+        document.getElementById('stats-grid').innerHTML = '<p style="color: var(--error);">Failed to load statistics</p>';
+      }
+    }
+
+    // ==========================================================================
     // Tab Navigation
     // ==========================================================================
     function showTab(tabId) {
@@ -1294,6 +1567,7 @@ function getHtmlPage(): string {
       document.querySelector(\`.tab[onclick*="\${tabId}"]\`).classList.add('active');
       document.getElementById(\`\${tabId}-panel\`).classList.add('active');
 
+      if (tabId === 'dashboard') loadStats();
       if (tabId === 'logs') refreshLogs();
       if (tabId === 'query') {
         loadExamples();
@@ -1349,6 +1623,7 @@ function getHtmlPage(): string {
 
       btn.disabled = false;
       btn.innerHTML = 'Run';
+      loadStats();  // Auto-refresh dashboard stats
     }
 
     async function runAllSeeds() {
@@ -1376,6 +1651,7 @@ function getHtmlPage(): string {
 
       btn.disabled = false;
       btn.innerHTML = '<span>&#9654;</span> Run All Seeds';
+      loadStats();  // Auto-refresh dashboard stats
     }
 
     async function clearAll() {
@@ -1401,6 +1677,7 @@ function getHtmlPage(): string {
 
       btn.disabled = false;
       btn.innerHTML = '<span>&#128465;</span> Clear All';
+      loadStats();  // Auto-refresh dashboard stats
     }
 
     async function quickReset() {
@@ -1417,6 +1694,7 @@ function getHtmlPage(): string {
 
       btn.disabled = false;
       btn.innerHTML = '<span>&#8635;</span> Quick Reset';
+      loadStats();  // Auto-refresh dashboard stats
     }
 
     async function verify() {
@@ -1441,6 +1719,7 @@ function getHtmlPage(): string {
 
       btn.disabled = false;
       btn.innerHTML = '<span>&#10003;</span> Verify';
+      loadStats();  // Auto-refresh dashboard stats
     }
 
     // ==========================================================================
@@ -1726,6 +2005,7 @@ function getHtmlPage(): string {
       });
 
       // Load initial data
+      loadStats();  // Dashboard is now default tab
       loadScripts();
       loadExamples();
       renderHistory();
