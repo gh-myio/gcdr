@@ -7,6 +7,8 @@ export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
 
 /**
  * Metric domains for alarm rules
+ *
+ * Continuous metrics:
  * - energy_consumption: Wh (watt-hour) - always uses SUM aggregation
  * - instantaneous_power: W (watts)
  * - water_flow: l (liters)
@@ -14,15 +16,27 @@ export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
  * - temperature: °C (Celsius)
  * - water_level_continuous: % (percentage) - future use
  * - water_level_discreet: % (percentage) - future use
+ *
+ * Discrete/binary metrics (require device metadata: { channelId, value }):
+ * - sensor: generic sensor (value: 0|1)
+ * - presence_sensor: presence detection (1=detected, 0=not_detected)
+ * - door_sensor: door state (1=open, 0=closed)
+ * - lamp: lamp output control (1=off, 0=on)
  */
 export type MetricDomain =
+  // Continuous metrics
   | 'energy_consumption'
   | 'instantaneous_power'
   | 'water_flow'
   | 'humidity'
   | 'temperature'
   | 'water_level_continuous'
-  | 'water_level_discreet';
+  | 'water_level_discreet'
+  // Discrete/binary metrics
+  | 'sensor'
+  | 'presence_sensor'
+  | 'door_sensor'
+  | 'lamp';
 
 // Alarm Threshold Configuration
 export interface AlarmThresholdConfig {
