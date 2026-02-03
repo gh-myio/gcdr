@@ -45,7 +45,7 @@ BEGIN
         'ASSET',
         v_room1_id,
         false,
-        '{"metric": "temperature", "operator": "LT", "value": 18, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "temperature", "operator": "LTE", "value": 18, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}]',
         '["temperature", "server-room"]',
         'ACTIVE',
