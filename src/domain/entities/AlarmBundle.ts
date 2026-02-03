@@ -113,7 +113,7 @@ export interface SimpleBundleAlarmRule {
   operator: ComparisonOperator;      // e.g., "GT", "LT", "BETWEEN"
   value: number;
   valueHigh?: number;                // For BETWEEN/OUTSIDE operators
-  duration: number;                  // Always present (default 0)
+  duration: number;                  // In milliseconds (converted from minutes in DB)
   hysteresis: number;                // Always present (default 0)
   aggregation: AggregationType;      // Always present (default 'LAST')
   // Schedule fields (always present)

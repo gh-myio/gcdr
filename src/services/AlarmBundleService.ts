@@ -148,6 +148,10 @@ export class AlarmBundleService {
           ? 'SUM'
           : (rule.alarmConfig.aggregation ?? 'LAST');
 
+        // Convert duration from minutes (stored in DB) to milliseconds
+        const durationMinutes = rule.alarmConfig.duration ?? 0;
+        const durationMs = durationMinutes * 60 * 1000;
+
         const simplifiedRule: SimpleBundleAlarmRule = {
           id: rule.id,
           name: rule.name,
@@ -155,7 +159,7 @@ export class AlarmBundleService {
           operator: rule.alarmConfig.operator,
           value: rule.alarmConfig.value,
           valueHigh: rule.alarmConfig.valueHigh,
-          duration: rule.alarmConfig.duration ?? 0,
+          duration: durationMs,
           hysteresis: rule.alarmConfig.hysteresis ?? 0,
           aggregation,
           // Schedule fields (always present with defaults)
