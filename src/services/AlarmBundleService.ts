@@ -143,6 +143,11 @@ export class AlarmBundleService {
           6: daysArray.includes(6),
         };
 
+        // Determine aggregation: energy_consumption always uses SUM
+        const aggregation = rule.alarmConfig.metric === 'energy_consumption'
+          ? 'SUM'
+          : (rule.alarmConfig.aggregation ?? 'LAST');
+
         const simplifiedRule: SimpleBundleAlarmRule = {
           id: rule.id,
           name: rule.name,
@@ -152,7 +157,7 @@ export class AlarmBundleService {
           valueHigh: rule.alarmConfig.valueHigh,
           duration: rule.alarmConfig.duration ?? 0,
           hysteresis: rule.alarmConfig.hysteresis ?? 0,
-          aggregation: rule.alarmConfig.aggregation ?? 'LAST',
+          aggregation,
           // Schedule fields (always present with defaults)
           startAt: rule.alarmConfig.startAt || '00:00',
           endAt: rule.alarmConfig.endAt || '23:59',

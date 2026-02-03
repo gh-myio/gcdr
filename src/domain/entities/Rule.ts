@@ -7,7 +7,7 @@ export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
 
 /**
  * Metric domains for alarm rules
- * - energy: Wh (watt-hour)
+ * - energy_consumption: Wh (watt-hour) - always uses SUM aggregation
  * - instantaneous_power: W (watts)
  * - water: l (liters)
  * - humidity: % (percentage)
@@ -16,7 +16,7 @@ export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
  * - water_level_discreet: % (percentage) - future use
  */
 export type MetricDomain =
-  | 'energy'
+  | 'energy_consumption'
   | 'instantaneous_power'
   | 'water'
   | 'humidity'
