@@ -3,10 +3,30 @@ import { BaseEntity, EntityStatus } from '../../shared/types';
 export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW';
 export type RulePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComparisonOperator = 'GT' | 'GTE' | 'LT' | 'LTE' | 'EQ' | 'NEQ' | 'BETWEEN' | 'OUTSIDE';
+export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
+
+/**
+ * Metric domains for alarm rules
+ * - energy: Wh (watt-hour)
+ * - instantaneous_power: W (watts)
+ * - water: l (liters)
+ * - humidity: % (percentage)
+ * - temperature: °C (Celsius)
+ * - water_level_continuous: % (percentage) - future use
+ * - water_level_discreet: % (percentage) - future use
+ */
+export type MetricDomain =
+  | 'energy'
+  | 'instantaneous_power'
+  | 'water'
+  | 'humidity'
+  | 'temperature'
+  | 'water_level_continuous'
+  | 'water_level_discreet';
 
 // Alarm Threshold Configuration
 export interface AlarmThresholdConfig {
-  metric: string;
+  metric: MetricDomain;
   operator: ComparisonOperator;
   value: number;
   valueHigh?: number; // For BETWEEN/OUTSIDE operators
@@ -14,7 +34,7 @@ export interface AlarmThresholdConfig {
   hysteresis?: number; // Percentage or absolute value to prevent flapping
   hysteresisType?: 'PERCENTAGE' | 'ABSOLUTE';
   duration?: number; // Time in seconds the condition must persist
-  aggregation?: 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
+  aggregation?: AggregationType;
   aggregationWindow?: number; // Window in seconds for aggregation
 
   // Calibration offset (for temperature sensors, etc.)

@@ -1,4 +1,4 @@
-import { RulePriority, ComparisonOperator } from './Rule';
+import { RulePriority, ComparisonOperator, AggregationType, MetricDomain } from './Rule';
 
 /**
  * Alarm Rule in compact format for the bundle
@@ -7,7 +7,7 @@ export interface BundleAlarmRule {
   id: string;
   name: string;
   priority: RulePriority;
-  metric: string;
+  metric: MetricDomain;
   operator: ComparisonOperator;
   value: number;
   valueHigh?: number;
@@ -109,16 +109,16 @@ export interface GenerateBundleParams {
 export interface SimpleBundleAlarmRule {
   id: string;
   name: string;
+  metric: MetricDomain;              // e.g., "temperature", "humidity", "energy"
+  operator: ComparisonOperator;      // e.g., "GT", "LT", "BETWEEN"
   value: number;
-  valueHigh?: number;
-  duration?: number;
-  hysteresis?: number;
-  aggregation?: 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
-  // Calibration offset (included for temperature metrics)
-  offset?: number;
+  valueHigh?: number;                // For BETWEEN/OUTSIDE operators
+  duration: number;                  // Always present (default 0)
+  hysteresis: number;                // Always present (default 0)
+  aggregation: AggregationType;      // Always present (default 'LAST')
   // Schedule fields (always present)
-  startAt: string;      // HH:mm format (default "00:00")
-  endAt: string;        // HH:mm format (default "23:59")
+  startAt: string;                   // HH:mm format (default "00:00")
+  endAt: string;                     // HH:mm format (default "23:59")
   daysOfWeek: Record<number, boolean>; // 0-6, where 0 is Sunday (e.g., {0: true, 1: true, ...})
 }
 
@@ -129,6 +129,7 @@ export interface SimpleDeviceMapping {
   deviceName: string;
   centralId?: string;
   slaveId?: number;
+  offset: number;        // Calibration offset per device (default 0)
   ruleIds: string[];
 }
 

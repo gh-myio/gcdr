@@ -146,36 +146,37 @@ export class AlarmBundleService {
         const simplifiedRule: SimpleBundleAlarmRule = {
           id: rule.id,
           name: rule.name,
+          metric: rule.alarmConfig.metric,
+          operator: rule.alarmConfig.operator,
           value: rule.alarmConfig.value,
           valueHigh: rule.alarmConfig.valueHigh,
-          duration: rule.alarmConfig.duration,
-          hysteresis: rule.alarmConfig.hysteresis,
-          aggregation: rule.alarmConfig.aggregation,
+          duration: rule.alarmConfig.duration ?? 0,
+          hysteresis: rule.alarmConfig.hysteresis ?? 0,
+          aggregation: rule.alarmConfig.aggregation ?? 'LAST',
           // Schedule fields (always present with defaults)
           startAt: rule.alarmConfig.startAt || '00:00',
           endAt: rule.alarmConfig.endAt || '23:59',
           daysOfWeek: daysOfWeekObj,
         };
 
-        // Include offset for temperature metrics (default 0 if not set)
-        if (rule.alarmConfig.metric === 'temperature') {
-          simplifiedRule.offset = rule.alarmConfig.offset ?? 0;
-        }
-
         rulesCatalog[rule.id] = simplifiedRule;
       }
     }
 
-    // Build device index (minimal fields: name, centralId, slaveId, ruleIds)
+    // Build device index (minimal fields: name, centralId, slaveId, offset, ruleIds)
     const deviceIndex: Record<string, SimpleDeviceMapping> = {};
 
     for (const device of devices) {
       const applicableRuleIds = this.getApplicableRules(device, rules);
 
+      // Get offset from device metadata or attributes (default 0)
+      const offset = this.getDeviceOffset(device);
+
       deviceIndex[device.id] = {
         deviceName: device.name,
         centralId: device.centralId,
         slaveId: device.slaveId,
+        offset,
         ruleIds: applicableRuleIds,
       };
     }
@@ -424,6 +425,24 @@ export class AlarmBundleService {
       return domainTag.split(':')[1];
     }
     return 'default';
+  }
+
+  /**
+   * Get device calibration offset from metadata/attributes
+   * Used for temperature, humidity, power sensors calibration
+   */
+  private getDeviceOffset(device: Device): number {
+    // Check metadata first (preferred)
+    if (device.metadata?.offset !== undefined) {
+      const offset = Number(device.metadata.offset);
+      return isNaN(offset) ? 0 : offset;
+    }
+    // Check attributes
+    if (device.attributes?.offset !== undefined) {
+      const offset = Number(device.attributes.offset);
+      return isNaN(offset) ? 0 : offset;
+    }
+    return 0;
   }
 
   /**
