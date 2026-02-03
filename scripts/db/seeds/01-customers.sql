@@ -13,6 +13,7 @@ DECLARE
     v_company2_id UUID := '44444444-4444-4444-4444-444444444444';
     v_branch1_id UUID := '55555555-5555-5555-5555-555555555555';
     v_branch2_id UUID := '66666666-6666-6666-6666-666666666666';
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
 BEGIN
     -- Holding (root customer)
     INSERT INTO customers (id, tenant_id, parent_customer_id, path, depth, name, display_name, code, type, email, phone, address, settings, metadata, status, version)
@@ -119,7 +120,28 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 5 customers';
+    -- Company 3 - Dimension (child of holding)
+    INSERT INTO customers (id, tenant_id, parent_customer_id, path, depth, name, display_name, code, type, email, phone, address, settings, metadata, status, version)
+    VALUES (
+        v_dimension_id,
+        v_tenant_id,
+        v_holding_id,
+        '/' || v_tenant_id || '/' || v_holding_id || '/' || v_dimension_id,
+        1,
+        'Dimension',
+        'Dimension Engenharia Ltda.',
+        'DIMENSION',
+        'COMPANY',
+        'contato@dimension.com.br',
+        '+55 11 3005-0000',
+        '{"street": "Av. Brigadeiro Faria Lima, 2000", "city": "São Paulo", "state": "SP", "country": "Brazil", "postalCode": "01451-000"}',
+        '{"timezone": "America/Sao_Paulo", "language": "pt-BR", "currency": "BRL"}',
+        '{"industry": "Engineering", "employees": 150}',
+        'ACTIVE',
+        1
+    );
+
+    RAISE NOTICE 'Inserted 6 customers';
 END $$;
 
 -- Verify

@@ -14,6 +14,11 @@ DECLARE
     v_room1_id UUID := 'ffff4444-4444-4444-4444-444444444444';
     v_room2_id UUID := 'ffff5555-5555-5555-5555-555555555555';
     v_equipment1_id UUID := 'ffff6666-6666-6666-6666-666666666666';
+    -- Dimension customer assets
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
+    v_dim_building_id UUID := 'dddd1111-1111-1111-1111-111111111111';
+    v_dim_lab_id UUID := 'dddd2222-2222-2222-2222-222222222222';
+    v_dim_entrada_id UUID := 'dddd3333-3333-3333-3333-333333333333';
 BEGIN
     -- Building (root asset)
     INSERT INTO assets (id, tenant_id, customer_id, parent_asset_id, path, depth, name, display_name, code, type, description, location, specs, tags, metadata, status, version)
@@ -147,7 +152,77 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 6 assets';
+    -- ==========================================================================
+    -- Dimension Customer Assets
+    -- ==========================================================================
+
+    -- Dimension Building (root asset)
+    INSERT INTO assets (id, tenant_id, customer_id, parent_asset_id, path, depth, name, display_name, code, type, description, location, specs, tags, metadata, status, version)
+    VALUES (
+        v_dim_building_id,
+        v_tenant_id,
+        v_dimension_id,
+        NULL,
+        '/' || v_tenant_id || '/' || v_dimension_id || '/' || v_dim_building_id,
+        0,
+        'Dimension Building',
+        'Prédio Dimension',
+        'DIM-MAIN',
+        'BUILDING',
+        'Main Dimension engineering building',
+        '{"address": "Av. Brigadeiro Faria Lima, 2000", "city": "São Paulo", "state": "SP", "country": "Brazil", "postalCode": "01451-000"}',
+        '{"area": 5000, "floors": 3}',
+        '["headquarters", "engineering"]',
+        '{"buildingType": "commercial", "energyClass": "B"}',
+        'ACTIVE',
+        1
+    );
+
+    -- Dimension Laboratório (room)
+    INSERT INTO assets (id, tenant_id, customer_id, parent_asset_id, path, depth, name, display_name, code, type, description, location, specs, tags, metadata, status, version)
+    VALUES (
+        v_dim_lab_id,
+        v_tenant_id,
+        v_dimension_id,
+        v_dim_building_id,
+        '/' || v_tenant_id || '/' || v_dimension_id || '/' || v_dim_building_id || '/' || v_dim_lab_id,
+        1,
+        'Laboratório',
+        'Laboratório de Engenharia',
+        'DIM-LAB',
+        'ROOM',
+        'Engineering laboratory',
+        '{"floor": "1", "room": "LAB-01"}',
+        '{"area": 100, "capacity": 20}',
+        '["laboratory", "engineering"]',
+        '{"roomType": "laboratory"}',
+        'ACTIVE',
+        1
+    );
+
+    -- Dimension Entrada (zone)
+    INSERT INTO assets (id, tenant_id, customer_id, parent_asset_id, path, depth, name, display_name, code, type, description, location, specs, tags, metadata, status, version)
+    VALUES (
+        v_dim_entrada_id,
+        v_tenant_id,
+        v_dimension_id,
+        v_dim_building_id,
+        '/' || v_tenant_id || '/' || v_dimension_id || '/' || v_dim_building_id || '/' || v_dim_entrada_id,
+        1,
+        'Entrada',
+        'Entrada Principal',
+        'DIM-ENT',
+        'ZONE',
+        'Main entrance area',
+        '{"floor": "0", "zone": "entrance"}',
+        '{"area": 50}',
+        '["entrance", "reception"]',
+        '{"zoneType": "entrance", "accessControl": true}',
+        'ACTIVE',
+        1
+    );
+
+    RAISE NOTICE 'Inserted 9 assets';
 END $$;
 
 -- Verify

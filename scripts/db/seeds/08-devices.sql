@@ -12,6 +12,12 @@ DECLARE
     v_room2_id UUID := 'ffff5555-5555-5555-5555-555555555555'; -- Meeting Room
     v_equipment1_id UUID := 'ffff6666-6666-6666-6666-666666666666'; -- AC Unit
     v_central1_id UUID := 'eeee1111-1111-1111-1111-111111111111'; -- Central 1
+    -- Dimension customer
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
+    v_dim_lab_id UUID := 'dddd2222-2222-2222-2222-222222222222';
+    v_dim_entrada_id UUID := 'dddd3333-3333-3333-3333-333333333333';
+    v_dim_building_id UUID := 'dddd1111-1111-1111-1111-111111111111';
+    v_central_dim_id UUID := 'eeee2222-2222-2222-2222-222222222222'; -- Central Dimension
 BEGIN
     -- Temperature Sensor in Server Room (with RFC-0008 fields)
     INSERT INTO devices (
@@ -288,7 +294,215 @@ BEGIN
         '5808W3_SMOKE'                                  -- device_type
     );
 
-    RAISE NOTICE 'Inserted 7 devices';
+    -- ==========================================================================
+    -- Dimension Customer Devices
+    -- ==========================================================================
+
+    -- Device 1: Energy Laboratório (lamp)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000001',
+        v_tenant_id,
+        v_dim_lab_id,
+        v_dimension_id,
+        'Energy Laboratório',
+        'Medidor Energia Laboratório',
+        'ENERGY-LAB',
+        'METER',
+        'Energy meter for laboratory lighting',
+        'SN-DIM-ENERGY-LAB-001',
+        'dim-energy-lab-001',
+        '{"manufacturer": "Schneider", "model": "PM5100", "protocol": "MODBUS"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["energy", "lamp", "laboratory"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
+        '{"offset": 0}',
+        'ACTIVE',
+        1,
+        1,
+        v_central_dim_id,
+        'ENERGY_LAB_01',
+        'ENERGY_METER',
+        'PM5100_LAMP'
+    );
+
+    -- Device 2: Energy Entrada (lamp)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000002',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Energy Entrada',
+        'Medidor Energia Entrada',
+        'ENERGY-ENT',
+        'METER',
+        'Energy meter for entrance lighting',
+        'SN-DIM-ENERGY-ENT-001',
+        'dim-energy-ent-001',
+        '{"manufacturer": "Schneider", "model": "PM5100", "protocol": "MODBUS"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["energy", "lamp", "entrance"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
+        '{"offset": 0}',
+        'ACTIVE',
+        1,
+        2,
+        v_central_dim_id,
+        'ENERGY_ENTRADA_01',
+        'ENERGY_METER',
+        'PM5100_LAMP'
+    );
+
+    -- Device 3: Sensor Presença Entrada (presence_sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000003',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Sensor Presença Entrada',
+        'Sensor de Presença Entrada',
+        'PRES-ENT',
+        'SENSOR',
+        'Presence sensor for entrance area',
+        'SN-DIM-PRES-ENT-001',
+        'dim-presence-ent-001',
+        '{"manufacturer": "Honeywell", "model": "IS312B", "protocol": "ZIGBEE"}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["presence", "sensor", "entrance"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "presence_sensor"}',
+        '{"offset": 0}',
+        'ACTIVE',
+        1,
+        3,
+        v_central_dim_id,
+        'PRESENCE_ENTRADA_01',
+        'PRESENCE_SENSOR',
+        'IS312B_PIR'
+    );
+
+    -- Device 4: Laboratório (temperature sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000004',
+        v_tenant_id,
+        v_dim_lab_id,
+        v_dimension_id,
+        'Laboratório',
+        'Sensor Temperatura Laboratório',
+        'TEMP-LAB',
+        'SENSOR',
+        'Temperature sensor for laboratory',
+        'SN-DIM-TEMP-LAB-001',
+        'dim-temp-lab-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'ONLINE',
+        NOW() - INTERVAL '3 minutes',
+        '["temperature", "sensor", "laboratory"]',
+        '{"installationDate": "2024-01-15"}',
+        '{"offset": -0.5}',
+        'ACTIVE',
+        1,
+        4,
+        v_central_dim_id,
+        'TEMP_LAB_01',
+        'SENSOR_TEMP',
+        'SHT40_TEMP'
+    );
+
+    -- Device 5: 3F Geral (general energy meter)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000005',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        '3F Geral',
+        'Medidor Geral 3F',
+        '3F-GERAL',
+        'METER',
+        'General 3-phase energy meter',
+        'SN-DIM-3F-GERAL-001',
+        'dim-3f-geral-001',
+        '{"manufacturer": "Schneider", "model": "PM5560", "protocol": "MODBUS", "phases": 3}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["energy", "meter", "3-phase", "general"]',
+        '{"installationDate": "2024-01-10"}',
+        '{"offset": 0}',
+        'ACTIVE',
+        1,
+        5,
+        v_central_dim_id,
+        '3F_GERAL_01',
+        '3F_MEDIDOR',
+        'PM5560_3F'
+    );
+
+    -- Device 6: Temp. Sala (room temperature sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000006',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Temp. Sala',
+        'Sensor Temperatura Sala',
+        'TEMP-SALA',
+        'SENSOR',
+        'Room temperature sensor',
+        'SN-DIM-TEMP-SALA-001',
+        'dim-temp-sala-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["temperature", "sensor", "room"]',
+        '{"installationDate": "2024-01-15"}',
+        '{"offset": 0.3}',
+        'ACTIVE',
+        1,
+        6,
+        v_central_dim_id,
+        'TEMP_SALA_01',
+        'SENSOR_TEMP',
+        'SHT40_TEMP'
+    );
+
+    RAISE NOTICE 'Inserted 13 devices';
 END $$;
 
 -- Verify

@@ -10,6 +10,8 @@ DECLARE
     v_company1_id UUID := '33333333-3333-3333-3333-333333333333';
     v_admin_id UUID := 'bbbb1111-1111-1111-1111-111111111111';
     v_joao_id UUID := 'bbbb2222-2222-2222-2222-222222222222';
+    -- Dimension customer
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
 BEGIN
     -- Production API Key
     INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, last_used_at, last_used_ip, usage_count, is_active, created_by, version)
@@ -149,7 +151,29 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 7 customer API keys';
+    -- ==========================================================================
+    -- Dimension Customer API Key
+    -- ==========================================================================
+    -- Plaintext Key: gcdr_dimension_api_key_2026
+    -- Hash: SHA256('gcdr_dimension_api_key_2026')
+    INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
+    VALUES (
+        'cee00002-0001-0001-0001-000000000001',
+        v_tenant_id,
+        v_dimension_id,
+        'e21ece6b9656b5a2e936df71e928b2788b09ec5c54ec361f7aa7d698bf669b9e',
+        'gcdr_dim_',
+        'Dimension Integration Key',
+        'Full access API key for Dimension customer - TEST KEY: gcdr_dimension_api_key_2026',
+        '["bundles:read", "rules:read", "rules:write", "devices:read", "devices:write", "alarms:read", "alarms:write", "telemetry:read", "telemetry:write"]',
+        NOW() + INTERVAL '365 days',
+        0,
+        true,
+        v_admin_id,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 8 customer API keys';
 END $$;
 
 -- Verify
