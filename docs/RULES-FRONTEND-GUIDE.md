@@ -491,19 +491,41 @@ Usado para calibrar sensores de temperatura, umidade, potência, etc.
 
 ---
 
-## 12. API Endpoints
+## 12. API Endpoints - Referência Completa
 
-### Criar Rule
+### Headers Obrigatórios
+
+Todas as requisições devem incluir:
+
+```http
+Content-Type: application/json
+Authorization: Bearer <jwt-token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+Ou para API Key:
+
+```http
+Content-Type: application/json
+X-API-Key: <api-key>
+X-Tenant-Id: <tenant-uuid>
+```
+
+---
+
+### 12.1 Criar Rule
 
 ```http
 POST /rules
-Content-Type: application/json
-Authorization: Bearer <token>
-X-Tenant-Id: <tenant-id>
+```
 
+#### Request Body
+
+```json
 {
   "customerId": "77777777-7777-7777-7777-777777777777",
   "name": "High Temperature Alert",
+  "description": "Alerta quando temperatura excede 28°C",
   "type": "ALARM_THRESHOLD",
   "priority": "HIGH",
   "scope": {
@@ -515,35 +537,690 @@ X-Tenant-Id: <tenant-id>
     "metric": "temperature",
     "operator": "GT",
     "value": 28,
+    "valueHigh": null,
     "unit": "°C",
     "duration": 5,
     "hysteresis": 2,
+    "hysteresisType": "ABSOLUTE",
     "aggregation": "AVG",
+    "aggregationWindow": 60,
     "startAt": "08:00",
     "endAt": "18:00",
     "daysOfWeek": [1, 2, 3, 4, 5]
   },
-  "tags": ["temperature", "critical"]
+  "notificationChannels": [
+    {
+      "type": "EMAIL",
+      "config": {
+        "to": "ops@empresa.com"
+      },
+      "enabled": true
+    }
+  ],
+  "tags": ["temperature", "critical"],
+  "enabled": true
 }
 ```
 
-### Listar Rules
+#### Campos do Body
 
-```http
-GET /rules?customerId=<id>&type=ALARM_THRESHOLD
-```
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `customerId` | UUID | Sim | ID do customer |
+| `name` | string | Sim | Nome da rule (1-255 chars) |
+| `description` | string | Não | Descrição (max 1000 chars) |
+| `type` | enum | Sim | `ALARM_THRESHOLD` |
+| `priority` | enum | Não | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` (default: `MEDIUM`) |
+| `scope` | object | Sim | Escopo de aplicação |
+| `alarmConfig` | object | Sim* | Configuração do alarme (*obrigatório para `ALARM_THRESHOLD`) |
+| `notificationChannels` | array | Não | Canais de notificação |
+| `tags` | string[] | Não | Tags para organização |
+| `enabled` | boolean | Não | Se a rule está ativa (default: `true`) |
 
-### Obter Bundle
+#### Scope Object
 
-```http
-GET /customers/:customerId/alarm-rules/bundle/simple
-X-API-Key: <api-key>
-X-Tenant-Id: <tenant-id>
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `type` | enum | Sim | `GLOBAL`, `CUSTOMER`, `ASSET`, `DEVICE` |
+| `entityId` | UUID | Condicional | Obrigatório se type != `GLOBAL` |
+| `inherited` | boolean | Não | Se aplica a entidades filhas |
+
+#### AlarmConfig Object
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `metric` | MetricDomain | Sim | Tipo de métrica |
+| `operator` | enum | Sim | `GT`, `GTE`, `LT`, `LTE`, `EQ`, `NEQ`, `BETWEEN`, `OUTSIDE` |
+| `value` | number | Sim | Valor de threshold |
+| `valueHigh` | number | Condicional | Obrigatório para `BETWEEN`/`OUTSIDE` |
+| `unit` | string | Não | Unidade de medida |
+| `duration` | number | Não | Duração em **minutos** (default: 0) |
+| `hysteresis` | number | Não | Valor de histerese (default: 0) |
+| `hysteresisType` | enum | Não | `PERCENTAGE`, `ABSOLUTE` |
+| `aggregation` | enum | Não | `LAST`, `AVG`, `MIN`, `MAX`, `SUM`, `COUNT` (default: `LAST`) |
+| `aggregationWindow` | number | Não | Janela de agregação em segundos |
+| `startAt` | string | Não | Hora início "HH:mm" (default: "00:00") |
+| `endAt` | string | Não | Hora fim "HH:mm" (default: "23:59") |
+| `daysOfWeek` | number[] | Não | Dias ativos 0-6 (default: todos) |
+
+#### Response (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "aaaa0001-0001-0001-0001-000000000020",
+    "tenantId": "11111111-1111-1111-1111-111111111111",
+    "customerId": "77777777-7777-7777-7777-777777777777",
+    "name": "High Temperature Alert",
+    "description": "Alerta quando temperatura excede 28°C",
+    "type": "ALARM_THRESHOLD",
+    "priority": "HIGH",
+    "scope": {
+      "type": "CUSTOMER",
+      "entityId": "77777777-7777-7777-7777-777777777777",
+      "inherited": true
+    },
+    "alarmConfig": { ... },
+    "notificationChannels": [ ... ],
+    "tags": ["temperature", "critical"],
+    "status": "ACTIVE",
+    "enabled": true,
+    "version": 1,
+    "createdAt": "2026-02-03T15:30:00.000Z",
+    "updatedAt": "2026-02-03T15:30:00.000Z",
+    "createdBy": "bbbb1111-1111-1111-1111-111111111111"
+  },
+  "meta": {
+    "requestId": "abc123",
+    "timestamp": "2026-02-03T15:30:00.000Z"
+  }
+}
 ```
 
 ---
 
-## 13. Diagrama de Estados
+### 12.2 Listar Rules
+
+```http
+GET /rules
+```
+
+#### Query Parameters (Filtros)
+
+| Parâmetro | Tipo | Descrição | Exemplo |
+|-----------|------|-----------|---------|
+| `limit` | number | Itens por página (1-100, default: 20) | `?limit=50` |
+| `cursor` | string | Cursor para paginação | `?cursor=abc123` |
+| `type` | enum | Filtrar por tipo | `?type=ALARM_THRESHOLD` |
+| `priority` | enum | Filtrar por prioridade | `?priority=HIGH` |
+| `customerId` | UUID | Filtrar por customer | `?customerId=77777777-...` |
+| `enabled` | boolean | Filtrar por status ativo | `?enabled=true` |
+| `status` | enum | Filtrar por status | `?status=ACTIVE` |
+
+#### Exemplos de Filtros
+
+```http
+# Todas as rules ALARM_THRESHOLD do customer
+GET /rules?customerId=77777777-7777-7777-7777-777777777777&type=ALARM_THRESHOLD
+
+# Rules de alta prioridade ativas
+GET /rules?priority=HIGH&enabled=true
+
+# Paginação
+GET /rules?limit=20&cursor=eyJpZCI6ImFhYWEwMDAxLi4uIn0=
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "aaaa0001-0001-0001-0001-000000000001",
+        "name": "High Temperature Alert",
+        "type": "ALARM_THRESHOLD",
+        "priority": "HIGH",
+        "scope": { ... },
+        "alarmConfig": { ... },
+        "status": "ACTIVE",
+        "enabled": true,
+        "createdAt": "2026-02-03T15:30:00.000Z"
+      },
+      ...
+    ],
+    "count": 15,
+    "nextCursor": "eyJpZCI6ImFhYWEwMDAxLi4uIn0="
+  },
+  "meta": {
+    "requestId": "abc123",
+    "timestamp": "2026-02-03T15:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 12.3 Obter Rule por ID
+
+```http
+GET /rules/:id
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "aaaa0001-0001-0001-0001-000000000001",
+    "tenantId": "11111111-1111-1111-1111-111111111111",
+    "customerId": "77777777-7777-7777-7777-777777777777",
+    "name": "High Temperature Alert",
+    "description": "Alerta quando temperatura excede 28°C",
+    "type": "ALARM_THRESHOLD",
+    "priority": "HIGH",
+    "scope": {
+      "type": "CUSTOMER",
+      "entityId": "77777777-7777-7777-7777-777777777777",
+      "inherited": true
+    },
+    "alarmConfig": {
+      "metric": "temperature",
+      "operator": "GT",
+      "value": 28,
+      "unit": "°C",
+      "duration": 5,
+      "hysteresis": 2,
+      "aggregation": "AVG",
+      "startAt": "08:00",
+      "endAt": "18:00",
+      "daysOfWeek": [1, 2, 3, 4, 5]
+    },
+    "notificationChannels": [],
+    "tags": ["temperature", "critical"],
+    "status": "ACTIVE",
+    "enabled": true,
+    "version": 1,
+    "lastTriggeredAt": "2026-02-02T10:15:00.000Z",
+    "triggerCount": 42,
+    "createdAt": "2026-01-15T10:00:00.000Z",
+    "updatedAt": "2026-02-01T14:30:00.000Z",
+    "createdBy": "bbbb1111-1111-1111-1111-111111111111",
+    "updatedBy": "bbbb2222-2222-2222-2222-222222222222"
+  }
+}
+```
+
+---
+
+### 12.4 Atualizar Rule
+
+```http
+PUT /rules/:id
+```
+
+#### Request Body (campos opcionais)
+
+```json
+{
+  "name": "Updated Temperature Alert",
+  "description": "Nova descrição",
+  "priority": "CRITICAL",
+  "scope": {
+    "type": "ASSET",
+    "entityId": "dddd2222-2222-2222-2222-222222222222",
+    "inherited": false
+  },
+  "alarmConfig": {
+    "metric": "temperature",
+    "operator": "GT",
+    "value": 30,
+    "duration": 10,
+    "hysteresis": 3,
+    "aggregation": "AVG"
+  },
+  "tags": ["temperature", "updated"],
+  "enabled": true
+}
+```
+
+> **Nota:** Envie apenas os campos que deseja atualizar. Campos não enviados mantêm seus valores atuais.
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "aaaa0001-0001-0001-0001-000000000001",
+    "name": "Updated Temperature Alert",
+    "version": 2,
+    "updatedAt": "2026-02-03T16:00:00.000Z",
+    ...
+  }
+}
+```
+
+---
+
+### 12.5 Deletar Rule
+
+```http
+DELETE /rules/:id
+```
+
+#### Response (204 No Content)
+
+```
+(sem corpo de resposta)
+```
+
+---
+
+### 12.6 Toggle Enable/Disable
+
+```http
+POST /rules/:id/toggle
+```
+
+#### Request Body
+
+```json
+{
+  "enabled": false,
+  "reason": "Manutenção programada"
+}
+```
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `enabled` | boolean | Sim | Novo estado |
+| `reason` | string | Não | Motivo da alteração (max 500 chars) |
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "aaaa0001-0001-0001-0001-000000000001",
+    "enabled": false,
+    "updatedAt": "2026-02-03T16:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 12.7 Listar Rules por Customer
+
+```http
+GET /customers/:customerId/rules
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [ ... ],
+    "count": 10
+  }
+}
+```
+
+---
+
+### 12.8 Estatísticas de Rules
+
+```http
+GET /rules/statistics
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 45,
+    "byType": {
+      "ALARM_THRESHOLD": 30,
+      "SLA": 5,
+      "ESCALATION": 5,
+      "MAINTENANCE_WINDOW": 5
+    },
+    "byPriority": {
+      "LOW": 10,
+      "MEDIUM": 20,
+      "HIGH": 10,
+      "CRITICAL": 5
+    },
+    "byStatus": {
+      "enabled": 40,
+      "disabled": 5
+    }
+  }
+}
+```
+
+---
+
+### 12.9 Testar/Avaliar Rule
+
+```http
+POST /rules/evaluate
+```
+
+#### Request Body
+
+```json
+{
+  "ruleId": "aaaa0001-0001-0001-0001-000000000001",
+  "sampleData": {
+    "temperature": 32,
+    "humidity": 65,
+    "timestamp": "2026-02-03T15:00:00.000Z"
+  }
+}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "ruleId": "aaaa0001-0001-0001-0001-000000000001",
+    "ruleName": "High Temperature Alert",
+    "triggered": true,
+    "evaluation": {
+      "metric": "temperature",
+      "operator": "GT",
+      "threshold": 28,
+      "actualValue": 32,
+      "condition": "32 > 28",
+      "result": true
+    }
+  }
+}
+```
+
+---
+
+### 12.10 Obter Bundle Simplificado
+
+```http
+GET /customers/:customerId/alarm-rules/bundle/simple
+```
+
+#### Query Parameters
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `domain` | string | Filtrar por domínio |
+| `deviceType` | string | Filtrar por tipo de device |
+| `includeDisabled` | boolean | Incluir rules desabilitadas |
+
+#### Response Headers
+
+```http
+ETag: "v1-20260203-153000"
+Cache-Control: private, max-age=300
+X-Bundle-Version: v1-20260203-153000
+X-Bundle-Signature: abc123...
+X-Bundle-Rules-Count: 15
+X-Bundle-Devices-Count: 6
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "versionId": "v1-20260203-153000",
+    "deviceIndex": {
+      "22220001-0001-0001-0001-000000000001": {
+        "deviceName": "Energy Laboratório",
+        "centralId": "eeee2222-2222-2222-2222-222222222222",
+        "slaveId": 1,
+        "offset": 0,
+        "ruleIds": ["aaaa0001-0001-0001-0001-000000000014"]
+      }
+    },
+    "rules": {
+      "aaaa0001-0001-0001-0001-000000000014": {
+        "id": "aaaa0001-0001-0001-0001-000000000014",
+        "name": "High Instantaneous Power Alert",
+        "metric": "instantaneous_power",
+        "operator": "GT",
+        "value": 500,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {"0": true, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true}
+      }
+    }
+  }
+}
+```
+
+#### Caching com ETag
+
+```http
+# Primeira requisição
+GET /customers/:customerId/alarm-rules/bundle/simple
+
+# Response: 200 OK
+# ETag: "v1-20260203-153000"
+
+# Requisições subsequentes (verificar se mudou)
+GET /customers/:customerId/alarm-rules/bundle/simple
+If-None-Match: "v1-20260203-153000"
+
+# Se não mudou: 304 Not Modified (sem body)
+# Se mudou: 200 OK (novo bundle)
+```
+
+---
+
+## 13. Códigos de Erro
+
+| Código | Descrição | Causa |
+|--------|-----------|-------|
+| 400 | Bad Request | Payload inválido, validação falhou |
+| 401 | Unauthorized | Token/API Key ausente ou inválido |
+| 403 | Forbidden | Sem permissão para o recurso |
+| 404 | Not Found | Rule não encontrada |
+| 409 | Conflict | Conflito (ex: nome duplicado) |
+| 422 | Unprocessable Entity | Dados válidos mas não processáveis |
+| 500 | Internal Server Error | Erro interno |
+
+### Exemplo de Erro
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "details": [
+      {
+        "field": "alarmConfig.value",
+        "message": "Expected number, received string"
+      },
+      {
+        "field": "scope.entityId",
+        "message": "entityId is required for non-GLOBAL scope types"
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "abc123",
+    "timestamp": "2026-02-03T15:30:00.000Z"
+  }
+}
+```
+
+---
+
+## 14. Exemplos de Integração (Frontend)
+
+### TypeScript/Fetch
+
+```typescript
+// Configuração base
+const API_BASE = 'https://api.gcdr.com';
+const headers = {
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+  'X-Tenant-Id': tenantId
+};
+
+// Criar Rule
+async function createRule(data: CreateRuleDTO): Promise<Rule> {
+  const response = await fetch(`${API_BASE}/rules`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data)
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error.message);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Listar Rules com filtros
+async function listRules(filters: ListRulesParams): Promise<RuleListResponse> {
+  const params = new URLSearchParams();
+
+  if (filters.customerId) params.append('customerId', filters.customerId);
+  if (filters.type) params.append('type', filters.type);
+  if (filters.priority) params.append('priority', filters.priority);
+  if (filters.enabled !== undefined) params.append('enabled', String(filters.enabled));
+  if (filters.limit) params.append('limit', String(filters.limit));
+  if (filters.cursor) params.append('cursor', filters.cursor);
+
+  const response = await fetch(`${API_BASE}/rules?${params}`, { headers });
+  const result = await response.json();
+  return result.data;
+}
+
+// Atualizar Rule
+async function updateRule(id: string, data: UpdateRuleDTO): Promise<Rule> {
+  const response = await fetch(`${API_BASE}/rules/${id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Toggle Enable/Disable
+async function toggleRule(id: string, enabled: boolean, reason?: string): Promise<Rule> {
+  const response = await fetch(`${API_BASE}/rules/${id}/toggle`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ enabled, reason })
+  });
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Deletar Rule
+async function deleteRule(id: string): Promise<void> {
+  await fetch(`${API_BASE}/rules/${id}`, {
+    method: 'DELETE',
+    headers
+  });
+}
+
+// Obter Bundle com cache
+async function getBundle(customerId: string, etag?: string): Promise<BundleResponse | null> {
+  const requestHeaders = { ...headers };
+  if (etag) {
+    requestHeaders['If-None-Match'] = etag;
+  }
+
+  const response = await fetch(
+    `${API_BASE}/customers/${customerId}/alarm-rules/bundle/simple`,
+    { headers: requestHeaders }
+  );
+
+  if (response.status === 304) {
+    return null; // Not modified, use cached version
+  }
+
+  const result = await response.json();
+  return {
+    data: result.data,
+    etag: response.headers.get('ETag')
+  };
+}
+```
+
+### React Hook Exemplo
+
+```typescript
+function useRules(customerId: string) {
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    async function fetchRules() {
+      try {
+        setLoading(true);
+        const data = await listRules({ customerId, type: 'ALARM_THRESHOLD' });
+        setRules(data.items);
+      } catch (err) {
+        setError(err as Error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRules();
+  }, [customerId]);
+
+  const createNewRule = async (data: CreateRuleDTO) => {
+    const newRule = await createRule({ ...data, customerId });
+    setRules(prev => [...prev, newRule]);
+    return newRule;
+  };
+
+  const updateExistingRule = async (id: string, data: UpdateRuleDTO) => {
+    const updated = await updateRule(id, data);
+    setRules(prev => prev.map(r => r.id === id ? updated : r));
+    return updated;
+  };
+
+  const removeRule = async (id: string) => {
+    await deleteRule(id);
+    setRules(prev => prev.filter(r => r.id !== id));
+  };
+
+  return { rules, loading, error, createNewRule, updateExistingRule, removeRule };
+}
+```
+
+---
+
+## 15. Diagrama de Estados
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -565,7 +1242,7 @@ X-Tenant-Id: <tenant-id>
 
 ---
 
-## 14. Checklist de Implementação
+## 16. Checklist de Implementação
 
 ### Frontend
 
@@ -578,6 +1255,10 @@ X-Tenant-Id: <tenant-id>
 - [ ] Seletor de escopo (customer/asset/device)
 - [ ] Agendamento com UI intuitiva
 - [ ] Suporte a métricas discretas
+- [ ] Integração com API (criar, editar, deletar, toggle)
+- [ ] Paginação com cursor
+- [ ] Cache do bundle com ETag
+- [ ] Tratamento de erros
 
 ### UX
 
@@ -586,3 +1267,5 @@ X-Tenant-Id: <tenant-id>
 - [ ] Feedback visual para campos com regras automáticas
 - [ ] Atalhos para configurações comuns
 - [ ] Confirmação antes de deletar
+- [ ] Loading states
+- [ ] Toast notifications para sucesso/erro
