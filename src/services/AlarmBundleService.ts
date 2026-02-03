@@ -149,8 +149,9 @@ export class AlarmBundleService {
           : (rule.alarmConfig.aggregation ?? 'LAST');
 
         // Convert duration from minutes (stored in DB) to milliseconds
+        // Rule: when aggregation is LAST, duration must be 0
         const durationMinutes = rule.alarmConfig.duration ?? 0;
-        const durationMs = durationMinutes * 60 * 1000;
+        const durationMs = aggregation === 'LAST' ? 0 : durationMinutes * 60 * 1000;
 
         const simplifiedRule: SimpleBundleAlarmRule = {
           id: rule.id,
