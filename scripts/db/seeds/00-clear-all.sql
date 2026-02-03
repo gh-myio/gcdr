@@ -11,7 +11,7 @@ BEGIN;
 SET session_replication_role = 'replica';
 
 -- Delete in reverse dependency order (only if tables exist)
-DO $$
+DO $clear$
 DECLARE
   t text;
 BEGIN
@@ -42,7 +42,7 @@ BEGIN
       EXECUTE format('TRUNCATE TABLE %I CASCADE', t);
     END IF;
   END LOOP;
-END $$;
+END $clear$;
 
 -- Re-enable triggers
 SET session_replication_role = 'origin';
