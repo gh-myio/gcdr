@@ -109,9 +109,10 @@ Instead of using `Authorization: Bearer <jwt>`, use the `X-API-Key` header:
 curl -X GET \
   "https://gcdr-server.apps.myio-bas.com/customers/{customerId}/alarm-rules/bundle" \
   -H "Content-Type: application/json" \
-  -H "x-tenant-id: <tenant-uuid>" \
   -H "X-API-Key: gcdr_cust_a1b2c3d4..."
 ```
+
+> **Note:** The `x-tenant-id` header is **optional** when using API Key. The tenant is automatically discovered from the API Key.
 
 ### Configuration in Node-RED
 
@@ -119,7 +120,6 @@ curl -X GET \
 // In function node
 msg.headers = {
     'Content-Type': 'application/json',
-    'x-tenant-id': env.get('GCDR_TENANT_ID'),
     'X-API-Key': env.get('GCDR_API_KEY')
 };
 
@@ -176,9 +176,10 @@ https://gcdr-server.apps.myio-bas.com/customers/{customerId}/alarm-rules/bundle
 
 ```http
 Content-Type: application/json
-x-tenant-id: <tenant-uuid>
 X-API-Key: gcdr_cust_<your-api-key>
 ```
+
+> **Note:** `x-tenant-id` is **optional** with API Key - tenant is auto-discovered from the key.
 
 **Option 2: JWT Token**
 
@@ -204,7 +205,6 @@ Authorization: Bearer <jwt-token>
 curl -X GET \
   "https://gcdr-server.apps.myio-bas.com/customers/cust-123/alarm-rules/bundle?domain=energy" \
   -H "Content-Type: application/json" \
-  -H "x-tenant-id: tenant-uuid" \
   -H "X-API-Key: gcdr_cust_a1b2c3d4e5f67890abcdef..."
 ```
 
@@ -431,13 +431,12 @@ Cache-Control: private, max-age=300
 ### Implementation in Node-RED
 
 ```javascript
-// In function node
+// In function node (using API Key - recommended)
 const cachedETag = flow.get('alarmBundleETag') || null;
 const cachedBundle = flow.get('alarmBundle') || null;
 
 msg.headers = {
-    'Authorization': 'Bearer ' + env.get('GCDR_TOKEN'),
-    'x-tenant-id': env.get('TENANT_ID')
+    'X-API-Key': env.get('GCDR_API_KEY')
 };
 
 if (cachedETag) {

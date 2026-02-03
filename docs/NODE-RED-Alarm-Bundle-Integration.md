@@ -49,19 +49,20 @@ http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules
 GET /customers/{customerId}/alarm-rules/bundle
 ```
 
-## Headers Obrigatórios
+## Headers de Autenticação
 
-| Header | Valor | Descrição |
-|--------|-------|-----------|
-| `X-API-Key` | `gcdr_cust_...` | Chave de API para autenticação |
-| `X-Tenant-Id` | `11111111-1111-1111-1111-111111111111` | Identificador do tenant |
+| Header | Obrigatório | Descrição |
+|--------|-------------|-----------|
+| `X-API-Key` | **Sim** | Chave de API para autenticação |
+| `X-Tenant-Id` | Não | Tenant (auto-descoberto da API Key) |
+
+> **Nota:** O header `X-Tenant-Id` é **opcional**. O tenant é automaticamente descoberto a partir da API Key.
 
 ## Exemplo com cURL
 
 ```bash
 curl -X GET "http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules/bundle" \
-  -H "X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08" \
-  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111"
+  -H "X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08"
 ```
 
 ## Parâmetros de Query (Opcionais)
@@ -76,8 +77,7 @@ curl -X GET "http://localhost:3015/customers/33333333-3333-3333-3333-33333333333
 
 ```bash
 curl -X GET "http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules/bundle?deviceType=SENSOR&includeDisabled=false" \
-  -H "X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08" \
-  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111"
+  -H "X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08"
 ```
 
 ## Estrutura da Resposta (Bundle Simplificado)
@@ -196,7 +196,6 @@ Para evitar downloads desnecessários, use o header `If-None-Match`:
 ```bash
 curl -X GET "http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules/bundle" \
   -H "X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08" \
-  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
   -H "If-None-Match: \"00eb2f223a8de6cd\""
 ```
 
@@ -213,7 +212,6 @@ Configure um nó `http request` com:
 - **Headers**:
   ```
   X-API-Key: gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08
-  X-Tenant-Id: 11111111-1111-1111-1111-111111111111
   ```
 
 ### 2. Inject Node (Polling)
@@ -240,8 +238,7 @@ Configure um nó `inject` para fazer polling periódico:
     "method": "GET",
     "url": "http://gcdr-api:3015/customers/33333333-3333-3333-3333-333333333333/alarm-rules/bundle",
     "headers": {
-      "X-API-Key": "gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08",
-      "X-Tenant-Id": "11111111-1111-1111-1111-111111111111"
+      "X-API-Key": "gcdr_cust_78ce6aacbcbe9dca63149aa54829b86911a222f1bb75f985219e8d49d2275d08"
     }
   },
   {

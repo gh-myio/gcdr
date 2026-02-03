@@ -493,9 +493,9 @@ Usado para calibrar sensores de temperatura, umidade, potência, etc.
 
 ## 12. API Endpoints - Referência Completa
 
-### Headers Obrigatórios
+### Headers de Autenticação
 
-Todas as requisições devem incluir:
+#### Opção 1: JWT Token
 
 ```http
 Content-Type: application/json
@@ -503,13 +503,16 @@ Authorization: Bearer <jwt-token>
 X-Tenant-Id: <tenant-uuid>
 ```
 
-Ou para API Key:
+#### Opção 2: API Key (Recomendado para integrações)
 
 ```http
 Content-Type: application/json
 X-API-Key: <api-key>
-X-Tenant-Id: <tenant-uuid>
 ```
+
+> **Nota:** O header `X-Tenant-Id` é **opcional** quando usando API Key.
+> O tenant é automaticamente descoberto a partir da API Key.
+> Se fornecido, permite uma busca mais rápida no banco de dados.
 
 ---
 
