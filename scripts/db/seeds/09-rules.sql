@@ -263,6 +263,69 @@ BEGIN
         1
     );
 
+    -- ALARM_THRESHOLD rule: High Instantaneous Power
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000014',
+        v_tenant_id,
+        v_company1_id,
+        'High Instantaneous Power Alert',
+        'Alerts when instantaneous power exceeds 500W for more than 5 minutes',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com"]}, "enabled": true}]',
+        '["power", "instantaneous", "high"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Power Surge Detection
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000015',
+        v_tenant_id,
+        v_company1_id,
+        'Power Surge Alert',
+        'Alerts immediately when instantaneous power exceeds 800W - possible surge',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "GTE", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST"}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["power", "surge", "critical", "instantaneous"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Low Power (Equipment Off Detection)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000016',
+        v_tenant_id,
+        v_company1_id,
+        'Low Power Alert',
+        'Alerts when instantaneous power falls below 50W during business hours - equipment may be off',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "LTE", "value": 50, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
+        '["power", "low", "equipment", "business-hours"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
     -- Disabled rule
     INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
@@ -284,7 +347,7 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 13 rules';
+    RAISE NOTICE 'Inserted 16 rules';
 END $$;
 
 -- Verify
