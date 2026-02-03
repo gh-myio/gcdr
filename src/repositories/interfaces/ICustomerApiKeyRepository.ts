@@ -18,6 +18,12 @@ export interface ICustomerApiKeyRepository {
   getByKeyHash(tenantId: string, keyHash: string): Promise<CustomerApiKey | null>;
 
   /**
+   * Get API key by key hash only (without tenant - for auto-discovery)
+   * Used when X-Tenant-Id header is not provided
+   */
+  getByKeyHashOnly(keyHash: string): Promise<CustomerApiKey | null>;
+
+  /**
    * List API keys for a customer
    */
   listByCustomer(

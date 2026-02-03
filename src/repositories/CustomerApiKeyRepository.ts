@@ -55,6 +55,16 @@ export class CustomerApiKeyRepository implements ICustomerApiKeyRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  async getByKeyHashOnly(keyHash: string): Promise<CustomerApiKey | null> {
+    const [result] = await db
+      .select()
+      .from(customerApiKeys)
+      .where(eq(customerApiKeys.keyHash, keyHash))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
   async listByCustomer(
     tenantId: string,
     customerId: string,

@@ -86,7 +86,7 @@ export class CustomerApiKeyService {
   }
 
   /**
-   * Validate an API key and return its context
+   * Validate an API key and return its context (auto-discovers tenant from key)
    * Also updates usage statistics
    */
   async validateApiKey(
@@ -99,20 +99,43 @@ export class CustomerApiKeyService {
       throw new UnauthorizedError('Invalid API key format');
     }
 
-    // Extract tenant from key or use default (in production, tenant should be in the key or header)
-    // For now, we'll need to search across tenants or require tenant header
+    // Hash and lookup without tenant (global search)
     const keyHash = this.hashKey(plaintextKey);
+    const apiKey = await this.apiKeyRepository.getByKeyHashOnly(keyHash);
 
-    // We need tenant ID to lookup - for now, extract from a header or use a global index
-    // This is a limitation - we'll need to either:
-    // 1. Include tenant in the key format
-    // 2. Use a global secondary index
-    // 3. Require tenant header even with API key
+    if (!apiKey) {
+      throw new UnauthorizedError('Invalid API key');
+    }
 
-    // For MVP, we'll require the x-tenant-id header to be present
-    // The validation will be called from middleware with tenant context
+    // Check if active
+    if (!apiKey.isActive) {
+      throw new UnauthorizedError('API key is deactivated');
+    }
 
-    throw new Error('validateApiKey requires tenant context - use validateApiKeyWithTenant');
+    // Check expiration
+    if (apiKey.expiresAt) {
+      const expiresAt = new Date(apiKey.expiresAt);
+      if (expiresAt < new Date()) {
+        throw new UnauthorizedError('API key has expired');
+      }
+    }
+
+    // Check scope
+    if (requiredScope && !hasScope(apiKey.scopes, requiredScope)) {
+      throw new UnauthorizedError(`API key does not have required scope: ${requiredScope}`);
+    }
+
+    // Update usage statistics (fire and forget - don't block the request)
+    this.apiKeyRepository.updateLastUsed(apiKey.tenantId, apiKey.id, clientIp).catch(() => {});
+    this.apiKeyRepository.incrementUsageCount(apiKey.tenantId, apiKey.id).catch(() => {});
+
+    return {
+      keyId: apiKey.id,
+      tenantId: apiKey.tenantId,
+      customerId: apiKey.customerId,
+      scopes: apiKey.scopes,
+      name: apiKey.name,
+    };
   }
 
   /**

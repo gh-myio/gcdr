@@ -9,16 +9,15 @@ API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="33333333-3333-3333-3333-333333333333"
 # Fixed test API key (seeded in database)
 API_KEY="gcdr_cust_test_bundle_key_myio2026"
-TENANT_ID="11111111-1111-1111-1111-111111111111"
+# X-Tenant-Id is optional - tenant is auto-discovered from API key
 OUTPUT_FILE="$(dirname "$0")/simple_bundle_output.json"
 
 echo "Fetching simplified bundle..."
-echo "Customer: $CUSTOMER_ID" 
+echo "Customer: $CUSTOMER_ID"
 echo ""
 
 curl -s "${API_URL}/customers/${CUSTOMER_ID}/alarm-rules/bundle/simple" \
   -H "X-API-Key: ${API_KEY}" \
-  -H "X-Tenant-Id: ${TENANT_ID}" \
   -H "Accept: application/json" \
   -o "$OUTPUT_FILE"
 

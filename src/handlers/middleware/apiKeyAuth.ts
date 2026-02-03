@@ -41,6 +41,7 @@ export function getClientIp(event: APIGatewayProxyEvent): string {
 
 /**
  * Validate API key authentication for a request
+ * X-Tenant-Id header is optional - tenant is auto-discovered from the API key
  *
  * @param event - The API Gateway event
  * @param requiredScope - Optional scope required for the operation
@@ -58,15 +59,20 @@ export async function validateApiKeyAuth(
   }
 
   const tenantId = extractTenantId(event);
-
-  if (!tenantId) {
-    throw new UnauthorizedError('Tenant ID is required (x-tenant-id header)');
-  }
-
   const clientIp = getClientIp(event);
 
-  return customerApiKeyService.validateApiKeyWithTenant(
-    tenantId,
+  // If tenant provided, use faster tenant-specific lookup
+  // Otherwise, auto-discover tenant from the API key
+  if (tenantId) {
+    return customerApiKeyService.validateApiKeyWithTenant(
+      tenantId,
+      apiKey,
+      clientIp,
+      requiredScope
+    );
+  }
+
+  return customerApiKeyService.validateApiKey(
     apiKey,
     clientIp,
     requiredScope
@@ -83,6 +89,7 @@ export function hasApiKeyAuth(event: APIGatewayProxyEvent): boolean {
 /**
  * Try to validate API key, returns null if no API key present
  * Useful for endpoints that support both API key and JWT auth
+ * X-Tenant-Id is optional - tenant is auto-discovered from the API key
  */
 export async function tryValidateApiKeyAuth(
   event: APIGatewayProxyEvent,
@@ -94,16 +101,22 @@ export async function tryValidateApiKeyAuth(
     return null;
   }
 
-  const tenantId = extractTenantId(event);
-
-  if (!tenantId) {
-    return null;
-  }
-
   try {
+    const tenantId = extractTenantId(event);
     const clientIp = getClientIp(event);
-    return await customerApiKeyService.validateApiKeyWithTenant(
-      tenantId,
+
+    // If tenant provided, use faster tenant-specific lookup
+    // Otherwise, auto-discover tenant from the API key
+    if (tenantId) {
+      return await customerApiKeyService.validateApiKeyWithTenant(
+        tenantId,
+        apiKey,
+        clientIp,
+        requiredScope
+      );
+    }
+
+    return await customerApiKeyService.validateApiKey(
       apiKey,
       clientIp,
       requiredScope

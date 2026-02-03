@@ -76,7 +76,7 @@ export function requireRoles(...roles: string[]) {
  *
  * Priority:
  * 1. Bearer token (Authorization header)
- * 2. API Key (X-API-Key header) - requires X-Tenant-Id header
+ * 2. API Key (X-API-Key header) - X-Tenant-Id is optional (auto-discovered from key)
  *
  * @param requiredScope - Optional scope required for API Key authentication
  */
@@ -102,16 +102,23 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope) {
     // Try API Key
     if (apiKey) {
       try {
-        // Get tenant from header or use default demo tenant
-        const tenantId = req.headers['x-tenant-id'] as string || '11111111-1111-1111-1111-111111111111';
         const clientIp = req.ip || req.socket.remoteAddress || '';
+        const tenantIdHeader = req.headers['x-tenant-id'] as string | undefined;
 
-        const apiKeyContext = await customerApiKeyService.validateApiKeyWithTenant(
-          tenantId,
-          apiKey,
-          clientIp,
-          requiredScope
-        );
+        // If tenant provided, use faster tenant-specific lookup
+        // Otherwise, auto-discover tenant from the API key
+        const apiKeyContext = tenantIdHeader
+          ? await customerApiKeyService.validateApiKeyWithTenant(
+              tenantIdHeader,
+              apiKey,
+              clientIp,
+              requiredScope
+            )
+          : await customerApiKeyService.validateApiKey(
+              apiKey,
+              clientIp,
+              requiredScope
+            );
 
         // Set context from API Key
         req.context.tenantId = apiKeyContext.tenantId;
