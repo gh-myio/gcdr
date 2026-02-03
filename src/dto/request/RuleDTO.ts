@@ -12,7 +12,7 @@ const AlarmThresholdConfigSchema = z.object({
   metric: z.string().min(1),
   operator: ComparisonOperatorSchema,
   value: z.number(),
-  valueHigh: z.number().optional(),
+  valueHigh: z.number().nullable().optional(),
   unit: z.string().optional(),
   hysteresis: z.number().min(0).optional(),
   hysteresisType: z.enum(['PERCENTAGE', 'ABSOLUTE']).optional(),
