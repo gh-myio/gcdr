@@ -17,7 +17,7 @@ DECLARE
     v_dim_lab_id UUID := 'dddd2222-2222-2222-2222-222222222222';
     v_dim_entrada_id UUID := 'dddd3333-3333-3333-3333-333333333333';
     v_dim_building_id UUID := 'dddd1111-1111-1111-1111-111111111111';
-    v_central_dim_id UUID := 'eeee2222-2222-2222-2222-222222222222'; -- Central Dimension
+    v_central_dim_id UUID := '9308af89-94b2-45e6-9e47-ae78f881afd2'; -- Central Dimension (real)
 BEGIN
     -- Temperature Sensor in Server Room (with RFC-0008 fields)
     INSERT INTO devices (
@@ -47,7 +47,7 @@ BEGIN
         '{"reportingInterval": 30, "telemetryKeys": ["temperature", "humidity"], "attributeKeys": ["firmware", "battery"]}',
         '["temperature", "sensor", "critical", "server-room"]',
         '{"installationDate": "2023-06-15", "calibrationDate": "2024-01-10"}',
-        '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10"}',
+        '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10", "offset": {"temperature": 0, "humidity": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -88,7 +88,7 @@ BEGIN
         '{"reportingInterval": 30, "telemetryKeys": ["humidity", "temperature"], "attributeKeys": ["firmware"]}',
         '["humidity", "sensor", "server-room"]',
         '{"installationDate": "2023-06-15"}',
-        '{"firmware": "2.1.0"}',
+        '{"firmware": "2.1.0", "offset": {"humidity": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -127,7 +127,7 @@ BEGIN
         '{"reportingInterval": 60, "telemetryKeys": ["power", "voltage", "current", "powerFactor", "energy"], "attributeKeys": ["firmware"]}',
         '["power", "meter", "energy", "server-room"]',
         '{"installationDate": "2023-06-15", "maxLoad": 100}',
-        '{"firmware": "3.0.1", "totalEnergy": 125430.5}',
+        '{"firmware": "3.0.1", "totalEnergy": 125430.5, "offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -322,7 +322,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["energy", "lamp", "laboratory"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
-        '{"offset": 0}',
+        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
         'ACTIVE',
         1,
         1,
@@ -356,7 +356,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["energy", "lamp", "entrance"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
-        '{"offset": 0}',
+        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
         'ACTIVE',
         1,
         2,
@@ -390,7 +390,7 @@ BEGIN
         NOW() - INTERVAL '1 minute',
         '["presence", "sensor", "entrance"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "presence_sensor"}',
-        '{"offset": 0}',
+        '{"offset": {}}',
         'ACTIVE',
         1,
         3,
@@ -424,7 +424,7 @@ BEGIN
         NOW() - INTERVAL '3 minutes',
         '["temperature", "sensor", "laboratory"]',
         '{"installationDate": "2024-01-15"}',
-        '{"offset": -0.5}',
+        '{"offset": {"temperature": -0.5}}',
         'ACTIVE',
         1,
         4,
@@ -458,7 +458,7 @@ BEGIN
         NOW() - INTERVAL '1 minute',
         '["energy", "meter", "3-phase", "general"]',
         '{"installationDate": "2024-01-10"}',
-        '{"offset": 0}',
+        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
         'ACTIVE',
         1,
         5,
@@ -492,7 +492,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["temperature", "sensor", "room"]',
         '{"installationDate": "2024-01-15"}',
-        '{"offset": 0.3}',
+        '{"offset": {"temperature": 0.3}}',
         'ACTIVE',
         1,
         6,

@@ -439,20 +439,26 @@ export class AlarmBundleService {
 
   /**
    * Get device calibration offset from metadata/attributes
-   * Used for temperature, humidity, power sensors calibration
+   * Returns per-metric offset object (e.g., { temperature: -0.5, humidity: 0 })
    */
-  private getDeviceOffset(device: Device): number {
+  private getDeviceOffset(device: Device): Record<string, number> {
     // Check metadata first (preferred)
-    if (device.metadata?.offset !== undefined) {
-      const offset = Number(device.metadata.offset);
-      return isNaN(offset) ? 0 : offset;
+    const raw = device.metadata?.offset ?? device.attributes?.offset;
+
+    if (raw !== undefined && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      // Already an object - validate numeric values
+      const result: Record<string, number> = {};
+      for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+        const num = Number(val);
+        if (!isNaN(num)) {
+          result[key] = num;
+        }
+      }
+      return result;
     }
-    // Check attributes
-    if (device.attributes?.offset !== undefined) {
-      const offset = Number(device.attributes.offset);
-      return isNaN(offset) ? 0 : offset;
-    }
-    return 0;
+
+    // Legacy: single number → return empty object (no per-metric offset)
+    return {};
   }
 
   /**

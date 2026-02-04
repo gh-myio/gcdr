@@ -10,6 +10,9 @@ DECLARE
     v_company1_id UUID := '33333333-3333-3333-3333-333333333333';
     v_room1_id UUID := 'ffff4444-4444-4444-4444-444444444444'; -- Server Room
     v_building1_id UUID := 'ffff1111-1111-1111-1111-111111111111';
+    -- Dimension customer
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
+    v_dim_building_id UUID := 'dddd1111-1111-1111-1111-111111111111';
 BEGIN
     -- NodeHub Central
     INSERT INTO centrals (id, tenant_id, customer_id, asset_id, name, display_name, serial_number, type, status, connection_status, firmware_version, software_version, last_update_at, config, stats, location, tags, metadata, version)
@@ -82,7 +85,35 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 3 centrals';
+    -- ==========================================================================
+    -- Dimension Customer Central
+    -- ==========================================================================
+
+    -- Dimension NodeHub Central
+    INSERT INTO centrals (id, tenant_id, customer_id, asset_id, name, display_name, serial_number, type, status, connection_status, firmware_version, software_version, last_update_at, config, stats, location, tags, metadata, version)
+    VALUES (
+        '9308af89-94b2-45e6-9e47-ae78f881afd2',
+        v_tenant_id,
+        v_dimension_id,
+        v_dim_building_id,
+        'Central Dimension',
+        'Central Principal Dimension',
+        'NH-2024-DIM-001',
+        'NODEHUB',
+        'ACTIVE',
+        'ONLINE',
+        '2.5.0',
+        '3.1.2',
+        NOW() - INTERVAL '1 day',
+        '{"mqttBroker": "mqtt://broker.dimension.local:1883", "dataRetention": 30, "syncInterval": 60, "maxDevices": 50}',
+        '{"connectedDevices": 6, "messagesPerHour": 800, "uptime": 1296000, "lastRestart": "2024-01-01T00:00:00Z"}',
+        '{"floor": "3", "room": "MAIN"}',
+        '["nodehub", "primary", "dimension"]',
+        '{"installationDate": "2024-01-10", "maintenanceContact": "support@dimension.com"}',
+        1
+    );
+
+    RAISE NOTICE 'Inserted 4 centrals';
 END $$;
 
 -- Verify

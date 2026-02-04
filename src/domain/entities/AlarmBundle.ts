@@ -129,7 +129,7 @@ export interface SimpleDeviceMapping {
   deviceName: string;
   centralId?: string;
   slaveId?: number;
-  offset: number;        // Calibration offset per device (default 0)
+  offset: Record<string, number>;  // Calibration offset per metric (e.g., { temperature: -0.5, humidity: 0 })
   ruleIds: string[];
 }
 
