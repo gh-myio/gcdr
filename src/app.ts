@@ -18,6 +18,8 @@ import {
   customersController,
   assetsController,
   partnersController,
+  groupsController,
+  domainsController,
   devicesController,
   devicesListByAssetHandler,
   usersController,
@@ -175,6 +177,12 @@ app.use('/integrations', authMiddleware, integrationsController);
 
 // Partners
 app.use('/partners', authMiddleware, partnersController);
+
+// Groups
+app.use('/groups', authMiddleware, groupsController);
+
+// Domains (metrics, operators, aggregations for rules)
+app.use('/domains', authMiddleware, domainsController);
 
 // Audit Logs (RFC-0009)
 app.use('/audit-logs', authMiddleware, auditLogsController);
