@@ -51,8 +51,8 @@ export interface AlarmThresholdConfig {
   aggregation?: AggregationType;
   aggregationWindow?: number; // Window in seconds for aggregation
 
-  // Calibration offset per metric (for temperature, humidity, power sensors, etc.)
-  offset?: Record<string, number>; // e.g., { temperature: -0.5, humidity: 0 }
+  // Calibration offset per metric (temp, hum, pot, water_level)
+  offset?: Record<string, number>; // e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 }
 
   // Schedule configuration (when the rule is active)
   startAt?: string; // HH:mm format (e.g., "08:00")

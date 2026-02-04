@@ -803,7 +803,183 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 37 rules (25 ACME + 12 Dimension)';
+    -- ==========================================================================
+    -- DIMENSION: HUMIDITY RULES
+    -- ==========================================================================
+
+    -- Humidity High for dedicated humidity sensor
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000013',
+        v_tenant_id,
+        v_dimension_id,
+        'Entrance Humidity High',
+        'Alerts when entrance humidity exceeds 70%',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
+        false,
+        '{"metric": "humidity", "operator": "GT", "value": 70, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
+        '["humidity", "entrance", "high"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Humidity Low
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000014',
+        v_tenant_id,
+        v_dimension_id,
+        'Entrance Humidity Low',
+        'Alerts when entrance humidity falls below 30%',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
+        false,
+        '{"metric": "humidity", "operator": "LT", "value": 30, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
+        '["humidity", "entrance", "low"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Humidity Outside Comfort Range (OUTSIDE)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000015',
+        v_tenant_id,
+        v_dimension_id,
+        'Humidity Outside Comfort Range',
+        'Alerts when humidity is outside comfort range (40-60%)',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'CUSTOMER',
+        v_dimension_id,
+        true,
+        '{"metric": "humidity", "operator": "OUTSIDE", "value": 40, "valueHigh": 60, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 3, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
+        '["humidity", "comfort", "outside", "customer-wide"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Lab Multi-sensor Humidity High
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000016',
+        v_tenant_id,
+        v_dimension_id,
+        'Lab Humidity High',
+        'Alerts when lab humidity exceeds 65% (multi-sensor ch2)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000008', -- Temp+Umidade Lab
+        false,
+        '{"metric": "humidity", "operator": "GT", "value": 65, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
+        '["humidity", "laboratory", "high", "multi-sensor"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ==========================================================================
+    -- DIMENSION: WATER LEVEL RULES
+    -- ==========================================================================
+
+    -- Water Level Low
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000017',
+        v_tenant_id,
+        v_dimension_id,
+        'Water Tank Low Level',
+        'Alerts when water tank level falls below 20%',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        false,
+        '{"metric": "water_level_continuous", "operator": "LT", "value": 20, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 3, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["water", "level", "low"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Water Level Critical Low
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000018',
+        v_tenant_id,
+        v_dimension_id,
+        'Water Tank Critical Low',
+        'Critical alert when water tank level falls below 10%',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        false,
+        '{"metric": "water_level_continuous", "operator": "LT", "value": 10, "unit": "%", "duration": 0, "aggregation": "LAST"}',
+        '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["water", "level", "critical", "emergency"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Water Level Normal Range (BETWEEN)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000019',
+        v_tenant_id,
+        v_dimension_id,
+        'Water Tank Normal Range',
+        'Monitors when water tank is within normal range (40-80%)',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        false,
+        '{"metric": "water_level_continuous", "operator": "BETWEEN", "value": 40, "valueHigh": 80, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/water-status"}, "enabled": true}]',
+        '["water", "level", "normal", "between"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Water Level Outside Safe Range (OUTSIDE)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000020',
+        v_tenant_id,
+        v_dimension_id,
+        'Water Tank Outside Safe Range',
+        'Alerts when water tank level is outside safe range (below 15% or above 95%)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        false,
+        '{"metric": "water_level_continuous", "operator": "OUTSIDE", "value": 15, "valueHigh": 95, "unit": "%", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
+        '["water", "level", "outside", "safety"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 45 rules (25 ACME + 20 Dimension)';
 END $$;
 
 -- Verify

@@ -47,7 +47,7 @@ BEGIN
         '{"reportingInterval": 30, "telemetryKeys": ["temperature", "humidity"], "attributeKeys": ["firmware", "battery"]}',
         '["temperature", "sensor", "critical", "server-room"]',
         '{"installationDate": "2023-06-15", "calibrationDate": "2024-01-10"}',
-        '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10", "offset": {"temperature": 0, "humidity": 0}}',
+        '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10", "offset": {"temp": 0, "hum": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -88,7 +88,7 @@ BEGIN
         '{"reportingInterval": 30, "telemetryKeys": ["humidity", "temperature"], "attributeKeys": ["firmware"]}',
         '["humidity", "sensor", "server-room"]',
         '{"installationDate": "2023-06-15"}',
-        '{"firmware": "2.1.0", "offset": {"humidity": 0}}',
+        '{"firmware": "2.1.0", "offset": {"hum": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -127,7 +127,7 @@ BEGIN
         '{"reportingInterval": 60, "telemetryKeys": ["power", "voltage", "current", "powerFactor", "energy"], "attributeKeys": ["firmware"]}',
         '["power", "meter", "energy", "server-room"]',
         '{"installationDate": "2023-06-15", "maxLoad": 100}',
-        '{"firmware": "3.0.1", "totalEnergy": 125430.5, "offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
+        '{"firmware": "3.0.1", "totalEnergy": 125430.5, "offset": {"pot": 0}}',
         'ACTIVE',
         1,
         -- RFC-0008 fields
@@ -322,7 +322,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["energy", "lamp", "laboratory"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
-        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
+        '{"offset": {"pot": 0}}',
         'ACTIVE',
         1,
         1,
@@ -356,7 +356,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["energy", "lamp", "entrance"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
-        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
+        '{"offset": {"pot": 0}}',
         'ACTIVE',
         1,
         2,
@@ -424,7 +424,7 @@ BEGIN
         NOW() - INTERVAL '3 minutes',
         '["temperature", "sensor", "laboratory"]',
         '{"installationDate": "2024-01-15"}',
-        '{"offset": {"temperature": -0.5}}',
+        '{"offset": {"temp": -0.5}}',
         'ACTIVE',
         1,
         4,
@@ -458,7 +458,7 @@ BEGIN
         NOW() - INTERVAL '1 minute',
         '["energy", "meter", "3-phase", "general"]',
         '{"installationDate": "2024-01-10"}',
-        '{"offset": {"instantaneous_power": 0, "energy_consumption": 0}}',
+        '{"offset": {"pot": 0}}',
         'ACTIVE',
         1,
         5,
@@ -492,7 +492,7 @@ BEGIN
         NOW() - INTERVAL '2 minutes',
         '["temperature", "sensor", "room"]',
         '{"installationDate": "2024-01-15"}',
-        '{"offset": {"temperature": 0.3}}',
+        '{"offset": {"temp": 0.3}}',
         'ACTIVE',
         1,
         6,
@@ -502,7 +502,109 @@ BEGIN
         'SHT40_TEMP'
     );
 
-    RAISE NOTICE 'Inserted 13 devices';
+    -- Device 7: Sensor Umidade Entrada (humidity sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000007',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Umidade Entrada',
+        'Sensor Umidade Entrada',
+        'HUM-ENT',
+        'SENSOR',
+        'Humidity sensor for entrance area',
+        'SN-DIM-HUM-ENT-001',
+        'dim-hum-ent-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["humidity", "sensor", "entrance"]',
+        '{"installationDate": "2024-02-01", "deviceIcon": "humidity"}',
+        '{"offset": {"hum": -1.0}}',
+        'ACTIVE',
+        1,
+        7,
+        v_central_dim_id,
+        'HUM_ENTRADA_01',
+        'SENSOR_HUMIDITY',
+        'SHT40_HUM'
+    );
+
+    -- Device 8: Sensor Temp+Umidade Lab (multi-sensor, 2 channels)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000008',
+        v_tenant_id,
+        v_dim_lab_id,
+        v_dimension_id,
+        'Temp+Umidade Lab',
+        'Sensor Temperatura e Umidade Laboratório',
+        'TEMPHUM-LAB',
+        'SENSOR',
+        'Multi-sensor: temperature (ch1) and humidity (ch2) for laboratory',
+        'SN-DIM-TEMPHUM-LAB-001',
+        'dim-temphum-lab-001',
+        '{"manufacturer": "Sensirion", "model": "SHT45", "protocol": "MQTT", "channels": [{"id": 1, "metric": "temperature"}, {"id": 2, "metric": "humidity"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["temperature", "humidity", "sensor", "laboratory", "multi-sensor"]',
+        '{"installationDate": "2024-02-01", "deviceIcon": "multi_sensor"}',
+        '{"offset": {"temp": 0.2, "hum": -1.5}}',
+        'ACTIVE',
+        1,
+        8,
+        v_central_dim_id,
+        'TEMPHUM_LAB_01',
+        'SENSOR_TEMP_HUMIDITY',
+        'SHT45_TEMP_HUM'
+    );
+
+    -- Device 9: Nível Caixa D'Água (water level sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000009',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Nível Caixa Água',
+        'Sensor Nível Caixa D''Água',
+        'WATER-LVL',
+        'SENSOR',
+        'Water tank level sensor (ultrasonic, height adjustment offset)',
+        'SN-DIM-WATER-LVL-001',
+        'dim-water-lvl-001',
+        '{"manufacturer": "Siemens", "model": "SITRANS Probe LU", "protocol": "MODBUS", "range": "0-100%", "tankHeight": 2000}',
+        'ONLINE',
+        NOW() - INTERVAL '3 minutes',
+        '["water", "level", "sensor", "building"]',
+        '{"installationDate": "2024-03-01", "deviceIcon": "water_level"}',
+        '{"offset": {"water_level": 5}}',
+        'ACTIVE',
+        1,
+        9,
+        v_central_dim_id,
+        'WATER_LEVEL_01',
+        'SENSOR_WATER_LEVEL',
+        'SITRANS_LU'
+    );
+
+    RAISE NOTICE 'Inserted 16 devices';
 END $$;
 
 -- Verify
