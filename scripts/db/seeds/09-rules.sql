@@ -347,7 +347,205 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 16 rules';
+    -- ==========================================================================
+    -- RANGE RULES (BETWEEN / OUTSIDE) - Examples with valueHigh
+    -- ==========================================================================
+
+    -- ALARM_THRESHOLD rule: Temperature Comfort Zone (BETWEEN)
+    -- Alerts when temperature is WITHIN the comfort zone (18-26°C) - for monitoring
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000020',
+        v_tenant_id,
+        v_company1_id,
+        'Temperature in Comfort Zone',
+        'Monitors when temperature is within comfort zone (18-26°C)',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "temperature", "operator": "BETWEEN", "value": 18, "valueHigh": 26, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "WEBHOOK", "config": {"url": "https://api.example.com/comfort-status"}, "enabled": true}]',
+        '["temperature", "comfort", "range", "between"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Temperature Outside Safe Range (OUTSIDE)
+    -- Alerts when temperature is OUTSIDE the safe range (15-30°C)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000021',
+        v_tenant_id,
+        v_company1_id,
+        'Temperature Outside Safe Range',
+        'Alerts when temperature is outside safe range (below 15°C or above 30°C)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 30, "unit": "°C", "duration": 120, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["temperature", "safety", "range", "outside", "critical"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Power Normal Operating Range (BETWEEN)
+    -- Monitors when power is within normal operating range (100-400W)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000022',
+        v_tenant_id,
+        v_company1_id,
+        'Power in Normal Range',
+        'Monitors when instantaneous power is within normal operating range (100-400W)',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "WEBHOOK", "config": {"url": "https://api.example.com/power-status"}, "enabled": true}]',
+        '["power", "normal", "range", "between"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Power Anomaly Detection (OUTSIDE)
+    -- Alerts when power is OUTSIDE normal range (below 50W or above 600W)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000023',
+        v_tenant_id,
+        v_company1_id,
+        'Power Anomaly Alert',
+        'Alerts when instantaneous power is outside normal range (below 50W equipment off, or above 600W overload)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "facilities@acmetech.com"]}, "enabled": true}]',
+        '["power", "anomaly", "range", "outside"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Server Room Temperature Critical Range (OUTSIDE)
+    -- For server room: alerts when temperature is outside 18-28°C
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000024',
+        v_tenant_id,
+        v_company1_id,
+        'Server Room Temperature Critical',
+        'Critical alert when server room temperature is outside safe range (18-28°C)',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'ASSET',
+        v_room1_id,
+        false,
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 18, "valueHigh": 28, "unit": "°C", "duration": 60, "aggregation": "AVG", "aggregationWindow": 30, "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}, {"type": "PAGERDUTY", "config": {"serviceKey": "pd-key-123"}, "enabled": true}]',
+        '["temperature", "server-room", "critical", "outside", "range"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Minimum Temperature (LT)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000025',
+        v_tenant_id,
+        v_company1_id,
+        'Minimum Temperature Alert',
+        'Alerts when temperature falls below minimum threshold of 15°C',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "temperature", "operator": "LT", "value": 15, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
+        '["temperature", "minimum", "cold"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Maximum Temperature (GT)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000026',
+        v_tenant_id,
+        v_company1_id,
+        'Maximum Temperature Alert',
+        'Alerts when temperature exceeds maximum threshold of 32°C',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "temperature", "operator": "GT", "value": 32, "unit": "°C", "duration": 120, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}]',
+        '["temperature", "maximum", "hot"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Minimum Power (Equipment Off)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000027',
+        v_tenant_id,
+        v_company1_id,
+        'Minimum Power Alert',
+        'Alerts when instantaneous power is below 30W - equipment may be off',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "20:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
+        '["power", "minimum", "equipment-off"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- ALARM_THRESHOLD rule: Maximum Power (Overload)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'aaaa0001-0001-0001-0001-000000000028',
+        v_tenant_id,
+        v_company1_id,
+        'Maximum Power Overload Alert',
+        'Alerts when instantaneous power exceeds 750W - potential overload',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'CUSTOMER',
+        v_company1_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 750, "unit": "W", "duration": 1, "aggregation": "LAST"}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["power", "maximum", "overload", "critical"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 25 rules (including 9 new range/min/max examples)';
 END $$;
 
 -- Verify
