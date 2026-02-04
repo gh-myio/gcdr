@@ -10,6 +10,8 @@ DECLARE
     v_company1_id UUID := '33333333-3333-3333-3333-333333333333';
     v_room1_id UUID := 'ffff4444-4444-4444-4444-444444444444'; -- Server Room
     v_temp_device_id UUID := '11110001-0001-0001-0001-000000000001';
+    -- Dimension customer
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
 BEGIN
     -- ALARM_THRESHOLD rule: High Temperature
     INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
@@ -545,7 +547,263 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 25 rules (including 9 new range/min/max examples)';
+    -- ==========================================================================
+    -- DIMENSION CUSTOMER RULES (77777777-7777-7777-7777-777777777777)
+    -- ==========================================================================
+
+    -- Temperature rules for Laboratório device
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000001',
+        v_tenant_id,
+        v_dimension_id,
+        'Lab Temperature High',
+        'Alerts when laboratory temperature exceeds 28°C',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
+        false,
+        '{"metric": "temperature", "operator": "GT", "value": 28, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
+        '["temperature", "laboratory", "high"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Temperature Low for Laboratório
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000002',
+        v_tenant_id,
+        v_dimension_id,
+        'Lab Temperature Low',
+        'Alerts when laboratory temperature falls below 18°C',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
+        false,
+        '{"metric": "temperature", "operator": "LT", "value": 18, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
+        '["temperature", "laboratory", "low"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Temperature Range for Temp. Sala (OUTSIDE - alert when outside comfort zone)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000003',
+        v_tenant_id,
+        v_dimension_id,
+        'Room Temperature Outside Comfort Zone',
+        'Alerts when room temperature is outside comfort zone (20-26°C)',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000006', -- Temp. Sala sensor
+        false,
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 20, "valueHigh": 26, "unit": "°C", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
+        '["temperature", "room", "comfort", "outside"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Temperature Range for Customer (BETWEEN - monitoring comfort)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000004',
+        v_tenant_id,
+        v_dimension_id,
+        'Temperature in Comfort Zone',
+        'Monitors when temperature is within optimal range (22-24°C)',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'CUSTOMER',
+        v_dimension_id,
+        true,
+        '{"metric": "temperature", "operator": "BETWEEN", "value": 22, "valueHigh": 24, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/comfort-status"}, "enabled": true}]',
+        '["temperature", "comfort", "between"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Energy/Power rules for 3F Geral meter
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000005',
+        v_tenant_id,
+        v_dimension_id,
+        '3F Power High',
+        'Alerts when 3F instantaneous power exceeds 500W',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        false,
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br"]}, "enabled": true}]',
+        '["power", "3f", "high"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Power Low (equipment off detection)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000006',
+        v_tenant_id,
+        v_dimension_id,
+        '3F Power Low - Equipment Off',
+        'Alerts when 3F power is below 30W during business hours',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        false,
+        '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
+        '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
+        '["power", "3f", "low", "equipment-off"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Power Normal Range (BETWEEN)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000007',
+        v_tenant_id,
+        v_dimension_id,
+        '3F Power Normal Range',
+        'Monitors when power is within normal operating range (100-400W)',
+        'ALARM_THRESHOLD',
+        'LOW',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        false,
+        '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/power-status"}, "enabled": true}]',
+        '["power", "3f", "normal", "between"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Power Anomaly (OUTSIDE)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000008',
+        v_tenant_id,
+        v_dimension_id,
+        '3F Power Anomaly',
+        'Alerts when power is outside normal range (below 50W or above 600W)',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        false,
+        '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
+        '["power", "3f", "anomaly", "outside"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Energy Lab lamp rules
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000009',
+        v_tenant_id,
+        v_dimension_id,
+        'Lab Energy High Consumption',
+        'Alerts when lab energy meter shows high consumption (>200W)',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000001', -- Energy Laboratório meter
+        false,
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 200, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120}',
+        '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
+        '["energy", "laboratory", "high"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Presence sensor rule
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000010',
+        v_tenant_id,
+        v_dimension_id,
+        'Entrance Presence After Hours',
+        'Alerts when presence is detected at entrance after business hours',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000003', -- Sensor Presença Entrada
+        false,
+        '{"metric": "presence_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6]}',
+        '[{"type": "EMAIL", "config": {"to": ["security@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["presence", "entrance", "security", "after-hours"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Customer-wide temperature critical (inherited)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000011',
+        v_tenant_id,
+        v_dimension_id,
+        'Critical Temperature Alert',
+        'Critical alert when any temperature sensor reads outside 15-32°C',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'CUSTOMER',
+        v_dimension_id,
+        true,
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 32, "unit": "°C", "duration": 2, "aggregation": "LAST", "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
+        '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["temperature", "critical", "customer-wide"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Customer-wide power surge detection
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000012',
+        v_tenant_id,
+        v_dimension_id,
+        'Power Surge Detection',
+        'Critical alert when any power meter detects surge (>800W)',
+        'ALARM_THRESHOLD',
+        'CRITICAL',
+        'CUSTOMER',
+        v_dimension_id,
+        true,
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST"}',
+        '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
+        '["power", "surge", "critical", "customer-wide"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 37 rules (25 ACME + 12 Dimension)';
 END $$;
 
 -- Verify
