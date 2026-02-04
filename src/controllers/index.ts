@@ -8,6 +8,8 @@ export { dbAdminController } from './admin/db-admin.controller';
 
 // Protected routes
 export { default as customersController } from './customers.controller';
+export { default as assetsController } from './assets.controller';
+export { default as partnersController } from './partners.controller';
 export { default as devicesController, listByAssetHandler as devicesListByAssetHandler } from './devices.controller';
 export { default as usersController, listByCustomerHandler as usersListByCustomerHandler } from './users.controller';
 export { default as policiesController } from './policies.controller';

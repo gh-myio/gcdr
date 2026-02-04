@@ -16,6 +16,8 @@ import {
   healthController,
   docsController,
   customersController,
+  assetsController,
+  partnersController,
   devicesController,
   devicesListByAssetHandler,
   usersController,
@@ -141,7 +143,10 @@ app.use('/customers', authMiddleware, customersController);
 // Devices
 app.use('/devices', authMiddleware, devicesController);
 
-// Asset Devices (nested route)
+// Assets
+app.use('/assets', authMiddleware, assetsController);
+
+// Asset Devices (nested route - must come after assets router for :assetId routes)
 app.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
 
 // Asset Centrals (nested route)
@@ -167,6 +172,9 @@ app.use('/rules', authMiddleware, rulesController);
 
 // Integrations
 app.use('/integrations', authMiddleware, integrationsController);
+
+// Partners
+app.use('/partners', authMiddleware, partnersController);
 
 // Audit Logs (RFC-0009)
 app.use('/audit-logs', authMiddleware, auditLogsController);
