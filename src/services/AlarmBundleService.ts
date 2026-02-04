@@ -437,28 +437,33 @@ export class AlarmBundleService {
     return 'default';
   }
 
+  /** All offset keys - always present, 0 when not applicable */
+  private static readonly OFFSET_KEYS = ['temp', 'hum', 'pot', 'water_level'] as const;
+
   /**
    * Get device calibration offset from metadata/attributes
-   * Returns per-metric offset object (e.g., { temperature: -0.5, humidity: 0 })
+   * Always returns all keys (temp, hum, pot, water_level) - 0 when not applicable
    */
   private getDeviceOffset(device: Device): Record<string, number> {
-    // Check metadata first (preferred)
+    const result: Record<string, number> = {};
+    for (const key of AlarmBundleService.OFFSET_KEYS) {
+      result[key] = 0;
+    }
+
     const raw = device.metadata?.offset ?? device.attributes?.offset;
 
     if (raw !== undefined && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-      // Already an object - validate numeric values
-      const result: Record<string, number> = {};
       for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
-        const num = Number(val);
-        if (!isNaN(num)) {
-          result[key] = num;
+        if (key in result) {
+          const num = Number(val);
+          if (!isNaN(num)) {
+            result[key] = num;
+          }
         }
       }
-      return result;
     }
 
-    // Legacy: single number → return empty object (no per-metric offset)
-    return {};
+    return result;
   }
 
   /**
