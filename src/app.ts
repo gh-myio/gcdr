@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Router } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -89,6 +89,9 @@ app.use('/admin/db', dbAdminController);
 // Simulator Cockpit UI (RFC-0010)
 app.use('/admin/simulator', simulatorAdminController);
 
+// Admin User Management (RFC-0011)
+app.use('/admin/users', userAdminController);
+
 // =============================================================================
 // Security Middleware (after admin routes that need relaxed CSP)
 // =============================================================================
@@ -103,99 +106,107 @@ app.use(contextMiddleware);
 // Public Routes (no authentication required)
 // =============================================================================
 
-// Health checks
+// Health checks (no prefix - standard for k8s probes)
 app.use('/health', healthController);
 
-// Authentication routes
-app.use('/auth', authController);
+// =============================================================================
+// API v1 Router
+// =============================================================================
 
-// =============================================================================
+const apiV1Router = Router();
+
+// -----------------------------------------------------------------------------
+// Authentication (public)
+// -----------------------------------------------------------------------------
+apiV1Router.use('/auth', authController);
+
+// -----------------------------------------------------------------------------
 // Protected Routes (authentication required)
-// =============================================================================
+// -----------------------------------------------------------------------------
 
 // Customer-specific nested routes MUST come before the general /customers router
 // to ensure proper route matching (more specific routes first)
 
 // Customer Alarm Bundle - Simplified (supports JWT or API Key auth for M2M integration)
 // More specific route MUST come first
-app.get('/customers/:customerId/alarm-rules/bundle/simple', hybridAuthMiddleware('bundles:read'), getSimplifiedAlarmBundleHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/simple', hybridAuthMiddleware('bundles:read'), getSimplifiedAlarmBundleHandler);
 
 // Customer Alarm Bundle - Full (supports JWT or API Key auth for M2M integration)
-app.get('/customers/:customerId/alarm-rules/bundle', hybridAuthMiddleware('bundles:read'), getAlarmBundleHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle', hybridAuthMiddleware('bundles:read'), getAlarmBundleHandler);
 
 // Customer API Keys (nested under customers)
-app.use('/customers/:customerId/api-keys', authMiddleware, customerApiKeysController);
+apiV1Router.use('/customers/:customerId/api-keys', authMiddleware, customerApiKeysController);
 
 // Customer Users (nested route)
-app.get('/customers/:customerId/users', authMiddleware, usersListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/users', authMiddleware, usersListByCustomerHandler);
 
 // Customer Rules (nested route)
-app.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);
 
 // Customer Centrals (nested route)
-app.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
 
 // Customer Themes (nested routes)
-app.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
-app.get('/customers/:customerId/themes', authMiddleware, themesListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
+apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCustomerHandler);
 
 // Customers (general router - must come after specific nested routes)
-app.use('/customers', authMiddleware, customersController);
+apiV1Router.use('/customers', authMiddleware, customersController);
 
 // Devices
-app.use('/devices', authMiddleware, devicesController);
+apiV1Router.use('/devices', authMiddleware, devicesController);
 
 // Assets
-app.use('/assets', authMiddleware, assetsController);
+apiV1Router.use('/assets', authMiddleware, assetsController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
-app.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
+apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
 
 // Asset Centrals (nested route)
-app.get('/assets/:assetId/centrals', authMiddleware, centralsListByAssetHandler);
+apiV1Router.get('/assets/:assetId/centrals', authMiddleware, centralsListByAssetHandler);
 
 // Centrals
-app.use('/centrals', authMiddleware, centralsController);
+apiV1Router.use('/centrals', authMiddleware, centralsController);
 
 // Themes (Look and Feel)
-app.use('/themes', authMiddleware, themesController);
+apiV1Router.use('/themes', authMiddleware, themesController);
 
 // Users
-app.use('/users', authMiddleware, usersController);
+apiV1Router.use('/users', authMiddleware, usersController);
 
 // Policies
-app.use('/policies', authMiddleware, policiesController);
+apiV1Router.use('/policies', authMiddleware, policiesController);
 
 // Authorization
-app.use('/authorization', authMiddleware, authorizationController);
+apiV1Router.use('/authorization', authMiddleware, authorizationController);
 
 // Rules
-app.use('/rules', authMiddleware, rulesController);
+apiV1Router.use('/rules', authMiddleware, rulesController);
 
 // Integrations
-app.use('/integrations', authMiddleware, integrationsController);
+apiV1Router.use('/integrations', authMiddleware, integrationsController);
 
 // Partners
-app.use('/partners', authMiddleware, partnersController);
+apiV1Router.use('/partners', authMiddleware, partnersController);
 
 // Groups
-app.use('/groups', authMiddleware, groupsController);
+apiV1Router.use('/groups', authMiddleware, groupsController);
 
 // Domains (metrics, operators, aggregations for rules)
-app.use('/domains', authMiddleware, domainsController);
+apiV1Router.use('/domains', authMiddleware, domainsController);
 
 // Audit Logs (RFC-0009)
-app.use('/audit-logs', authMiddleware, auditLogsController);
+apiV1Router.use('/audit-logs', authMiddleware, auditLogsController);
 
 // Simulator (RFC-0010)
-app.use('/simulator', authMiddleware, simulatorController);
-
-// Admin User Management (RFC-0011)
-app.use('/admin/users', userAdminController);
+apiV1Router.use('/simulator', authMiddleware, simulatorController);
 
 // RFC-0013: User Access Profile Bundle
-app.use('/maintenance-groups', authMiddleware, maintenanceGroupsController);
-app.use('/access-bundle', authMiddleware, accessBundleController);
+apiV1Router.use('/maintenance-groups', authMiddleware, maintenanceGroupsController);
+apiV1Router.use('/access-bundle', authMiddleware, accessBundleController);
+
+// Mount API v1 router
+app.use('/api/v1', apiV1Router);
 
 // =============================================================================
 // Error Handling
@@ -217,16 +228,18 @@ const HOST = process.env.HOST || '0.0.0.0';
 if (require.main === module) {
   app.listen(PORT, HOST, async () => {
     const isDev = process.env.NODE_ENV !== 'production';
+    const baseUrl = `http://${HOST}:${PORT}`;
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                    GCDR API Server                         ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(42)}║
-║  Server:      http://${HOST}:${PORT.toString().padEnd(33)}║
-║  Health:      http://${HOST}:${PORT}/health${' '.repeat(26)}║
-║  Docs:        http://${HOST}:${PORT}/docs${' '.repeat(28)}║${isDev ? `
-║  DB Admin:    http://${HOST}:${PORT}/admin/db${' '.repeat(22)}║
-║  Simulator:   http://${HOST}:${PORT}/admin/simulator${' '.repeat(15)}║` : ''}
+║  Server:      ${baseUrl.padEnd(42)}║
+║  API:         ${(baseUrl + '/api/v1').padEnd(42)}║
+║  Health:      ${(baseUrl + '/health').padEnd(42)}║
+║  Docs:        ${(baseUrl + '/docs').padEnd(42)}║${isDev ? `
+║  DB Admin:    ${(baseUrl + '/admin/db').padEnd(42)}║
+║  Simulator:   ${(baseUrl + '/admin/simulator').padEnd(42)}║` : ''}
 ╚════════════════════════════════════════════════════════════╝
     `);
 
