@@ -377,9 +377,11 @@ export class SimulatorEngine extends EventEmitter {
 
     this.emit('device:scanned', sessionId, device.deviceId, telemetry);
 
-    // Evaluate rules for this device
+    // Evaluate rules for this device (filter by scenario ruleIds if configured)
     if (deviceMapping) {
+      const scenarioRuleIds = active.config.ruleIds;
       for (const ruleId of deviceMapping.ruleIds) {
+        if (scenarioRuleIds && !scenarioRuleIds.includes(ruleId)) continue;
         const rule = bundle.rules[ruleId];
         if (rule) {
           await this.evaluateRule(sessionId, active, device, deviceIdentifier, rule, telemetry, bundle);

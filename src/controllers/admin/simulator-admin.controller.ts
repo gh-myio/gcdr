@@ -1,7 +1,8 @@
 // =============================================================================
-// GCDR Simulator Cockpit Controller (RFC-0010)
+// GCDR Simulator Cockpit Controller (RFC-0010 + RFC-0014)
 // =============================================================================
 // Premium UI for managing alarm simulations
+// RFC-0014: 2x3 grid layout + Scenario Builder wizard
 // Access: http://localhost:3015/admin/simulator
 // =============================================================================
 
@@ -138,6 +139,130 @@ router.get('/api/queue/stats', (req: Request, res: Response) => {
 });
 
 // =============================================================================
+// Wizard API Routes — Centrals, Devices per Central, Rules (RFC-0014)
+// =============================================================================
+
+// List centrals for a customer (wizard step 1)
+router.get('/api/centrals', async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    const customerId = req.query.customerId as string;
+    if (!tenantId || !customerId) {
+      return res.status(400).json({ error: 'tenantId and customerId are required' });
+    }
+
+    const { db } = await import('../../infrastructure/database/drizzle/db');
+    const { centrals } = await import('../../infrastructure/database/drizzle/schema');
+    const { eq, and } = await import('drizzle-orm');
+
+    const result = await db
+      .select({
+        id: centrals.id,
+        name: centrals.name,
+        serialNumber: centrals.serialNumber,
+        type: centrals.type,
+        connectionStatus: centrals.connectionStatus,
+        status: centrals.status,
+      })
+      .from(centrals)
+      .where(and(
+        eq(centrals.tenantId, tenantId),
+        eq(centrals.customerId, customerId),
+        eq(centrals.status, 'ACTIVE')
+      ))
+      .limit(100);
+
+    res.json({ centrals: result });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List devices for a specific central (wizard step 2)
+router.get('/api/centrals/:centralId/devices', async (req: Request, res: Response) => {
+  try {
+    const { centralId } = req.params;
+    const tenantId = req.query.tenantId as string;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    const { db } = await import('../../infrastructure/database/drizzle/db');
+    const { devices } = await import('../../infrastructure/database/drizzle/schema');
+    const { eq, and } = await import('drizzle-orm');
+
+    const result = await db
+      .select({
+        id: devices.id,
+        name: devices.name,
+        type: devices.type,
+        serialNumber: devices.serialNumber,
+        slaveId: devices.slaveId,
+        identifier: devices.identifier,
+        specs: devices.specs,
+        connectivityStatus: devices.connectivityStatus,
+      })
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.centralId, centralId),
+        eq(devices.status, 'ACTIVE')
+      ))
+      .limit(200);
+
+    // Expose channels for OUTLET devices
+    const mapped = result.map(d => ({
+      ...d,
+      channels: d.type === 'OUTLET' && d.specs && typeof d.specs === 'object'
+        ? (d.specs as any).channels || []
+        : undefined,
+    }));
+
+    res.json({ devices: mapped });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List alarm rules for a customer (wizard step 3)
+router.get('/api/rules', async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    const customerId = req.query.customerId as string;
+    if (!tenantId || !customerId) {
+      return res.status(400).json({ error: 'tenantId and customerId are required' });
+    }
+
+    const { db } = await import('../../infrastructure/database/drizzle/db');
+    const { rules } = await import('../../infrastructure/database/drizzle/schema');
+    const { eq, and } = await import('drizzle-orm');
+
+    const result = await db
+      .select({
+        id: rules.id,
+        name: rules.name,
+        type: rules.type,
+        priority: rules.priority,
+        alarmConfig: rules.alarmConfig,
+        enabled: rules.enabled,
+        scopeType: rules.scopeType,
+      })
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.customerId, customerId),
+        eq(rules.status, 'ACTIVE'),
+        eq(rules.enabled, true)
+      ))
+      .limit(200);
+
+    res.json({ rules: result });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
 // DEMO Setup - Creates everything needed for a working demo
 // =============================================================================
 
@@ -173,7 +298,6 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
 
     if (existingCustomer.length > 0) {
       console.log('[Demo Setup] Demo already configured, returning existing IDs');
-      // Demo already setup, just return the IDs
       return res.json({
         success: true,
         message: 'Demo already configured',
@@ -190,7 +314,6 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
 
     console.log('[Demo Setup] Creating demo customer...');
 
-    // Create Demo Customer
     await db.insert(customers).values({
       id: DEMO_CUSTOMER_ID,
       tenantId: DEMO_TENANT_ID,
@@ -206,7 +329,6 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
 
     console.log('[Demo Setup] Customer created successfully');
 
-    // Create Demo Asset
     await db.insert(assets).values({
       id: DEMO_ASSET_ID,
       tenantId: DEMO_TENANT_ID,
@@ -220,7 +342,6 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
       status: 'ACTIVE',
     });
 
-    // Create Demo Central
     await db.insert(centrals).values({
       id: DEMO_CENTRAL_ID,
       tenantId: DEMO_TENANT_ID,
@@ -236,7 +357,6 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
       softwareVersion: '2.0.0',
     });
 
-    // Create Demo Devices
     const demoDevices = [
       {
         id: DEMO_DEVICE_IDS[0],
@@ -289,19 +409,18 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
       });
     }
 
-    // Create Demo Alarm Rules
     const demoRules = [
       {
         id: DEMO_RULE_IDS[0],
         name: 'High Temperature Alert',
-        description: 'Triggers when temperature exceeds 28°C',
+        description: 'Triggers when temperature exceeds 28C',
         type: 'ALARM_THRESHOLD' as const,
         priority: 'HIGH' as const,
         alarmConfig: {
           field: 'temperature',
           operator: 'gt',
           threshold: 28,
-          unit: '°C',
+          unit: 'C',
           duration: 60,
           message: 'Temperature is above normal threshold',
         },
@@ -365,7 +484,6 @@ router.post('/api/demo/start-session', async (req: Request, res: Response) => {
   try {
     const sessionName = `Demo Session ${new Date().toLocaleTimeString()}`;
 
-    // Create session with demo devices
     const session = await simulatorEngine.startSession(
       DEMO_TENANT_ID,
       DEMO_CUSTOMER_ID,
@@ -373,19 +491,19 @@ router.post('/api/demo/start-session', async (req: Request, res: Response) => {
       sessionName,
       {
         customerId: DEMO_CUSTOMER_ID,
-        deviceScanIntervalMs: 30000, // 30 seconds for demo
-        bundleRefreshIntervalMs: 60000, // 1 minute
+        deviceScanIntervalMs: 30000,
+        bundleRefreshIntervalMs: 60000,
         devices: [
           {
             deviceId: DEMO_DEVICE_IDS[0],
             telemetryProfile: {
-              temperature: { min: 22, max: 32, unit: '°C' }, // May trigger alarm > 28
+              temperature: { min: 22, max: 32, unit: 'C' },
             }
           },
           {
             deviceId: DEMO_DEVICE_IDS[1],
             telemetryProfile: {
-              humidity: { min: 50, max: 80, unit: '%' }, // May trigger alarm > 70
+              humidity: { min: 50, max: 80, unit: '%' },
             }
           },
           {
@@ -416,7 +534,6 @@ router.get('/api/customers', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenantId is required' });
     }
 
-    // Simple query to get customers
     const { db } = await import('../../infrastructure/database/drizzle/db');
     const { customers } = await import('../../infrastructure/database/drizzle/schema');
     const { eq, and } = await import('drizzle-orm');
@@ -463,7 +580,7 @@ router.get('/api/devices', async (req: Request, res: Response) => {
 });
 
 // =============================================================================
-// HTML UI
+// HTML UI (RFC-0014: 2x3 Grid + Scenario Builder Wizard)
 // =============================================================================
 
 router.get('/', (req: Request, res: Response) => {
@@ -490,1472 +607,907 @@ function getHtmlPage(): string {
       --accent-yellow: #eab308;
       --accent-red: #ef4444;
       --accent-purple: #a855f7;
+      --accent-orange: #f97316;
       --border-color: #475569;
     }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    header h1 {
-      font-size: 24px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    header h1 .icon {
-      font-size: 28px;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .badge {
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .badge-premium {
-      background: linear-gradient(135deg, #a855f7, #6366f1);
-      color: white;
-    }
-
-    .btn-demo {
-      background: linear-gradient(135deg, #22c55e, #16a34a);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-    }
-
-    .btn-demo:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
-    }
-
-    .btn-demo:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .btn-help {
-      background: var(--bg-tertiary);
-      color: var(--text-secondary);
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      border: 1px solid var(--border-color);
-      transition: all 0.2s;
-    }
-
-    .btn-help:hover {
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-      border-color: var(--accent-blue);
-    }
-
-    /* Modal Styles */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(4px);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-
-    .modal-overlay.active {
-      display: flex;
-    }
-
-    .modal {
-      background: var(--bg-secondary);
-      border-radius: 16px;
-      border: 1px solid var(--border-color);
-      max-width: 900px;
-      max-height: 85vh;
-      width: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .modal-header {
-      padding: 20px 24px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-header h2 {
-      font-size: 20px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .modal-close {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 24px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 6px;
-      transition: all 0.2s;
-    }
-
-    .modal-close:hover {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-    }
-
-    .modal-body {
-      padding: 24px;
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    .manual-section {
-      margin-bottom: 32px;
-    }
-
-    .manual-section:last-child {
-      margin-bottom: 0;
-    }
-
-    .manual-section h3 {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--accent-blue);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .manual-section p {
-      color: var(--text-secondary);
-      line-height: 1.6;
-      margin-bottom: 12px;
-    }
-
-    .manual-section ul {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .manual-section li {
-      color: var(--text-secondary);
-      padding: 8px 0;
-      padding-left: 24px;
-      position: relative;
-      line-height: 1.5;
-    }
-
-    .manual-section li::before {
-      content: "→";
-      position: absolute;
-      left: 0;
-      color: var(--accent-green);
-    }
-
-    .manual-code {
-      background: var(--bg-primary);
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 13px;
-      color: var(--accent-green);
-      margin: 12px 0;
-      overflow-x: auto;
-    }
-
-    .manual-tip {
-      background: rgba(59, 130, 246, 0.1);
-      border-left: 4px solid var(--accent-blue);
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 16px 0;
-    }
-
-    .manual-tip strong {
-      color: var(--accent-blue);
-    }
-
-    .manual-warning {
-      background: rgba(234, 179, 8, 0.1);
-      border-left: 4px solid var(--accent-yellow);
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 16px 0;
-    }
-
-    .manual-warning strong {
-      color: var(--accent-yellow);
-    }
-
-    .step-number {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      background: var(--accent-blue);
-      color: white;
-      border-radius: 50%;
-      font-size: 12px;
-      font-weight: 600;
-      margin-right: 8px;
-    }
-
-    .tenant-selector {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .tenant-selector label {
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    .tenant-selector input {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      color: var(--text-primary);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      width: 320px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .grid-full {
-      grid-column: 1 / -1;
-    }
-
-    .card {
-      background: var(--bg-secondary);
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      overflow: hidden;
-    }
-
-    .card-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .card-header h2 {
-      font-size: 16px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-body {
-      padding: 20px;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
-    }
-
-    .form-group input,
-    .form-group select {
-      width: 100%;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border-color);
-      color: var(--text-primary);
-      padding: 10px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: var(--accent-blue);
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .btn {
-      padding: 10px 20px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: var(--accent-blue);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #2563eb;
-    }
-
-    .btn-success {
-      background: var(--accent-green);
-      color: white;
-    }
-
-    .btn-danger {
-      background: var(--accent-red);
-      color: white;
-    }
-
-    .btn-sm {
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-
-    .sessions-list {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .session-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .session-item:last-child {
-      border-bottom: none;
-    }
-
-    .session-info {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .session-status {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .session-status.running {
-      background: var(--accent-green);
-      box-shadow: 0 0 8px var(--accent-green);
-    }
-
-    .session-status.stopped {
-      background: var(--text-muted);
-    }
-
-    .session-status.expired {
-      background: var(--accent-yellow);
-    }
-
-    .session-status.error {
-      background: var(--accent-red);
-    }
-
-    .session-name {
-      font-weight: 500;
-    }
-
-    .session-meta {
-      font-size: 12px;
-      color: var(--text-secondary);
-    }
-
-    .session-stats {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    .stat-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    .monitor-log {
-      background: var(--bg-primary);
-      border-radius: 8px;
-      padding: 16px;
-      height: 350px;
-      overflow-y: auto;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 13px;
-    }
-
-    .log-entry {
-      padding: 4px 0;
-      display: flex;
-      gap: 12px;
-    }
-
-    .log-time {
-      color: var(--text-muted);
-      flex-shrink: 0;
-    }
-
-    .log-icon {
-      flex-shrink: 0;
-    }
-
-    .log-message {
-      color: var(--text-secondary);
-    }
-
-    .log-entry.alarm .log-message {
-      color: var(--accent-red);
-    }
-
-    .log-entry.bundle .log-message {
-      color: var(--accent-blue);
-    }
-
-    .log-entry.scan .log-message {
-      color: var(--accent-green);
-    }
-
-    .quotas-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-    }
-
-    .quota-item {
-      background: var(--bg-tertiary);
-      padding: 16px;
-      border-radius: 8px;
-      text-align: center;
-    }
-
-    .quota-value {
-      font-size: 24px;
-      font-weight: 700;
-    }
-
-    .quota-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .progress-bar {
-      height: 6px;
-      background: var(--bg-primary);
-      border-radius: 3px;
-      margin-top: 8px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: var(--accent-blue);
-      transition: width 0.3s;
-    }
-
-    .progress-fill.warning {
-      background: var(--accent-yellow);
-    }
-
-    .progress-fill.danger {
-      background: var(--accent-red);
-    }
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-    }
-
-    .metric-card {
-      background: var(--bg-tertiary);
-      padding: 16px;
-      border-radius: 8px;
-      text-align: center;
-    }
-
-    .metric-value {
-      font-size: 28px;
-      font-weight: 700;
-    }
-
-    .metric-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      margin-top: 4px;
-    }
-
-    .health-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .health-status.healthy {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--accent-green);
-    }
-
-    .health-status.degraded {
-      background: rgba(234, 179, 8, 0.2);
-      color: var(--accent-yellow);
-    }
-
-    .health-status.unhealthy {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--accent-red);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: var(--text-muted);
-    }
-
-    .empty-state .icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-
-    .device-list {
-      max-height: 150px;
-      overflow-y: auto;
-      background: var(--bg-primary);
-      border-radius: 6px;
-      padding: 8px;
-    }
-
-    .device-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--bg-tertiary);
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      margin: 2px;
-    }
-
-    .device-chip .remove {
-      cursor: pointer;
-      color: var(--text-muted);
-    }
-
-    .device-chip .remove:hover {
-      color: var(--accent-red);
-    }
-
-    .loading {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .pulsing {
-      animation: pulse 2s infinite;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
+
+    /* ===== HEADER ===== */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); height: 52px; }
+    .top-bar h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .top-bar .badge { font-size: 10px; padding: 3px 7px; border-radius: 4px; font-weight: 600; text-transform: uppercase; background: linear-gradient(135deg, #a855f7, #6366f1); color: white; }
+    .top-bar-actions { display: flex; align-items: center; gap: 10px; }
+    .top-bar-actions label { color: var(--text-secondary); font-size: 13px; }
+    .top-bar-actions input { background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 5px 10px; border-radius: 5px; font-size: 13px; width: 280px; }
+    .btn { padding: 6px 14px; border-radius: 5px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all .15s; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent-blue); color: white; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-success { background: var(--accent-green); color: white; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-danger { background: var(--accent-red); color: white; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+    .btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .btn-outline:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--text-primary); }
+    .btn-demo { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; font-weight: 600; box-shadow: 0 2px 8px rgba(34,197,94,.3); }
+    .btn-demo:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(34,197,94,.4); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-lg { padding: 10px 24px; font-size: 14px; font-weight: 600; }
+
+    /* ===== 2x3 GRID ===== */
+    .simulator-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; padding: 12px; height: calc(100vh - 52px); }
+
+    /* ===== BLOCK (card) ===== */
+    .block { background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    .block-header { padding: 10px 14px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .block-header h2 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); }
+    .block-body { padding: 12px 14px; overflow-y: auto; flex: 1; min-height: 0; }
+
+    /* ===== BLOCK 1: SCENARIO OVERVIEW ===== */
+    .scenario-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .summary-item { background: var(--bg-tertiary); padding: 8px 10px; border-radius: 6px; }
+    .summary-item .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .summary-item .value { font-size: 16px; font-weight: 700; margin-top: 2px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .status-badge.not-configured { background: rgba(100,116,139,.2); color: var(--text-muted); }
+    .status-badge.ready { background: rgba(59,130,246,.2); color: var(--accent-blue); }
+    .status-badge.running { background: rgba(34,197,94,.2); color: var(--accent-green); }
+    .status-badge.stopped { background: rgba(239,68,68,.2); color: var(--accent-red); }
+    .status-badge.error { background: rgba(239,68,68,.2); color: var(--accent-red); }
+    @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:.4} }
+    .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse-dot 1.5s infinite; }
+    .block-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 8px; }
+    .block-actions .btn { flex: 1; }
+
+    /* ===== BLOCK 2: BUNDLE & RULES ===== */
+    .bundle-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .bundle-field { background: var(--bg-tertiary); padding: 6px 8px; border-radius: 5px; }
+    .bundle-field .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    .bundle-field .value { font-size: 13px; font-weight: 500; }
+    .rules-list { max-height: 999px; }
+    .rule-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; border-radius: 4px; font-size: 12px; border-bottom: 1px solid rgba(71,85,105,.3); }
+    .rule-row:last-child { border-bottom: none; }
+    .rule-name { font-weight: 500; }
+    .rule-meta { color: var(--text-muted); font-size: 11px; }
+
+    /* ===== BLOCK 3: DEVICE SCANNER ===== */
+    .feed { font-family: 'Consolas','Monaco',monospace; font-size: 12px; }
+    .feed-entry { padding: 3px 0; display: flex; gap: 8px; border-bottom: 1px solid rgba(71,85,105,.15); }
+    .feed-entry:last-child { border-bottom: none; }
+    .feed-time { color: var(--text-muted); flex-shrink: 0; font-size: 11px; }
+    .feed-device { color: var(--accent-blue); font-weight: 500; min-width: 80px; flex-shrink: 0; }
+    .feed-values { color: var(--text-secondary); }
+    .feed-values .val-green { color: var(--accent-green); }
+    .feed-values .val-yellow { color: var(--accent-yellow); }
+    .feed-values .val-red { color: var(--accent-red); }
+
+    /* ===== BLOCK 4: RULE EVALUATOR ===== */
+    .eval-entry { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: 12px; border-bottom: 1px solid rgba(71,85,105,.15); }
+    .eval-entry:last-child { border-bottom: none; }
+    .eval-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .eval-badge.pass { background: rgba(34,197,94,.15); color: var(--accent-green); }
+    .eval-badge.fail { background: rgba(239,68,68,.15); color: var(--accent-red); }
+
+    /* ===== BLOCK 5: ALARM CANDIDATES ===== */
+    .alarm-entry { padding: 6px 8px; border-radius: 5px; margin-bottom: 4px; font-size: 12px; background: rgba(239,68,68,.08); border-left: 3px solid var(--accent-red); }
+    .alarm-entry .alarm-head { display: flex; justify-content: space-between; align-items: center; }
+    .alarm-entry .alarm-detail { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+    .severity-badge { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .severity-badge.WARNING { background: rgba(234,179,8,.2); color: var(--accent-yellow); }
+    .severity-badge.CRITICAL { background: rgba(239,68,68,.2); color: var(--accent-red); }
+    .severity-badge.INFO { background: rgba(59,130,246,.2); color: var(--accent-blue); }
+
+    /* ===== BLOCK 6: METRICS & QUOTAS ===== */
+    .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+    .metric-box { background: var(--bg-tertiary); padding: 8px; border-radius: 6px; text-align: center; }
+    .metric-box .val { font-size: 20px; font-weight: 700; }
+    .metric-box .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    .quota-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+    .quota-row .quota-label { min-width: 90px; color: var(--text-secondary); }
+    .quota-bar { flex: 1; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden; }
+    .quota-fill { height: 100%; background: var(--accent-blue); transition: width .3s; }
+    .quota-fill.warn { background: var(--accent-yellow); }
+    .quota-fill.crit { background: var(--accent-red); }
+    .quota-val { min-width: 50px; text-align: right; color: var(--text-muted); font-size: 11px; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty { text-align: center; padding: 24px 12px; color: var(--text-muted); }
+    .empty .icon { font-size: 32px; margin-bottom: 8px; }
+    .empty p { font-size: 13px; }
+    .empty small { font-size: 11px; }
+
+    /* ===== SESSIONS DROPDOWN ===== */
+    .sessions-dropdown { position: relative; }
+    .sessions-dropdown select { background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 12px; max-width: 160px; }
+
+    /* ===== WIZARD OVERLAY ===== */
+    .wizard-overlay { display: none; position: fixed; inset: 0; background: var(--bg-primary); z-index: 1000; flex-direction: column; }
+    .wizard-overlay.active { display: flex; }
+    .wizard-top { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
+    .wizard-top h2 { font-size: 18px; font-weight: 600; }
+    .wizard-steps { display: flex; gap: 4px; align-items: center; }
+    .wizard-step { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--text-muted); transition: all .2s; }
+    .wizard-step.active { background: var(--accent-blue); color: white; font-weight: 600; }
+    .wizard-step.completed { color: var(--accent-green); }
+    .wizard-step .step-num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--bg-tertiary); }
+    .wizard-step.active .step-num { background: rgba(255,255,255,.2); }
+    .wizard-step.completed .step-num { background: rgba(34,197,94,.2); }
+    .wizard-step-arrow { color: var(--text-muted); font-size: 11px; }
+    .wizard-body { flex: 1; overflow-y: auto; padding: 24px 32px; }
+    .wizard-footer { display: flex; justify-content: space-between; padding: 16px 24px; border-top: 1px solid var(--border-color); background: var(--bg-secondary); }
+
+    /* ===== WIZARD CONTENT ===== */
+    .wizard-section { display: none; }
+    .wizard-section.active { display: block; }
+    .wizard-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .wizard-section p.desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; }
+    .check-list { list-style: none; }
+    .check-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all .15s; }
+    .check-item:hover { border-color: var(--accent-blue); background: rgba(59,130,246,.05); }
+    .check-item.selected { border-color: var(--accent-blue); background: rgba(59,130,246,.1); }
+    .check-item input[type=checkbox] { accent-color: var(--accent-blue); width: 16px; height: 16px; }
+    .check-item .item-info { flex: 1; }
+    .check-item .item-name { font-weight: 500; font-size: 14px; }
+    .check-item .item-meta { font-size: 12px; color: var(--text-muted); }
+    .check-item .item-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+    .ch-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; background: rgba(168,85,247,.15); color: var(--accent-purple); }
+    .type-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; background: rgba(59,130,246,.15); color: var(--accent-blue); }
+    .conn-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .conn-badge.ONLINE { background: rgba(34,197,94,.15); color: var(--accent-green); }
+    .conn-badge.OFFLINE { background: rgba(239,68,68,.15); color: var(--accent-red); }
+
+    /* Wizard control form */
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .ctrl-field { margin-bottom: 0; }
+    .ctrl-field label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+    .ctrl-field input, .ctrl-field select { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 10px; border-radius: 5px; font-size: 14px; }
+    .ctrl-field input:focus, .ctrl-field select:focus { outline: none; border-color: var(--accent-blue); }
+
+    /* Wizard review */
+    .review-section { margin-bottom: 16px; }
+    .review-section h4 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .review-list { background: var(--bg-tertiary); border-radius: 6px; padding: 8px 12px; }
+    .review-list .review-item { padding: 3px 0; font-size: 13px; border-bottom: 1px solid rgba(71,85,105,.3); }
+    .review-list .review-item:last-child { border-bottom: none; }
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .review-stat { background: var(--bg-tertiary); padding: 10px; border-radius: 6px; text-align: center; }
+    .review-stat .rval { font-size: 20px; font-weight: 700; }
+    .review-stat .rlbl { font-size: 11px; color: var(--text-muted); }
+
+    /* Device group in wizard */
+    .device-group { margin-bottom: 16px; }
+    .device-group h4 { font-size: 13px; color: var(--accent-blue); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .select-all { font-size: 12px; color: var(--accent-blue); cursor: pointer; margin-left: auto; }
+    .select-all:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>
-        <span class="icon">🎮</span>
-        Simulator Cockpit
-        <span class="badge badge-premium">Premium</span>
-      </h1>
-      <div class="header-actions">
-        <button class="btn-help" onclick="openManual()">
-          📖 Manual
-        </button>
-        <button class="btn-demo" id="demoBtn" onclick="runDemo()">
-          🚀 DEMO
-        </button>
-        <div class="tenant-selector">
-          <label>Tenant ID:</label>
-          <input type="text" id="tenantId" placeholder="Enter tenant UUID..." />
-          <button class="btn btn-primary" onclick="loadData()">Load</button>
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <h1>Simulator Cockpit <span class="badge">Premium</span></h1>
+    <div class="top-bar-actions">
+      <button class="btn btn-demo btn-sm" id="demoBtn" onclick="runDemo()">DEMO</button>
+      <label>Tenant:</label>
+      <input type="text" id="tenantId" placeholder="Enter tenant UUID..." />
+      <label>Customer:</label>
+      <select id="customerId" style="background:var(--bg-primary);border:1px solid var(--border-color);color:var(--text-primary);padding:5px 10px;border-radius:5px;font-size:13px;min-width:160px;">
+        <option value="">Select...</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="loadData()">Load</button>
+    </div>
+  </div>
+
+  <!-- 2x3 GRID -->
+  <div class="simulator-grid">
+    <!-- BLOCK 1: Scenario Overview -->
+    <div class="block" id="block1">
+      <div class="block-header">
+        <h2>B1 Scenario Overview</h2>
+        <span class="status-badge not-configured" id="simStatusBadge">Not Configured</span>
+      </div>
+      <div class="block-body">
+        <div class="scenario-summary" id="scenarioSummary">
+          <div class="summary-item"><div class="label">Centrals</div><div class="value" id="sumCentrals">0</div></div>
+          <div class="summary-item"><div class="label">Devices</div><div class="value" id="sumDevices">0</div></div>
+          <div class="summary-item"><div class="label">Rules</div><div class="value" id="sumRules">0</div></div>
+          <div class="summary-item"><div class="label">Mode</div><div class="value" id="sumMode">-</div></div>
+        </div>
+        <div id="sessionInfo" style="display:none; margin-bottom:8px;">
+          <div style="font-size:12px;color:var(--text-secondary);">Session: <strong id="sessionNameDisplay"></strong></div>
+          <div style="font-size:11px;color:var(--text-muted);" id="sessionTimerDisplay"></div>
+        </div>
+        <div class="block-actions">
+          <button class="btn btn-primary" id="btnConfigure" onclick="openWizard()">Configure Simulator</button>
+          <button class="btn btn-success" id="btnStart" onclick="startSimulation()" disabled>Start Simulation</button>
+        </div>
+        <div class="block-actions" id="runningActions" style="display:none;">
+          <button class="btn btn-danger" id="btnStop" onclick="stopSimulation()">Stop Simulation</button>
+          <button class="btn btn-outline" id="btnReconfigure" onclick="openWizard()">Reconfigure</button>
         </div>
       </div>
-    </header>
+    </div>
 
-    <div class="grid">
-      <!-- New Session Card -->
-      <div class="card">
-        <div class="card-header">
-          <h2>➕ New Session</h2>
+    <!-- BLOCK 2: Bundle Status & Rules -->
+    <div class="block" id="block2">
+      <div class="block-header">
+        <h2>B2 Bundle & Rules</h2>
+        <span style="font-size:11px;color:var(--text-muted);" id="bundleStatus">-</span>
+      </div>
+      <div class="block-body">
+        <div class="bundle-info" id="bundleInfo">
+          <div class="bundle-field"><div class="label">Version</div><div class="value" id="bundleVersion">-</div></div>
+          <div class="bundle-field"><div class="label">Last Fetch</div><div class="value" id="bundleLastFetch">-</div></div>
+          <div class="bundle-field"><div class="label">Rules</div><div class="value" id="bundleRulesCount">-</div></div>
+          <div class="bundle-field"><div class="label">Devices</div><div class="value" id="bundleDevicesCount">-</div></div>
         </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>Session Name</label>
-            <input type="text" id="sessionName" placeholder="e.g., QA Test Session" />
-          </div>
-          <div class="form-group">
-            <label>Customer</label>
-            <select id="customerId">
-              <option value="">Select customer...</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Scan Interval (seconds)</label>
-              <input type="number" id="scanInterval" value="60" min="10" />
-            </div>
-            <div class="form-group">
-              <label>Bundle Refresh (seconds)</label>
-              <input type="number" id="bundleRefresh" value="300" min="30" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Devices</label>
-            <select id="deviceSelect" onchange="addDevice()">
-              <option value="">Add device...</option>
-            </select>
-            <div class="device-list" id="deviceList">
-              <div class="empty-state" style="padding: 20px;">
-                <small>No devices selected</small>
-              </div>
-            </div>
-          </div>
-          <button class="btn btn-success" onclick="startSession()" style="width: 100%;">
-            ▶ Start Session
-          </button>
+        <div class="rules-list" id="rulesListBlock">
+          <div class="empty"><p>Waiting for bundle...</p></div>
         </div>
       </div>
+    </div>
 
-      <!-- Active Sessions Card -->
-      <div class="card">
-        <div class="card-header">
-          <h2>📋 Sessions</h2>
-          <button class="btn btn-sm btn-primary" onclick="loadSessions()">Refresh</button>
-        </div>
-        <div class="card-body" style="padding: 0;">
-          <div class="sessions-list" id="sessionsList">
-            <div class="empty-state">
-              <div class="icon">📭</div>
-              <p>No sessions found</p>
-              <small>Enter tenant ID and click Load</small>
-            </div>
-          </div>
+    <!-- BLOCK 3: Device Scanner -->
+    <div class="block" id="block3">
+      <div class="block-header">
+        <h2>B3 Device Scanner</h2>
+        <span style="font-size:11px;color:var(--text-muted);" id="scanCounter">0 scans</span>
+      </div>
+      <div class="block-body">
+        <div class="feed" id="scanFeed">
+          <div class="empty"><div class="icon">&#128225;</div><p>Waiting for scans...</p></div>
         </div>
       </div>
+    </div>
 
-      <!-- Live Monitor Card -->
-      <div class="card grid-full">
-        <div class="card-header">
-          <h2>
-            <span id="monitorStatus">⚪</span>
-            Live Monitor
-            <span id="monitorSession" style="font-weight: normal; color: var(--text-secondary); font-size: 14px;"></span>
-          </h2>
-          <button class="btn btn-sm btn-danger" onclick="stopMonitor()" id="stopMonitorBtn" style="display: none;">
-            Stop Monitor
-          </button>
-        </div>
-        <div class="card-body">
-          <div class="monitor-log" id="monitorLog">
-            <div class="empty-state">
-              <div class="icon">📡</div>
-              <p>Select a session to monitor</p>
-              <small>Click "Monitor" on any running session</small>
-            </div>
-          </div>
+    <!-- BLOCK 4: Rule Evaluator -->
+    <div class="block" id="block4">
+      <div class="block-header">
+        <h2>B4 Rule Evaluator</h2>
+        <span style="font-size:11px;color:var(--text-muted);" id="evalCounter">0 evaluations</span>
+      </div>
+      <div class="block-body">
+        <div id="evalFeed">
+          <div class="empty"><p>Waiting for evaluations...</p></div>
         </div>
       </div>
+    </div>
 
-      <!-- Quotas Card -->
-      <div class="card">
-        <div class="card-header">
-          <h2>📊 Quotas</h2>
-          <span class="health-status healthy" id="planBadge">Standard</span>
-        </div>
-        <div class="card-body">
-          <div class="quotas-grid" id="quotasGrid">
-            <div class="quota-item">
-              <div class="quota-value" id="quotaSessions">-/-</div>
-              <div class="quota-label">Sessions</div>
-              <div class="progress-bar">
-                <div class="progress-fill" id="quotaSessionsBar" style="width: 0%"></div>
-              </div>
-            </div>
-            <div class="quota-item">
-              <div class="quota-value" id="quotaDevices">-</div>
-              <div class="quota-label">Max Devices</div>
-            </div>
-            <div class="quota-item">
-              <div class="quota-value" id="quotaScans">-/hr</div>
-              <div class="quota-label">Scans Limit</div>
-            </div>
-          </div>
+    <!-- BLOCK 5: Alarm Candidates -->
+    <div class="block" id="block5">
+      <div class="block-header">
+        <h2>B5 Alarm Candidates</h2>
+        <span style="font-size:11px;color:var(--accent-red);font-weight:600;" id="alarmCounter">0</span>
+      </div>
+      <div class="block-body">
+        <div id="alarmFeed">
+          <div class="empty"><div class="icon">&#128276;</div><p>No alarms yet</p></div>
         </div>
       </div>
+    </div>
 
-      <!-- Metrics Card -->
-      <div class="card">
-        <div class="card-header">
-          <h2>📈 Metrics</h2>
-          <span class="health-status" id="healthStatus">Loading...</span>
+    <!-- BLOCK 6: Metrics & Quotas -->
+    <div class="block" id="block6">
+      <div class="block-header">
+        <h2>B6 Metrics & Quotas</h2>
+        <span class="status-badge ready" id="healthBadge" style="font-size:10px;">Healthy</span>
+      </div>
+      <div class="block-body">
+        <div class="metrics-row">
+          <div class="metric-box"><div class="val" id="m_active">0</div><div class="lbl">Active</div></div>
+          <div class="metric-box"><div class="val" id="m_scans">0</div><div class="lbl">Scans</div></div>
+          <div class="metric-box"><div class="val" id="m_alarms">0</div><div class="lbl">Alarms</div></div>
+          <div class="metric-box"><div class="val" id="m_monitors">0</div><div class="lbl">Monitors</div></div>
         </div>
-        <div class="card-body">
-          <div class="metrics-grid" id="metricsGrid">
-            <div class="metric-card">
-              <div class="metric-value" id="metricActive">0</div>
-              <div class="metric-label">Active</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-value" id="metricScans">0</div>
-              <div class="metric-label">Scans</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-value" id="metricAlarms">0</div>
-              <div class="metric-label">Alarms</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-value" id="metricClients">0</div>
-              <div class="metric-label">Monitors</div>
-            </div>
-          </div>
+        <div id="quotasArea">
+          <div class="quota-row"><span class="quota-label">Sessions</span><div class="quota-bar"><div class="quota-fill" id="qbar_sessions" style="width:0%"></div></div><span class="quota-val" id="qval_sessions">-/-</span></div>
+          <div class="quota-row"><span class="quota-label">Max Devices</span><div class="quota-bar"><div class="quota-fill" style="width:0%"></div></div><span class="quota-val" id="qval_devices">-</span></div>
+          <div class="quota-row"><span class="quota-label">Scans/hr</span><div class="quota-bar"><div class="quota-fill" style="width:0%"></div></div><span class="quota-val" id="qval_scans">-</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Manual Modal -->
-  <div class="modal-overlay" id="manualModal" onclick="closeManualOutside(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h2>📖 Simulator Manual</h2>
-        <button class="modal-close" onclick="closeManual()">×</button>
+  <!-- WIZARD OVERLAY -->
+  <div class="wizard-overlay" id="wizardOverlay">
+    <div class="wizard-top">
+      <h2>Scenario Builder</h2>
+      <div class="wizard-steps" id="wizardSteps">
+        <div class="wizard-step active" data-step="1"><span class="step-num">1</span> Centrals</div>
+        <span class="wizard-step-arrow">&#9654;</span>
+        <div class="wizard-step" data-step="2"><span class="step-num">2</span> Devices</div>
+        <span class="wizard-step-arrow">&#9654;</span>
+        <div class="wizard-step" data-step="3"><span class="step-num">3</span> Rules</div>
+        <span class="wizard-step-arrow">&#9654;</span>
+        <div class="wizard-step" data-step="4"><span class="step-num">4</span> Control</div>
+        <span class="wizard-step-arrow">&#9654;</span>
+        <div class="wizard-step" data-step="5"><span class="step-num">5</span> Review</div>
       </div>
-      <div class="modal-body">
-        <div class="manual-section">
-          <h3>🎯 Overview</h3>
-          <p>
-            The <strong>GCDR Simulator Cockpit</strong> is a premium tool for testing alarm rules
-            without affecting production systems. It simulates IoT devices generating telemetry data,
-            evaluates alarm rules, and routes triggered alarms to an <strong>isolated queue</strong>.
-          </p>
-          <div class="manual-tip">
-            <strong>💡 Tip:</strong> All simulated alarms are tagged with <code>source.type: 'SIMULATOR'</code>
-            and sent to a separate queue, ensuring complete isolation from production.
-          </div>
+      <button class="btn btn-outline" onclick="closeWizard()">Close</button>
+    </div>
+    <div class="wizard-body" id="wizardBody">
+      <!-- Step 1: Centrals -->
+      <div class="wizard-section active" id="wiz_step1">
+        <h3>Step 1: Select Centrals</h3>
+        <p class="desc">Choose which centrals to include in this simulation scenario. Devices will be loaded from selected centrals.</p>
+        <div id="centralsList"><div class="empty"><p>Select a customer first</p></div></div>
+      </div>
+      <!-- Step 2: Devices -->
+      <div class="wizard-section" id="wiz_step2">
+        <h3>Step 2: Select Devices</h3>
+        <p class="desc">Pick devices from your selected centrals. OUTLET devices show their channel configuration.</p>
+        <div id="devicesListWiz"><div class="empty"><p>Select centrals first</p></div></div>
+      </div>
+      <!-- Step 3: Rules -->
+      <div class="wizard-section" id="wiz_step3">
+        <h3>Step 3: Select Alarm Rules</h3>
+        <p class="desc">Choose which alarm rules should be evaluated during simulation. Only active rules are shown.</p>
+        <div id="rulesListWiz"><div class="empty"><p>Loading rules...</p></div></div>
+      </div>
+      <!-- Step 4: Control -->
+      <div class="wizard-section" id="wiz_step4">
+        <h3>Step 4: Simulation Control</h3>
+        <p class="desc">Configure timing and session parameters.</p>
+        <div class="control-grid">
+          <div class="ctrl-field"><label>Session Name *</label><input type="text" id="wizName" placeholder="e.g., QA Test Session" /></div>
+          <div class="ctrl-field"><label>Description</label><input type="text" id="wizDesc" placeholder="Optional description..." /></div>
+          <div class="ctrl-field"><label>Device Scan Interval</label><select id="wizScanInterval"><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60" selected>60 seconds</option><option value="120">2 minutes</option></select></div>
+          <div class="ctrl-field"><label>Bundle Refresh Interval</label><select id="wizBundleInterval"><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="300" selected>5 minutes</option></select></div>
+          <div class="ctrl-field"><label>Session Duration</label><select id="wizDuration"><option value="1">1 hour</option><option value="4">4 hours</option><option value="12">12 hours</option><option value="24" selected>24 hours</option><option value="72">72 hours (Premium)</option></select></div>
         </div>
-
-        <div class="manual-section">
-          <h3>🚀 Quick Start with DEMO</h3>
-          <p>Click the <strong>🚀 DEMO</strong> button in the header to:</p>
-          <ul>
-            <li>Automatically create a demo tenant, customer, and devices</li>
-            <li>Set up sample alarm rules (temperature &gt; 28°C, humidity &gt; 70%)</li>
-            <li>Start a simulation session immediately</li>
-            <li>Begin monitoring in real-time</li>
-          </ul>
-          <div class="manual-warning">
-            <strong>⚠️ Note:</strong> Demo mode uses pre-configured UUIDs. Re-clicking DEMO will reuse existing data.
-          </div>
+      </div>
+      <!-- Step 5: Review -->
+      <div class="wizard-section" id="wiz_step5">
+        <h3>Step 5: Review & Create</h3>
+        <p class="desc">Verify your scenario configuration before creating.</p>
+        <div class="review-grid" id="reviewGrid">
+          <div class="review-stat"><div class="rval" id="revCentrals">0</div><div class="rlbl">Centrals</div></div>
+          <div class="review-stat"><div class="rval" id="revDevices">0</div><div class="rlbl">Devices</div></div>
+          <div class="review-stat"><div class="rval" id="revRules">0</div><div class="rlbl">Rules</div></div>
+          <div class="review-stat"><div class="rval" id="revDuration">24h</div><div class="rlbl">Duration</div></div>
         </div>
-
-        <div class="manual-section">
-          <h3>📋 Manual Setup (Step by Step)</h3>
-          <p>If you want to use your own data:</p>
-          <ul>
-            <li><span class="step-number">1</span> Enter your <strong>Tenant ID</strong> in the header and click <strong>Load</strong></li>
-            <li><span class="step-number">2</span> In "New Session", enter a <strong>Session Name</strong> (e.g., "QA Test")</li>
-            <li><span class="step-number">3</span> Select a <strong>Customer</strong> from the dropdown</li>
-            <li><span class="step-number">4</span> Add one or more <strong>Devices</strong> to simulate</li>
-            <li><span class="step-number">5</span> Adjust <strong>Scan Interval</strong> (how often devices are scanned)</li>
-            <li><span class="step-number">6</span> Adjust <strong>Bundle Refresh</strong> (how often rules are fetched)</li>
-            <li><span class="step-number">7</span> Click <strong>▶ Start Session</strong></li>
-          </ul>
-        </div>
-
-        <div class="manual-section">
-          <h3>📡 Live Monitor</h3>
-          <p>The Live Monitor shows real-time events from your simulation:</p>
-          <ul>
-            <li><strong>📦 Bundle events</strong> - When alarm rules are fetched/updated</li>
-            <li><strong>📡 Scan events</strong> - Device telemetry readings (temp, humidity, etc.)</li>
-            <li><strong>🔔 Alarm events</strong> - When a rule threshold is exceeded</li>
-            <li><strong>ℹ️ Info events</strong> - Session lifecycle (start, stop, expire)</li>
-          </ul>
-          <p>Click <strong>Monitor</strong> on any running session to connect.</p>
-        </div>
-
-        <div class="manual-section">
-          <h3>📊 Understanding Quotas</h3>
-          <p>The Quotas panel shows your limits:</p>
-          <ul>
-            <li><strong>Sessions</strong> - How many concurrent simulations you can run</li>
-            <li><strong>Max Devices</strong> - Devices per session (50 standard, 200 premium)</li>
-            <li><strong>Scans/hr</strong> - Maximum device scans per hour</li>
-          </ul>
-          <div class="manual-code">Standard: 3 sessions, 50 devices, 1000 scans/hr
-Premium: 10 sessions, 200 devices, 10000 scans/hr</div>
-        </div>
-
-        <div class="manual-section">
-          <h3>📈 Metrics Explained</h3>
-          <ul>
-            <li><strong>Active</strong> - Currently running sessions (across all tenants)</li>
-            <li><strong>Scans</strong> - Total device scans performed</li>
-            <li><strong>Alarms</strong> - Total alarm candidates raised</li>
-            <li><strong>Monitors</strong> - Connected SSE monitor clients</li>
-          </ul>
-        </div>
-
-        <div class="manual-section">
-          <h3>🔧 Telemetry Profiles</h3>
-          <p>Each device generates random values within configured ranges:</p>
-          <div class="manual-code">Temperature: { min: 22, max: 32, unit: '°C' }
-Humidity:    { min: 50, max: 80, unit: '%' }
-Power:       { min: 100, max: 500, unit: 'W' }</div>
-          <p>Rules are evaluated against these values. If a value exceeds the rule threshold, an alarm is raised.</p>
-        </div>
-
-        <div class="manual-section">
-          <h3>🛡️ Isolation & Safety</h3>
-          <p>The simulator is designed with safety in mind:</p>
-          <ul>
-            <li>All alarms go to <code>alarm-candidates:simulated</code> queue (not production)</li>
-            <li>Events are tagged with <code>metadata.simulated: true</code></li>
-            <li>Sessions auto-expire after 24 hours (72h for premium)</li>
-            <li>Rate limiting prevents resource exhaustion</li>
-          </ul>
-        </div>
-
-        <div class="manual-section">
-          <h3>❓ Troubleshooting</h3>
-          <ul>
-            <li><strong>"No customers found"</strong> - Check if your Tenant ID is correct and has customers</li>
-            <li><strong>"No devices"</strong> - The selected customer needs devices assigned to it</li>
-            <li><strong>"Quota exceeded"</strong> - Stop existing sessions or wait for expiration</li>
-            <li><strong>"Connection lost"</strong> - SSE reconnects automatically, or refresh the page</li>
-            <li><strong>"No alarms triggering"</strong> - Check that rules exist for the customer and telemetry ranges can exceed thresholds</li>
-          </ul>
-        </div>
+        <div id="reviewDetails" style="margin-top:12px;"></div>
+      </div>
+    </div>
+    <div class="wizard-footer">
+      <button class="btn btn-outline" id="wizBtnBack" onclick="wizardBack()" style="display:none;">Back</button>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <button class="btn btn-primary btn-lg" id="wizBtnNext" onclick="wizardNext()">Next</button>
+        <button class="btn btn-success btn-lg" id="wizBtnCreate" onclick="wizardCreate()" style="display:none;">Create Scenario</button>
       </div>
     </div>
   </div>
 
   <script>
-    // State
-    let selectedDevices = [];
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let scenario = null;     // completed scenario config (null = not configured)
+    let runningSessionId = null;
     let eventSource = null;
-    let currentMonitorSession = null;
     let demoRunning = false;
+    let wizardStep = 1;
 
-    // Initialize
+    // Wizard transient state
+    let wiz = { centralIds: [], centralsData: [], devices: [], devicesData: {}, ruleIds: [], rulesData: [] };
+
+    // Counters for blocks
+    let scanCount = 0, evalCount = 0, alarmCount = 0;
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
     document.addEventListener('DOMContentLoaded', () => {
-      // Try to get tenant ID from localStorage
-      const savedTenantId = localStorage.getItem('simulatorTenantId');
-      if (savedTenantId) {
-        document.getElementById('tenantId').value = savedTenantId;
-        loadData();
-      }
-
-      // Load metrics periodically
+      const saved = localStorage.getItem('simulatorTenantId');
+      if (saved) { document.getElementById('tenantId').value = saved; loadData(); }
       loadMetrics();
       setInterval(loadMetrics, 10000);
-
-      // Close modal on Escape key
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeManual();
-      });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWizard(); });
     });
 
     // =========================================================================
-    // DEMO Functions
+    // TOP BAR: LOAD DATA
     // =========================================================================
-
-    async function runDemo() {
-      if (demoRunning) return;
-      demoRunning = true;
-
-      const demoBtn = document.getElementById('demoBtn');
-      demoBtn.disabled = true;
-      demoBtn.innerHTML = '⏳ Setting up...';
-
-      // Clear monitor log first
-      document.getElementById('monitorLog').innerHTML = '';
-
-      try {
-        // Step 1: Setup demo environment
-        addLogEntry('info', '🚀 Starting DEMO setup...');
-        const setupRes = await fetch('/admin/simulator/api/demo/setup', { method: 'POST' });
-        const setupData = await setupRes.json();
-
-        if (!setupData.success) {
-          throw new Error(setupData.error || 'Setup failed');
-        }
-
-        addLogEntry('info', '✅ Demo environment ready: ' + setupData.message);
-
-        // Step 2: Set tenant ID and load data
-        document.getElementById('tenantId').value = setupData.demo.tenantId;
-        localStorage.setItem('simulatorTenantId', setupData.demo.tenantId);
-
-        // Load data and wait a bit for DB to be ready
-        await loadData();
-
-        // Step 3: Auto-select the demo customer
-        const customerSelect = document.getElementById('customerId');
-        customerSelect.value = setupData.demo.customerId;
-
-        // Verify customer was selected
-        if (!customerSelect.value) {
-          addLogEntry('info', '⚠️ Customer not found in dropdown, retrying...');
-          await new Promise(r => setTimeout(r, 500));
-          await loadCustomers();
-          customerSelect.value = setupData.demo.customerId;
-        }
-
-        // Trigger device loading for demo customer
-        if (customerSelect.value) {
-          addLogEntry('info', '📦 Loading demo devices...');
-          customerSelect.dispatchEvent(new Event('change'));
-          await new Promise(r => setTimeout(r, 300)); // Wait for devices to load
-        }
-
-        demoBtn.innerHTML = '⏳ Starting session...';
-
-        // Step 4: Start demo session
-        const sessionRes = await fetch('/admin/simulator/api/demo/start-session', { method: 'POST' });
-        const sessionData = await sessionRes.json();
-
-        if (!sessionData.success) {
-          throw new Error(sessionData.error || 'Failed to start session');
-        }
-
-        addLogEntry('info', '✅ Demo session started: ' + sessionData.session.name);
-
-        // Step 5: Reload sessions and start monitoring
-        await loadSessions();
-        startMonitor(sessionData.session.id, sessionData.session.name);
-
-        demoBtn.innerHTML = '✅ DEMO Running';
-        setTimeout(() => {
-          demoBtn.innerHTML = '🚀 DEMO';
-          demoBtn.disabled = false;
-          demoRunning = false;
-        }, 3000);
-
-      } catch (error) {
-        console.error('Demo error:', error);
-        addLogEntry('info', '❌ Demo failed: ' + error.message);
-        alert('Demo setup failed: ' + error.message);
-        demoBtn.innerHTML = '🚀 DEMO';
-        demoBtn.disabled = false;
-        demoRunning = false;
-      }
-    }
-
-    // =========================================================================
-    // Manual Modal Functions
-    // =========================================================================
-
-    function openManual() {
-      document.getElementById('manualModal').classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeManual() {
-      document.getElementById('manualModal').classList.remove('active');
-      document.body.style.overflow = '';
-    }
-
-    function closeManualOutside(event) {
-      if (event.target === document.getElementById('manualModal')) {
-        closeManual();
-      }
-    }
-
-    // Load all data
     async function loadData() {
-      const tenantId = document.getElementById('tenantId').value.trim();
-      if (!tenantId) {
-        alert('Please enter a Tenant ID');
-        return;
-      }
-
-      localStorage.setItem('simulatorTenantId', tenantId);
-
-      await Promise.all([
-        loadSessions(),
-        loadQuotas(),
-        loadCustomers(),
-      ]);
+      const tid = document.getElementById('tenantId').value.trim();
+      if (!tid) return alert('Enter a Tenant ID');
+      localStorage.setItem('simulatorTenantId', tid);
+      await Promise.all([loadCustomers(), loadQuotas(), loadSessions()]);
     }
 
-    // Load sessions
+    async function loadCustomers() {
+      const tid = document.getElementById('tenantId').value.trim(); if (!tid) return;
+      try {
+        const r = await fetch(\`/admin/simulator/api/customers?tenantId=\${tid}\`);
+        const d = await r.json();
+        const sel = document.getElementById('customerId');
+        if (!d.customers || !d.customers.length) { sel.innerHTML = '<option value="">No customers</option>'; return; }
+        sel.innerHTML = '<option value="">Select...</option>' + d.customers.map(c => \`<option value="\${c.id}">\${c.name}</option>\`).join('');
+      } catch(e) { console.error(e); }
+    }
+
     async function loadSessions() {
-      const tenantId = document.getElementById('tenantId').value.trim();
-      if (!tenantId) return;
-
+      const tid = document.getElementById('tenantId').value.trim(); if (!tid) return;
       try {
-        const res = await fetch(\`/admin/simulator/api/sessions?tenantId=\${tenantId}\`);
-        const data = await res.json();
-
-        const container = document.getElementById('sessionsList');
-        if (!data.sessions || data.sessions.length === 0) {
-          container.innerHTML = \`
-            <div class="empty-state">
-              <div class="icon">📭</div>
-              <p>No sessions found</p>
-              <small>Create a new session to get started</small>
-            </div>
-          \`;
-          return;
+        const r = await fetch(\`/admin/simulator/api/sessions?tenantId=\${tid}\`);
+        const d = await r.json();
+        // If there's a running session, track it
+        if (d.sessions) {
+          const running = d.sessions.find(s => s.status === 'RUNNING' && s.isActive);
+          if (running && !runningSessionId) {
+            runningSessionId = running.id;
+            showRunningState(running.name);
+            startMonitor(running.id);
+          }
         }
-
-        container.innerHTML = data.sessions.map(s => \`
-          <div class="session-item">
-            <div class="session-info">
-              <div class="session-status \${s.status.toLowerCase()}"></div>
-              <div>
-                <div class="session-name">\${s.name}</div>
-                <div class="session-meta">\${s.status} • \${formatDuration(s.sessionExpiresIn)}</div>
-              </div>
-            </div>
-            <div class="session-stats">
-              <div class="stat">
-                <div class="stat-value">\${s.scansCount}</div>
-                <div class="stat-label">Scans</div>
-              </div>
-              <div class="stat">
-                <div class="stat-value">\${s.alarmsTriggeredCount}</div>
-                <div class="stat-label">Alarms</div>
-              </div>
-              \${s.status === 'RUNNING' ? \`
-                <button class="btn btn-sm btn-primary" onclick="startMonitor('\${s.id}', '\${s.name}')">Monitor</button>
-                <button class="btn btn-sm btn-danger" onclick="stopSession('\${s.id}')">Stop</button>
-              \` : ''}
-            </div>
-          </div>
-        \`).join('');
-      } catch (error) {
-        console.error('Failed to load sessions:', error);
-      }
+      } catch(e) { console.error(e); }
     }
 
-    // Load quotas
     async function loadQuotas() {
-      const tenantId = document.getElementById('tenantId').value.trim();
-      if (!tenantId) return;
-
+      const tid = document.getElementById('tenantId').value.trim(); if (!tid) return;
       try {
-        const res = await fetch(\`/admin/simulator/api/quotas?tenantId=\${tenantId}\`);
-        const data = await res.json();
-
-        document.getElementById('quotaSessions').textContent =
-          \`\${data.activeSessions}/\${data.quotas.maxConcurrentSessions}\`;
-        document.getElementById('quotaDevices').textContent = data.quotas.maxDevicesPerSession;
-        document.getElementById('quotaScans').textContent = \`\${data.quotas.maxScansPerHour}/hr\`;
-
-        const sessionPct = (data.activeSessions / data.quotas.maxConcurrentSessions) * 100;
-        const bar = document.getElementById('quotaSessionsBar');
-        bar.style.width = sessionPct + '%';
-        bar.className = 'progress-fill' + (sessionPct > 80 ? ' danger' : sessionPct > 50 ? ' warning' : '');
-
-        document.getElementById('planBadge').textContent = data.isPremium ? 'Premium' : 'Standard';
-        document.getElementById('planBadge').className = 'health-status ' + (data.isPremium ? 'healthy' : 'degraded');
-      } catch (error) {
-        console.error('Failed to load quotas:', error);
-      }
+        const r = await fetch(\`/admin/simulator/api/quotas?tenantId=\${tid}\`);
+        const d = await r.json();
+        const pct = (d.activeSessions / d.quotas.maxConcurrentSessions) * 100;
+        document.getElementById('qval_sessions').textContent = d.activeSessions+'/'+d.quotas.maxConcurrentSessions;
+        const bar = document.getElementById('qbar_sessions');
+        bar.style.width = pct+'%';
+        bar.className = 'quota-fill' + (pct > 80 ? ' crit' : pct > 50 ? ' warn' : '');
+        document.getElementById('qval_devices').textContent = d.quotas.maxDevicesPerSession;
+        document.getElementById('qval_scans').textContent = d.quotas.maxScansPerHour+'/hr';
+      } catch(e) { console.error(e); }
     }
 
-    // Load metrics
     async function loadMetrics() {
       try {
-        const res = await fetch('/admin/simulator/api/metrics');
-        const data = await res.json();
+        const r = await fetch('/admin/simulator/api/metrics');
+        const d = await r.json();
+        document.getElementById('m_active').textContent = d.sessions.active;
+        document.getElementById('m_scans').textContent = d.processing.scansPerformed;
+        document.getElementById('m_alarms').textContent = d.processing.alarmsTriggered;
+        document.getElementById('m_monitors').textContent = d.monitor.connectedClients;
+        const h = document.getElementById('healthBadge');
+        h.textContent = d.health.status.charAt(0).toUpperCase() + d.health.status.slice(1);
+        h.className = 'status-badge ' + (d.health.status === 'healthy' ? 'ready' : d.health.status === 'degraded' ? 'stopped' : 'error');
+      } catch(e) {}
+    }
 
-        document.getElementById('metricActive').textContent = data.sessions.active;
-        document.getElementById('metricScans').textContent = data.processing.scansPerformed;
-        document.getElementById('metricAlarms').textContent = data.processing.alarmsTriggered;
-        document.getElementById('metricClients').textContent = data.monitor.connectedClients;
-
-        const healthEl = document.getElementById('healthStatus');
-        healthEl.textContent = data.health.status.charAt(0).toUpperCase() + data.health.status.slice(1);
-        healthEl.className = 'health-status ' + data.health.status;
-      } catch (error) {
-        console.error('Failed to load metrics:', error);
+    // =========================================================================
+    // BLOCK 1: SCENARIO CONTROL
+    // =========================================================================
+    function updateBlock1() {
+      if (runningSessionId) return; // handled by showRunningState
+      if (!scenario) {
+        document.getElementById('simStatusBadge').className = 'status-badge not-configured';
+        document.getElementById('simStatusBadge').textContent = 'Not Configured';
+        document.getElementById('sumCentrals').textContent = '0';
+        document.getElementById('sumDevices').textContent = '0';
+        document.getElementById('sumRules').textContent = '0';
+        document.getElementById('sumMode').textContent = '-';
+        document.getElementById('btnStart').disabled = true;
+        document.getElementById('btnConfigure').textContent = 'Configure Simulator';
+        document.getElementById('btnConfigure').style.display = '';
+        document.getElementById('btnStart').style.display = '';
+        document.getElementById('runningActions').style.display = 'none';
+        document.getElementById('sessionInfo').style.display = 'none';
+      } else {
+        document.getElementById('simStatusBadge').className = 'status-badge ready';
+        document.getElementById('simStatusBadge').textContent = 'Ready';
+        document.getElementById('sumCentrals').textContent = scenario.centralIds.length;
+        document.getElementById('sumDevices').textContent = scenario.devices.length;
+        document.getElementById('sumRules').textContent = scenario.ruleIds.length;
+        document.getElementById('sumMode').textContent = scenario.scanInterval + 's scan';
+        document.getElementById('btnStart').disabled = false;
+        document.getElementById('btnConfigure').textContent = 'Reconfigure';
+        document.getElementById('btnConfigure').style.display = '';
+        document.getElementById('btnStart').style.display = '';
+        document.getElementById('runningActions').style.display = 'none';
+        document.getElementById('sessionInfo').style.display = 'none';
       }
     }
 
-    // Load customers
-    async function loadCustomers() {
-      const tenantId = document.getElementById('tenantId').value.trim();
-      if (!tenantId) return;
+    function showRunningState(sessionName) {
+      document.getElementById('simStatusBadge').className = 'status-badge running';
+      document.getElementById('simStatusBadge').innerHTML = '<span class="pulse-dot"></span> Running';
+      document.getElementById('btnConfigure').style.display = 'none';
+      document.getElementById('btnStart').style.display = 'none';
+      document.getElementById('runningActions').style.display = 'flex';
+      document.getElementById('sessionInfo').style.display = 'block';
+      document.getElementById('sessionNameDisplay').textContent = sessionName;
+    }
+
+    function showStoppedState() {
+      runningSessionId = null;
+      document.getElementById('simStatusBadge').className = 'status-badge stopped';
+      document.getElementById('simStatusBadge').textContent = 'Stopped';
+      document.getElementById('runningActions').style.display = 'none';
+      document.getElementById('sessionInfo').style.display = 'none';
+      document.getElementById('btnConfigure').style.display = '';
+      document.getElementById('btnStart').style.display = '';
+      document.getElementById('btnStart').disabled = !!scenario;
+      document.getElementById('btnConfigure').textContent = scenario ? 'Reconfigure' : 'Configure Simulator';
+    }
+
+    // =========================================================================
+    // START / STOP SIMULATION
+    // =========================================================================
+    async function startSimulation() {
+      if (!scenario) return;
+      const tid = document.getElementById('tenantId').value.trim();
+      const cid = document.getElementById('customerId').value;
+      if (!tid || !cid) return alert('Set Tenant and Customer first');
+
+      const config = {
+        customerId: cid,
+        deviceScanIntervalMs: scenario.scanInterval * 1000,
+        bundleRefreshIntervalMs: scenario.bundleInterval * 1000,
+        devices: scenario.devices,
+        centralIds: scenario.centralIds,
+        ruleIds: scenario.ruleIds,
+        sessionDurationHours: scenario.duration,
+        description: scenario.description,
+      };
 
       try {
-        const res = await fetch(\`/admin/simulator/api/customers?tenantId=\${tenantId}\`);
-        const data = await res.json();
-
-        if (data.error) {
-          console.error('API error loading customers:', data.error);
-          return;
-        }
-
-        const select = document.getElementById('customerId');
-        if (!data.customers || data.customers.length === 0) {
-          select.innerHTML = '<option value="">No customers found</option>';
-          console.warn('No customers found for tenant:', tenantId);
-          return;
-        }
-
-        select.innerHTML = '<option value="">Select customer...</option>' +
-          data.customers.map(c => \`<option value="\${c.id}">\${c.name}</option>\`).join('');
-
-        console.log('Loaded', data.customers.length, 'customers');
-      } catch (error) {
-        console.error('Failed to load customers:', error);
-      }
-    }
-
-    // Load devices for selected customer
-    document.getElementById('customerId').addEventListener('change', async (e) => {
-      const customerId = e.target.value;
-      if (!customerId) return;
-
-      try {
-        const res = await fetch(\`/admin/simulator/api/devices?customerId=\${customerId}\`);
-        const data = await res.json();
-
-        const select = document.getElementById('deviceSelect');
-        select.innerHTML = '<option value="">Add device...</option>' +
-          data.devices.map(d => \`<option value="\${d.id}" data-name="\${d.name}" data-type="\${d.type}">\${d.name} (\${d.type})</option>\`).join('');
-      } catch (error) {
-        console.error('Failed to load devices:', error);
-      }
-    });
-
-    // Add device to list
-    function addDevice() {
-      const select = document.getElementById('deviceSelect');
-      const option = select.options[select.selectedIndex];
-      if (!option.value) return;
-
-      const deviceId = option.value;
-      const deviceName = option.dataset.name;
-      const deviceType = option.dataset.type;
-
-      if (selectedDevices.find(d => d.deviceId === deviceId)) {
-        select.value = '';
-        return;
-      }
-
-      selectedDevices.push({
-        deviceId,
-        name: deviceName,
-        type: deviceType,
-        telemetryProfile: {
-          temperature: { min: 20, max: 30, unit: '°C' },
-          humidity: { min: 40, max: 70, unit: '%' },
-        }
-      });
-
-      renderDevices();
-      select.value = '';
-    }
-
-    // Remove device
-    function removeDevice(deviceId) {
-      selectedDevices = selectedDevices.filter(d => d.deviceId !== deviceId);
-      renderDevices();
-    }
-
-    // Render device chips
-    function renderDevices() {
-      const container = document.getElementById('deviceList');
-      if (selectedDevices.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="padding: 20px;"><small>No devices selected</small></div>';
-        return;
-      }
-
-      container.innerHTML = selectedDevices.map(d => \`
-        <span class="device-chip">
-          📟 \${d.name}
-          <span class="remove" onclick="removeDevice('\${d.deviceId}')">✕</span>
-        </span>
-      \`).join('');
-    }
-
-    // Start session
-    async function startSession() {
-      const tenantId = document.getElementById('tenantId').value.trim();
-      const customerId = document.getElementById('customerId').value;
-      const name = document.getElementById('sessionName').value.trim();
-      const scanInterval = parseInt(document.getElementById('scanInterval').value) || 60;
-      const bundleRefresh = parseInt(document.getElementById('bundleRefresh').value) || 300;
-
-      if (!tenantId || !customerId || !name) {
-        alert('Please fill in all required fields');
-        return;
-      }
-
-      if (selectedDevices.length === 0) {
-        alert('Please add at least one device');
-        return;
-      }
-
-      try {
-        const res = await fetch('/admin/simulator/api/sessions/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenantId,
-            customerId,
-            name,
-            config: {
-              customerId,
-              deviceScanIntervalMs: scanInterval * 1000,
-              bundleRefreshIntervalMs: bundleRefresh * 1000,
-              devices: selectedDevices,
-            }
-          })
+        const r = await fetch('/admin/simulator/api/sessions/start', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ tenantId: tid, customerId: cid, name: scenario.name, config })
         });
-
-        const data = await res.json();
-        if (data.success) {
-          // Clear form
-          document.getElementById('sessionName').value = '';
-          selectedDevices = [];
-          renderDevices();
-
-          // Reload data
-          await loadData();
-
-          // Start monitoring
-          startMonitor(data.session.id, data.session.name);
-        } else {
-          alert('Error: ' + data.error);
-        }
-      } catch (error) {
-        alert('Failed to start session: ' + error.message);
-      }
+        const d = await r.json();
+        if (!d.success) return alert('Error: ' + d.error);
+        runningSessionId = d.session.id;
+        showRunningState(scenario.name);
+        startMonitor(d.session.id);
+        loadQuotas();
+      } catch(e) { alert('Failed: ' + e.message); }
     }
 
-    // Stop session
-    async function stopSession(sessionId) {
-      if (!confirm('Stop this simulation session?')) return;
-
+    async function stopSimulation() {
+      if (!runningSessionId) return;
       try {
-        await fetch(\`/admin/simulator/api/sessions/\${sessionId}/stop\`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'USER_REQUESTED' })
+        await fetch(\`/admin/simulator/api/sessions/\${runningSessionId}/stop\`, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({reason:'USER_REQUESTED'})
         });
-
-        await loadData();
-
-        if (currentMonitorSession === sessionId) {
-          stopMonitor();
-        }
-      } catch (error) {
-        alert('Failed to stop session: ' + error.message);
-      }
+        stopMonitor();
+        showStoppedState();
+        loadQuotas();
+      } catch(e) { alert('Failed: ' + e.message); }
     }
 
-    // Start monitoring
-    function startMonitor(sessionId, sessionName) {
+    // =========================================================================
+    // SSE MONITOR — routes events to blocks
+    // =========================================================================
+    function startMonitor(sessionId) {
       stopMonitor();
-
-      currentMonitorSession = sessionId;
-      document.getElementById('monitorSession').textContent = '- ' + sessionName;
-      document.getElementById('monitorStatus').textContent = '🟢';
-      document.getElementById('stopMonitorBtn').style.display = 'inline-block';
-
-      const logContainer = document.getElementById('monitorLog');
-      logContainer.innerHTML = '';
-      addLogEntry('info', 'Connected to session monitor');
-
+      scanCount = 0; evalCount = 0; alarmCount = 0;
+      clearBlocks();
       eventSource = new EventSource(\`/admin/simulator/api/sessions/\${sessionId}/monitor\`);
 
-      eventSource.addEventListener('connected', (e) => {
-        addLogEntry('info', 'Monitor connected');
-      });
-
       eventSource.addEventListener('bundle:fetched', (e) => {
-        const data = JSON.parse(e.data);
-        addLogEntry('bundle', \`Bundle \${data.data.isUpdated ? 'updated' : 'unchanged'} - v\${data.data.version}\`);
+        const ev = JSON.parse(e.data);
+        const bd = ev.data;
+        document.getElementById('bundleVersion').textContent = bd.version || '-';
+        document.getElementById('bundleLastFetch').textContent = new Date().toLocaleTimeString();
+        document.getElementById('bundleRulesCount').textContent = bd.rulesCount ?? '-';
+        document.getElementById('bundleDevicesCount').textContent = bd.devicesCount ?? '-';
+        document.getElementById('bundleStatus').textContent = bd.isUpdated ? 'Updated' : 'Unchanged';
       });
 
       eventSource.addEventListener('device:scanned', (e) => {
-        const data = JSON.parse(e.data);
-        const telemetry = Object.entries(data.data.telemetry)
-          .map(([k, v]) => \`\${k}=\${v}\`).join(', ');
-        addLogEntry('scan', \`Device scan: \${data.data.deviceId.substring(0, 8)}... (\${telemetry})\`);
+        const ev = JSON.parse(e.data);
+        scanCount++;
+        document.getElementById('scanCounter').textContent = scanCount + ' scans';
+        const feed = document.getElementById('scanFeed');
+        if (scanCount === 1) feed.innerHTML = '';
+        const telParts = Object.entries(ev.data.telemetry).map(([k,v]) => {
+          return \`<span>\${k}=\${Number(v).toFixed(1)}</span>\`;
+        }).join(' ');
+        const row = document.createElement('div');
+        row.className = 'feed-entry';
+        row.innerHTML = \`<span class="feed-time">\${new Date().toLocaleTimeString()}</span><span class="feed-device">\${(ev.data.deviceId||'').substring(0,8)}...</span><span class="feed-values">\${telParts}</span>\`;
+        feed.insertBefore(row, feed.firstChild);
+        while (feed.children.length > 60) feed.removeChild(feed.lastChild);
       });
 
       eventSource.addEventListener('alarm:candidate', (e) => {
-        const data = JSON.parse(e.data);
-        addLogEntry('alarm', \`🔔 ALARM: \${data.data.ruleName} - \${data.data.field}=\${data.data.value} (threshold: \${data.data.threshold})\`);
+        const ev = JSON.parse(e.data);
+        alarmCount++;
+        document.getElementById('alarmCounter').textContent = alarmCount;
+
+        // Block 4: eval result (fail)
+        evalCount++;
+        document.getElementById('evalCounter').textContent = evalCount + ' evaluations';
+        const evalFeed = document.getElementById('evalFeed');
+        if (evalCount === 1) evalFeed.innerHTML = '';
+        const evalRow = document.createElement('div');
+        evalRow.className = 'eval-entry';
+        evalRow.innerHTML = \`<span>\${ev.data.ruleName} on \${(ev.data.deviceId||'').substring(0,8)}</span><span>\${ev.data.field}=\${Number(ev.data.value).toFixed(1)} vs \${ev.data.threshold}</span><span class="eval-badge fail">FAIL</span>\`;
+        evalFeed.insertBefore(evalRow, evalFeed.firstChild);
+        while (evalFeed.children.length > 40) evalFeed.removeChild(evalFeed.lastChild);
+
+        // Block 5: alarm entry
+        const af = document.getElementById('alarmFeed');
+        if (alarmCount === 1) af.innerHTML = '';
+        const ae = document.createElement('div');
+        ae.className = 'alarm-entry';
+        ae.innerHTML = \`<div class="alarm-head"><strong>\${ev.data.ruleName}</strong><span class="severity-badge WARNING">WARNING</span></div><div class="alarm-detail">\${ev.data.field}=\${Number(ev.data.value).toFixed(1)} (threshold: \${ev.data.threshold}) | Device: \${(ev.data.deviceId||'').substring(0,8)}... | \${new Date().toLocaleTimeString()}</div>\`;
+        af.insertBefore(ae, af.firstChild);
+        while (af.children.length > 30) af.removeChild(af.lastChild);
       });
 
-      eventSource.addEventListener('session:stopped', (e) => {
-        addLogEntry('info', 'Session stopped');
-        stopMonitor();
-      });
-
-      eventSource.addEventListener('session:expired', (e) => {
-        addLogEntry('info', 'Session expired');
-        stopMonitor();
-      });
-
-      eventSource.addEventListener('heartbeat', (e) => {
-        // Keep alive
-      });
-
-      eventSource.onerror = () => {
-        addLogEntry('info', 'Connection lost, reconnecting...');
-      };
+      eventSource.addEventListener('session:stopped', () => { stopMonitor(); showStoppedState(); });
+      eventSource.addEventListener('session:expired', () => { stopMonitor(); showStoppedState(); });
+      eventSource.onerror = () => { console.log('SSE reconnecting...'); };
     }
 
-    // Stop monitoring
     function stopMonitor() {
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-      currentMonitorSession = null;
-      document.getElementById('monitorSession').textContent = '';
-      document.getElementById('monitorStatus').textContent = '⚪';
-      document.getElementById('stopMonitorBtn').style.display = 'none';
+      if (eventSource) { eventSource.close(); eventSource = null; }
     }
 
-    // Add log entry
-    function addLogEntry(type, message) {
-      const container = document.getElementById('monitorLog');
-      const time = new Date().toLocaleTimeString();
-      const icons = {
-        info: 'ℹ️',
-        bundle: '📦',
-        scan: '📡',
-        alarm: '🔔',
+    function clearBlocks() {
+      document.getElementById('scanFeed').innerHTML = '<div class="empty"><div class="icon">&#128225;</div><p>Waiting for scans...</p></div>';
+      document.getElementById('evalFeed').innerHTML = '<div class="empty"><p>Waiting for evaluations...</p></div>';
+      document.getElementById('alarmFeed').innerHTML = '<div class="empty"><div class="icon">&#128276;</div><p>No alarms yet</p></div>';
+      document.getElementById('scanCounter').textContent = '0 scans';
+      document.getElementById('evalCounter').textContent = '0 evaluations';
+      document.getElementById('alarmCounter').textContent = '0';
+    }
+
+    // =========================================================================
+    // WIZARD
+    // =========================================================================
+    function openWizard() {
+      const cid = document.getElementById('customerId').value;
+      if (!cid) return alert('Select a Customer first');
+      wizardStep = 1;
+      wiz = { centralIds:[], centralsData:[], devices:[], devicesData:{}, ruleIds:[], rulesData:[] };
+      showWizardStep(1);
+      document.getElementById('wizardOverlay').classList.add('active');
+      loadWizardCentrals();
+    }
+
+    function closeWizard() {
+      document.getElementById('wizardOverlay').classList.remove('active');
+    }
+
+    function showWizardStep(step) {
+      wizardStep = step;
+      for (let i = 1; i <= 5; i++) {
+        document.getElementById('wiz_step'+i).classList.toggle('active', i === step);
+      }
+      document.querySelectorAll('.wizard-step[data-step]').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        el.classList.toggle('active', s === step);
+        el.classList.toggle('completed', s < step);
+      });
+      document.getElementById('wizBtnBack').style.display = step > 1 ? '' : 'none';
+      document.getElementById('wizBtnNext').style.display = step < 5 ? '' : 'none';
+      document.getElementById('wizBtnCreate').style.display = step === 5 ? '' : 'none';
+    }
+
+    function wizardNext() {
+      if (wizardStep === 1) {
+        wiz.centralIds = getCheckedIds('centralsList');
+        if (!wiz.centralIds.length) return alert('Select at least one central');
+        loadWizardDevices();
+      } else if (wizardStep === 2) {
+        wiz.devices = getCheckedDevices();
+        if (!wiz.devices.length) return alert('Select at least one device');
+        loadWizardRules();
+      } else if (wizardStep === 3) {
+        wiz.ruleIds = getCheckedIds('rulesListWiz');
+        if (!wiz.ruleIds.length) return alert('Select at least one rule');
+      } else if (wizardStep === 4) {
+        if (!document.getElementById('wizName').value.trim()) return alert('Enter a session name');
+        buildReview();
+      }
+      showWizardStep(wizardStep + 1);
+    }
+
+    function wizardBack() { if (wizardStep > 1) showWizardStep(wizardStep - 1); }
+
+    function wizardCreate() {
+      scenario = {
+        centralIds: wiz.centralIds,
+        devices: wiz.devices,
+        ruleIds: wiz.ruleIds,
+        name: document.getElementById('wizName').value.trim(),
+        description: document.getElementById('wizDesc').value.trim(),
+        scanInterval: parseInt(document.getElementById('wizScanInterval').value),
+        bundleInterval: parseInt(document.getElementById('wizBundleInterval').value),
+        duration: parseInt(document.getElementById('wizDuration').value),
       };
+      closeWizard();
+      updateBlock1();
+    }
 
-      const entry = document.createElement('div');
-      entry.className = 'log-entry ' + type;
-      entry.innerHTML = \`
-        <span class="log-time">\${time}</span>
-        <span class="log-icon">\${icons[type] || 'ℹ️'}</span>
-        <span class="log-message">\${message}</span>
-      \`;
+    // --- Wizard data loaders ---
+    async function loadWizardCentrals() {
+      const tid = document.getElementById('tenantId').value.trim();
+      const cid = document.getElementById('customerId').value;
+      try {
+        const r = await fetch(\`/admin/simulator/api/centrals?tenantId=\${tid}&customerId=\${cid}\`);
+        const d = await r.json();
+        wiz.centralsData = d.centrals || [];
+        const container = document.getElementById('centralsList');
+        if (!wiz.centralsData.length) { container.innerHTML = '<div class="empty"><p>No centrals found</p></div>'; return; }
+        container.innerHTML = '<ul class="check-list">' + wiz.centralsData.map(c => \`
+          <li class="check-item" onclick="toggleCheck(this)">
+            <input type="checkbox" data-id="\${c.id}" />
+            <div class="item-info">
+              <div class="item-name">\${c.name}</div>
+              <div class="item-meta">SN: \${c.serialNumber} | \${c.type} <span class="conn-badge \${c.connectionStatus}">\${c.connectionStatus}</span></div>
+            </div>
+          </li>
+        \`).join('') + '</ul>';
+      } catch(e) { console.error(e); }
+    }
 
-      container.insertBefore(entry, container.firstChild);
+    async function loadWizardDevices() {
+      const tid = document.getElementById('tenantId').value.trim();
+      const container = document.getElementById('devicesListWiz');
+      container.innerHTML = '<div class="empty"><p>Loading devices...</p></div>';
+      let html = '';
+      for (const cid of wiz.centralIds) {
+        try {
+          const r = await fetch(\`/admin/simulator/api/centrals/\${cid}/devices?tenantId=\${tid}\`);
+          const d = await r.json();
+          wiz.devicesData[cid] = d.devices || [];
+          const centralName = wiz.centralsData.find(c => c.id === cid)?.name || cid.substring(0,8);
+          html += \`<div class="device-group"><h4>&#9881; \${centralName} <span class="select-all" onclick="selectAllInGroup(this)">Select All</span></h4><ul class="check-list">\`;
+          for (const dev of wiz.devicesData[cid]) {
+            const chBadges = dev.channels ? dev.channels.map(ch => \`<span class="ch-badge">\${ch.name}</span>\`).join('') : '';
+            html += \`<li class="check-item" onclick="toggleCheck(this)">
+              <input type="checkbox" data-id="\${dev.id}" data-name="\${dev.name}" data-type="\${dev.type}" data-slave="\${dev.slaveId||''}" data-channels='\${JSON.stringify(dev.channels||[])}' />
+              <div class="item-info">
+                <div class="item-name">\${dev.name}</div>
+                <div class="item-meta">
+                  <span class="type-badge">\${dev.type}</span>
+                  SN: \${dev.serialNumber || '-'} | Slave: \${dev.slaveId ?? '-'}
+                </div>
+                \${chBadges ? '<div class="item-badges">' + chBadges + '</div>' : ''}
+              </div>
+            </li>\`;
+          }
+          html += '</ul></div>';
+        } catch(e) { console.error(e); }
+      }
+      container.innerHTML = html || '<div class="empty"><p>No devices found</p></div>';
+    }
 
-      // Keep max 100 entries
-      while (container.children.length > 100) {
-        container.removeChild(container.lastChild);
+    async function loadWizardRules() {
+      const tid = document.getElementById('tenantId').value.trim();
+      const cid = document.getElementById('customerId').value;
+      const container = document.getElementById('rulesListWiz');
+      try {
+        const r = await fetch(\`/admin/simulator/api/rules?tenantId=\${tid}&customerId=\${cid}\`);
+        const d = await r.json();
+        wiz.rulesData = d.rules || [];
+        if (!wiz.rulesData.length) { container.innerHTML = '<div class="empty"><p>No rules found</p></div>'; return; }
+        container.innerHTML = '<ul class="check-list">' + wiz.rulesData.map(rule => {
+          const ac = rule.alarmConfig || {};
+          return \`<li class="check-item" onclick="toggleCheck(this)">
+            <input type="checkbox" data-id="\${rule.id}" />
+            <div class="item-info">
+              <div class="item-name">\${rule.name}</div>
+              <div class="item-meta">\${rule.type} | \${rule.priority} | \${ac.field || '-'} \${ac.operator || ''} \${ac.threshold ?? ''}</div>
+            </div>
+          </li>\`;
+        }).join('') + '</ul>';
+      } catch(e) { console.error(e); }
+    }
+
+    // --- Wizard helpers ---
+    function toggleCheck(li) {
+      const cb = li.querySelector('input[type=checkbox]');
+      cb.checked = !cb.checked;
+      li.classList.toggle('selected', cb.checked);
+    }
+
+    function selectAllInGroup(el) {
+      const group = el.closest('.device-group');
+      const items = group.querySelectorAll('.check-item');
+      const allChecked = Array.from(items).every(li => li.querySelector('input').checked);
+      items.forEach(li => {
+        li.querySelector('input').checked = !allChecked;
+        li.classList.toggle('selected', !allChecked);
+      });
+    }
+
+    function getCheckedIds(containerId) {
+      return Array.from(document.querySelectorAll('#'+containerId+' input[type=checkbox]:checked')).map(cb => cb.dataset.id);
+    }
+
+    function getCheckedDevices() {
+      return Array.from(document.querySelectorAll('#devicesListWiz input[type=checkbox]:checked')).map(cb => {
+        const devType = cb.dataset.type;
+        let profile = { temperature: {min:20,max:32,unit:'C'}, humidity: {min:40,max:80,unit:'%'} };
+        // Auto-profile from channels for OUTLET
+        const channels = JSON.parse(cb.dataset.channels || '[]');
+        if (channels.length) {
+          profile = {};
+          channels.forEach(ch => {
+            const defaults = { temperature:{min:18,max:35,unit:'C'}, humidity:{min:30,max:85,unit:'%'}, flow:{min:0,max:100,unit:'L/min'}, energy:{min:0,max:500,unit:'kWh'} };
+            profile[ch.name] = defaults[ch.type] || {min:0,max:100,unit:''};
+          });
+        }
+        return { deviceId: cb.dataset.id, telemetryProfile: profile };
+      });
+    }
+
+    function buildReview() {
+      document.getElementById('revCentrals').textContent = wiz.centralIds.length;
+      document.getElementById('revDevices').textContent = wiz.devices.length;
+      document.getElementById('revRules').textContent = wiz.ruleIds.length;
+      document.getElementById('revDuration').textContent = document.getElementById('wizDuration').value + 'h';
+      let details = '';
+      // Centrals detail
+      details += '<div class="review-section"><h4>Centrals</h4><div class="review-list">';
+      wiz.centralIds.forEach(id => {
+        const c = wiz.centralsData.find(x => x.id === id);
+        details += '<div class="review-item">' + (c ? c.name + ' (' + c.type + ')' : id.substring(0,8)) + '</div>';
+      });
+      details += '</div></div>';
+      // Devices detail
+      details += '<div class="review-section"><h4>Devices</h4><div class="review-list">';
+      wiz.devices.forEach(d => {
+        const metrics = Object.keys(d.telemetryProfile).join(', ');
+        details += '<div class="review-item">' + d.deviceId.substring(0,8) + '... [' + metrics + ']</div>';
+      });
+      details += '</div></div>';
+      // Rules detail
+      details += '<div class="review-section"><h4>Rules</h4><div class="review-list">';
+      wiz.ruleIds.forEach(id => {
+        const r = wiz.rulesData.find(x => x.id === id);
+        details += '<div class="review-item">' + (r ? r.name : id.substring(0,8)) + '</div>';
+      });
+      details += '</div></div>';
+      // Control detail
+      details += '<div class="review-section"><h4>Control</h4><div class="review-list">';
+      details += '<div class="review-item">Name: ' + document.getElementById('wizName').value + '</div>';
+      details += '<div class="review-item">Scan: ' + document.getElementById('wizScanInterval').value + 's | Bundle: ' + document.getElementById('wizBundleInterval').value + 's</div>';
+      details += '<div class="review-item">Duration: ' + document.getElementById('wizDuration').value + ' hours</div>';
+      details += '</div></div>';
+      document.getElementById('reviewDetails').innerHTML = details;
+    }
+
+    // =========================================================================
+    // DEMO
+    // =========================================================================
+    async function runDemo() {
+      if (demoRunning) return;
+      demoRunning = true;
+      const btn = document.getElementById('demoBtn');
+      btn.disabled = true; btn.textContent = 'Setting up...';
+      clearBlocks();
+      try {
+        const sr = await fetch('/admin/simulator/api/demo/setup', {method:'POST'});
+        const sd = await sr.json();
+        if (!sd.success) throw new Error(sd.error);
+        document.getElementById('tenantId').value = sd.demo.tenantId;
+        localStorage.setItem('simulatorTenantId', sd.demo.tenantId);
+        await loadData();
+        document.getElementById('customerId').value = sd.demo.customerId;
+        btn.textContent = 'Starting...';
+        const sess = await fetch('/admin/simulator/api/demo/start-session', {method:'POST'});
+        const sessD = await sess.json();
+        if (!sessD.success) throw new Error(sessD.error);
+        // Set scenario from demo
+        scenario = { centralIds: [sd.demo.centralId], devices: sessD.session.config?.devices || [], ruleIds: sd.demo.ruleIds, name: sessD.session.name, description: 'Demo', scanInterval: 30, bundleInterval: 60, duration: 24 };
+        runningSessionId = sessD.session.id;
+        showRunningState(sessD.session.name);
+        updateBlock1();
+        startMonitor(sessD.session.id);
+        btn.textContent = 'Running';
+        setTimeout(() => { btn.textContent = 'DEMO'; btn.disabled = false; demoRunning = false; }, 2000);
+      } catch(e) {
+        alert('Demo failed: ' + e.message);
+        btn.textContent = 'DEMO'; btn.disabled = false; demoRunning = false;
       }
     }
 
-    // Format duration
-    function formatDuration(seconds) {
-      if (seconds <= 0) return 'Expired';
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      if (hours > 0) return \`\${hours}h \${minutes}m remaining\`;
-      return \`\${minutes}m remaining\`;
-    }
+    // Init block 1
+    updateBlock1();
   </script>
 </body>
 </html>`;

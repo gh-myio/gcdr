@@ -41,6 +41,12 @@ export const StartSimulationSchema = z.object({
     .min(1, 'At least one device is required')
     .max(200, 'Maximum 200 devices per session'),
   customerId: z.string().uuid('Customer ID must be a valid UUID'),
+
+  // Scenario Builder fields (RFC-0014)
+  centralIds: z.array(z.string().uuid()).optional(),
+  ruleIds: z.array(z.string().uuid()).optional(),
+  sessionDurationHours: z.number().int().min(1).max(72).optional(),
+  description: z.string().max(500).optional(),
 });
 
 export type StartSimulationInput = z.infer<typeof StartSimulationSchema>;

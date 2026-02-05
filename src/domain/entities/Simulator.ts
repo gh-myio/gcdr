@@ -32,6 +32,12 @@ export interface SimulatorConfig {
   deviceScanIntervalMs: number;
   devices: SimulatedDeviceConfig[];
   customerId: string;
+
+  // Scenario Builder fields (RFC-0014)
+  centralIds?: string[];
+  ruleIds?: string[];
+  sessionDurationHours?: number;
+  description?: string;
 }
 
 /**
