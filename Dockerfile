@@ -75,7 +75,7 @@ ENV HOST=0.0.0.0
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3015/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3015/health || exit 1
 
 # Start application (run migrations first, then start server)
 # Migration errors are logged but don't prevent startup (for cases where DB is already migrated)
