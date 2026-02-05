@@ -6,6 +6,7 @@ export interface IUserRepository {
   create(tenantId: string, data: CreateUserDTO, createdBy: string): Promise<User>;
   getById(tenantId: string, id: string): Promise<User | null>;
   getByEmail(tenantId: string, email: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
   getByUsername(tenantId: string, username: string): Promise<User | null>;
   update(tenantId: string, id: string, data: UpdateUserDTO, updatedBy: string): Promise<User>;
   delete(tenantId: string, id: string): Promise<void>;

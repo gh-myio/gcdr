@@ -24,7 +24,7 @@ const router = Router();
  */
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId, ip, requestId } = req.context;
+    const { ip, requestId } = req.context;
 
     const result = LoginRequestSchema.safeParse(req.body);
     if (!result.success) {
@@ -34,7 +34,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     const { email, password, mfaCode, deviceInfo } = result.data;
-    const response = await authService.login(tenantId, email, password, mfaCode, ip, deviceInfo);
+    const response = await authService.login(email, password, mfaCode, ip, deviceInfo);
 
     sendSuccess(res, response, 200, requestId);
   } catch (err) {

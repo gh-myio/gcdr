@@ -2,13 +2,12 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { authService } from '../../services/AuthService';
 import { LoginRequestSchema } from '../../dto/request/AuthDTO';
 import { handleError } from '../middleware/errorHandler';
-import { parseBody, getTenantId, getClientIp } from '../middleware/requestContext';
+import { parseBody, getClientIp } from '../middleware/requestContext';
 import { success } from '../middleware/response';
 import { ValidationError } from '../../shared/errors/AppError';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
-    const tenantId = getTenantId(event);
     const body = parseBody(event);
     const ip = getClientIp(event);
 
@@ -22,7 +21,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const { email, password, mfaCode, deviceInfo } = result.data;
 
-    const response = await authService.login(tenantId, email, password, mfaCode, ip, deviceInfo);
+    const response = await authService.login(email, password, mfaCode, ip, deviceInfo);
 
     return success(response);
   } catch (err) {

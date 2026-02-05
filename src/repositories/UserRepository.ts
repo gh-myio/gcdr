@@ -320,6 +320,16 @@ export class UserRepository implements IUserRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    const [result] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email.toLowerCase()))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
   async getByUsername(tenantId: string, username: string): Promise<User | null> {
     const [result] = await db
       .select()

@@ -194,21 +194,22 @@ export class AuthService {
   }
 
   async login(
-    tenantId: string,
     email: string,
     password: string,
     mfaCode?: string,
     ip?: string,
     deviceInfo?: string
   ): Promise<LoginResponse | MfaRequiredResponse> {
-    // Find user by email
+    // Find user by email (tenant-independent)
     let user: User;
     try {
-      user = await this.userService.getByEmail(tenantId, email);
+      user = await this.userService.findByEmail(email);
     } catch {
       // Record failed attempt even if user not found (prevent enumeration)
       throw new UnauthorizedError('Credenciais inválidas');
     }
+
+    const tenantId = user.tenantId;
 
     // RFC-0011: Check user status with new states
     switch (user.status) {
