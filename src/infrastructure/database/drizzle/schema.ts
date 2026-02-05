@@ -42,7 +42,7 @@ export const userTypeEnum = pgEnum('user_type', ['INTERNAL', 'CUSTOMER', 'PARTNE
 
 export const assetTypeEnum = pgEnum('asset_type', ['BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']);
 
-export const deviceTypeEnum = pgEnum('device_type', ['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OTHER']);
+export const deviceTypeEnum = pgEnum('device_type', ['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'OTHER']);
 
 export const deviceProtocolEnum = pgEnum('device_protocol', ['MQTT', 'HTTP', 'MODBUS', 'BACNET', 'LORAWAN', 'ZIGBEE', 'OTHER']);
 

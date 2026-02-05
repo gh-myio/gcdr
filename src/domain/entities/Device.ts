@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type DeviceType = 'SENSOR' | 'ACTUATOR' | 'GATEWAY' | 'CONTROLLER' | 'METER' | 'CAMERA' | 'OTHER';
+export type DeviceType = 'SENSOR' | 'ACTUATOR' | 'GATEWAY' | 'CONTROLLER' | 'METER' | 'CAMERA' | 'OUTLET' | 'OTHER';
 export type DeviceProtocol = 'MQTT' | 'HTTP' | 'MODBUS' | 'BACNET' | 'LORAWAN' | 'ZIGBEE' | 'OTHER';
 export type ConnectivityStatus = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
 
@@ -55,6 +55,12 @@ export interface LogAnnotations {
 
 // =============================================================================
 
+export interface DeviceChannel {
+  name: string;
+  channel: number;
+  type: string;
+}
+
 export interface DeviceSpecs {
   manufacturer?: string;
   model?: string;
@@ -76,6 +82,9 @@ export interface DeviceSpecs {
   // RFC-0008: Complex configuration
   mapInstantaneousPower?: MapInstantaneousPower;
   logAnnotations?: LogAnnotations;
+
+  // OUTLET: channel definitions
+  channels?: DeviceChannel[];
 
   // Allow additional properties
   [key: string]: unknown;

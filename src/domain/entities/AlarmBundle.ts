@@ -1,4 +1,5 @@
 import { RulePriority, ComparisonOperator, AggregationType, MetricDomain } from './Rule';
+import { DeviceChannel } from './Device';
 
 /**
  * Alarm Rule in compact format for the bundle
@@ -127,8 +128,10 @@ export interface SimpleBundleAlarmRule {
  */
 export interface SimpleDeviceMapping {
   deviceName: string;
+  deviceType?: string;
   centralId?: string;
   slaveId?: number;
+  channels?: DeviceChannel[];
   offset: Record<string, number>;  // Calibration offset per metric (e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 })
   ruleIds: string[];
 }

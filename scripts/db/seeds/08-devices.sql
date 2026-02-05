@@ -536,7 +536,7 @@ BEGIN
         'SHT40_HUM'
     );
 
-    -- Device 8: Sensor Temp+Umidade Lab (multi-sensor, 2 channels)
+    -- Device 8: Temp+Umidade Lab (OUTLET with 2 channels: temperature + humidity)
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -551,14 +551,14 @@ BEGIN
         'Temp+Umidade Lab',
         'Sensor Temperatura e Umidade Laboratório',
         'TEMPHUM-LAB',
-        'SENSOR',
-        'Multi-sensor: temperature (ch1) and humidity (ch2) for laboratory',
+        'OUTLET',
+        'Multi-channel outlet: temperature (ch0) and humidity (ch1) for laboratory',
         'SN-DIM-TEMPHUM-LAB-001',
         'dim-temphum-lab-001',
-        '{"manufacturer": "Sensirion", "model": "SHT45", "protocol": "MQTT", "channels": [{"id": 1, "metric": "temperature"}, {"id": 2, "metric": "humidity"}]}',
+        '{"manufacturer": "Sensirion", "model": "SHT45", "protocol": "MQTT", "channels": [{"name": "temperature", "channel": 0, "type": "temperature"}, {"name": "humidity", "channel": 1, "type": "humidity"}]}',
         'ONLINE',
         NOW() - INTERVAL '1 minute',
-        '["temperature", "humidity", "sensor", "laboratory", "multi-sensor"]',
+        '["temperature", "humidity", "outlet", "laboratory", "multi-channel"]',
         '{"installationDate": "2024-02-01", "deviceIcon": "multi_sensor"}',
         '{"offset": {"temp": 0.2, "hum": -1.5, "pot": 0, "water_level": 0}}',
         'ACTIVE',
@@ -566,7 +566,7 @@ BEGIN
         8,
         v_central_dim_id,
         'TEMPHUM_LAB_01',
-        'SENSOR_TEMP_HUMIDITY',
+        'OUTLET_TEMP_HUMIDITY',
         'SHT45_TEMP_HUM'
     );
 
@@ -604,7 +604,75 @@ BEGIN
         'SITRANS_LU'
     );
 
-    RAISE NOTICE 'Inserted 16 devices';
+    -- Device 10: Hidr. Mc Donald's (flow sensor OUTLET - Node-RED example)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000010',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Hidr. Mc Donalds',
+        'Hidrômetro Mc Donald''s',
+        'HIDR-MCD',
+        'OUTLET',
+        'Flow sensor outlet for water metering (Mc Donald''s)',
+        'SN-DIM-HIDR-MCD-001',
+        'dim-hidr-mcd-001',
+        '{"manufacturer": "Elster", "model": "Q4000", "protocol": "MODBUS", "channels": [{"name": "flow_sensor", "channel": 0, "type": "flow"}, {"name": "temperature", "channel": 1, "type": "temperature"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["flow", "water", "outlet", "entrance"]',
+        '{"installationDate": "2024-05-10", "deviceIcon": "water_meter"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        10,
+        v_central_dim_id,
+        'HIDR_MCD_01',
+        'OUTLET_FLOW',
+        'Q4000_FLOW'
+    );
+
+    -- Device 11: Multi-channel Energy+Temp Outlet
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000011',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Energia+Temp Geral',
+        'Outlet Energia e Temperatura Geral',
+        'ENETEMP-GERAL',
+        'OUTLET',
+        'Multi-channel outlet: energy meter (ch0), temperature (ch1), humidity (ch2)',
+        'SN-DIM-ENETEMP-GERAL-001',
+        'dim-enetemp-geral-001',
+        '{"manufacturer": "Schneider", "model": "PM5560-T", "protocol": "MODBUS", "channels": [{"name": "energy", "channel": 0, "type": "energy"}, {"name": "temperature", "channel": 1, "type": "temperature"}, {"name": "humidity", "channel": 2, "type": "humidity"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["energy", "temperature", "humidity", "outlet", "building"]',
+        '{"installationDate": "2024-06-01"}',
+        '{"offset": {"temp": -0.3, "hum": 0.5, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        11,
+        v_central_dim_id,
+        'ENETEMP_GERAL_01',
+        'OUTLET_ENERGY_TEMP',
+        'PM5560T_MULTI'
+    );
+
+    RAISE NOTICE 'Inserted 18 devices';
 END $$;
 
 -- Verify

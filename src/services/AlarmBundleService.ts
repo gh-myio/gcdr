@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { Rule, isAlarmRule } from '../domain/entities/Rule';
-import { Device } from '../domain/entities/Device';
+import { Device, DeviceChannel } from '../domain/entities/Device';
 import { Customer } from '../domain/entities/Customer';
 import {
   AlarmRulesBundle,
@@ -182,13 +182,24 @@ export class AlarmBundleService {
       // Get offset from device metadata or attributes (default 0)
       const offset = this.getDeviceOffset(device);
 
-      deviceIndex[device.id] = {
+      const mapping: SimpleDeviceMapping = {
         deviceName: device.name,
         centralId: device.centralId,
         slaveId: device.slaveId,
         offset,
         ruleIds: applicableRuleIds,
       };
+
+      // Include deviceType and channels for OUTLET devices
+      if (device.type === 'OUTLET') {
+        mapping.deviceType = device.type;
+        const channels = (device.specs?.channels ?? []) as DeviceChannel[];
+        if (channels.length > 0) {
+          mapping.channels = channels;
+        }
+      }
+
+      deviceIndex[device.id] = mapping;
     }
 
     // Calculate version hash from content

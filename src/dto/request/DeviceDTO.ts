@@ -23,6 +23,13 @@ const MapInstantaneousPowerSchema = z.object({
   limitsByInstantaneousPowerType: z.array(z.any()),
 }).optional();
 
+// Device Channel Schema (OUTLET devices)
+const DeviceChannelSchema = z.object({
+  name: z.string().min(1).max(100),
+  channel: z.number().int().min(0),
+  type: z.string().min(1).max(100),
+});
+
 // Device Specs Schema
 const DeviceSpecsSchema = z.object({
   manufacturer: z.string().max(200).optional(),
@@ -45,6 +52,9 @@ const DeviceSpecsSchema = z.object({
   // RFC-0008: Complex configuration
   mapInstantaneousPower: MapInstantaneousPowerSchema,
   logAnnotations: LogAnnotationsSchema,
+
+  // OUTLET: channel definitions
+  channels: z.array(DeviceChannelSchema).max(32).optional(),
 }).refine(
   (data) => !data.addrLow || !data.addrHigh || data.addrLow <= data.addrHigh,
   { message: 'addrLow must be less than or equal to addrHigh' }
@@ -71,7 +81,7 @@ export const CreateDeviceSchema = z.object({
   name: z.string().min(1).max(255),
   displayName: z.string().max(255).optional(),
   label: z.string().max(100).optional(),
-  type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OTHER']),
+  type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'OTHER']),
   description: z.string().max(1000).optional(),
   serialNumber: z.string().min(1).max(100),
   externalId: z.string().max(100).optional(),
@@ -99,7 +109,7 @@ export const UpdateDeviceSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   displayName: z.string().max(255).optional(),
   label: z.string().max(100).optional(),
-  type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OTHER']).optional(),
+  type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'OTHER']).optional(),
   description: z.string().max(1000).optional(),
   externalId: z.string().max(100).optional(),
   specs: DeviceSpecsSchema.optional(),
