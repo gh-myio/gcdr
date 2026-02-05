@@ -1,8 +1,9 @@
 # RFC-0014: Simulator UI/UX Overhaul — Scenario Builder & 2×3 Grid Layout
 
 - **RFC**: 0014
-- **Status**: Draft
+- **Status**: Implemented
 - **Created**: 2026-02-05
+- **Implemented**: 2026-02-05
 - **Depends on**: RFC-0010 (Premium Alarm Simulator — Implemented MVP)
 - **Author**: GCDR Team
 
@@ -502,47 +503,47 @@ follow-up RFC without breaking changes.
 ## Implementation Checklist
 
 ### Phase 1: Backend Read Endpoints
-- [ ] Add `GET /admin/simulator/api/centrals` route
-- [ ] Add `GET /admin/simulator/api/centrals/:id/devices` route (include OUTLET channels)
-- [ ] Add `GET /admin/simulator/api/rules` route
-- [ ] Test endpoints with existing seed data
+- [x] Add `GET /admin/simulator/api/centrals` route
+- [x] Add `GET /admin/simulator/api/centrals/:id/devices` route (include OUTLET channels)
+- [x] Add `GET /admin/simulator/api/rules` route
+- [x] Test endpoints with existing seed data
 
 ### Phase 2: SimulatorConfig Extension
-- [ ] Add `centralIds`, `ruleIds`, `sessionDurationHours`, `description` to `SimulatorConfig`
-- [ ] Add corresponding fields to `StartSimulationSchema` (Zod)
-- [ ] Add rule filtering in `SimulatorEngine.evaluateRules()`
-- [ ] Verify backward compatibility (start without new fields still works)
-- [ ] Run `npm run build`
+- [x] Add `centralIds`, `ruleIds`, `sessionDurationHours`, `description` to `SimulatorConfig`
+- [x] Add corresponding fields to `StartSimulationSchema` (Zod)
+- [x] Add rule filtering in `SimulatorEngine.evaluateRules()`
+- [x] Verify backward compatibility (start without new fields still works)
+- [x] Run `npm run build`
 
 ### Phase 3: Grid Layout Shell
-- [ ] Replace cockpit HTML with 2×3 CSS Grid
-- [ ] Implement 6 block cards with headers and empty states
-- [ ] Wire Block 1 with scenario status badge and CTA buttons
-- [ ] Verify SSE connection still works after HTML restructure
+- [x] Replace cockpit HTML with 2×3 CSS Grid
+- [x] Implement 6 block cards with headers and empty states
+- [x] Wire Block 1 with scenario status badge and CTA buttons
+- [x] Verify SSE connection still works after HTML restructure
 
 ### Phase 4: Scenario Builder Wizard
-- [ ] Implement wizard overlay modal (5-step navigation)
-- [ ] Step 1: Centrals selection (fetch + checkbox list)
-- [ ] Step 2: Devices selection (grouped by central, OUTLET channel badges)
-- [ ] Step 2: Auto-generate telemetry profiles with editable min/max
-- [ ] Step 3: Rules selection (filtered, with applicability highlight)
-- [ ] Step 4: Control configuration form
-- [ ] Step 5: Review summary + validation + "Create Scenario"
-- [ ] Wire "Create Scenario" to update Block 1 and enable "Start Simulation"
+- [x] Implement wizard overlay modal (5-step navigation)
+- [x] Step 1: Centrals selection (fetch + checkbox list)
+- [x] Step 2: Devices selection (grouped by central, OUTLET channel badges)
+- [x] Step 2: Auto-generate telemetry profiles with editable min/max
+- [x] Step 3: Rules selection (filtered, with applicability highlight)
+- [x] Step 4: Control configuration form
+- [x] Step 5: Review summary + validation + "Create Scenario"
+- [x] Wire "Create Scenario" to update Block 1 and enable "Start Simulation"
 
 ### Phase 5: Real-time Block Updates
-- [ ] Dispatch SSE events to block-specific renderers
-- [ ] Block 2: bundle status + rules catalog display
-- [ ] Block 3: color-coded telemetry feed
-- [ ] Block 4: rule evaluation results table
-- [ ] Block 5: alarm candidates list with severity badges
-- [ ] Block 6: metrics counters + quota progress bars
+- [x] Dispatch SSE events to block-specific renderers
+- [x] Block 2: bundle status + rules catalog display
+- [x] Block 3: color-coded telemetry feed
+- [x] Block 4: rule evaluation results table
+- [x] Block 5: alarm candidates list with severity badges
+- [x] Block 6: metrics counters + quota progress bars
 
 ### Phase 6: Testing & Polish
-- [ ] End-to-end wizard flow test
-- [ ] OUTLET channel display test
-- [ ] Rule filtering test
-- [ ] Backward compatibility test
-- [ ] State transition test (Not Configured → Ready → Running → Stopped)
-- [ ] Edge case tests (empty data, quota exceeded)
-- [ ] UI polish (loading states, error handling, responsive behavior)
+- [x] End-to-end wizard flow test
+- [x] OUTLET channel display test
+- [x] Rule filtering test
+- [x] Backward compatibility test
+- [x] State transition test (Not Configured → Ready → Running → Stopped)
+- [x] Edge case tests (empty data, quota exceeded)
+- [x] UI polish (loading states, error handling, responsive behavior)

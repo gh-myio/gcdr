@@ -1,0 +1,606 @@
+{
+  "success": true,
+  "data": {
+    "versionId": "v1-20260205-004642",
+    "deviceIndex": {
+      "22220001-0001-0001-0001-000000000005": {
+        "deviceName": "3F Geral",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 5,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000008",
+          "bbbb0001-0001-0001-0001-000000000005",
+          "bbbb0001-0001-0001-0001-000000000006",
+          "bbbb0001-0001-0001-0001-000000000007",
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000011": {
+        "deviceName": "Energia+Temp Geral",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 11,
+        "offset": { "temp": -0.3, "hum": 0.5, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ],
+        "deviceType": "OUTLET",
+        "channels": [
+          { "name": "energy", "type": "energy", "channel": 0 },
+          { "name": "temperature", "type": "temperature", "channel": 1 },
+          { "name": "humidity", "type": "humidity", "channel": 2 }
+        ]
+      },
+      "22220001-0001-0001-0001-000000000002": {
+        "deviceName": "Energy Entrada",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 2,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000001": {
+        "deviceName": "Energy Laboratório",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 1,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000009",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000010": {
+        "deviceName": "Hidr. Mc Donalds",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 10,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ],
+        "deviceType": "OUTLET",
+        "channels": [
+          { "name": "flow_sensor", "type": "flow", "channel": 0 },
+          { "name": "temperature", "type": "temperature", "channel": 1 }
+        ]
+      },
+      "22220001-0001-0001-0001-000000000004": {
+        "deviceName": "Laboratório",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 4,
+        "offset": { "temp": -0.5, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000001",
+          "bbbb0001-0001-0001-0001-000000000002",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000009": {
+        "deviceName": "Nível Caixa Água",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 9,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 5 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004",
+          "bbbb0001-0001-0001-0001-000000000018",
+          "bbbb0001-0001-0001-0001-000000000017",
+          "bbbb0001-0001-0001-0001-000000000019",
+          "bbbb0001-0001-0001-0001-000000000020"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000003": {
+        "deviceName": "Sensor Presença Entrada",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 3,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000010",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000006": {
+        "deviceName": "Temp. Sala",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 6,
+        "offset": { "temp": 0.3, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000003",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      },
+      "22220001-0001-0001-0001-000000000008": {
+        "deviceName": "Temp+Umidade Lab",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 8,
+        "offset": { "temp": 0.2, "hum": -1.5, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000016",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ],
+        "deviceType": "OUTLET",
+        "channels": [
+          { "name": "temperature", "type": "temperature", "channel": 0 },
+          { "name": "humidity", "type": "humidity", "channel": 1 }
+        ]
+      },
+      "22220001-0001-0001-0001-000000000007": {
+        "deviceName": "Umidade Entrada",
+        "centralId": "9308af89-94b2-45e6-9e47-ae78f881afd2",
+        "slaveId": 7,
+        "offset": { "temp": 0, "hum": -1, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000011",
+          "bbbb0001-0001-0001-0001-000000000013",
+          "bbbb0001-0001-0001-0001-000000000014",
+          "bbbb0001-0001-0001-0001-000000000015",
+          "bbbb0001-0001-0001-0001-000000000012",
+          "bbbb0001-0001-0001-0001-000000000004"
+        ]
+      }
+    },
+    "rules": {
+      "bbbb0001-0001-0001-0001-000000000008": {
+        "id": "bbbb0001-0001-0001-0001-000000000008",
+        "name": "3F Power Anomaly",
+        "metric": "instantaneous_power",
+        "operator": "OUTSIDE",
+        "value": 50,
+        "valueHigh": 600,
+        "duration": 180000,
+        "hysteresis": 10,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000005": {
+        "id": "bbbb0001-0001-0001-0001-000000000005",
+        "name": "3F Power High",
+        "metric": "instantaneous_power",
+        "operator": "GT",
+        "value": 500,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000006": {
+        "id": "bbbb0001-0001-0001-0001-000000000006",
+        "name": "3F Power Low - Equipment Off",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 30,
+        "duration": 600000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "08:00",
+        "endAt": "18:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": false
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000007": {
+        "id": "bbbb0001-0001-0001-0001-000000000007",
+        "name": "3F Power Normal Range",
+        "metric": "instantaneous_power",
+        "operator": "BETWEEN",
+        "value": 100,
+        "valueHigh": 400,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000011": {
+        "id": "bbbb0001-0001-0001-0001-000000000011",
+        "name": "Critical Temperature Alert",
+        "metric": "temperature",
+        "operator": "OUTSIDE",
+        "value": 15,
+        "valueHigh": 32,
+        "duration": 0,
+        "hysteresis": 1,
+        "aggregation": "LAST",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000013": {
+        "id": "bbbb0001-0001-0001-0001-000000000013",
+        "name": "Entrance Humidity High",
+        "metric": "humidity",
+        "operator": "GT",
+        "value": 70,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000014": {
+        "id": "bbbb0001-0001-0001-0001-000000000014",
+        "name": "Entrance Humidity Low",
+        "metric": "humidity",
+        "operator": "LT",
+        "value": 30,
+        "duration": 600000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000010": {
+        "id": "bbbb0001-0001-0001-0001-000000000010",
+        "name": "Entrance Presence After Hours",
+        "metric": "presence_sensor",
+        "operator": "EQ",
+        "value": 1,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "LAST",
+        "startAt": "20:00",
+        "endAt": "06:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000015": {
+        "id": "bbbb0001-0001-0001-0001-000000000015",
+        "name": "Humidity Outside Comfort Range",
+        "metric": "humidity",
+        "operator": "OUTSIDE",
+        "value": 40,
+        "valueHigh": 60,
+        "duration": 600000,
+        "hysteresis": 3,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000009": {
+        "id": "bbbb0001-0001-0001-0001-000000000009",
+        "name": "Lab Energy High Consumption",
+        "metric": "instantaneous_power",
+        "operator": "GT",
+        "value": 200,
+        "duration": 600000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000016": {
+        "id": "bbbb0001-0001-0001-0001-000000000016",
+        "name": "Lab Humidity High",
+        "metric": "humidity",
+        "operator": "GT",
+        "value": 65,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000001": {
+        "id": "bbbb0001-0001-0001-0001-000000000001",
+        "name": "Lab Temperature High",
+        "metric": "temperature",
+        "operator": "GT",
+        "value": 28,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000002": {
+        "id": "bbbb0001-0001-0001-0001-000000000002",
+        "name": "Lab Temperature Low",
+        "metric": "temperature",
+        "operator": "LT",
+        "value": 18,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000012": {
+        "id": "bbbb0001-0001-0001-0001-000000000012",
+        "name": "Power Surge Detection",
+        "metric": "instantaneous_power",
+        "operator": "GT",
+        "value": 800,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "LAST",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000003": {
+        "id": "bbbb0001-0001-0001-0001-000000000003",
+        "name": "Room Temperature Outside Comfort Zone",
+        "metric": "temperature",
+        "operator": "OUTSIDE",
+        "value": 20,
+        "valueHigh": 26,
+        "duration": 600000,
+        "hysteresis": 1,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000004": {
+        "id": "bbbb0001-0001-0001-0001-000000000004",
+        "name": "Temperature in Comfort Zone",
+        "metric": "temperature",
+        "operator": "BETWEEN",
+        "value": 22,
+        "valueHigh": 24,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000018": {
+        "id": "bbbb0001-0001-0001-0001-000000000018",
+        "name": "Water Tank Critical Low",
+        "metric": "water_level_continuous",
+        "operator": "LT",
+        "value": 10,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "LAST",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000017": {
+        "id": "bbbb0001-0001-0001-0001-000000000017",
+        "name": "Water Tank Low Level",
+        "metric": "water_level_continuous",
+        "operator": "LT",
+        "value": 20,
+        "duration": 300000,
+        "hysteresis": 3,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000019": {
+        "id": "bbbb0001-0001-0001-0001-000000000019",
+        "name": "Water Tank Normal Range",
+        "metric": "water_level_continuous",
+        "operator": "BETWEEN",
+        "value": 40,
+        "valueHigh": 80,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      },
+      "bbbb0001-0001-0001-0001-000000000020": {
+        "id": "bbbb0001-0001-0001-0001-000000000020",
+        "name": "Water Tank Outside Safe Range",
+        "metric": "water_level_continuous",
+        "operator": "OUTSIDE",
+        "value": 15,
+        "valueHigh": 95,
+        "duration": 180000,
+        "hysteresis": 2,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "23:59",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        }
+      }
+    }
+  },
+  "meta": {
+    "requestId": "286dca40-3253-4935-8443-d3e9c2b62535",
+    "timestamp": "2026-02-05T00:46:42.330Z"
+  }
+}

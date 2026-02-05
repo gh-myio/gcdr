@@ -2,10 +2,11 @@
 
 - **Status**: Implemented (MVP)
 - **Created**: 2026-01-23
-- **Updated**: 2026-01-27
+- **Updated**: 2026-02-05
 - **Author**: GCDR Team
 - **Review**: [RFC-0010-Premium-Alarm-Simulator.review.md](./RFC-0010-Premium-Alarm-Simulator.review.md)
 - **User Manual**: [SIMULATOR-MANUAL.md](./SIMULATOR-MANUAL.md)
+- **Enhancement**: [RFC-0014](./RFC-0014-FixSimulator-Implementation-Plan.md) — Scenario Builder wizard & 2×3 grid layout (Implemented)
 
 ## Summary
 

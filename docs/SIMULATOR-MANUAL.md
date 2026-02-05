@@ -40,7 +40,9 @@ O **GCDR Simulator Cockpit** é uma ferramenta premium para testar regras de ala
 | Feature | Descrição |
 |---------|-----------|
 | **Isolamento Total** | Alarmes vão para fila separada (`alarm-candidates:simulated`) |
-| **Tempo Real** | Monitor SSE para visualização em tempo real |
+| **Tempo Real** | Monitor SSE com grid 2×3 — cada bloco exibe uma etapa do ciclo de alarme |
+| **Scenario Builder** | Wizard de 5 passos (Centrais → Devices → Rules → Controle → Review) |
+| **OUTLET Support** | Dispositivos OUTLET exibem badges de canais (flow, temperature, etc.) |
 | **Multi-tenant** | Suporte completo a múltiplos tenants |
 | **Quotas** | Limites configuráveis (Standard vs Premium) |
 | **Auto-expire** | Sessões expiram automaticamente (24h/72h) |
@@ -57,41 +59,43 @@ O **GCDR Simulator Cockpit** é uma ferramenta premium para testar regras de ala
 | **Staging** | `https://api-staging.gcdr.myio.com.br/admin/simulator` |
 | **Production** | `https://api.gcdr.myio.com.br/admin/simulator` |
 
-### Interface Principal
+### Interface Principal — Grid 2×3
+
+A interface é organizada como um **grid fixo de 2 linhas e 3 colunas**, onde cada bloco representa uma etapa do ciclo de vida do alarme:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  🎮 Simulator Cockpit [Premium]     📖 Manual  🚀 DEMO  [Tenant ID] │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────────────┐  ┌─────────────────────────────────────┐  │
-│  │  ➕ New Session     │  │  📋 Sessions                        │  │
-│  │                     │  │                                     │  │
-│  │  Session Name: ___  │  │  ● Demo Session    RUNNING  [Stop]  │  │
-│  │  Customer: [▼]      │  │    Scans: 42  Alarms: 3   [Monitor] │  │
-│  │  Devices: [Add...]  │  │                                     │  │
-│  │                     │  │  ○ Old Session     STOPPED          │  │
-│  │  [▶ Start Session]  │  │    Scans: 100 Alarms: 15            │  │
-│  └─────────────────────┘  └─────────────────────────────────────┘  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  🟢 Live Monitor - Demo Session                    [Stop]   │   │
-│  │  ──────────────────────────────────────────────────────────  │   │
-│  │  14:32:05 📦 Bundle updated - v1.2.3                        │   │
-│  │  14:32:10 📡 Device scan: TEMP-A... (temperature=29.5)      │   │
-│  │  14:32:10 🔔 ALARM: High Temperature - temp=29.5 (>28)      │   │
-│  │  14:32:15 📡 Device scan: HUM-B... (humidity=65.2)          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                     │
-│  ┌─────────────────────┐  ┌─────────────────────────────────────┐  │
-│  │  📊 Quotas          │  │  📈 Metrics                         │  │
-│  │                     │  │                                     │  │
-│  │  Sessions: 1/3      │  │  Active: 1    Scans: 42             │  │
-│  │  Max Devices: 50    │  │  Alarms: 3    Monitors: 1           │  │
-│  │  Scans/hr: 1000     │  │                                     │  │
-│  └─────────────────────┘  └─────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Simulator Cockpit [Premium]              Manual  DEMO  [Tenant ID]  [Load]    │
+├─────────────────────┬─────────────────────┬─────────────────────────────────────┤
+│  Block 1            │  Block 2            │  Block 3                            │
+│  Scenario Overview  │  Bundle & Rules     │  Device Scanner                     │
+│  & Control Center   │  Status             │  & Telemetry Feed                   │
+│                     │                     │                                     │
+│  Centrals: 2        │  Version: v1.2.3    │  14:32:10 TEMP-A  temp=29.5        │
+│  Devices: 5         │  Rules: 8           │  14:32:15 HUM-B   hum=65.2         │
+│  Rules: 3           │  Last fetch: 10s    │  14:32:20 PWR-C   power=420        │
+│  Status: RUNNING    │                     │                                     │
+│                     │                     │                                     │
+│  [Configure] [Start]│                     │                                     │
+├─────────────────────┼─────────────────────┼─────────────────────────────────────┤
+│  Block 4            │  Block 5            │  Block 6                            │
+│  Rule Evaluator     │  Alarm Candidates   │  Metrics & Quotas                   │
+│                     │                     │                                     │
+│  Rule: Temp High    │  ALARM: Temp High   │  Scans: 42/1000                     │
+│  Device: TEMP-A     │  Device: TEMP-A     │  Alarms: 3                          │
+│  29.5 > 28 = FAIL   │  Severity: HIGH     │  Uptime: 01:15:30                   │
+│                     │  Fingerprint: abc.. │  Remaining: 22:44                   │
+└─────────────────────┴─────────────────────┴─────────────────────────────────────┘
 ```
+
+| Bloco | Nome | Eventos SSE Associados |
+|-------|------|----------------------|
+| **Block 1** | Scenario Overview & Control | Status da sessão |
+| **Block 2** | Bundle Status & Rules Catalog | `bundle:fetched`, `bundle:unchanged` |
+| **Block 3** | Device Scanner & Telemetry Feed | `device:scanned` |
+| **Block 4** | Rule Evaluator Live Results | `alarm:candidate` (detalhes da avaliação) |
+| **Block 5** | Alarm Candidates Queue & History | `alarm:candidate` (alarmes gerados) |
+| **Block 6** | Session Metrics & Quotas | Todos os eventos (contadores) |
 
 ---
 
@@ -154,79 +158,101 @@ Os dispositivos geram valores aleatórios dentro destes ranges:
 
 ---
 
-## 4. Configuração Manual
+## 4. Scenario Builder (Wizard)
 
-Se você quer usar seus próprios dados:
+A configuração manual agora é feita via **Scenario Builder**, um wizard full-screen de 5 passos.
 
-### Passo 1: Configurar Tenant
+### Abrindo o Wizard
 
-1. Digite seu **Tenant ID** (UUID) no campo do header
-2. Clique em **Load**
-3. Os dropdowns serão populados com seus dados
+1. Digite seu **Tenant ID** (UUID) no campo do header e clique em **Load**
+2. Selecione o **Customer** no dropdown
+3. Clique em **"Configure Simulator"** no Block 1
 
-### Passo 2: Criar Nova Sessão
+### Step 1 — Centrals
 
-1. **Session Name**: Nome descritivo (ex: "QA Test Sprint 42")
-2. **Customer**: Selecione o customer que tem as regras de alarme
-3. **Scan Interval**: Intervalo entre scans de dispositivos
-   - Mínimo: 10 segundos (premium) / 30 segundos (standard)
-   - Recomendado: 60 segundos
-4. **Bundle Refresh**: Intervalo para atualizar regras
-   - Mínimo: 30 segundos (premium) / 60 segundos (standard)
-   - Recomendado: 300 segundos (5 minutos)
+- Lista todas as centrais do customer selecionado
+- Selecione uma ou mais centrais (checkbox)
+- Exibe: nome, serial number, status de conexão
+- Mínimo: 1 central selecionada
 
-### Passo 3: Adicionar Dispositivos
+### Step 2 — Devices
 
-1. Selecione dispositivos no dropdown **Devices**
-2. Cada dispositivo adicionado aparece como chip
-3. Clique no **✕** para remover um dispositivo
-4. Dispositivos usam perfil de telemetria padrão:
-   ```javascript
-   {
-     temperature: { min: 20, max: 30, unit: '°C' },
-     humidity: { min: 40, max: 70, unit: '%' }
-   }
-   ```
+- Lista dispositivos de cada central selecionada (agrupados)
+- Selecione os dispositivos desejados (checkbox)
+- Para dispositivos **OUTLET**: badges coloridos mostram os canais disponíveis (ex: `[flow] [temperature] [humidity]`)
+- Perfis de telemetria são **auto-gerados** com base no tipo do dispositivo:
+  - OUTLET channels geram profiles automaticamente (ex: canal `temperature` → `{ min: 15, max: 35, unit: '°C' }`)
+  - Usuário pode ajustar `min/max` antes de prosseguir
+- Mínimo: 1 dispositivo selecionado
 
-### Passo 4: Iniciar Sessão
+### Step 3 — Rules
 
-1. Clique em **▶ Start Session**
-2. A sessão aparece na lista de Sessions
-3. O monitor conecta automaticamente
+- Lista regras de alarme do customer
+- Filtrável por `centralId` (query parameter opcional)
+- Exibe: nome da regra, métrica, operador, threshold, prioridade
+- Selecione as regras que serão avaliadas durante a simulação
+- Mínimo: 1 regra selecionada
+
+> **Nota:** Ao selecionar regras específicas, o `SimulatorEngine` filtra e avalia **apenas** essas regras. Sem seleção de regras, todas as regras do bundle são avaliadas (comportamento legado).
+
+### Step 4 — Simulation Control
+
+| Campo | Descrição | Default |
+|-------|-----------|---------|
+| **Session Name** | Nome descritivo (obrigatório) | — |
+| **Description** | Descrição opcional (max 500 chars) | — |
+| **Scan Interval** | Intervalo entre scans: 10s / 30s / 60s / 120s | 60s |
+| **Bundle Refresh** | Intervalo de refresh: 30s / 60s / 300s | 300s |
+| **Session Duration** | Duração: 1h / 4h / 12h / 24h / 72h | 24h |
+
+### Step 5 — Review & Create
+
+- Resumo completo: centrais, dispositivos, regras, intervalos, duração
+- Validação contra quotas do tenant
+- Botão **"Create Scenario"** → salva config no browser, fecha o wizard
+- O Block 1 atualiza para status `READY`
+- Clique **"Start Simulation"** no Block 1 para iniciar
+
+### Fluxo de Estados
+
+```
+NOT CONFIGURED → [Configure] → READY → [Start] → RUNNING → [Stop] → STOPPED
+                                  ↑                                      │
+                                  └──────── [Reconfigure] ──────────────┘
+```
 
 ---
 
-## 5. Live Monitor
+## 5. Live Monitor (SSE → Grid Blocks)
 
-O Live Monitor usa **Server-Sent Events (SSE)** para streaming em tempo real.
+O Live Monitor usa **Server-Sent Events (SSE)** para streaming em tempo real. Os eventos são **roteados para blocos específicos** do grid 2×3.
 
-### Tipos de Eventos
+### Roteamento de Eventos SSE
 
-| Ícone | Tipo | Descrição |
-|-------|------|-----------|
-| 📦 | `bundle:fetched` | Bundle de regras foi atualizado |
-| 📡 | `device:scanned` | Dispositivo gerou telemetria |
-| 🔔 | `alarm:candidate` | Regra disparou um alarme |
-| ℹ️ | `session:*` | Eventos de ciclo de vida |
+| Evento SSE | Bloco Destino | O que é atualizado |
+|------------|---------------|-------------------|
+| `bundle:fetched` | Block 2 | Versão, assinatura, timestamp do bundle |
+| `bundle:unchanged` | Block 2 | Apenas timestamp atualizado |
+| `device:scanned` | Block 3 | Feed de telemetria com valores coloridos |
+| `alarm:candidate` | Block 4 + Block 5 | Resultado da avaliação (B4) + alarme gerado (B5) |
+| Todos os eventos | Block 6 | Contadores de scans, alarmes, uptime |
 
-### Exemplo de Log
+### Indicadores Visuais no Block 3 (Device Scanner)
 
-```
-14:32:05  ℹ️  Connected to session monitor
-14:32:05  📦  Bundle updated - v1.2.3
-14:32:10  📡  Device scan: 55555555... (temperature=26.3, humidity=58.2)
-14:32:15  📡  Device scan: 55555555... (temperature=29.1, humidity=62.4)
-14:32:15  🔔  ALARM: High Temperature Alert - temperature=29.1 (threshold: 28)
-14:32:20  📡  Device scan: 55555555... (temperature=27.8, humidity=71.3)
-14:32:20  🔔  ALARM: High Humidity Warning - humidity=71.3 (threshold: 70)
-```
+Os valores de telemetria são coloridos por proximidade ao threshold:
+
+| Cor | Significado |
+|-----|-------------|
+| **Verde** | Valor dentro da faixa normal |
+| **Amarelo** | Valor próximo ao threshold (< 10% de distância) |
+| **Vermelho** | Valor excede o threshold (alarme disparado) |
 
 ### Controles do Monitor
 
-- **Monitor**: Conecta ao stream de uma sessão
-- **Stop Monitor**: Desconecta do stream atual
-- O monitor mantém no máximo **100 entradas** visíveis
+- A conexão SSE é estabelecida automaticamente ao iniciar a simulação
 - Heartbeat a cada **30 segundos** mantém conexão viva
+- Cada bloco mantém suas **últimas entradas** visíveis (scroll automático)
+- Block 6 exibe progress bars para quotas em tempo real
 
 ---
 
@@ -389,9 +415,9 @@ O simulador foi projetado com segurança em mente:
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| GET | `/admin/simulator` | UI do Cockpit |
+| GET | `/admin/simulator` | UI do Cockpit (grid 2×3) |
 | GET | `/admin/simulator/api/sessions` | Lista sessões |
-| POST | `/admin/simulator/api/sessions/start` | Inicia sessão |
+| POST | `/admin/simulator/api/sessions/start` | Inicia sessão (aceita `centralIds`, `ruleIds`, `sessionDurationHours`, `description`) |
 | POST | `/admin/simulator/api/sessions/:id/stop` | Para sessão |
 | GET | `/admin/simulator/api/sessions/:id/monitor` | SSE stream |
 | GET | `/admin/simulator/api/quotas` | Quotas do tenant |
@@ -400,6 +426,14 @@ O simulador foi projetado com segurança em mente:
 | GET | `/admin/simulator/api/devices` | Lista devices |
 | GET | `/admin/simulator/api/queue/stats` | Stats da fila |
 
+### Endpoints do Wizard (Scenario Builder)
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/admin/simulator/api/centrals?tenantId=X&customerId=X` | Lista centrais do customer (Step 1) |
+| GET | `/admin/simulator/api/centrals/:id/devices?tenantId=X` | Lista devices da central, com channels para OUTLET (Step 2) |
+| GET | `/admin/simulator/api/rules?tenantId=X&customerId=X` | Lista regras de alarme do customer (Step 3) |
+
 ### Endpoints DEMO
 
 | Método | Endpoint | Descrição |
@@ -407,7 +441,7 @@ O simulador foi projetado com segurança em mente:
 | POST | `/admin/simulator/api/demo/setup` | Cria ambiente demo |
 | POST | `/admin/simulator/api/demo/start-session` | Inicia sessão demo |
 
-### Exemplo: Iniciar Sessão via API
+### Exemplo: Iniciar Sessão via API (com Scenario Builder fields)
 
 ```bash
 curl -X POST http://localhost:3015/admin/simulator/api/sessions/start \
@@ -420,6 +454,10 @@ curl -X POST http://localhost:3015/admin/simulator/api/sessions/start \
       "customerId": "22222222-2222-2222-2222-222222222222",
       "deviceScanIntervalMs": 60000,
       "bundleRefreshIntervalMs": 300000,
+      "centralIds": ["central-uuid-1", "central-uuid-2"],
+      "ruleIds": ["rule-uuid-1", "rule-uuid-2"],
+      "sessionDurationHours": 4,
+      "description": "Testing temperature rules on lab devices",
       "devices": [
         {
           "deviceId": "55555555-5555-5555-5555-555555555501",
@@ -431,6 +469,8 @@ curl -X POST http://localhost:3015/admin/simulator/api/sessions/start \
     }
   }'
 ```
+
+> **Nota:** Os campos `centralIds`, `ruleIds`, `sessionDurationHours` e `description` são **opcionais** e backward-compatible. Sessões sem esses campos continuam funcionando normalmente.
 
 ---
 
@@ -486,9 +526,10 @@ curl -X POST http://localhost:3015/admin/simulator/api/sessions/{sessionId}/stop
 ## Referências
 
 - [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação técnica completa
+- [RFC-0014: Simulator UI/UX Overhaul](./RFC-0014-FixSimulator-Implementation-Plan.md) - Grid 2×3 + Scenario Builder
 - [ONBOARDING.md](./ONBOARDING.md) - Manual de onboarding do projeto
 - [RULE-ENTITY.md](./RULE-ENTITY.md) - Documentação do motor de regras
 
 ---
 
-**Última atualização:** Janeiro 2026
+**Última atualização:** Fevereiro 2026

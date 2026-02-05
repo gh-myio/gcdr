@@ -219,6 +219,7 @@ npm run test:coverage    # Tests with coverage
 - [RFC-0011](docs/RFC-0011-User-Registration-Approval-Workflow.md) - User Registration & Approval Workflow
 - [RFC-0012](docs/RFC-0012-Features-Registry.md) - Features Registry (Draft)
 - [RFC-0013](docs/RFC-0013-User-Access-Profile-Bundle.md) - User Access Profile Bundle
+- [RFC-0014](docs/RFC-0014-FixSimulator-Implementation-Plan.md) - Simulator UI/UX Overhaul (Scenario Builder + 2×3 Grid)
 - [RULE-ENTITY.md](docs/RULE-ENTITY.md) - Rules Engine Documentation
 - [SIMULATOR-MANUAL.md](docs/SIMULATOR-MANUAL.md) - Alarm Simulator Manual
 - [DEPLOY-DOKPLOY.md](docs/DEPLOY-DOKPLOY.md) - Dokploy Deployment Guide
