@@ -380,7 +380,9 @@ export class SimulatorEngine extends EventEmitter {
     // Evaluate rules for this device (filter by scenario ruleIds if configured)
     if (deviceMapping) {
       const scenarioRuleIds = active.config.ruleIds;
-      for (const ruleId of deviceMapping.ruleIds) {
+      for (const ruleEntry of deviceMapping.ruleIds) {
+        // Handle both string and RuleIdWithChannel formats
+        const ruleId = typeof ruleEntry === 'string' ? ruleEntry : ruleEntry.id;
         if (scenarioRuleIds && !scenarioRuleIds.includes(ruleId)) continue;
         const rule = bundle.rules[ruleId];
         if (rule) {

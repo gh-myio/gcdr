@@ -13,6 +13,7 @@ import {
   SimpleBundleAlarmRule,
   SimpleDeviceMapping,
   SimpleBundleMeta,
+  RuleIdEntry,
 } from '../domain/entities/AlarmBundle';
 import { RuleRepository } from '../repositories/RuleRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
@@ -167,6 +168,8 @@ export class AlarmBundleService {
           startAt: rule.alarmConfig.startAt || '00:00',
           endAt: rule.alarmConfig.endAt || '23:59',
           daysOfWeek: daysOfWeekObj,
+          // Channel targeting (only for OUTLET devices with discrete metrics)
+          channelId: rule.alarmConfig.channelId,
         };
 
         rulesCatalog[rule.id] = simplifiedRule;
@@ -177,7 +180,8 @@ export class AlarmBundleService {
     const deviceIndex: Record<string, SimpleDeviceMapping> = {};
 
     for (const device of devices) {
-      const applicableRuleIds = this.getApplicableRules(device, rules);
+      // Get applicable rules with channel info for discrete metrics
+      const applicableRuleIds = this.getApplicableRulesWithChannel(device, rules);
 
       // Get offset from device metadata or attributes (default 0)
       const offset = this.getDeviceOffset(device);
@@ -518,6 +522,54 @@ export class AlarmBundleService {
     }
 
     return applicableRuleIds;
+  }
+
+  /**
+   * Get rules applicable to a device with channel info for discrete metrics
+   * Returns RuleIdEntry[] - string for simple rules, object with channel for channel-specific rules
+   */
+  private getApplicableRulesWithChannel(device: Device, rules: Rule[]): RuleIdEntry[] {
+    const applicableRules: RuleIdEntry[] = [];
+
+    for (const rule of rules) {
+      if (!rule.alarmConfig) continue;
+
+      const scope = rule.scope;
+      let isApplicable = false;
+
+      switch (scope.type) {
+        case 'GLOBAL':
+          isApplicable = true;
+          break;
+        case 'CUSTOMER':
+          isApplicable =
+            scope.entityId === device.customerId ||
+            (scope.inherited === true);
+          break;
+        case 'ASSET':
+          isApplicable =
+            scope.entityId === device.assetId ||
+            (scope.inherited === true && device.assetId !== undefined);
+          break;
+        case 'DEVICE':
+          isApplicable = scope.entityId === device.id;
+          break;
+      }
+
+      if (isApplicable) {
+        // Check if rule has channelId (for discrete metrics on OUTLET devices)
+        if (rule.alarmConfig.channelId !== undefined) {
+          applicableRules.push({
+            id: rule.id,
+            channel: rule.alarmConfig.channelId,
+          });
+        } else {
+          applicableRules.push(rule.id);
+        }
+      }
+    }
+
+    return applicableRules;
   }
 
   /**

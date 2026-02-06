@@ -105,6 +105,19 @@ export interface GenerateBundleParams {
 // =============================================================================
 
 /**
+ * Rule ID with channel info for OUTLET devices with channel-specific rules
+ */
+export interface RuleIdWithChannel {
+  id: string;
+  channel: number;
+}
+
+/**
+ * Rule ID entry - either a simple string or object with channel info
+ */
+export type RuleIdEntry = string | RuleIdWithChannel;
+
+/**
  * Simplified alarm rule - minimal fields for Node-RED processing
  */
 export interface SimpleBundleAlarmRule {
@@ -121,6 +134,8 @@ export interface SimpleBundleAlarmRule {
   startAt: string;                   // HH:mm format (default "00:00")
   endAt: string;                     // HH:mm format (default "23:59")
   daysOfWeek: Record<number, boolean>; // 0-6, where 0 is Sunday (e.g., {0: true, 1: true, ...})
+  // Channel targeting for OUTLET devices
+  channelId?: number;                // Channel index for multi-channel devices
 }
 
 /**
@@ -133,7 +148,7 @@ export interface SimpleDeviceMapping {
   slaveId?: number;
   channels?: DeviceChannel[];
   offset: Record<string, number>;  // Calibration offset per metric (e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 })
-  ruleIds: string[];
+  ruleIds: RuleIdEntry[];          // Rule IDs - string for simple rules, object with channel for channel-specific rules
 }
 
 /**

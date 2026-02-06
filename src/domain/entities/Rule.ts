@@ -58,6 +58,9 @@ export interface AlarmThresholdConfig {
   startAt?: string; // HH:mm format (e.g., "08:00")
   endAt?: string;   // HH:mm format (e.g., "18:00")
   daysOfWeek?: number[]; // 0-6, where 0 is Sunday (e.g., [1,2,3,4,5] for weekdays)
+
+  // Channel targeting for OUTLET devices with discrete metrics
+  channelId?: number; // Channel index (0, 1, 2...) for multi-channel devices
 }
 
 // SLA Configuration
