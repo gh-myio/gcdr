@@ -267,6 +267,9 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     const { customerId } = req.params;
     const { domain, deviceType, includeDisabled } = req.query;
 
+    // Optional X-Central-Id header to filter devices by central
+    const centralId = req.headers['x-central-id'] as string | undefined;
+
     if (!customerId) {
       throw new ValidationError('Customer ID is required');
     }
@@ -277,6 +280,7 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     const bundle = await alarmBundleService.generateSimplifiedBundle({
       tenantId,
       customerId,
+      centralId,
       domain: domain as string | undefined,
       deviceType: deviceType as string | undefined,
       includeDisabled: includeDisabled === 'true',

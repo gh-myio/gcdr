@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type DeviceType = 'SENSOR' | 'ACTUATOR' | 'GATEWAY' | 'CONTROLLER' | 'METER' | 'CAMERA' | 'OUTLET' | 'OTHER';
+export type DeviceType = 'SENSOR' | 'ACTUATOR' | 'GATEWAY' | 'CONTROLLER' | 'METER' | 'CAMERA' | 'OUTLET' | 'INFRARED' | 'OTHER';
 export type DeviceProtocol = 'MQTT' | 'HTTP' | 'MODBUS' | 'BACNET' | 'LORAWAN' | 'ZIGBEE' | 'OTHER';
 export type ConnectivityStatus = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
 

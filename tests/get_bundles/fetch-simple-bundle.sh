@@ -10,14 +10,18 @@ CUSTOMER_ID="77777777-7777-7777-7777-777777777777"
 # Fixed test API key (seeded in database)
 API_KEY="gcdr_cust_test_bundle_key_myio2026"
 # X-Tenant-Id is optional - tenant is auto-discovered from API key
+# X-Central-Id is optional - filters devices by central ID
+CENTRAL_ID="9308af89-94b2-45e6-9e47-ae78f881afd2"
 OUTPUT_FILE="$(dirname "$0")/simple_bundle_output.json"
 
 echo "Fetching simplified bundle..."
 echo "Customer: $CUSTOMER_ID"
+echo "Central:  $CENTRAL_ID"
 echo ""
 
 curl -s "${API_URL}/api/v1/customers/${CUSTOMER_ID}/alarm-rules/bundle/simple" \
   -H "X-API-Key: ${API_KEY}" \
+  -H "X-Central-Id: ${CENTRAL_ID}" \
   -H "Accept: application/json" \
   -o "$OUTPUT_FILE"
 

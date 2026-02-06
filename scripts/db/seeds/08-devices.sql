@@ -366,7 +366,7 @@ BEGIN
         'PM5100_LAMP'
     );
 
-    -- Device 3: Sensor Presença Dual (OUTLET with 2 channels: Lab ch0, Entrada ch1) - slaveId=2
+    -- Device 3: Sensores + Lampada (OUTLET with 2 channels: entrada lamp ch0, lab lamp ch1) - slaveId=2
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -378,29 +378,29 @@ BEGIN
         v_tenant_id,
         v_dim_building_id,
         v_dimension_id,
-        'Sensor Presença Dual',
-        'Sensor de Presença Laboratório e Entrada',
-        'PRES-DUAL',
+        'Sensores Lampada',
+        'Controle Lampadas Entrada e Laboratório',
+        'LAMP-DUAL',
         'OUTLET',
-        'Dual presence sensor outlet: Laboratory (ch0) and Entrance (ch1) - same slaveId, different channels',
-        'SN-DIM-PRES-DUAL-001',
-        'dim-presence-dual-001',
-        '{"manufacturer": "Honeywell", "model": "IS335", "protocol": "MODBUS", "channels": [{"name": "presence_lab", "channel": 0, "type": "presence"}, {"name": "presence_entrada", "channel": 1, "type": "presence"}]}',
+        'Dual lamp control outlet: Entrance lamp (ch0) and Laboratory lamp (ch1)',
+        'SN-DIM-LAMP-DUAL-001',
+        'dim-lamp-dual-001',
+        '{"manufacturer": "Schneider", "model": "iLC150", "protocol": "MODBUS", "channels": [{"name": "lamp_entrada", "channel": 0, "type": "lamp"}, {"name": "lamp_lab", "channel": 1, "type": "lamp"}]}',
         'ONLINE',
         NOW() - INTERVAL '1 minute',
-        '["presence", "sensor", "laboratory", "entrance", "outlet", "dual-channel"]',
-        '{"installationDate": "2024-01-15", "deviceIcon": "presence_sensor"}',
+        '["lamp", "control", "laboratory", "entrance", "outlet", "dual-channel"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
         '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
         2,
         v_central_dim_id,
-        'PRESENCE_DUAL_01',
-        'OUTLET_PRESENCE',
-        'IS335_DUAL_PIR'
+        'LAMP_DUAL_01',
+        'OUTLET_LAMP',
+        'ILC150_DUAL_LAMP'
     );
 
-    -- Device 4: Laboratório (temperature sensor)
+    -- Device 4: Sala Reunião (OUTLET with 2 channels: Lampada ch0, Sensor Porta ch1) - slaveId=3
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -410,31 +410,31 @@ BEGIN
     VALUES (
         '22220001-0001-0001-0001-000000000004',
         v_tenant_id,
-        v_dim_lab_id,
+        v_dim_building_id,
         v_dimension_id,
-        'Laboratório',
-        'Sensor Temperatura Laboratório',
-        'TEMP-LAB',
-        'SENSOR',
-        'Temperature sensor for laboratory',
-        'SN-DIM-TEMP-LAB-001',
-        'dim-temp-lab-001',
-        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'Sala Reunião',
+        'Controle Sala Reunião (Lampada + Sensor Porta)',
+        'REUNIAO-CTRL',
+        'OUTLET',
+        'Meeting room outlet: Lamp control (ch0) and Door sensor (ch1)',
+        'SN-DIM-REUNIAO-001',
+        'dim-reuniao-001',
+        '{"manufacturer": "Schneider", "model": "iLC150-D", "protocol": "MODBUS", "channels": [{"name": "lamp_reuniao", "channel": 0, "type": "lamp"}, {"name": "door_reuniao", "channel": 1, "type": "door_sensor"}]}',
         'ONLINE',
-        NOW() - INTERVAL '3 minutes',
-        '["temperature", "sensor", "laboratory"]',
-        '{"installationDate": "2024-01-15"}',
-        '{"offset": {"temp": -0.5, "hum": 0, "pot": 0, "water_level": 0}}',
+        NOW() - INTERVAL '1 minute',
+        '["lamp", "door", "sensor", "meeting-room", "outlet", "dual-channel"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "meeting_room"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
-        4,
+        3,
         v_central_dim_id,
-        'TEMP_LAB_01',
-        'SENSOR_TEMP',
-        'SHT40_TEMP'
+        'REUNIAO_01',
+        'OUTLET_LAMP_DOOR',
+        'ILC150D_LAMP_DOOR'
     );
 
-    -- Device 5: 3F Geral (general energy meter)
+    -- Device 5: 3F Geral (general energy meter) - slaveId=4
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -450,7 +450,7 @@ BEGIN
         'Medidor Geral 3F',
         '3F-GERAL',
         'METER',
-        'General 3-phase energy meter',
+        'General 3-phase energy meter (no channels needed)',
         'SN-DIM-3F-GERAL-001',
         'dim-3f-geral-001',
         '{"manufacturer": "Schneider", "model": "PM5560", "protocol": "MODBUS", "phases": 3}',
@@ -461,14 +461,14 @@ BEGIN
         '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
-        5,
+        4,
         v_central_dim_id,
         '3F_GERAL_01',
         '3F_MEDIDOR',
         'PM5560_3F'
     );
 
-    -- Device 6: Temp. Sala (room temperature sensor)
+    -- Device 6: Infravermelho (infrared sensor with temperature + humidity) - slaveId=6
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -480,26 +480,26 @@ BEGIN
         v_tenant_id,
         v_dim_building_id,
         v_dimension_id,
-        'Temp. Sala',
-        'Sensor Temperatura Sala',
-        'TEMP-SALA',
-        'SENSOR',
-        'Room temperature sensor',
-        'SN-DIM-TEMP-SALA-001',
-        'dim-temp-sala-001',
-        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'Infravermelho',
+        'Sensor Infravermelho (Temperatura e Umidade)',
+        'IR-TEMPHUM',
+        'INFRARED',
+        'Infrared sensor with temperature and humidity readings (no channels needed)',
+        'SN-DIM-IR-001',
+        'dim-ir-001',
+        '{"manufacturer": "Melexis", "model": "MLX90614", "protocol": "I2C", "metrics": ["temperature", "humidity"]}',
         'ONLINE',
         NOW() - INTERVAL '2 minutes',
-        '["temperature", "sensor", "room"]',
-        '{"installationDate": "2024-01-15"}',
+        '["infrared", "temperature", "humidity", "sensor"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "infrared"}',
         '{"offset": {"temp": 0.3, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
         6,
         v_central_dim_id,
-        'TEMP_SALA_01',
-        'SENSOR_TEMP',
-        'SHT40_TEMP'
+        'IR_TEMPHUM_01',
+        'SENSOR_INFRARED',
+        'MLX90614_IR'
     );
 
     -- Device 7: Sensor Umidade Entrada (humidity sensor)

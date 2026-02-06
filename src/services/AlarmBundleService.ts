@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { Rule, isAlarmRule } from '../domain/entities/Rule';
-import { Device, DeviceChannel } from '../domain/entities/Device';
+import { Device } from '../domain/entities/Device';
 import { Customer } from '../domain/entities/Customer';
 import {
   AlarmRulesBundle,
@@ -86,7 +86,7 @@ export class AlarmBundleService {
    * - Rules without enabled/tags fields
    */
   async generateSimplifiedBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle> {
-    const { tenantId, customerId, domain, deviceType, includeDisabled = false } = params;
+    const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false } = params;
 
     // Validate customer exists
     const customer = await this.customerRepository.getById(tenantId, customerId);
@@ -94,8 +94,8 @@ export class AlarmBundleService {
       throw new NotFoundError(`Customer ${customerId} not found`);
     }
 
-    // Get all devices for this customer
-    const devices = await this.getDevicesByCustomer(tenantId, customerId, domain, deviceType);
+    // Get all devices for this customer (optionally filtered by centralId)
+    const devices = await this.getDevicesByCustomer(tenantId, customerId, centralId, domain, deviceType);
 
     // Get all alarm rules for this customer
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
@@ -186,22 +186,14 @@ export class AlarmBundleService {
       // Get offset from device metadata or attributes (default 0)
       const offset = this.getDeviceOffset(device);
 
+      // Note: centralId is now passed via X-Central-Id header (filters devices)
+      // Note: channels are included in rule entries with channelId when applicable
       const mapping: SimpleDeviceMapping = {
         deviceName: device.name,
-        centralId: device.centralId,
         slaveId: device.slaveId,
         offset,
         ruleIds: applicableRuleIds,
       };
-
-      // Include deviceType and channels for OUTLET devices
-      if (device.type === 'OUTLET') {
-        mapping.deviceType = device.type;
-        const channels = (device.specs?.channels ?? []) as DeviceChannel[];
-        if (channels.length > 0) {
-          mapping.channels = channels;
-        }
-      }
 
       deviceIndex[device.id] = mapping;
     }
@@ -277,6 +269,7 @@ export class AlarmBundleService {
   private async getDevicesByCustomer(
     tenantId: string,
     customerId: string,
+    centralId?: string,
     domain?: string,
     deviceType?: string
   ): Promise<Device[]> {
@@ -286,6 +279,11 @@ export class AlarmBundleService {
     });
 
     let devices = result.items;
+
+    // Filter by centralId if specified (via X-Central-Id header)
+    if (centralId) {
+      devices = devices.filter(d => d.centralId === centralId);
+    }
 
     // Filter by domain if specified (domain is stored in metadata or attributes)
     if (domain) {

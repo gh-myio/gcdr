@@ -1,5 +1,4 @@
 import { RulePriority, ComparisonOperator, AggregationType, MetricDomain } from './Rule';
-import { DeviceChannel } from './Device';
 
 /**
  * Alarm Rule in compact format for the bundle
@@ -95,6 +94,7 @@ export interface AlarmRulesBundle {
 export interface GenerateBundleParams {
   tenantId: string;
   customerId: string;
+  centralId?: string;
   domain?: string;
   deviceType?: string;
   includeDisabled?: boolean;
@@ -140,13 +140,12 @@ export interface SimpleBundleAlarmRule {
 
 /**
  * Simplified device mapping - minimal fields for Node-RED processing
+ * Note: centralId is now passed via X-Central-Id header (filters devices)
+ * Note: channels are included in rule entries with channelId when applicable
  */
 export interface SimpleDeviceMapping {
   deviceName: string;
-  deviceType?: string;
-  centralId?: string;
   slaveId?: number;
-  channels?: DeviceChannel[];
   offset: Record<string, number>;  // Calibration offset per metric (e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 })
   ruleIds: RuleIdEntry[];          // Rule IDs - string for simple rules, object with channel for channel-specific rules
 }
