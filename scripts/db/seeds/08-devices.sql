@@ -332,7 +332,7 @@ BEGIN
         'PM5100_LAMP'
     );
 
-    -- Device 2: Energy Entrada (lamp)
+    -- Device 2: Energy Entrada (lamp) - slaveId=12 (moved from 2)
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -359,14 +359,14 @@ BEGIN
         '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
-        2,
+        12,
         v_central_dim_id,
         'ENERGY_ENTRADA_01',
         'ENERGY_METER',
         'PM5100_LAMP'
     );
 
-    -- Device 3: Sensor Presença Entrada (presence_sensor)
+    -- Device 3: Sensor Presença Dual (OUTLET with 2 channels: Lab ch0, Entrada ch1) - slaveId=2
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -376,28 +376,28 @@ BEGIN
     VALUES (
         '22220001-0001-0001-0001-000000000003',
         v_tenant_id,
-        v_dim_entrada_id,
+        v_dim_building_id,
         v_dimension_id,
-        'Sensor Presença Entrada',
-        'Sensor de Presença Entrada',
-        'PRES-ENT',
-        'SENSOR',
-        'Presence sensor for entrance area',
-        'SN-DIM-PRES-ENT-001',
-        'dim-presence-ent-001',
-        '{"manufacturer": "Honeywell", "model": "IS312B", "protocol": "ZIGBEE"}',
+        'Sensor Presença Dual',
+        'Sensor de Presença Laboratório e Entrada',
+        'PRES-DUAL',
+        'OUTLET',
+        'Dual presence sensor outlet: Laboratory (ch0) and Entrance (ch1) - same slaveId, different channels',
+        'SN-DIM-PRES-DUAL-001',
+        'dim-presence-dual-001',
+        '{"manufacturer": "Honeywell", "model": "IS335", "protocol": "MODBUS", "channels": [{"name": "presence_lab", "channel": 0, "type": "presence"}, {"name": "presence_entrada", "channel": 1, "type": "presence"}]}',
         'ONLINE',
         NOW() - INTERVAL '1 minute',
-        '["presence", "sensor", "entrance"]',
+        '["presence", "sensor", "laboratory", "entrance", "outlet", "dual-channel"]',
         '{"installationDate": "2024-01-15", "deviceIcon": "presence_sensor"}',
         '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
         'ACTIVE',
         1,
-        3,
+        2,
         v_central_dim_id,
-        'PRESENCE_ENTRADA_01',
-        'PRESENCE_SENSOR',
-        'IS312B_PIR'
+        'PRESENCE_DUAL_01',
+        'OUTLET_PRESENCE',
+        'IS335_DUAL_PIR'
     );
 
     -- Device 4: Laboratório (temperature sensor)

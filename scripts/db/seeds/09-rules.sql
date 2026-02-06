@@ -740,22 +740,43 @@ BEGIN
         1
     );
 
-    -- Presence sensor rule
+    -- Presence sensor rule (Entrance channel - ch1)
     INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000010',
         v_tenant_id,
         v_dimension_id,
         'Entrance Presence After Hours',
-        'Alerts when presence is detected at entrance after business hours',
+        'Alerts when presence is detected at entrance (ch1) after business hours',
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000003', -- Sensor Presença Entrada
+        '22220001-0001-0001-0001-000000000003', -- Sensor Presença Dual (OUTLET)
         false,
-        '{"metric": "presence_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6]}',
+        '{"metric": "presence_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1}',
         '[{"type": "EMAIL", "config": {"to": ["security@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
-        '["presence", "entrance", "security", "after-hours"]',
+        '["presence", "entrance", "security", "after-hours", "channel-1"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Presence sensor rule (Laboratory channel - ch0)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000021',
+        v_tenant_id,
+        v_dimension_id,
+        'Laboratory Presence After Hours',
+        'Alerts when presence is detected in laboratory (ch0) after business hours',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000003', -- Sensor Presença Dual (OUTLET)
+        false,
+        '{"metric": "presence_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 0}',
+        '[{"type": "EMAIL", "config": {"to": ["security@dimension.com.br", "lab@dimension.com.br"]}, "enabled": true}]',
+        '["presence", "laboratory", "security", "after-hours", "channel-0"]',
         'ACTIVE',
         true,
         1
@@ -979,7 +1000,7 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 45 rules (25 ACME + 20 Dimension)';
+    RAISE NOTICE 'Inserted 46 rules (25 ACME + 21 Dimension)';
 END $$;
 
 -- Verify
