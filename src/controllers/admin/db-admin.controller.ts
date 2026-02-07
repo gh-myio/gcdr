@@ -1640,7 +1640,7 @@ function getHtmlPage(): string {
           if (r.success) {
             addLogEntry('success', \`\${r.script} - Done (\${r.duration}ms)\`);
           } else {
-            addLogEntry('error', \`\${r.script} - Failed\`);
+            addLogEntry('error', \`\${r.script} - Failed: \${r.error || 'Unknown error'}\`);
           }
         });
 
@@ -1751,9 +1751,13 @@ function getHtmlPage(): string {
         container.innerHTML = data.logs.map(log => {
           const time = new Date(log.timestamp).toLocaleString();
           const icon = { success: '\\u2713', error: '\\u2717', warning: '\\u26A0', info: '\\u2139' }[log.type] || '';
-          return \`<div class="log-entry log-\${log.type}">
-            <span class="log-time">\${time}</span>
-            <span>\${icon} \${log.message}</span>
+          const details = log.details ? \`<div style="margin-top: 4px; padding: 8px; background: var(--bg); border-radius: 4px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word;">\${log.details}</div>\` : '';
+          return \`<div class="log-entry log-\${log.type}" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; gap: 10px;">
+              <span class="log-time">\${time}</span>
+              <span>\${icon} \${log.message}</span>
+            </div>
+            \${details}
           </div>\`;
         }).join('');
       } catch (err) {
