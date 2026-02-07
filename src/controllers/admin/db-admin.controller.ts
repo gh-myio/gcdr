@@ -30,6 +30,63 @@ const executionLogs: Array<{
   details?: string;
 }> = [];
 
+/**
+ * Extract meaningful PostgreSQL error from Drizzle error object.
+ * Drizzle wraps errors and includes the full query in message, making it unreadable.
+ */
+function extractPgError(error: any): string {
+  // Try to get the underlying PostgreSQL error details
+  if (error.cause) {
+    // Drizzle often wraps the real error in cause
+    const cause = error.cause;
+    if (cause.message) {
+      return cause.message;
+    }
+  }
+
+  // Check for PostgreSQL-specific error properties
+  if (error.detail) {
+    return `${error.message?.split('\n')[0] || 'Error'}: ${error.detail}`;
+  }
+
+  // Check for constraint/column info
+  if (error.column || error.constraint) {
+    const parts = [];
+    if (error.column) parts.push(`column: ${error.column}`);
+    if (error.constraint) parts.push(`constraint: ${error.constraint}`);
+    return `${error.message?.split('\n')[0] || 'Error'} (${parts.join(', ')})`;
+  }
+
+  // If message starts with "Failed query:", try to extract the actual error
+  const msg = error.message || String(error);
+  if (msg.includes('Failed query:')) {
+    // The actual PostgreSQL error is usually at the end or in a separate property
+    // Try to find common PostgreSQL error patterns
+    const patterns = [
+      /invalid input value for enum[^:]*: "([^"]+)"/i,
+      /duplicate key value violates unique constraint "([^"]+)"/i,
+      /violates foreign key constraint "([^"]+)"/i,
+      /null value in column "([^"]+)"/i,
+      /relation "([^"]+)" does not exist/i,
+      /column "([^"]+)" does not exist/i,
+      /syntax error at or near "([^"]+)"/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = msg.match(pattern);
+      if (match) {
+        return match[0];
+      }
+    }
+
+    // If no pattern matched, return first line only (without the huge query)
+    return msg.split('\n')[0].replace(/Failed query:.*/, 'SQL execution failed').trim();
+  }
+
+  // Default: return first line of message to avoid huge outputs
+  return msg.split('\n')[0].substring(0, 500);
+}
+
 const MAX_LOGS = 500;
 
 function addLog(type: 'info' | 'success' | 'error' | 'warning', message: string, details?: string) {
@@ -197,13 +254,14 @@ router.post('/api/scripts/:name/run', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `${name} - Failed (${duration}ms)`, error.message);
+    const errorMsg = extractPgError(error);
+    addLog('error', `${name} - Failed (${duration}ms)`, errorMsg);
 
     res.status(500).json({
       success: false,
       script: name,
       duration,
-      error: error.message,
+      error: errorMsg,
     });
   }
 });
@@ -235,8 +293,9 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
         results.push({ script: file, success: true, duration });
       } catch (error: any) {
         const duration = Date.now() - scriptStart;
-        addLog('error', `${file} - Failed (${duration}ms)`, error.message);
-        results.push({ script: file, success: false, duration, error: error.message });
+        const errorMsg = extractPgError(error);
+        addLog('error', `${file} - Failed (${duration}ms)`, errorMsg);
+        results.push({ script: file, success: false, duration, error: errorMsg });
       }
     }
 
@@ -254,8 +313,8 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
       results,
     });
   } catch (error: any) {
-    addLog('error', 'Seed failed', error.message);
-    res.status(500).json({ error: error.message });
+    addLog('error', 'Seed failed', extractPgError(error));
+    res.status(500).json({ error: extractPgError(error) });
   }
 });
 
@@ -277,8 +336,8 @@ router.post('/api/clear', async (req: Request, res: Response) => {
     res.json({ success: true, duration, output: 'Data cleared successfully' });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `Clear failed (${duration}ms)`, error.message);
-    res.status(500).json({ success: false, error: error.message });
+    addLog('error', `Clear failed (${duration}ms)`, extractPgError(error));
+    res.status(500).json({ success: false, error: extractPgError(error) });
   }
 });
 
@@ -300,8 +359,8 @@ router.post('/api/verify', async (req: Request, res: Response) => {
     res.json({ success: true, duration, output: JSON.stringify(result, null, 2) });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `Verification failed (${duration}ms)`, error.message);
-    res.status(500).json({ success: false, error: error.message });
+    addLog('error', `Verification failed (${duration}ms)`, extractPgError(error));
+    res.status(500).json({ success: false, error: extractPgError(error) });
   }
 });
 
@@ -355,11 +414,11 @@ router.post('/api/query', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    addLog('error', `Query failed (${duration}ms)`, error.message);
+    addLog('error', `Query failed (${duration}ms)`, extractPgError(error));
     res.status(500).json({
       success: false,
       duration,
-      error: error.message,
+      error: extractPgError(error),
     });
   }
 });
