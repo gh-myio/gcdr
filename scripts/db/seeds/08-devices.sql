@@ -400,7 +400,7 @@ BEGIN
         'ILC150_DUAL_LAMP'
     );
 
-    -- Device 4: Sala Reunião (OUTLET with 2 channels: Lampada ch0, Sensor Porta ch1) - slaveId=3
+    -- Device 4: SW Reuniao (OUTLET with 2 channels: Lampada ch0, Sensor Porta ch1) - slaveId=3
     INSERT INTO devices (
         id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
         serial_number, external_id, specs, connectivity_status, last_connected_at,
@@ -412,9 +412,9 @@ BEGIN
         v_tenant_id,
         v_dim_building_id,
         v_dimension_id,
-        'Sala Reunião',
-        'Controle Sala Reunião (Lampada + Sensor Porta)',
-        'REUNIAO-CTRL',
+        'SW Reuniao',
+        'Switch Sala Reunião (Lampada + Sensor Porta)',
+        'SW-REUNIAO',
         'OUTLET',
         'Meeting room outlet: Lamp control (ch0) and Door sensor (ch1)',
         'SN-DIM-REUNIAO-001',
@@ -429,7 +429,7 @@ BEGIN
         1,
         3,
         v_central_dim_id,
-        'REUNIAO_01',
+        'SW_REUNIAO_01',
         'OUTLET_LAMP_DOOR',
         'ILC150D_LAMP_DOOR'
     );
