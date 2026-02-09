@@ -270,11 +270,14 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     // Optional X-Central-Id header to filter devices by central
     const centralId = req.headers['x-central-id'] as string | undefined;
 
+    // Optional X-Version-Id header for cache validation (simpler than ETag for Node-RED)
+    const clientVersionId = req.headers['x-version-id'] as string | undefined;
+
     if (!customerId) {
       throw new ValidationError('Customer ID is required');
     }
 
-    // Check for conditional request (If-None-Match header)
+    // Check for conditional request (If-None-Match header - standard HTTP)
     const ifNoneMatch = req.headers['if-none-match'];
 
     const bundle = await alarmBundleService.generateSimplifiedBundle({
@@ -287,14 +290,27 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     });
 
     const etag = `"${bundle.meta.version}"`;
+    const currentVersionId = bundle.meta.version;
 
-    // Return 304 Not Modified if ETag matches
+    // Return 304 Not Modified if X-Version-Id matches current version
+    if (clientVersionId && clientVersionId === currentVersionId) {
+      res.set({
+        'ETag': etag,
+        'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+        'X-Bundle-Version': currentVersionId,
+      });
+      res.status(304).json({ versionId: currentVersionId });
+      return;
+    }
+
+    // Return 304 Not Modified if ETag matches (standard HTTP caching)
     if (ifNoneMatch && ifNoneMatch === etag) {
       res.set({
         'ETag': etag,
         'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+        'X-Bundle-Version': currentVersionId,
       });
-      res.status(304).send();
+      res.status(304).json({ versionId: currentVersionId });
       return;
     }
 
