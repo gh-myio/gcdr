@@ -1067,7 +1067,28 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 49 rules (25 ACME + 24 Dimension)';
+    -- Daily energy limit (10 kWh max per day)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000025',
+        v_tenant_id,
+        v_dimension_id,
+        'Limite máximo de 10 kWh por dia',
+        'Alerta quando o consumo diário de energia excede 10 kWh',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        false,
+        '{"metric": "energy", "operator": "GT", "value": 10000, "unit": "Wh", "duration": 0, "aggregation": "SUM", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 0.25}',
+        '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
+        '["energy", "daily-limit", "consumption", "kwh"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 50 rules (25 ACME + 25 Dimension)';
 END $$;
 
 -- Verify
