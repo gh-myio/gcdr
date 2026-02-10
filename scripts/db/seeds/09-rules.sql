@@ -1038,7 +1038,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral
         false,
-        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 960000, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": {"0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true}, "keyMulti": 1}',
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 16, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": [1, 2, 3, 4, 5, 6], "keyMulti": 1}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["elevator", "energy", "standby", "weekday"]',
         'ACTIVE',
@@ -1059,7 +1059,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral
         false,
-        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 901000, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": {"0": true, "1": false, "2": false, "3": false, "4": false, "5": false, "6": false}, "keyMulti": 1}',
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 16, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": [0], "keyMulti": 1}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["elevator", "energy", "standby", "sunday"]',
         'ACTIVE',
