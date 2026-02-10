@@ -136,6 +136,8 @@ export interface SimpleBundleAlarmRule {
   daysOfWeek: Record<number, boolean>; // 0-6, where 0 is Sunday (e.g., {0: true, 1: true, ...})
   // Channel targeting for OUTLET devices
   channelId?: number;                // Channel index for multi-channel devices
+  // Energy unit multiplier: 1 for W (default), 0.25 for Wh
+  keyMulti?: number;
 }
 
 /**

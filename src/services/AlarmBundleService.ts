@@ -169,6 +169,8 @@ export class AlarmBundleService {
           daysOfWeek: daysOfWeekObj,
           // Channel targeting (only for OUTLET devices with discrete metrics)
           channelId: rule.alarmConfig.channelId,
+          // Energy unit multiplier: 1 for W (default), 0.25 for Wh
+          keyMulti: rule.alarmConfig.keyMulti ?? 1,
         };
 
         rulesCatalog[rule.id] = simplifiedRule;
