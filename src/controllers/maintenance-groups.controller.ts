@@ -8,8 +8,9 @@ import {
   AddGroupMembersSchema,
   RemoveGroupMembersSchema,
 } from '../dto/request/MaintenanceGroupDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -21,7 +22,15 @@ const router = Router();
  * POST /maintenance-groups
  * Create a new maintenance group
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/',
+  logEvent({
+    eventType: EventType.GROUP_CREATED,
+    description: (req) => `Maintenance group "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({ key: req.body.key, groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = CreateMaintenanceGroupSchema.parse(req.body);
@@ -123,7 +132,14 @@ router.get('/key/:key', async (req: Request, res: Response, next: NextFunction) 
  * PUT /maintenance-groups/:groupId
  * Update maintenance group
  */
-router.put('/:groupId', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:groupId',
+  logEvent({
+    eventType: EventType.GROUP_UPDATED,
+    description: (req) => `Maintenance group ${req.params.groupId} updated`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: () => ({ groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { groupId } = req.params;
@@ -144,7 +160,14 @@ router.put('/:groupId', async (req: Request, res: Response, next: NextFunction) 
  * DELETE /maintenance-groups/:groupId
  * Delete maintenance group
  */
-router.delete('/:groupId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:groupId',
+  logEvent({
+    eventType: EventType.GROUP_DELETED,
+    description: (req) => `Maintenance group ${req.params.groupId} deleted`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: () => ({ groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId } = req.context;
     const { groupId } = req.params;
@@ -193,7 +216,14 @@ router.get('/:groupId/members', async (req: Request, res: Response, next: NextFu
  * POST /maintenance-groups/:groupId/members
  * Add a single member to group
  */
-router.post('/:groupId/members', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:groupId/members',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_ADDED,
+    description: (req) => `Member added to maintenance group ${req.params.groupId}`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: (req) => ({ memberId: req.body.userId, groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { groupId } = req.params;
@@ -215,7 +245,14 @@ router.post('/:groupId/members', async (req: Request, res: Response, next: NextF
  * POST /maintenance-groups/:groupId/members/bulk
  * Add multiple members to group
  */
-router.post('/:groupId/members/bulk', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:groupId/members/bulk',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_ADDED,
+    description: (req) => `${req.body.userIds?.length || 0} members added to maintenance group ${req.params.groupId}`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: (req) => ({ memberCount: req.body.userIds?.length, groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { groupId } = req.params;
@@ -237,7 +274,14 @@ router.post('/:groupId/members/bulk', async (req: Request, res: Response, next: 
  * DELETE /maintenance-groups/:groupId/members/:userId
  * Remove a single member from group
  */
-router.delete('/:groupId/members/:memberId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:groupId/members/:memberId',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_REMOVED,
+    description: (req) => `Member ${req.params.memberId} removed from maintenance group ${req.params.groupId}`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: (req) => ({ memberId: req.params.memberId, groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId } = req.context;
     const { groupId, memberId } = req.params;
@@ -260,7 +304,14 @@ router.delete('/:groupId/members/:memberId', async (req: Request, res: Response,
  * POST /maintenance-groups/:groupId/members/remove
  * Remove multiple members from group
  */
-router.post('/:groupId/members/remove', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:groupId/members/remove',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_REMOVED,
+    description: (req) => `${req.body.userIds?.length || 0} members removed from maintenance group ${req.params.groupId}`,
+    getEntityId: (req) => req.params.groupId,
+    getMetadata: (req) => ({ memberCount: req.body.userIds?.length, groupType: 'maintenance' }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { groupId } = req.params;

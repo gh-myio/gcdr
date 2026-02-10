@@ -4,8 +4,9 @@ import {
   CreateLookAndFeelSchema,
   UpdateLookAndFeelSchema,
 } from '../dto/request/LookAndFeelDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -13,16 +14,24 @@ const router = Router();
  * POST /themes
  * Create a new theme
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = CreateLookAndFeelSchema.parse(req.body);
-    const theme = await lookAndFeelRepository.create(tenantId, data, userId);
-    sendCreated(res, theme, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.THEME_CREATED,
+    description: (req) => `Theme "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = CreateLookAndFeelSchema.parse(req.body);
+      const theme = await lookAndFeelRepository.create(tenantId, data, userId);
+      sendCreated(res, theme, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /themes
@@ -71,68 +80,89 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /themes/:id
  * Update theme
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.THEME_UPDATED,
+    description: (req) => `Theme ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Theme ID is required');
+      if (!id) {
+        throw new ValidationError('Theme ID is required');
+      }
+
+      const data = UpdateLookAndFeelSchema.parse(req.body);
+      const theme = await lookAndFeelRepository.update(tenantId, id, data, userId);
+      sendSuccess(res, theme, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateLookAndFeelSchema.parse(req.body);
-    const theme = await lookAndFeelRepository.update(tenantId, id, data, userId);
-    sendSuccess(res, theme, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /themes/:id
  * Delete theme
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId } = req.context;
-    const { id } = req.params;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.THEME_DELETED,
+    description: (req) => `Theme ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Theme ID is required');
+      if (!id) {
+        throw new ValidationError('Theme ID is required');
+      }
+
+      await lookAndFeelRepository.delete(tenantId, id);
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    await lookAndFeelRepository.delete(tenantId, id);
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /themes/:id/set-default
  * Set theme as default for its customer
  */
-router.post('/:id/set-default', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, requestId } = req.context;
-    const { id } = req.params;
+router.post('/:id/set-default',
+  logEvent({
+    eventType: EventType.THEME_SET_DEFAULT,
+    description: (req) => `Theme ${req.params.id} set as default`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Theme ID is required');
+      if (!id) {
+        throw new ValidationError('Theme ID is required');
+      }
+
+      // Get theme to find customerId
+      const theme = await lookAndFeelRepository.getById(tenantId, id);
+      if (!theme) {
+        throw new ValidationError('Theme not found');
+      }
+
+      const updatedTheme = await lookAndFeelRepository.setDefault(tenantId, theme.customerId, id);
+      sendSuccess(res, updatedTheme, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    // Get theme to find customerId
-    const theme = await lookAndFeelRepository.getById(tenantId, id);
-    if (!theme) {
-      throw new ValidationError('Theme not found');
-    }
-
-    const updatedTheme = await lookAndFeelRepository.setDefault(tenantId, theme.customerId, id);
-    sendSuccess(res, updatedTheme, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /themes/:id/children

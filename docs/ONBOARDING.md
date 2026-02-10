@@ -1635,6 +1635,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0003: JWT Multiple Audience](./RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
 - [RFC-0004: Migration DynamoDB to PostgreSQL](./RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
 - [RFC-0005: Container Deployment](./RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
+- [RFC-0009: Events Audit Logs](./RFC-0009-Events-Audit-Logs.md) - Sistema de auditoria e logs de eventos
 - [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
 - [RFC-0011: User Registration Workflow](./RFC-0011-User-Registration-Approval-Workflow.md) - Auto-cadastro e aprovação de usuários
 - [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras

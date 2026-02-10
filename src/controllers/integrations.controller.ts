@@ -12,8 +12,9 @@ import {
   toPackageSummaryDTO,
   toSubscriptionDTO
 } from '../dto/response/IntegrationResponseDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -112,7 +113,14 @@ router.get('/subscriptions', async (req: Request, res: Response, next: NextFunct
  * POST /integrations/subscribe
  * Subscribe to a package
  */
-router.post('/subscribe', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/subscribe',
+  logEvent({
+    eventType: EventType.PACKAGE_SUBSCRIBED,
+    description: (req) => `Subscribed to package ${req.body.packageId}`,
+    getEntityId: (req) => req.body.packageId,
+    getMetadata: (req) => ({ version: req.body.version }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = SubscribePackageSchema.parse(req.body);
@@ -142,7 +150,13 @@ router.post('/subscribe', async (req: Request, res: Response, next: NextFunction
  * DELETE /integrations/subscriptions/:subscriptionId
  * Unsubscribe from a package
  */
-router.delete('/subscriptions/:subscriptionId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/subscriptions/:subscriptionId',
+  logEvent({
+    eventType: EventType.PACKAGE_UNSUBSCRIBED,
+    description: (req) => `Unsubscribed from subscription ${req.params.subscriptionId}`,
+    getEntityId: (req) => req.params.subscriptionId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { subscriptionId } = req.params;
@@ -223,7 +237,14 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
  * POST /integrations/:id/publish
  * Publish a new version
  */
-router.post('/:id/publish', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/publish',
+  logEvent({
+    eventType: EventType.PACKAGE_PUBLISHED,
+    description: (req) => `Package ${req.params.id} version ${req.body.version} published`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ version: req.body.version }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;

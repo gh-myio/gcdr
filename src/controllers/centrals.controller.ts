@@ -7,8 +7,9 @@ import {
   UpdateConnectionStatusSchema,
   ListCentralsDTO,
 } from '../dto/request/CentralDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -16,16 +17,25 @@ const router = Router();
  * POST /centrals
  * Create a new central
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = CreateCentralSchema.parse(req.body);
-    const central = await centralRepository.create(tenantId, data, userId);
-    sendCreated(res, central, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.CENTRAL_CREATED,
+    description: (req) => `Central "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({ serialNumber: req.body.serialNumber, type: req.body.type }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = CreateCentralSchema.parse(req.body);
+      const central = await centralRepository.create(tenantId, data, userId);
+      sendCreated(res, central, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /centrals
@@ -105,43 +115,59 @@ router.get('/serial/:serialNumber', async (req: Request, res: Response, next: Ne
  * PUT /centrals/:id
  * Update central
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.CENTRAL_UPDATED,
+    description: (req) => `Central ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ updatedFields: Object.keys(req.body) }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Central ID is required');
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      const data = UpdateCentralSchema.parse(req.body);
+      const central = await centralRepository.update(tenantId, id, data, userId);
+      sendSuccess(res, central, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateCentralSchema.parse(req.body);
-    const central = await centralRepository.update(tenantId, id, data, userId);
-    sendSuccess(res, central, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * PATCH /centrals/:id/status
  * Update central status
  */
-router.patch('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.patch('/:id/status',
+  logEvent({
+    eventType: EventType.CENTRAL_STATUS_CHANGED,
+    description: (req) => `Central ${req.params.id} status changed to ${req.body.status}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ status: req.body.status }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Central ID is required');
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      const data = UpdateCentralStatusSchema.parse(req.body);
+      const central = await centralRepository.updateStatus(tenantId, id, data.status, userId);
+      sendSuccess(res, central, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateCentralStatusSchema.parse(req.body);
-    const central = await centralRepository.updateStatus(tenantId, id, data.status, userId);
-    sendSuccess(res, central, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * PATCH /centrals/:id/connection
@@ -189,21 +215,28 @@ router.post('/:id/heartbeat', async (req: Request, res: Response, next: NextFunc
  * DELETE /centrals/:id
  * Delete central
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId } = req.context;
-    const { id } = req.params;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.CENTRAL_DELETED,
+    description: (req) => `Central ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Central ID is required');
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      await centralRepository.delete(tenantId, id);
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    await centralRepository.delete(tenantId, id);
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /customers/:customerId/centrals

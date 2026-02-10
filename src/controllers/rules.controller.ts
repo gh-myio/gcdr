@@ -8,8 +8,9 @@ import {
   EvaluateRuleSchema,
   ListRulesParamsSchema
 } from '../dto/request/RuleDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -17,16 +18,25 @@ const router = Router();
  * POST /rules
  * Create a new rule
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = CreateRuleSchema.parse(req.body);
-    const rule = await ruleService.create(tenantId, data, userId);
-    sendCreated(res, rule, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.RULE_CREATED,
+    description: (req) => `Rule "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({ type: req.body.type, priority: req.body.priority }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = CreateRuleSchema.parse(req.body);
+      const rule = await ruleService.create(tenantId, data, userId);
+      sendCreated(res, rule, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /rules
@@ -124,63 +134,87 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /rules/:id
  * Update rule
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.RULE_UPDATED,
+    description: (req) => `Rule ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ updatedFields: Object.keys(req.body) }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Rule ID is required');
+      if (!id) {
+        throw new ValidationError('Rule ID is required');
+      }
+
+      const data = UpdateRuleSchema.parse(req.body);
+      const rule = await ruleService.update(tenantId, id, data, userId);
+      sendSuccess(res, rule, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateRuleSchema.parse(req.body);
-    const rule = await ruleService.update(tenantId, id, data, userId);
-    sendSuccess(res, rule, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /rules/:id
  * Delete rule
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId } = req.context;
-    const { id } = req.params;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.RULE_DELETED,
+    description: (req) => `Rule ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Rule ID is required');
+      if (!id) {
+        throw new ValidationError('Rule ID is required');
+      }
+
+      await ruleService.delete(tenantId, id, userId);
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    await ruleService.delete(tenantId, id, userId);
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /rules/:id/toggle
  * Toggle rule enabled/disabled
  */
-router.post('/:id/toggle', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.post('/:id/toggle',
+  logEvent({
+    eventType: EventType.RULE_ENABLED,
+    description: (req) => `Rule ${req.params.id} ${req.body.enabled ? 'enabled' : 'disabled'}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ enabled: req.body.enabled, reason: req.body.reason }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Rule ID is required');
+      if (!id) {
+        throw new ValidationError('Rule ID is required');
+      }
+
+      const data = ToggleRuleSchema.parse(req.body);
+      const rule = await ruleService.toggle(tenantId, id, data.enabled, userId, data.reason);
+      sendSuccess(res, rule, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = ToggleRuleSchema.parse(req.body);
-    const rule = await ruleService.toggle(tenantId, id, data.enabled, userId, data.reason);
-    sendSuccess(res, rule, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /customers/:customerId/rules

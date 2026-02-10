@@ -6,8 +6,9 @@ import {
   MoveAssetSchema,
   ListAssetsParams,
 } from '../dto/request/AssetDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -15,16 +16,25 @@ const router = Router();
  * POST /assets
  * Create a new asset
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = CreateAssetSchema.parse(req.body);
-    const asset = await assetService.create(tenantId, data, userId);
-    sendCreated(res, asset, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.ASSET_CREATED,
+    description: (req) => `Asset "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({ type: req.body.type, code: req.body.code }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = CreateAssetSchema.parse(req.body);
+      const asset = await assetService.create(tenantId, data, userId);
+      sendCreated(res, asset, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /assets
@@ -95,63 +105,87 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /assets/:id
  * Update asset
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.ASSET_UPDATED,
+    description: (req) => `Asset ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ updatedFields: Object.keys(req.body) }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Asset ID is required');
+      if (!id) {
+        throw new ValidationError('Asset ID is required');
+      }
+
+      const data = UpdateAssetSchema.parse(req.body);
+      const asset = await assetService.update(tenantId, id, data, userId);
+      sendSuccess(res, asset, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateAssetSchema.parse(req.body);
-    const asset = await assetService.update(tenantId, id, data, userId);
-    sendSuccess(res, asset, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /assets/:id
  * Delete asset
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId } = req.context;
-    const { id } = req.params;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.ASSET_DELETED,
+    description: (req) => `Asset ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Asset ID is required');
+      if (!id) {
+        throw new ValidationError('Asset ID is required');
+      }
+
+      await assetService.delete(tenantId, id, userId);
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    await assetService.delete(tenantId, id, userId);
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /assets/:id/move
  * Move asset to another parent
  */
-router.post('/:id/move', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.post('/:id/move',
+  logEvent({
+    eventType: EventType.ASSET_MOVED,
+    description: (req) => `Asset ${req.params.id} moved to parent ${req.body.newParentAssetId || 'root'}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ newParentAssetId: req.body.newParentAssetId }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Asset ID is required');
+      if (!id) {
+        throw new ValidationError('Asset ID is required');
+      }
+
+      const data = MoveAssetSchema.parse(req.body);
+      const asset = await assetService.move(tenantId, id, data, userId);
+      sendSuccess(res, asset, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = MoveAssetSchema.parse(req.body);
-    const asset = await assetService.move(tenantId, id, data, userId);
-    sendSuccess(res, asset, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /assets/:id/children

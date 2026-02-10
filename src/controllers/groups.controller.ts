@@ -7,8 +7,9 @@ import {
   RemoveMembersSchema,
   ListGroupsQuerySchema,
 } from '../dto/request/GroupDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -16,22 +17,31 @@ const router = Router();
  * POST /groups
  * Create a new group
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { customerId } = req.body;
+router.post('/',
+  logEvent({
+    eventType: EventType.GROUP_CREATED,
+    description: (req) => `Group "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({ groupType: req.body.groupType }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { customerId } = req.body;
 
-    if (!customerId) {
-      throw new ValidationError('customerId is required');
+      if (!customerId) {
+        throw new ValidationError('customerId is required');
+      }
+
+      const data = CreateGroupSchema.parse(req.body);
+      const group = await groupService.createGroup(tenantId, customerId, data, userId);
+      sendCreated(res, group, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = CreateGroupSchema.parse(req.body);
-    const group = await groupService.createGroup(tenantId, customerId, data, userId);
-    sendCreated(res, group, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /groups
@@ -72,90 +82,120 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /groups/:id
  * Update group
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.GROUP_UPDATED,
+    description: (req) => `Group ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Group ID is required');
+      if (!id) {
+        throw new ValidationError('Group ID is required');
+      }
+
+      const data = UpdateGroupSchema.parse(req.body);
+      const group = await groupService.updateGroup(tenantId, id, data, userId);
+      sendSuccess(res, group, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateGroupSchema.parse(req.body);
-    const group = await groupService.updateGroup(tenantId, id, data, userId);
-    sendSuccess(res, group, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /groups/:id
  * Delete group
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId } = req.context;
-    const { id } = req.params;
-    const { soft } = req.query;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.GROUP_DELETED,
+    description: (req) => `Group ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId } = req.context;
+      const { id } = req.params;
+      const { soft } = req.query;
 
-    if (!id) {
-      throw new ValidationError('Group ID is required');
+      if (!id) {
+        throw new ValidationError('Group ID is required');
+      }
+
+      if (soft === 'true') {
+        await groupService.softDeleteGroup(tenantId, id, userId);
+      } else {
+        await groupService.deleteGroup(tenantId, id);
+      }
+
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    if (soft === 'true') {
-      await groupService.softDeleteGroup(tenantId, id, userId);
-    } else {
-      await groupService.deleteGroup(tenantId, id);
-    }
-
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /groups/:id/members
  * Add members to group
  */
-router.post('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.post('/:id/members',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_ADDED,
+    description: (req) => `Members added to group ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ memberCount: req.body.members?.length }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Group ID is required');
+      if (!id) {
+        throw new ValidationError('Group ID is required');
+      }
+
+      const data = AddMembersSchema.parse(req.body);
+      const group = await groupService.addMembers(tenantId, id, data, userId);
+      sendSuccess(res, group, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = AddMembersSchema.parse(req.body);
-    const group = await groupService.addMembers(tenantId, id, data, userId);
-    sendSuccess(res, group, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /groups/:id/members
  * Remove members from group
  */
-router.delete('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.delete('/:id/members',
+  logEvent({
+    eventType: EventType.GROUP_MEMBER_REMOVED,
+    description: (req) => `Members removed from group ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ memberCount: req.body.memberIds?.length }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Group ID is required');
+      if (!id) {
+        throw new ValidationError('Group ID is required');
+      }
+
+      const data = RemoveMembersSchema.parse(req.body);
+      const group = await groupService.removeMembers(tenantId, id, data.memberIds, userId);
+      sendSuccess(res, group, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = RemoveMembersSchema.parse(req.body);
-    const group = await groupService.removeMembers(tenantId, id, data.memberIds, userId);
-    sendSuccess(res, group, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /groups/:id/children

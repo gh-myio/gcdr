@@ -5,8 +5,9 @@ import {
   UpdateCustomerApiKeySchema,
   ListCustomerApiKeysQuerySchema
 } from '../dto/request/CustomerApiKeyDTO';
-import { sendSuccess, sendCreated } from '../middleware/response';
+import { sendSuccess, sendCreated, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 // This router is mounted at /customers/:customerId/api-keys
 const router = Router({ mergeParams: true });
@@ -18,7 +19,15 @@ const router = Router({ mergeParams: true });
  * IMPORTANT: The plaintext key is only returned once at creation.
  * Store it securely - it cannot be retrieved later!
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/',
+  logEvent({
+    eventType: EventType.API_KEY_CREATED,
+    description: (req) => `API key created for customer ${req.params.customerId}`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.params.customerId,
+    getMetadata: (req) => ({ keyName: req.body.name, scopes: req.body.scopes }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { customerId } = req.params;
@@ -193,7 +202,14 @@ router.put('/:keyId', async (req: Request, res: Response, next: NextFunction) =>
  *
  * Warning: This action cannot be undone. The key will stop working immediately.
  */
-router.delete('/:keyId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:keyId',
+  logEvent({
+    eventType: EventType.API_KEY_REVOKED,
+    description: (req) => `API key ${req.params.keyId} revoked for customer ${req.params.customerId}`,
+    getEntityId: (req) => req.params.keyId,
+    getCustomerId: (req) => req.params.customerId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const { customerId, keyId } = req.params;

@@ -11,9 +11,9 @@ import {
   UpdateWebhookSchema,
 } from '../dto/request/PartnerDTO';
 import { ListPartnersParams } from '../repositories/interfaces/IPartnerRepository';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
-import { PartnerStatus } from '../shared/types';
+import { PartnerStatus, EventType } from '../shared/types';
 
 const router = Router();
 
@@ -21,16 +21,24 @@ const router = Router();
  * POST /partners
  * Register a new partner
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = RegisterPartnerSchema.parse(req.body);
-    const partner = await partnerService.register(tenantId, data, userId);
-    sendCreated(res, partner, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.PARTNER_REGISTERED,
+    description: (req) => `Partner "${req.body.companyName}" registered`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getMetadata: (req) => ({ companyName: req.body.companyName }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = RegisterPartnerSchema.parse(req.body);
+      const partner = await partnerService.register(tenantId, data, userId);
+      sendCreated(res, partner, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /partners
@@ -99,7 +107,14 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * POST /partners/:id/approve
  * Approve a pending partner
  */
-router.post('/:id/approve', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/approve',
+  logEvent({
+    eventType: EventType.PARTNER_APPROVED,
+    description: (req) => `Partner ${req.params.id} approved`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ tier: req.body.tier }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -120,7 +135,14 @@ router.post('/:id/approve', async (req: Request, res: Response, next: NextFuncti
  * POST /partners/:id/reject
  * Reject a pending partner
  */
-router.post('/:id/reject', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/reject',
+  logEvent({
+    eventType: EventType.PARTNER_REJECTED,
+    description: (req) => `Partner ${req.params.id} rejected`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ reason: req.body.reason }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -141,7 +163,14 @@ router.post('/:id/reject', async (req: Request, res: Response, next: NextFunctio
  * POST /partners/:id/suspend
  * Suspend an active partner
  */
-router.post('/:id/suspend', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/suspend',
+  logEvent({
+    eventType: EventType.PARTNER_SUSPENDED,
+    description: (req) => `Partner ${req.params.id} suspended`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ reason: req.body.reason }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -166,7 +195,13 @@ router.post('/:id/suspend', async (req: Request, res: Response, next: NextFuncti
  * POST /partners/:id/activate
  * Activate an approved or suspended partner
  */
-router.post('/:id/activate', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/activate',
+  logEvent({
+    eventType: EventType.PARTNER_ACTIVATED,
+    description: (req) => `Partner ${req.params.id} activated`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -188,7 +223,14 @@ router.post('/:id/activate', async (req: Request, res: Response, next: NextFunct
  * POST /partners/:id/api-keys
  * Create a new API key for partner
  */
-router.post('/:id/api-keys', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/api-keys',
+  logEvent({
+    eventType: EventType.API_KEY_CREATED,
+    description: (req) => `API key created for partner ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ keyName: req.body.name, scopes: req.body.scopes }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -248,7 +290,14 @@ router.get('/:id/api-keys', async (req: Request, res: Response, next: NextFuncti
  * DELETE /partners/:id/api-keys/:keyId
  * Revoke an API key
  */
-router.delete('/:id/api-keys/:keyId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id/api-keys/:keyId',
+  logEvent({
+    eventType: EventType.API_KEY_REVOKED,
+    description: (req) => `API key ${req.params.keyId} revoked for partner ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ keyId: req.params.keyId }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId } = req.context;
     const { id, keyId } = req.params;
@@ -271,7 +320,14 @@ router.delete('/:id/api-keys/:keyId', async (req: Request, res: Response, next: 
  * POST /partners/:id/api-keys/:keyId/rotate
  * Rotate an API key (revoke old, create new with same settings)
  */
-router.post('/:id/api-keys/:keyId/rotate', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/api-keys/:keyId/rotate',
+  logEvent({
+    eventType: EventType.API_KEY_CREATED,
+    description: (req) => `API key ${req.params.keyId} rotated for partner ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ rotatedKeyId: req.params.keyId }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id, keyId } = req.params;

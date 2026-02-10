@@ -1054,10 +1054,19 @@ interface AuditLogResponse {
 
 ### Fase 3: Integracao nos Controllers
 - [x] Adicionar logEvent em customers
-- [ ] Adicionar logEvent em devices
-- [ ] Adicionar logEvent em users
-- [ ] Adicionar logEvent em rules
-- [ ] Adicionar logEvent em auth
+- [x] Adicionar logEvent em devices
+- [x] Adicionar logEvent em users
+- [x] Adicionar logEvent em rules
+- [x] Adicionar logEvent em auth
+- [x] Adicionar logEvent em assets
+- [x] Adicionar logEvent em policies
+- [x] Adicionar logEvent em centrals
+- [x] Adicionar logEvent em themes
+- [x] Adicionar logEvent em groups
+- [x] Adicionar logEvent em partners
+- [x] Adicionar logEvent em customer-api-keys
+- [x] Adicionar logEvent em integrations
+- [x] Adicionar logEvent em maintenance-groups
 
 ### Fase 4: API, Seguranca e Documentacao
 - [x] Criar endpoint GET /audit-logs com RBAC

@@ -11,10 +11,11 @@ import {
   VerifyEmailRequestSchema,
   ResendVerificationRequestSchema,
 } from '../dto/request/AuthDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT } from '../middleware/context';
 import { registrationService } from '../services/RegistrationService';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -22,25 +23,32 @@ const router = Router();
  * POST /auth/login
  * Authenticate user
  */
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { ip, requestId } = req.context;
+router.post('/login',
+  logEvent({
+    eventType: EventType.AUTH_LOGIN_SUCCESS,
+    description: (req) => `Login attempt for ${req.body.email}`,
+    getMetadata: (req) => ({ email: req.body.email }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { ip, requestId } = req.context;
 
-    const result = LoginRequestSchema.safeParse(req.body);
-    if (!result.success) {
-      throw new ValidationError('Dados de login inválidos', {
-        validation: result.error.errors.map((e) => e.message),
-      });
+      const result = LoginRequestSchema.safeParse(req.body);
+      if (!result.success) {
+        throw new ValidationError('Dados de login inválidos', {
+          validation: result.error.errors.map((e) => e.message),
+        });
+      }
+
+      const { email, password, mfaCode, deviceInfo } = result.data;
+      const response = await authService.login(email, password, mfaCode, ip, deviceInfo);
+
+      sendSuccess(res, response, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const { email, password, mfaCode, deviceInfo } = result.data;
-    const response = await authService.login(email, password, mfaCode, ip, deviceInfo);
-
-    sendSuccess(res, response, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /auth/refresh
@@ -94,35 +102,42 @@ router.post('/mfa/verify', async (req: Request, res: Response, next: NextFunctio
  * POST /auth/logout
  * Logout user
  */
-router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId } = req.context;
+router.post('/logout',
+  logEvent({
+    eventType: EventType.AUTH_LOGOUT,
+    description: () => `User logged out`,
+    getMetadata: (req) => ({ allDevices: req.body.allDevices }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId } = req.context;
 
-    const authHeader = req.headers['authorization'];
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new UnauthorizedError('Token não fornecido');
+      const authHeader = req.headers['authorization'];
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new UnauthorizedError('Token não fornecido');
+      }
+
+      const token = authHeader.slice(7);
+      const user = decodeJWT(token);
+      if (!user) {
+        throw new UnauthorizedError('Token inválido');
+      }
+
+      const result = LogoutRequestSchema.safeParse(req.body);
+      const { refreshToken, allDevices } = result.success ? result.data : { refreshToken: undefined, allDevices: false };
+
+      if (allDevices) {
+        await authService.logoutAllDevices(tenantId, user.sub);
+      } else {
+        await authService.logout(tenantId, user.sub, refreshToken);
+      }
+
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    const token = authHeader.slice(7);
-    const user = decodeJWT(token);
-    if (!user) {
-      throw new UnauthorizedError('Token inválido');
-    }
-
-    const result = LogoutRequestSchema.safeParse(req.body);
-    const { refreshToken, allDevices } = result.success ? result.data : { refreshToken: undefined, allDevices: false };
-
-    if (allDevices) {
-      await authService.logoutAllDevices(tenantId, user.sub);
-    } else {
-      await authService.logout(tenantId, user.sub, refreshToken);
-    }
-
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 // =============================================================================
 // RFC-0011: User Registration and Approval Workflow

@@ -7,8 +7,9 @@ import {
   UpdateConnectivitySchema,
   ListDevicesParams
 } from '../dto/request/DeviceDTO';
-import { sendSuccess, sendCreated, sendNoContent } from '../middleware/response';
+import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
+import { EventType } from '../shared/types';
 
 const router = Router();
 
@@ -16,16 +17,29 @@ const router = Router();
  * POST /devices
  * Create a new device
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const data = CreateDeviceSchema.parse(req.body);
-    const device = await deviceService.create(tenantId, data, userId);
-    sendCreated(res, device, requestId);
-  } catch (err) {
-    next(err);
+router.post('/',
+  logEvent({
+    eventType: EventType.DEVICE_CREATED,
+    description: (req) => `Device "${req.body.name}" created`,
+    getEntityId: (req, res) => res.locals.responseBody?.data?.id,
+    getCustomerId: (req) => req.body.customerId,
+    getMetadata: (req) => ({
+      serialNumber: req.body.serialNumber,
+      type: req.body.type,
+      assetId: req.body.assetId,
+    }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const data = CreateDeviceSchema.parse(req.body);
+      const device = await deviceService.create(tenantId, data, userId);
+      sendCreated(res, device, requestId);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /devices
@@ -77,84 +91,117 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /devices/:id
  * Update device
  */
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.put('/:id',
+  logEvent({
+    eventType: EventType.DEVICE_UPDATED,
+    description: (req) => `Device ${req.params.id} updated`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ updatedFields: Object.keys(req.body) }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Device ID is required');
+      if (!id) {
+        throw new ValidationError('Device ID is required');
+      }
+
+      const data = UpdateDeviceSchema.parse(req.body);
+      const device = await deviceService.update(tenantId, id, data, userId);
+      sendSuccess(res, device, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateDeviceSchema.parse(req.body);
-    const device = await deviceService.update(tenantId, id, data, userId);
-    sendSuccess(res, device, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * DELETE /devices/:id
  * Delete device
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId } = req.context;
-    const { id } = req.params;
+router.delete('/:id',
+  logEvent({
+    eventType: EventType.DEVICE_DELETED,
+    description: (req) => `Device ${req.params.id} deleted`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Device ID is required');
+      if (!id) {
+        throw new ValidationError('Device ID is required');
+      }
+
+      await deviceService.delete(tenantId, id, userId);
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
     }
-
-    await deviceService.delete(tenantId, id, userId);
-    sendNoContent(res);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * POST /devices/:id/move
  * Move device to another asset
  */
-router.post('/:id/move', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, userId, requestId } = req.context;
-    const { id } = req.params;
+router.post('/:id/move',
+  logEvent({
+    eventType: EventType.DEVICE_MOVED,
+    description: (req) => `Device ${req.params.id} moved to asset ${req.body.newAssetId}`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ newAssetId: req.body.newAssetId }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Device ID is required');
+      if (!id) {
+        throw new ValidationError('Device ID is required');
+      }
+
+      const data = MoveDeviceSchema.parse(req.body);
+      const device = await deviceService.move(tenantId, id, data, userId);
+      sendSuccess(res, device, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = MoveDeviceSchema.parse(req.body);
-    const device = await deviceService.move(tenantId, id, data, userId);
-    sendSuccess(res, device, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * PATCH /devices/:id/connectivity
  * Update device connectivity status
  */
-router.patch('/:id/connectivity', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId, requestId } = req.context;
-    const { id } = req.params;
+router.patch('/:id/connectivity',
+  logEvent({
+    eventType: EventType.DEVICE_CONNECTIVITY_CHANGED,
+    description: (req) => `Device ${req.params.id} connectivity changed to ${req.body.connectivityStatus}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ connectivityStatus: req.body.connectivityStatus }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
 
-    if (!id) {
-      throw new ValidationError('Device ID is required');
+      if (!id) {
+        throw new ValidationError('Device ID is required');
+      }
+
+      const data = UpdateConnectivitySchema.parse(req.body);
+      const device = await deviceService.updateConnectivityStatus(tenantId, id, data.connectivityStatus);
+      sendSuccess(res, device, 200, requestId);
+    } catch (err) {
+      next(err);
     }
-
-    const data = UpdateConnectivitySchema.parse(req.body);
-    const device = await deviceService.updateConnectivityStatus(tenantId, id, data.connectivityStatus);
-    sendSuccess(res, device, 200, requestId);
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * GET /assets/:assetId/devices
