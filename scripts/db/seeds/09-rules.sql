@@ -1021,7 +1021,53 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 47 rules (25 ACME + 22 Dimension)';
+    -- ==========================================================================
+    -- DIMENSION: ELEVATOR ENERGY RULES (for SW Reuniao device)
+    -- ==========================================================================
+
+    -- Elevator energized and not used (Monday to Saturday)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000023',
+        v_tenant_id,
+        v_dimension_id,
+        'Elevador energizado e não usado (seg-sáb)',
+        'Alerta quando o elevador está energizado mas não está sendo usado de segunda a sábado (10:00-22:00)',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        false,
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 960000, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": {"0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true}, "keyMulti": 1}',
+        '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
+        '["elevator", "energy", "standby", "weekday"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    -- Elevator energized and not used (Sunday)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000024',
+        v_tenant_id,
+        v_dimension_id,
+        'Elevador energizado e não usado (domingo)',
+        'Alerta quando o elevador está energizado mas não está sendo usado aos domingos (12:00-22:00)',
+        'ALARM_THRESHOLD',
+        'MEDIUM',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        false,
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 901000, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": {"0": true, "1": false, "2": false, "3": false, "4": false, "5": false, "6": false}, "keyMulti": 1}',
+        '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
+        '["elevator", "energy", "standby", "sunday"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 49 rules (25 ACME + 24 Dimension)';
 END $$;
 
 -- Verify
