@@ -132,37 +132,17 @@ export class AlarmBundleService {
     const rulesCatalog: Record<string, SimpleBundleAlarmRule> = {};
     for (const rule of rules) {
       if (rule.alarmConfig) {
-        // Convert daysOfWeek to object format {0: true, 1: false, ...}
-        // Supports both array [0,1,2] and object {"0": true, "1": false} formats
-        const daysOfWeekInput = rule.alarmConfig.daysOfWeek;
-        let daysOfWeekObj: Record<number, boolean>;
-
-        if (Array.isArray(daysOfWeekInput)) {
-          // Array format: [0, 1, 2, 3, 4, 5, 6]
-          daysOfWeekObj = {
-            0: daysOfWeekInput.includes(0),
-            1: daysOfWeekInput.includes(1),
-            2: daysOfWeekInput.includes(2),
-            3: daysOfWeekInput.includes(3),
-            4: daysOfWeekInput.includes(4),
-            5: daysOfWeekInput.includes(5),
-            6: daysOfWeekInput.includes(6),
-          };
-        } else if (daysOfWeekInput && typeof daysOfWeekInput === 'object') {
-          // Object format: {"0": true, "1": false, ...}
-          daysOfWeekObj = {
-            0: Boolean(daysOfWeekInput['0'] ?? daysOfWeekInput[0] ?? true),
-            1: Boolean(daysOfWeekInput['1'] ?? daysOfWeekInput[1] ?? true),
-            2: Boolean(daysOfWeekInput['2'] ?? daysOfWeekInput[2] ?? true),
-            3: Boolean(daysOfWeekInput['3'] ?? daysOfWeekInput[3] ?? true),
-            4: Boolean(daysOfWeekInput['4'] ?? daysOfWeekInput[4] ?? true),
-            5: Boolean(daysOfWeekInput['5'] ?? daysOfWeekInput[5] ?? true),
-            6: Boolean(daysOfWeekInput['6'] ?? daysOfWeekInput[6] ?? true),
-          };
-        } else {
-          // Default: all days enabled
-          daysOfWeekObj = { 0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
-        }
+        // Convert daysOfWeek array to object format {0: true, 1: false, ...}
+        const daysArray = rule.alarmConfig.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
+        const daysOfWeekObj: Record<number, boolean> = {
+          0: daysArray.includes(0),
+          1: daysArray.includes(1),
+          2: daysArray.includes(2),
+          3: daysArray.includes(3),
+          4: daysArray.includes(4),
+          5: daysArray.includes(5),
+          6: daysArray.includes(6),
+        };
 
         // Determine aggregation: energy_consumption always uses SUM
         const aggregation = rule.alarmConfig.metric === 'energy_consumption'
