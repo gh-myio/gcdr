@@ -9,8 +9,6 @@ import { DeviceRepository } from '../repositories/DeviceRepository';
 import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 
@@ -45,23 +43,6 @@ export class DeviceService {
     }
 
     const device = await this.repository.create(tenantId, data, asset.customerId, userId);
-
-    // Publish event
-    await eventService.publish(EventType.DEVICE_CREATED, {
-      tenantId,
-      entityType: 'device',
-      entityId: device.id,
-      action: 'created',
-      data: {
-        name: device.name,
-        type: device.type,
-        serialNumber: device.serialNumber,
-        assetId: device.assetId,
-        customerId: device.customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return device;
   }
 
@@ -93,38 +74,12 @@ export class DeviceService {
     }
 
     const device = await this.repository.update(tenantId, id, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.DEVICE_UPDATED, {
-      tenantId,
-      entityType: 'device',
-      entityId: device.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return device;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    const device = await this.getById(tenantId, id);
-
+    await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
-
-    // Publish event
-    await eventService.publish(EventType.DEVICE_DELETED, {
-      tenantId,
-      entityType: 'device',
-      entityId: id,
-      action: 'deleted',
-      data: {
-        name: device.name,
-        serialNumber: device.serialNumber,
-        assetId: device.assetId,
-      },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListDevicesParams): Promise<PaginatedResult<Device>> {
@@ -157,7 +112,6 @@ export class DeviceService {
 
   async move(tenantId: string, deviceId: string, data: MoveDeviceDTO, userId: string): Promise<Device> {
     const device = await this.getById(tenantId, deviceId);
-    const oldAssetId = device.assetId;
 
     // Validate new asset exists
     const newAsset = await this.assetRepository.getById(tenantId, data.newAssetId);
@@ -177,21 +131,6 @@ export class DeviceService {
       newAsset.customerId,
       userId
     );
-
-    // Publish event
-    await eventService.publish(EventType.DEVICE_UPDATED, {
-      tenantId,
-      entityType: 'device',
-      entityId: deviceId,
-      action: 'moved',
-      data: {
-        oldAssetId,
-        newAssetId: data.newAssetId,
-        oldCustomerId: device.customerId,
-        newCustomerId: newAsset.customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
 
     return movedDevice;
   }

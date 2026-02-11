@@ -15,8 +15,6 @@ import {
 import { userRepository, UserRepository } from '../repositories/UserRepository';
 import { PaginatedResult } from '../shared/types';
 import { AppError } from '../shared/errors/AppError';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 
 export class MaintenanceGroupService {
   constructor(
@@ -34,16 +32,6 @@ export class MaintenanceGroupService {
     createdBy: string
   ): Promise<MaintenanceGroup> {
     const group = await this.groupRepository.create(tenantId, data, createdBy);
-
-    await eventService.publish(EventType.ENTITY_CREATED, {
-      tenantId,
-      entityType: 'maintenance_group',
-      entityId: group.id,
-      action: 'created',
-      data: { key: group.key, name: group.name },
-      actor: { userId: createdBy, type: 'user' },
-    });
-
     return group;
   }
 
@@ -66,16 +54,6 @@ export class MaintenanceGroupService {
     updatedBy: string
   ): Promise<MaintenanceGroup> {
     const group = await this.groupRepository.update(tenantId, id, data, updatedBy);
-
-    await eventService.publish(EventType.ENTITY_UPDATED, {
-      tenantId,
-      entityType: 'maintenance_group',
-      entityId: group.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId: updatedBy, type: 'user' },
-    });
-
     return group;
   }
 
@@ -86,15 +64,6 @@ export class MaintenanceGroupService {
     }
 
     await this.groupRepository.delete(tenantId, id);
-
-    await eventService.publish(EventType.ENTITY_DELETED, {
-      tenantId,
-      entityType: 'maintenance_group',
-      entityId: id,
-      action: 'deleted',
-      data: { key: group.key, name: group.name },
-      actor: { userId: deletedBy, type: 'user' },
-    });
   }
 
   async listGroups(
@@ -122,15 +91,6 @@ export class MaintenanceGroupService {
     }
 
     await this.groupRepository.addMember(tenantId, groupId, userId, assignedBy, expiresAt);
-
-    await eventService.publish(EventType.USER_GROUP_CHANGED, {
-      tenantId,
-      entityType: 'user_maintenance_group',
-      entityId: `${groupId}:${userId}`,
-      action: 'member_added',
-      data: { groupId, memberId: userId, expiresAt },
-      actor: { userId: assignedBy, type: 'user' },
-    });
   }
 
   async addMembers(
@@ -149,28 +109,10 @@ export class MaintenanceGroupService {
     }
 
     await this.groupRepository.addMembers(tenantId, groupId, userIds, assignedBy, expiresAt);
-
-    await eventService.publish(EventType.USER_GROUP_CHANGED, {
-      tenantId,
-      entityType: 'user_maintenance_group',
-      entityId: groupId,
-      action: 'members_added',
-      data: { groupId, memberIds: userIds, count: userIds.length },
-      actor: { userId: assignedBy, type: 'user' },
-    });
   }
 
   async removeMember(tenantId: string, groupId: string, userId: string, removedBy: string): Promise<void> {
     await this.groupRepository.removeMember(tenantId, groupId, userId);
-
-    await eventService.publish(EventType.USER_GROUP_CHANGED, {
-      tenantId,
-      entityType: 'user_maintenance_group',
-      entityId: `${groupId}:${userId}`,
-      action: 'member_removed',
-      data: { groupId, memberId: userId },
-      actor: { userId: removedBy, type: 'user' },
-    });
   }
 
   async removeMembers(
@@ -180,15 +122,6 @@ export class MaintenanceGroupService {
     removedBy: string
   ): Promise<void> {
     await this.groupRepository.removeMembers(tenantId, groupId, userIds);
-
-    await eventService.publish(EventType.USER_GROUP_CHANGED, {
-      tenantId,
-      entityType: 'user_maintenance_group',
-      entityId: groupId,
-      action: 'members_removed',
-      data: { groupId, memberIds: userIds, count: userIds.length },
-      actor: { userId: removedBy, type: 'user' },
-    });
   }
 
   async getMembers(

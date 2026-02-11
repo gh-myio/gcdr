@@ -3,8 +3,6 @@ import { CreateLookAndFeelDTO, UpdateLookAndFeelDTO, QuickThemeUpdateDTO } from 
 import { CompiledThemeDTO } from '../dto/response/LookAndFeelResponseDTO';
 import { LookAndFeelRepository } from '../repositories/LookAndFeelRepository';
 import { ILookAndFeelRepository } from '../repositories/interfaces/ILookAndFeelRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ValidationError, ConflictError } from '../shared/errors/AppError';
 
@@ -31,19 +29,6 @@ export class ThemeService {
 
     const theme = await this.repository.create(tenantId, data, userId);
 
-    // Publish event
-    await eventService.publish(EventType.THEME_CREATED, {
-      tenantId,
-      entityType: 'theme',
-      entityId: theme.id,
-      action: 'created',
-      data: {
-        name: theme.name,
-        customerId: theme.customerId,
-        isDefault: theme.isDefault,
-      },
-      actor: { userId, type: 'user' },
-    });
 
     return theme;
   }
@@ -61,15 +46,6 @@ export class ThemeService {
 
     const theme = await this.repository.update(tenantId, id, data, userId);
 
-    // Publish event
-    await eventService.publish(EventType.THEME_UPDATED, {
-      tenantId,
-      entityType: 'theme',
-      entityId: theme.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
 
     return theme;
   }
@@ -123,18 +99,6 @@ export class ThemeService {
 
     await this.repository.delete(tenantId, id);
 
-    // Publish event
-    await eventService.publish(EventType.THEME_DELETED, {
-      tenantId,
-      entityType: 'theme',
-      entityId: id,
-      action: 'deleted',
-      data: {
-        name: theme.name,
-        customerId: theme.customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<LookAndFeel>> {
@@ -159,18 +123,6 @@ export class ThemeService {
 
     const updatedTheme = await this.repository.setDefault(tenantId, customerId, themeId);
 
-    // Publish event
-    await eventService.publish(EventType.THEME_SET_DEFAULT, {
-      tenantId,
-      entityType: 'theme',
-      entityId: themeId,
-      action: 'set_default',
-      data: {
-        name: theme.name,
-        customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
 
     return updatedTheme;
   }

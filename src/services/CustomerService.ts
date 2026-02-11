@@ -8,8 +8,6 @@ import {
 } from '../dto/request/CustomerDTO';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { CustomerTreeNode, ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 
@@ -30,21 +28,6 @@ export class CustomerService {
     }
 
     const customer = await this.repository.create(tenantId, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CUSTOMER_CREATED, {
-      tenantId,
-      entityType: 'customer',
-      entityId: customer.id,
-      action: 'created',
-      data: {
-        name: customer.name,
-        type: customer.type,
-        parentCustomerId: customer.parentCustomerId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return customer;
   }
 
@@ -69,17 +52,6 @@ export class CustomerService {
     }
 
     const customer = await this.repository.update(tenantId, id, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CUSTOMER_UPDATED, {
-      tenantId,
-      entityType: 'customer',
-      entityId: customer.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return customer;
   }
 
@@ -93,16 +65,6 @@ export class CustomerService {
     }
 
     await this.repository.delete(tenantId, id);
-
-    // Publish event
-    await eventService.publish(EventType.CUSTOMER_DELETED, {
-      tenantId,
-      entityType: 'customer',
-      entityId: id,
-      action: 'deleted',
-      data: { name: customer.name },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>> {
@@ -137,8 +99,7 @@ export class CustomerService {
   }
 
   async move(tenantId: string, customerId: string, data: MoveCustomerDTO, userId: string): Promise<Customer> {
-    const customer = await this.getById(tenantId, customerId);
-    const oldParentId = customer.parentCustomerId;
+    await this.getById(tenantId, customerId);
 
     // Validate new parent if provided
     if (data.newParentCustomerId) {
@@ -160,20 +121,6 @@ export class CustomerService {
     }
 
     const movedCustomer = await this.repository.move(tenantId, customerId, data.newParentCustomerId, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CUSTOMER_MOVED, {
-      tenantId,
-      entityType: 'customer',
-      entityId: customerId,
-      action: 'moved',
-      data: {
-        oldParentId,
-        newParentId: data.newParentCustomerId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return movedCustomer;
   }
 

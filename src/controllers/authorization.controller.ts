@@ -18,7 +18,7 @@ router.post('/check', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = EvaluatePermissionSchema.parse(req.body);
-    const result = await authorizationService.evaluatePermission(tenantId, data, userId);
+    const result = await authorizationService.evaluatePermission(tenantId, data);
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
@@ -33,7 +33,7 @@ router.post('/check/batch', async (req: Request, res: Response, next: NextFuncti
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = EvaluateBatchSchema.parse(req.body);
-    const result = await authorizationService.evaluateBatch(tenantId, data, userId);
+    const result = await authorizationService.evaluateBatch(tenantId, data);
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);

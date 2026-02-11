@@ -10,8 +10,6 @@ import { AssetRepository } from '../repositories/AssetRepository';
 import { AssetTreeNode, IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 
@@ -51,22 +49,6 @@ export class AssetService {
     }
 
     const asset = await this.repository.create(tenantId, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.ASSET_CREATED, {
-      tenantId,
-      entityType: 'asset',
-      entityId: asset.id,
-      action: 'created',
-      data: {
-        name: asset.name,
-        type: asset.type,
-        customerId: asset.customerId,
-        parentAssetId: asset.parentAssetId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return asset;
   }
 
@@ -90,17 +72,6 @@ export class AssetService {
     }
 
     const asset = await this.repository.update(tenantId, id, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.ASSET_UPDATED, {
-      tenantId,
-      entityType: 'asset',
-      entityId: asset.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return asset;
   }
 
@@ -116,16 +87,6 @@ export class AssetService {
     // TODO: Check for devices attached to this asset
 
     await this.repository.delete(tenantId, id);
-
-    // Publish event
-    await eventService.publish(EventType.ASSET_DELETED, {
-      tenantId,
-      entityType: 'asset',
-      entityId: id,
-      action: 'deleted',
-      data: { name: asset.name, customerId: asset.customerId },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListAssetsParams): Promise<PaginatedResult<Asset>> {
@@ -193,9 +154,6 @@ export class AssetService {
 
   async move(tenantId: string, assetId: string, data: MoveAssetDTO, userId: string): Promise<Asset> {
     const asset = await this.getById(tenantId, assetId);
-    const oldParentId = asset.parentAssetId;
-    const oldCustomerId = asset.customerId;
-
     const targetCustomerId = data.newCustomerId || asset.customerId;
 
     // Validate new customer if changing
@@ -236,21 +194,6 @@ export class AssetService {
       data.newCustomerId || null,
       userId
     );
-
-    // Publish event
-    await eventService.publish(EventType.ASSET_MOVED, {
-      tenantId,
-      entityType: 'asset',
-      entityId: assetId,
-      action: 'moved',
-      data: {
-        oldParentId,
-        newParentId: data.newParentAssetId,
-        oldCustomerId,
-        newCustomerId: targetCustomerId,
-      },
-      actor: { userId, type: 'user' },
-    });
 
     return movedAsset;
   }

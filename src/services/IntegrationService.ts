@@ -13,8 +13,6 @@ import {
 import { IIntegrationPackageRepository, ISubscriptionRepository } from '../repositories/interfaces/IIntegrationRepository';
 import { PartnerRepository } from '../repositories/PartnerRepository';
 import { IPartnerRepository } from '../repositories/interfaces/IPartnerRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from '../shared/errors/AppError';
 

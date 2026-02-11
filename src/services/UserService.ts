@@ -11,8 +11,6 @@ import {
 import { MfaSetupDTO } from '../dto/response/UserResponseDTO';
 import { UserRepository } from '../repositories/UserRepository';
 import { IUserRepository } from '../repositories/interfaces/IUserRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 
@@ -70,19 +68,6 @@ export class UserService {
     const verificationToken = generateToken();
     await this.repository.setEmailVerificationToken(tenantId, user.id, verificationToken);
 
-    // Publish event
-    await eventService.publish(EventType.USER_CREATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'created',
-      data: {
-        email: user.email,
-        type: user.type,
-        customerId: user.customerId,
-      },
-      actor: { userId: createdBy, type: 'user' },
-    });
 
     return user;
   }
@@ -116,19 +101,6 @@ export class UserService {
     const invitationToken = generateToken();
     await this.repository.setEmailVerificationToken(tenantId, user.id, invitationToken);
 
-    // Publish event
-    await eventService.publish(EventType.USER_INVITED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'invited',
-      data: {
-        email: user.email,
-        invitedBy,
-        customerId: data.customerId,
-      },
-      actor: { userId: invitedBy, type: 'user' },
-    });
 
     // TODO: Send invitation email with token
 
@@ -172,15 +144,6 @@ export class UserService {
 
     const user = await this.repository.update(tenantId, id, data, updatedBy);
 
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId: updatedBy, type: 'user' },
-    });
 
     return user;
   }
@@ -190,18 +153,6 @@ export class UserService {
 
     await this.repository.delete(tenantId, id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_DELETED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'deleted',
-      data: {
-        email: user.email,
-        customerId: user.customerId,
-      },
-      actor: { userId: deletedBy, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListUsersDTO): Promise<PaginatedResult<User>> {
@@ -224,19 +175,6 @@ export class UserService {
 
     const updated = await this.repository.updateStatus(tenantId, id, status, updatedBy, reason);
 
-    // Publish event
-    await eventService.publish(EventType.USER_STATUS_CHANGED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'status_changed',
-      data: {
-        previousStatus,
-        newStatus: status,
-        reason,
-      },
-      actor: { userId: updatedBy, type: 'user' },
-    });
 
     return updated;
   }
@@ -256,15 +194,6 @@ export class UserService {
     // Update password
     await this.repository.updatePassword(tenantId, id, hashPassword(data.newPassword));
 
-    // Publish event
-    await eventService.publish(EventType.USER_PASSWORD_CHANGED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'password_changed',
-      data: {},
-      actor: { userId: id, type: 'user' },
-    });
   }
 
   async requestPasswordReset(tenantId: string, email: string): Promise<void> {
@@ -279,15 +208,6 @@ export class UserService {
 
     await this.repository.setPasswordResetToken(tenantId, user.id, token, expiresAt);
 
-    // Publish event
-    await eventService.publish(EventType.USER_PASSWORD_RESET_REQUESTED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'password_reset_requested',
-      data: { email },
-      actor: { type: 'system' },
-    });
 
     // TODO: Send password reset email with token
   }
@@ -310,15 +230,6 @@ export class UserService {
     await this.repository.updatePassword(tenantId, user.id, hashPassword(newPassword));
     await this.repository.clearPasswordResetToken(tenantId, user.id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_PASSWORD_CHANGED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'password_reset',
-      data: {},
-      actor: { type: 'system' },
-    });
   }
 
   async verifyEmail(tenantId: string, token: string): Promise<User> {
@@ -332,15 +243,6 @@ export class UserService {
 
     await this.repository.verifyEmail(tenantId, user.id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_EMAIL_VERIFIED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'email_verified',
-      data: { email: user.email },
-      actor: { type: 'system' },
-    });
 
     return this.getById(tenantId, user.id);
   }
@@ -384,15 +286,6 @@ export class UserService {
     const backupCodes = generateBackupCodes();
     await this.repository.enableMfa(tenantId, id, method, secret, backupCodes);
 
-    // Publish event
-    await eventService.publish(EventType.USER_MFA_ENABLED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'mfa_enabled',
-      data: { method },
-      actor: { userId: id, type: 'user' },
-    });
   }
 
   async disableMfa(tenantId: string, id: string, disabledBy: string): Promise<void> {
@@ -400,15 +293,6 @@ export class UserService {
 
     await this.repository.disableMfa(tenantId, id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_MFA_DISABLED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'mfa_disabled',
-      data: {},
-      actor: { userId: disabledBy, type: 'user' },
-    });
   }
 
   async recordLoginAttempt(tenantId: string, email: string, success: boolean, ip: string): Promise<void> {
@@ -425,18 +309,6 @@ export class UserService {
         const lockUntil = new Date(Date.now() + this.lockDurationMinutes * 60 * 1000).toISOString();
         await this.repository.lockUser(tenantId, user.id, lockUntil);
 
-        // Publish event
-        await eventService.publish(EventType.USER_LOCKED, {
-          tenantId,
-          entityType: 'user',
-          entityId: user.id,
-          action: 'locked',
-          data: {
-            reason: 'Too many failed login attempts',
-            lockedUntil: lockUntil,
-          },
-          actor: { type: 'system' },
-        });
       }
     }
   }
@@ -446,15 +318,6 @@ export class UserService {
 
     await this.repository.unlockUser(tenantId, id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_UNLOCKED, {
-      tenantId,
-      entityType: 'user',
-      entityId: id,
-      action: 'unlocked',
-      data: {},
-      actor: { userId: unlockedBy, type: 'user' },
-    });
 
     return this.getById(tenantId, id);
   }
@@ -485,15 +348,6 @@ export class UserService {
     await this.repository.verifyEmail(tenantId, user.id);
     await this.repository.setInvitationAccepted(tenantId, user.id);
 
-    // Publish event
-    await eventService.publish(EventType.USER_INVITATION_ACCEPTED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'invitation_accepted',
-      data: { email: user.email },
-      actor: { userId: user.id, type: 'user' },
-    });
 
     return this.getById(tenantId, user.id);
   }

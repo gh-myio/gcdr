@@ -11,8 +11,6 @@ import {
 } from '../dto/request/PartnerDTO';
 import { PartnerRepository } from '../repositories/PartnerRepository';
 import { IPartnerRepository, ListPartnersParams } from '../repositories/interfaces/IPartnerRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult, PartnerStatus } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { generateId } from '../shared/utils/idGenerator';
@@ -35,19 +33,6 @@ export class PartnerService {
 
     const partner = await this.repository.create(tenantId, data, registeredBy || 'self-registration');
 
-    // Publish event
-    await eventService.publish(EventType.PARTNER_REGISTERED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: partner.id,
-      action: 'registered',
-      data: {
-        companyName: partner.companyName,
-        contactEmail: partner.contactEmail,
-      },
-      actor: registeredBy ? { userId: registeredBy, type: 'user' } : { type: 'system' },
-    });
-
     return partner;
   }
 
@@ -63,15 +48,6 @@ export class PartnerService {
     await this.getById(tenantId, id);
 
     const partner = await this.repository.update(tenantId, id, data, userId);
-
-    await eventService.publish(EventType.PARTNER_UPDATED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: partner.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
 
     return partner;
   }
@@ -97,23 +73,6 @@ export class PartnerService {
 
     const approvedPartner = await this.repository.approve(tenantId, id, data, approvedBy);
 
-    await eventService.publish(EventType.PARTNER_APPROVED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: id,
-      action: 'approved',
-      data: {
-        companyName: partner.companyName,
-        scopes: data.scopes,
-        rateLimits: {
-          perMinute: data.rateLimitPerMinute,
-          perDay: data.rateLimitPerDay,
-          monthly: data.monthlyQuota,
-        },
-      },
-      actor: { userId: approvedBy, type: 'user' },
-    });
-
     return approvedPartner;
   }
 
@@ -125,18 +84,6 @@ export class PartnerService {
     }
 
     const rejectedPartner = await this.repository.reject(tenantId, id, data.reason, rejectedBy);
-
-    await eventService.publish(EventType.PARTNER_REJECTED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: id,
-      action: 'rejected',
-      data: {
-        companyName: partner.companyName,
-        reason: data.reason,
-      },
-      actor: { userId: rejectedBy, type: 'user' },
-    });
 
     return rejectedPartner;
   }
@@ -150,18 +97,6 @@ export class PartnerService {
 
     const suspendedPartner = await this.repository.suspend(tenantId, id, reason, suspendedBy);
 
-    await eventService.publish(EventType.PARTNER_SUSPENDED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: id,
-      action: 'suspended',
-      data: {
-        companyName: partner.companyName,
-        reason,
-      },
-      actor: { userId: suspendedBy, type: 'user' },
-    });
-
     return suspendedPartner;
   }
 
@@ -173,17 +108,6 @@ export class PartnerService {
     }
 
     const activatedPartner = await this.repository.activate(tenantId, id, activatedBy);
-
-    await eventService.publish(EventType.PARTNER_ACTIVATED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: id,
-      action: 'activated',
-      data: {
-        companyName: partner.companyName,
-      },
-      actor: { userId: activatedBy, type: 'user' },
-    });
 
     return activatedPartner;
   }
@@ -224,20 +148,6 @@ export class PartnerService {
 
     const updatedPartner = await this.repository.addApiKey(tenantId, partnerId, apiKey);
 
-    await eventService.publish(EventType.PARTNER_API_KEY_CREATED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: partnerId,
-      action: 'api_key_created',
-      data: {
-        keyId: apiKey.id,
-        keyName: apiKey.name,
-        keyPrefix,
-        scopes: apiKey.scopes,
-      },
-      actor: { userId: createdBy, type: 'user' },
-    });
-
     // Return the raw key only once - it won't be stored
     return {
       partner: updatedPartner,
@@ -258,18 +168,6 @@ export class PartnerService {
     }
 
     const updatedPartner = await this.repository.revokeApiKey(tenantId, partnerId, apiKeyId);
-
-    await eventService.publish(EventType.PARTNER_API_KEY_REVOKED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: partnerId,
-      action: 'api_key_revoked',
-      data: {
-        keyId: apiKeyId,
-        keyName: apiKey.name,
-      },
-      actor: { userId: revokedBy, type: 'user' },
-    });
 
     return updatedPartner;
   }
@@ -310,20 +208,6 @@ export class PartnerService {
     // Revoke old key and add new one
     await this.repository.revokeApiKey(tenantId, partnerId, apiKeyId);
     const updatedPartner = await this.repository.addApiKey(tenantId, partnerId, newApiKey);
-
-    await eventService.publish(EventType.PARTNER_API_KEY_CREATED, {
-      tenantId,
-      entityType: 'partner',
-      entityId: partnerId,
-      action: 'api_key_rotated',
-      data: {
-        oldKeyId: apiKeyId,
-        newKeyId: newApiKey.id,
-        keyName: newApiKey.name,
-        keyPrefix,
-      },
-      actor: { userId: rotatedBy, type: 'user' },
-    });
 
     return {
       partner: updatedPartner,

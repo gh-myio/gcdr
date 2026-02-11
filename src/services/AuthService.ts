@@ -2,8 +2,6 @@ import * as crypto from 'crypto';
 import { User } from '../domain/entities/User';
 import { UserService, userService as defaultUserService } from './UserService';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { registrationService } from './RegistrationService';
 
 // RFC-0011: Configuration for account lockout
@@ -295,20 +293,6 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user, tenantId);
 
-    // Publish login event
-    await eventService.publish(EventType.USER_LOGIN, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'login',
-      data: {
-        email: user.email,
-        ip,
-        deviceInfo,
-      },
-      actor: { userId: user.id, type: 'user' },
-    });
-
     return {
       ...tokens,
       user: {
@@ -400,15 +384,6 @@ export class AuthService {
         this.refreshTokens.delete(payload.jti);
       }
     }
-
-    await eventService.publish(EventType.USER_LOGOUT, {
-      tenantId,
-      entityType: 'user',
-      entityId: userId,
-      action: 'logout',
-      data: {},
-      actor: { userId, type: 'user' },
-    });
   }
 
   async logoutAllDevices(tenantId: string, userId: string): Promise<void> {
@@ -418,15 +393,6 @@ export class AuthService {
         this.refreshTokens.delete(tokenId);
       }
     }
-
-    await eventService.publish(EventType.USER_LOGOUT, {
-      tenantId,
-      entityType: 'user',
-      entityId: userId,
-      action: 'logout_all',
-      data: { allDevices: true },
-      actor: { userId, type: 'user' },
-    });
   }
 
   verifyAccessToken(token: string): JWTPayload | null {

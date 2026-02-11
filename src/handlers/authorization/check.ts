@@ -12,7 +12,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const data = EvaluatePermissionSchema.parse(body);
 
-    const result = await authorizationService.evaluatePermission(ctx.tenantId, data, ctx.userId);
+    const result = await authorizationService.evaluatePermission(ctx.tenantId, data);
 
     return ok(result);
   } catch (err) {

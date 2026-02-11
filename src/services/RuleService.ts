@@ -4,8 +4,6 @@ import { RuleRepository } from '../repositories/RuleRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ValidationError, ConflictError } from '../shared/errors/AppError';
 
@@ -51,21 +49,6 @@ export class RuleService {
     this.validateRuleConfig(data);
 
     const rule = await this.repository.create(tenantId, data, userId);
-
-    await eventService.publish(EventType.RULE_CREATED, {
-      tenantId,
-      entityType: 'rule',
-      entityId: rule.id,
-      action: 'created',
-      data: {
-        name: rule.name,
-        type: rule.type,
-        priority: rule.priority,
-        customerId: rule.customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return rule;
   }
 
@@ -87,32 +70,12 @@ export class RuleService {
     }
 
     const rule = await this.repository.update(tenantId, id, data, userId);
-
-    await eventService.publish(EventType.RULE_UPDATED, {
-      tenantId,
-      entityType: 'rule',
-      entityId: rule.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return rule;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    const rule = await this.getById(tenantId, id);
-
+    await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
-
-    await eventService.publish(EventType.RULE_DELETED, {
-      tenantId,
-      entityType: 'rule',
-      entityId: id,
-      action: 'deleted',
-      data: { name: rule.name, type: rule.type },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListRulesParams): Promise<PaginatedResult<Rule>> {
@@ -137,17 +100,6 @@ export class RuleService {
     }
 
     const updatedRule = await this.repository.update(tenantId, id, { enabled }, userId);
-
-    const eventType = enabled ? EventType.RULE_ACTIVATED : EventType.RULE_DEACTIVATED;
-    await eventService.publish(eventType, {
-      tenantId,
-      entityType: 'rule',
-      entityId: id,
-      action: enabled ? 'activated' : 'deactivated',
-      data: { name: rule.name, reason },
-      actor: { userId, type: 'user' },
-    });
-
     return updatedRule;
   }
 

@@ -9,8 +9,6 @@ import { CentralRepository } from '../repositories/CentralRepository';
 import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
 
@@ -42,23 +40,6 @@ export class CentralService {
     }
 
     const central = await this.repository.create(tenantId, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CENTRAL_CREATED, {
-      tenantId,
-      entityType: 'central',
-      entityId: central.id,
-      action: 'created',
-      data: {
-        name: central.name,
-        type: central.type,
-        serialNumber: central.serialNumber,
-        assetId: central.assetId,
-        customerId: central.customerId,
-      },
-      actor: { userId, type: 'user' },
-    });
-
     return central;
   }
 
@@ -80,40 +61,13 @@ export class CentralService {
 
   async update(tenantId: string, id: string, data: UpdateCentralDTO, userId: string): Promise<Central> {
     await this.getById(tenantId, id);
-
     const central = await this.repository.update(tenantId, id, data, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CENTRAL_UPDATED, {
-      tenantId,
-      entityType: 'central',
-      entityId: central.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return central;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    const central = await this.getById(tenantId, id);
-
+    await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
-
-    // Publish event
-    await eventService.publish(EventType.CENTRAL_DELETED, {
-      tenantId,
-      entityType: 'central',
-      entityId: id,
-      action: 'deleted',
-      data: {
-        name: central.name,
-        serialNumber: central.serialNumber,
-        assetId: central.assetId,
-      },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async list(tenantId: string, params: ListCentralsDTO): Promise<PaginatedResult<Central>> {
@@ -140,19 +94,7 @@ export class CentralService {
 
   async updateStatus(tenantId: string, id: string, status: EntityStatus, userId: string): Promise<Central> {
     await this.getById(tenantId, id);
-
     const central = await this.repository.updateStatus(tenantId, id, status, userId);
-
-    // Publish event
-    await eventService.publish(EventType.CENTRAL_UPDATED, {
-      tenantId,
-      entityType: 'central',
-      entityId: id,
-      action: 'status_updated',
-      data: { status },
-      actor: { userId, type: 'user' },
-    });
-
     return central;
   }
 
@@ -161,8 +103,7 @@ export class CentralService {
     id: string,
     data: UpdateConnectionStatusDTO
   ): Promise<Central> {
-    const existing = await this.getById(tenantId, id);
-    const previousStatus = existing.connectionStatus;
+    await this.getById(tenantId, id);
 
     const central = await this.repository.updateConnectionStatus(
       tenantId,
@@ -170,27 +111,6 @@ export class CentralService {
       data.connectionStatus,
       data.stats
     );
-
-    // Publish connection event if status changed
-    if (previousStatus !== data.connectionStatus) {
-      const eventType =
-        data.connectionStatus === 'ONLINE'
-          ? EventType.CENTRAL_CONNECTED
-          : EventType.CENTRAL_DISCONNECTED;
-
-      await eventService.publish(eventType, {
-        tenantId,
-        entityType: 'central',
-        entityId: id,
-        action: data.connectionStatus === 'ONLINE' ? 'connected' : 'disconnected',
-        data: {
-          previousStatus,
-          newStatus: data.connectionStatus,
-          serialNumber: central.serialNumber,
-        },
-        actor: { type: 'system' },
-      });
-    }
 
     return central;
   }
@@ -200,22 +120,8 @@ export class CentralService {
     id: string,
     stats: Partial<Central['stats']>
   ): Promise<void> {
-    const central = await this.getById(tenantId, id);
-
+    await this.getById(tenantId, id);
     await this.repository.recordHeartbeat(tenantId, id, stats);
-
-    // Publish heartbeat event
-    await eventService.publish(EventType.CENTRAL_HEARTBEAT, {
-      tenantId,
-      entityType: 'central',
-      entityId: id,
-      action: 'heartbeat',
-      data: {
-        serialNumber: central.serialNumber,
-        stats,
-      },
-      actor: { type: 'system' },
-    });
   }
 }
 

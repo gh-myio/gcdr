@@ -17,8 +17,6 @@ import { customerRepository, CustomerRepository } from '../repositories/Customer
 import { maintenanceGroupRepository, MaintenanceGroupRepository } from '../repositories/MaintenanceGroupRepository';
 import { bundleCacheRepository, BundleCacheRepository } from '../repositories/BundleCacheRepository';
 import { authorizationService, AuthorizationService } from './AuthorizationService';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { AppError } from '../shared/errors/AppError';
 
 // Feature configuration (could be moved to database/config later)
@@ -120,15 +118,6 @@ export class BundleGeneratorService {
     } else {
       await this.cacheRepo.invalidate(tenantId, userId, reason);
     }
-
-    await eventService.publish(EventType.BUNDLE_INVALIDATED, {
-      tenantId,
-      entityType: 'user_bundle',
-      entityId: userId,
-      action: 'invalidated',
-      data: { reason, scope },
-      actor: { type: 'system' },
-    });
   }
 
   // =========================================================================

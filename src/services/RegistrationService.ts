@@ -6,8 +6,6 @@ import * as crypto from 'crypto';
 import { userRepository } from '../repositories/UserRepository';
 import { verificationTokenRepository, VerificationTokenType } from '../repositories/VerificationTokenRepository';
 import { ValidationError, UnauthorizedError, AppError } from '../shared/errors/AppError';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { emailService } from './EmailService';
 
 // Configuration
@@ -95,21 +93,6 @@ export class RegistrationService {
     await emailService.sendVerificationCode(email, code, firstName);
     console.log(`[REGISTRATION] Verification code sent to ${email}`);
 
-    // Publish registration event
-    await eventService.publish(EventType.USER_CREATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'register',
-      data: {
-        email: user.email,
-        status: 'UNVERIFIED',
-        selfRegistered: true,
-        ip: ipAddress,
-      },
-      actor: { userId: user.id, type: 'user' },
-    });
-
     return {
       userId: user.id,
       email: user.email,
@@ -158,19 +141,6 @@ export class RegistrationService {
 
     // Update user status to PENDING_APPROVAL
     await userRepository.setEmailVerifiedPendingApproval(tenantId, user.id);
-
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'email_verified',
-      data: {
-        email: user.email,
-        status: 'PENDING_APPROVAL',
-      },
-      actor: { userId: user.id, type: 'user' },
-    });
 
     return {
       status: 'PENDING_APPROVAL',
@@ -263,19 +233,6 @@ export class RegistrationService {
     // Send email with reset code
     await emailService.sendPasswordResetCode(email, code, user.profile.firstName);
     console.log(`[PASSWORD_RESET] Reset code sent to ${email}`);
-
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'password_reset_requested',
-      data: {
-        email: user.email,
-        ip: ipAddress,
-      },
-      actor: { userId: user.id, type: 'user' },
-    });
   }
 
   /**
@@ -324,19 +281,6 @@ export class RegistrationService {
     const wasLocked = user.status === 'LOCKED';
     await userRepository.resetPasswordAndUnlock(tenantId, user.id, passwordHash);
 
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: user.id,
-      action: 'password_reset_completed',
-      data: {
-        email: user.email,
-        wasLocked,
-      },
-      actor: { userId: user.id, type: 'user' },
-    });
-
     return {
       message: 'Senha alterada com sucesso',
       unlocked: wasLocked,
@@ -356,20 +300,6 @@ export class RegistrationService {
         userId,
         'Conta bloqueada após 6 tentativas de login incorretas'
       );
-
-      // Publish event
-      await eventService.publish(EventType.USER_UPDATED, {
-        tenantId,
-        entityType: 'user',
-        entityId: userId,
-        action: 'account_locked',
-        data: {
-          reason: 'Too many failed login attempts',
-          failedAttempts: attempts,
-          ip,
-        },
-        actor: { userId, type: 'system' },
-      });
     }
 
     return attempts;
@@ -400,19 +330,6 @@ export class RegistrationService {
     // Send approval notification email
     await emailService.sendAccountApproved(user.email, user.profile.firstName);
     console.log(`[REGISTRATION] User ${user.email} approved by ${approvedBy}`);
-
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: userId,
-      action: 'approved',
-      data: {
-        email: user.email,
-        status: 'ACTIVE',
-      },
-      actor: { userId: approvedBy, type: 'user' },
-    });
   }
 
   /**
@@ -433,20 +350,6 @@ export class RegistrationService {
     // Send rejection notification email
     await emailService.sendAccountRejected(user.email, user.profile.firstName, reason);
     console.log(`[REGISTRATION] User ${user.email} rejected by ${rejectedBy}: ${reason}`);
-
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: userId,
-      action: 'rejected',
-      data: {
-        email: user.email,
-        status: 'INACTIVE',
-        reason,
-      },
-      actor: { userId: rejectedBy, type: 'user' },
-    });
   }
 
   /**
@@ -467,19 +370,6 @@ export class RegistrationService {
     // Send unlock notification email
     await emailService.sendAccountUnlocked(user.email, user.profile.firstName);
     console.log(`[REGISTRATION] User ${user.email} unlocked by ${unlockedBy}`);
-
-    // Publish event
-    await eventService.publish(EventType.USER_UPDATED, {
-      tenantId,
-      entityType: 'user',
-      entityId: userId,
-      action: 'unlocked',
-      data: {
-        email: user.email,
-        status: 'ACTIVE',
-      },
-      actor: { userId: unlockedBy, type: 'user' },
-    });
   }
 
   /**

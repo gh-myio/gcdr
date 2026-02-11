@@ -15,8 +15,6 @@ import { RoleAssignmentRepository } from '../repositories/RoleAssignmentReposito
 import { IRoleRepository, ListRolesParams } from '../repositories/interfaces/IRoleRepository';
 import { IPolicyRepository, ListPoliciesParams, UpdatePolicyDTO } from '../repositories/interfaces/IPolicyRepository';
 import { IRoleAssignmentRepository, UpdateRoleAssignmentDTO } from '../repositories/interfaces/IRoleAssignmentRepository';
-import { eventService } from '../infrastructure/events/EventService';
-import { EventType } from '../shared/events/eventTypes';
 import { PaginatedResult, RiskLevel } from '../shared/types';
 import { NotFoundError, ForbiddenError, ConflictError } from '../shared/errors/AppError';
 
@@ -71,16 +69,6 @@ export class AuthorizationService {
     }
 
     const role = await this.roleRepository.create(tenantId, data, userId);
-
-    await eventService.publish(EventType.ROLE_CREATED, {
-      tenantId,
-      entityType: 'role',
-      entityId: role.id,
-      action: 'created',
-      data: { key: role.key, displayName: role.displayName },
-      actor: { userId, type: 'user' },
-    });
-
     return role;
   }
 
@@ -119,16 +107,6 @@ export class AuthorizationService {
     }
 
     const role = await this.roleRepository.update(tenantId, id, data, userId);
-
-    await eventService.publish(EventType.ROLE_UPDATED, {
-      tenantId,
-      entityType: 'role',
-      entityId: role.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return role;
   }
 
@@ -150,15 +128,6 @@ export class AuthorizationService {
     }
 
     await this.roleRepository.delete(tenantId, id);
-
-    await eventService.publish(EventType.ROLE_DELETED, {
-      tenantId,
-      entityType: 'role',
-      entityId: id,
-      action: 'deleted',
-      data: { key: role.key },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async listRoles(tenantId: string, params: ListRolesParams): Promise<PaginatedResult<Role>> {
@@ -172,16 +141,6 @@ export class AuthorizationService {
     this.validatePermissionFormat([...data.allow, ...data.deny]);
 
     const policy = await this.policyRepository.create(tenantId, data, userId);
-
-    await eventService.publish(EventType.POLICY_CREATED, {
-      tenantId,
-      entityType: 'policy',
-      entityId: policy.id,
-      action: 'created',
-      data: { key: policy.key, displayName: policy.displayName },
-      actor: { userId, type: 'user' },
-    });
-
     return policy;
   }
 
@@ -215,16 +174,6 @@ export class AuthorizationService {
     }
 
     const policy = await this.policyRepository.update(tenantId, id, data, userId);
-
-    await eventService.publish(EventType.POLICY_UPDATED, {
-      tenantId,
-      entityType: 'policy',
-      entityId: policy.id,
-      action: 'updated',
-      data: { updatedFields: Object.keys(data) },
-      actor: { userId, type: 'user' },
-    });
-
     return policy;
   }
 
@@ -246,15 +195,6 @@ export class AuthorizationService {
     }
 
     await this.policyRepository.delete(tenantId, id);
-
-    await eventService.publish(EventType.POLICY_DELETED, {
-      tenantId,
-      entityType: 'policy',
-      entityId: id,
-      action: 'deleted',
-      data: { key: policy.key },
-      actor: { userId, type: 'user' },
-    });
   }
 
   async listPolicies(tenantId: string, params: ListPoliciesParams): Promise<PaginatedResult<Policy>> {
@@ -271,20 +211,6 @@ export class AuthorizationService {
     }
 
     const assignment = await this.roleAssignmentRepository.create(tenantId, data, grantedBy);
-
-    await eventService.publish(EventType.ROLE_ASSIGNED, {
-      tenantId,
-      entityType: 'roleAssignment',
-      entityId: assignment.id,
-      action: 'assigned',
-      data: {
-        userId: data.userId,
-        roleKey: data.roleKey,
-        scope: data.scope,
-      },
-      actor: { userId: grantedBy, type: 'user' },
-    });
-
     return assignment;
   }
 
@@ -301,19 +227,6 @@ export class AuthorizationService {
       revokedBy
     );
 
-    await eventService.publish(EventType.ROLE_REVOKED, {
-      tenantId,
-      entityType: 'roleAssignment',
-      entityId: assignmentId,
-      action: 'revoked',
-      data: {
-        userId: assignment.userId,
-        roleKey: assignment.roleKey,
-        scope: assignment.scope,
-      },
-      actor: { userId: revokedBy, type: 'user' },
-    });
-
     return updated;
   }
 
@@ -329,33 +242,15 @@ export class AuthorizationService {
 
   async evaluatePermission(
     tenantId: string,
-    data: EvaluatePermissionDTO,
-    evaluatedBy?: string
+    data: EvaluatePermissionDTO
   ): Promise<PermissionEvaluationResult> {
     const result = await this.checkPermission(tenantId, data.userId, data.permission, data.resourceScope);
-
-    // Log evaluation
-    await eventService.publish(EventType.PERMISSION_EVALUATED, {
-      tenantId,
-      entityType: 'permission',
-      entityId: data.userId,
-      action: 'evaluated',
-      data: {
-        permission: data.permission,
-        resourceScope: data.resourceScope,
-        allowed: result.allowed,
-        reason: result.reason,
-      },
-      actor: evaluatedBy ? { userId: evaluatedBy, type: 'user' } : { userId: 'system', type: 'system' },
-    });
-
     return result;
   }
 
   async evaluateBatch(
     tenantId: string,
-    data: EvaluateBatchDTO,
-    evaluatedBy?: string
+    data: EvaluateBatchDTO
   ): Promise<BatchEvaluationResult> {
     const results: Record<string, PermissionEvaluationResult> = {};
     let allowed = 0;
@@ -371,20 +266,6 @@ export class AuthorizationService {
         denied++;
       }
     }
-
-    // Log batch evaluation
-    await eventService.publish(EventType.PERMISSION_EVALUATED, {
-      tenantId,
-      entityType: 'permission',
-      entityId: data.userId,
-      action: 'batch_evaluated',
-      data: {
-        permissions: data.permissions,
-        resourceScope: data.resourceScope,
-        summary: { total: data.permissions.length, allowed, denied },
-      },
-      actor: evaluatedBy ? { userId: evaluatedBy, type: 'user' } : { userId: 'system', type: 'system' },
-    });
 
     return {
       results,
