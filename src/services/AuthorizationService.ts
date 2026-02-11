@@ -234,6 +234,15 @@ export class AuthorizationService {
     return this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
   }
 
+  /**
+   * Get role keys for a user (used by AuthService for JWT/login response)
+   * Returns array of role keys like ['role:super-admin', 'role:viewer']
+   */
+  async getUserRoleKeys(tenantId: string, userId: string): Promise<string[]> {
+    const assignments = await this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
+    return [...new Set(assignments.map(a => a.roleKey))];
+  }
+
   async listAssignments(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<RoleAssignment>> {
     return this.roleAssignmentRepository.list(tenantId, params);
   }

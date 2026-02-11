@@ -3,6 +3,7 @@ import { User } from '../domain/entities/User';
 import { UserService, userService as defaultUserService } from './UserService';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
 import { registrationService } from './RegistrationService';
+import { authorizationService } from './AuthorizationService';
 
 // RFC-0011: Configuration for account lockout
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;
@@ -290,8 +291,11 @@ export class AuthService {
     // RFC-0011: Record successful login (resets failed attempts)
     await registrationService.recordSuccessfulLogin(tenantId, user.id, ip || 'unknown');
 
+    // Get user's roles from authorization service
+    const roles = await authorizationService.getUserRoleKeys(tenantId, user.id);
+
     // Generate tokens
-    const tokens = await this.generateTokens(user, tenantId);
+    const tokens = await this.generateTokens(user, tenantId, roles);
 
     return {
       ...tokens,
@@ -300,7 +304,7 @@ export class AuthService {
         email: user.email,
         displayName: user.profile.displayName || `${user.profile.firstName} ${user.profile.lastName}`,
         type: user.type,
-        roles: [], // TODO: Get roles from authorization service
+        roles,
       },
     };
   }
@@ -336,8 +340,11 @@ export class AuthService {
     // Record successful login
     await this.userService.recordLoginAttempt(tenantId, user.email, true, ip || 'unknown');
 
+    // Get user's roles from authorization service
+    const roles = await authorizationService.getUserRoleKeys(tenantId, user.id);
+
     // Generate tokens
-    const tokens = await this.generateTokens(user, tenantId);
+    const tokens = await this.generateTokens(user, tenantId, roles);
 
     return {
       ...tokens,
@@ -346,7 +353,7 @@ export class AuthService {
         email: user.email,
         displayName: user.profile.displayName || `${user.profile.firstName} ${user.profile.lastName}`,
         type: user.type,
-        roles: [],
+        roles,
       },
     };
   }
@@ -373,8 +380,11 @@ export class AuthService {
     // Revoke old refresh token
     this.refreshTokens.delete(payload.jti);
 
+    // Get user's roles from authorization service
+    const roles = await authorizationService.getUserRoleKeys(tenantId, user.id);
+
     // Generate new tokens
-    return this.generateTokens(user, tenantId);
+    return this.generateTokens(user, tenantId, roles);
   }
 
   async logout(tenantId: string, userId: string, refreshToken?: string): Promise<void> {
@@ -399,14 +409,14 @@ export class AuthService {
     return verifyJWT<JWTPayload>(token);
   }
 
-  private async generateTokens(user: User, tenantId: string): Promise<TokenResponse> {
+  private async generateTokens(user: User, tenantId: string, roles: string[] = []): Promise<TokenResponse> {
     // Generate access token
     const accessToken = createJWT(
       {
         sub: user.id,
         tenant_id: tenantId,
         email: user.email,
-        roles: [], // TODO: Get from authorization service
+        roles,
         type: user.type,
       },
       ACCESS_TOKEN_EXPIRY
