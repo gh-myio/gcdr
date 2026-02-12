@@ -28,7 +28,7 @@ O **GCDR (Global Central Data Registry)** é o **Single Source of Truth** para t
 1. **Gerencia Clientes** com hierarquia (Holding → Empresa → Filial → Franquia)
 2. **Registra Parceiros** que integram via API
 3. **Controla Autorizações** com roles, policies e scopes
-4. **Emite Eventos** para sincronização com outros sistemas
+4. **Registra Audit Logs** para compliance e rastreabilidade (RFC-0009)
 
 ### Por que ele existe?
 
@@ -314,7 +314,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "sub": "user-uuid",
   "tenant_id": "tenant-uuid",
   "email": "usuario@empresa.com",
-  "roles": ["admin", "operator"],
+  "roles": ["role:super-admin", "role:operator"],
+  "type": "CUSTOMER",
   "iat": 1737463200,
   "exp": 1737466800,
   "iss": "gcdr",
@@ -327,7 +328,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | `sub` | ID único do usuário |
 | `tenant_id` | ID do tenant (multi-tenancy) |
 | `email` | Email do usuário |
-| `roles` | Array de roles atribuídas |
+| `roles` | Array de role keys (ex: `role:super-admin`) - carregadas do AuthorizationService |
+| `type` | Tipo do usuário (CUSTOMER, PARTNER, SERVICE, INTERNAL) |
 | `iat` | Timestamp de emissão |
 | `exp` | Timestamp de expiração |
 | `iss` | Emissor do token |
@@ -482,10 +484,12 @@ Resposta:
     "email": "usuario@empresa.com",
     "displayName": "Joao Silva",
     "type": "CUSTOMER",
-    "roles": ["admin"]
+    "roles": ["role:super-admin", "role:viewer"]
   }
 }
 ```
+
+> **Nota sobre Roles**: As roles são carregadas dinamicamente do `AuthorizationService` a cada login, MFA verification e token refresh. Os role keys (ex: `role:super-admin`) são incluídos tanto na resposta de login quanto no JWT token, permitindo que frontends e outros serviços validem permissões.
 
 #### Login com MFA Habilitado
 Se o usuario tiver MFA habilitado, a resposta inicial sera:
@@ -753,7 +757,7 @@ curl http://localhost:3015/health
 | **Repositories** | Acesso a dados no PostgreSQL (Drizzle ORM) |
 | **DTOs** | Validação de entrada/saída com Zod |
 | **Middleware** | Error handling, request context, response formatting |
-| **Events** | Publicação no EventBridge para outros sistemas |
+| **Audit Logs** | Registro local de eventos para compliance (RFC-0009) |
 
 ### Domínios do GCDR
 
@@ -819,21 +823,17 @@ src/
 │       └── IRepository.ts
 │
 ├── infrastructure/       # Infraestrutura tecnica
-│   ├── database/
-│   │   └── drizzle/
-│   │       ├── schema.ts     # Drizzle schema definitions
-│   │       ├── client.ts     # PostgreSQL connection
-│   │       └── migrations/   # SQL migrations
-│   └── events/
-│       └── EventService.ts
+│   └── database/
+│       └── drizzle/
+│           ├── schema.ts     # Drizzle schema definitions
+│           ├── client.ts     # PostgreSQL connection
+│           └── migrations/   # SQL migrations
 │
 └── shared/               # Código compartilhado
     ├── config/
     │   └── Config.ts
     ├── errors/
     │   └── AppError.ts
-    ├── events/
-    │   └── eventTypes.ts
     ├── types/
     │   └── index.ts
     └── utils/
@@ -960,9 +960,9 @@ class CustomerRepository implements ICustomerRepository {
    └─> Monta entidade com Drizzle ORM
    └─> INSERT na tabela customers (PostgreSQL)
 
-5. EVENTOS (EventService.ts)
-   └─> Publica evento "customer.created" no EventBridge
-   └─> Outros sistemas recebem e sincronizam
+5. AUDIT LOG (AuditLogService)
+   └─> Registra ação "customer.created" no PostgreSQL
+   └─> Armazena: userId, action, resourceType, resourceId, changes
 
 6. RESPONSE
    └─> 201 Created
@@ -993,8 +993,8 @@ class CustomerRepository implements ICustomerRepository {
    └─> Gera API keys
    └─> Salva no repository
 
-4. EVENTOS
-   └─> Publica "partner.approved" no EventBridge
+4. AUDIT LOG
+   └─> Registra "partner.approved" no PostgreSQL
 
 5. RESPONSE
    └─> 200 OK
@@ -1489,31 +1489,32 @@ export const myEntities = pgTable('my_entities', {
 }));
 ```
 
-### Adicionar Evento
+### Adicionar Audit Log
 
-1. **Defina o tipo** em `src/shared/events/eventTypes.ts`:
+Para registrar ações em uma nova entidade para compliance (RFC-0009):
+
+1. **Importe o AuditLogService** no seu service:
 
 ```typescript
-export interface MyEntityCreatedEvent {
-  source: 'gcdr';
-  detailType: 'myentity.created';
-  detail: {
-    id: string;
-    tenantId: string;
-    // ...
-  };
-}
+import { auditLogService } from './AuditLogService';
 ```
 
-2. **Emita no service**:
+2. **Registre a ação após operação bem-sucedida**:
 
 ```typescript
-await this.eventService.publish({
-  source: 'gcdr',
-  detailType: 'myentity.created',
-  detail: { id: entity.id, tenantId: entity.tenantId },
+// Após criar/atualizar/deletar a entidade
+await auditLogService.log({
+  tenantId,
+  userId,
+  action: 'CREATE', // ou 'UPDATE', 'DELETE'
+  resourceType: 'my_entity',
+  resourceId: entity.id,
+  changes: { /* campos alterados */ },
+  ip: requestIp,
 });
 ```
+
+> **Nota**: O sistema de eventos externo (AWS EventBridge) foi removido. O GCDR agora usa apenas audit logs locais no PostgreSQL para rastreabilidade e compliance.
 
 ---
 
@@ -1698,3 +1699,23 @@ Use este checklist para acompanhar seu progresso:
 - [ ] Abriu um PR (mesmo que pequeno)
 
 **Bem-vindo ao time!**
+
+---
+
+## Changelog
+
+### 2026-02-11
+
+**Remoção do EventService (AWS EventBridge)**
+- O sistema de eventos externo (AWS EventBridge) foi completamente removido
+- O GCDR não envia mais eventos para sistemas externos via EventBridge
+- Audit logs locais (RFC-0009) continuam funcionando no PostgreSQL
+- Arquivos removidos: `src/infrastructure/events/EventService.ts`, `src/infrastructure/events/index.ts`
+- 14 services foram atualizados para remover referências ao EventService
+
+**Roles incluídas no Login**
+- O login agora retorna corretamente as roles do usuário
+- Roles são carregadas dinamicamente do `AuthorizationService.getUserRoleKeys()`
+- Roles são incluídas tanto na resposta de login quanto no JWT token
+- Formato das roles: `role:super-admin`, `role:viewer`, etc.
+- Afeta: login, MFA verification, e token refresh
