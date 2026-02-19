@@ -6,6 +6,7 @@ import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ValidationError, ConflictError } from '../shared/errors/AppError';
+import { alarmBundleService } from './AlarmBundleService';
 
 export interface RuleEvaluationResult {
   ruleId: string;
@@ -49,6 +50,11 @@ export class RuleService {
     this.validateRuleConfig(data);
 
     const rule = await this.repository.create(tenantId, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, data.customerId, {
+      reason: 'rule_created', entityType: 'rule', entityId: rule.id, userId,
+    });
+
     return rule;
   }
 
@@ -70,12 +76,21 @@ export class RuleService {
     }
 
     const rule = await this.repository.update(tenantId, id, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, rule.customerId, {
+      reason: 'rule_updated', entityType: 'rule', entityId: id, userId,
+    });
+
     return rule;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    await this.getById(tenantId, id);
+    const rule = await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, rule.customerId, {
+      reason: 'rule_deleted', entityType: 'rule', entityId: id, userId,
+    });
   }
 
   async list(tenantId: string, params: ListRulesParams): Promise<PaginatedResult<Rule>> {
@@ -100,6 +115,11 @@ export class RuleService {
     }
 
     const updatedRule = await this.repository.update(tenantId, id, { enabled }, userId);
+
+    alarmBundleService.invalidateCache(tenantId, rule.customerId, {
+      reason: 'rule_toggled', entityType: 'rule', entityId: id, userId,
+    });
+
     return updatedRule;
   }
 

@@ -11,6 +11,7 @@ import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
+import { alarmBundleService } from './AlarmBundleService';
 
 export class CentralService {
   private repository: ICentralRepository;
@@ -40,6 +41,11 @@ export class CentralService {
     }
 
     const central = await this.repository.create(tenantId, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, data.customerId, {
+      reason: 'central_created', entityType: 'central', entityId: central.id, userId,
+    });
+
     return central;
   }
 
@@ -60,14 +66,23 @@ export class CentralService {
   }
 
   async update(tenantId: string, id: string, data: UpdateCentralDTO, userId: string): Promise<Central> {
-    await this.getById(tenantId, id);
+    const existing = await this.getById(tenantId, id);
     const central = await this.repository.update(tenantId, id, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, existing.customerId, {
+      reason: 'central_updated', entityType: 'central', entityId: id, userId,
+    });
+
     return central;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    await this.getById(tenantId, id);
+    const central = await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, central.customerId, {
+      reason: 'central_deleted', entityType: 'central', entityId: id, userId,
+    });
   }
 
   async list(tenantId: string, params: ListCentralsDTO): Promise<PaginatedResult<Central>> {

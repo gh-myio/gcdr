@@ -12,6 +12,7 @@ import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
+import { alarmBundleService } from './AlarmBundleService';
 
 export class AssetService {
   private repository: IAssetRepository;
@@ -49,6 +50,11 @@ export class AssetService {
     }
 
     const asset = await this.repository.create(tenantId, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, data.customerId, {
+      reason: 'asset_created', entityType: 'asset', entityId: asset.id, userId,
+    });
+
     return asset;
   }
 
@@ -72,6 +78,11 @@ export class AssetService {
     }
 
     const asset = await this.repository.update(tenantId, id, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, existing.customerId, {
+      reason: 'asset_updated', entityType: 'asset', entityId: id, userId,
+    });
+
     return asset;
   }
 
@@ -87,6 +98,10 @@ export class AssetService {
     // TODO: Check for devices attached to this asset
 
     await this.repository.delete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, asset.customerId, {
+      reason: 'asset_deleted', entityType: 'asset', entityId: id, userId,
+    });
   }
 
   async list(tenantId: string, params: ListAssetsParams): Promise<PaginatedResult<Asset>> {

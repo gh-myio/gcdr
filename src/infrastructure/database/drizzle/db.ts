@@ -71,3 +71,6 @@ export type NewPackageSubscription = typeof schema.packageSubscriptions.$inferIn
 
 export type AuditLog = typeof schema.auditLogs.$inferSelect;
 export type NewAuditLog = typeof schema.auditLogs.$inferInsert;
+
+export type AlarmBundleVersion = typeof schema.alarmBundleVersions.$inferSelect;
+export type NewAlarmBundleVersion = typeof schema.alarmBundleVersions.$inferInsert;

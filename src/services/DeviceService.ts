@@ -11,6 +11,7 @@ import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
+import { alarmBundleService } from './AlarmBundleService';
 
 export class DeviceService {
   private repository: IDeviceRepository;
@@ -43,6 +44,11 @@ export class DeviceService {
     }
 
     const device = await this.repository.create(tenantId, data, asset.customerId, userId);
+
+    alarmBundleService.invalidateCache(tenantId, asset.customerId, {
+      reason: 'device_created', entityType: 'device', entityId: device.id, userId,
+    });
+
     return device;
   }
 
@@ -74,12 +80,21 @@ export class DeviceService {
     }
 
     const device = await this.repository.update(tenantId, id, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, existing.customerId, {
+      reason: 'device_updated', entityType: 'device', entityId: id, userId,
+    });
+
     return device;
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    await this.getById(tenantId, id);
+    const device = await this.getById(tenantId, id);
     await this.repository.delete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, device.customerId, {
+      reason: 'device_deleted', entityType: 'device', entityId: id, userId,
+    });
   }
 
   async list(tenantId: string, params: ListDevicesParams): Promise<PaginatedResult<Device>> {

@@ -48,6 +48,8 @@ UNION ALL
 SELECT 'user_maintenance_groups', COUNT(*), COUNT(*) FILTER (WHERE expires_at IS NULL OR expires_at > NOW()) FROM user_maintenance_groups
 UNION ALL
 SELECT 'user_bundle_cache', COUNT(*), COUNT(*) FILTER (WHERE expires_at > NOW()) FROM user_bundle_cache
+UNION ALL
+SELECT 'alarm_bundle_versions', COUNT(*), COUNT(*) FROM alarm_bundle_versions
 ORDER BY table_name;
 
 -- Check rules CHECK constraints are working

@@ -18,9 +18,11 @@ import {
 import { RuleRepository } from '../repositories/RuleRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
+import { AlarmBundleVersionRepository, alarmBundleVersionRepository } from '../repositories/AlarmBundleVersionRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { AlarmBundleVersion } from '../domain/entities/AlarmBundleVersion';
 import { NotFoundError } from '../shared/errors/AppError';
 
 // Default TTL for bundle cache (5 minutes)
@@ -29,11 +31,20 @@ const DEFAULT_TTL_SECONDS = 300;
 // Secret key for HMAC (in production, use AWS Secrets Manager or parameter store)
 const BUNDLE_SIGNING_SECRET = process.env.BUNDLE_SIGNING_SECRET || 'gcdr-alarm-bundle-secret-key';
 
+export interface InvalidationMeta {
+  reason: string;
+  entityType: string;
+  entityId?: string;
+  userId?: string;
+}
+
 export class AlarmBundleService {
   private ruleRepository: IRuleRepository;
   private deviceRepository: IDeviceRepository;
   private customerRepository: ICustomerRepository;
+  private versionRepository: AlarmBundleVersionRepository;
   private cache = new Map<string, { bundle: any; version: string; expiresAt: number }>();
+  private pendingInvalidation: InvalidationMeta | null = null;
 
   constructor(
     ruleRepository?: IRuleRepository,
@@ -43,6 +54,7 @@ export class AlarmBundleService {
     this.ruleRepository = ruleRepository || new RuleRepository();
     this.deviceRepository = deviceRepository || new DeviceRepository();
     this.customerRepository = customerRepository || new CustomerRepository();
+    this.versionRepository = alarmBundleVersionRepository;
   }
 
   /**
@@ -75,14 +87,18 @@ export class AlarmBundleService {
 
   /**
    * Invalidate cached entries for a tenant, optionally scoped to a customer.
+   * Stores invalidation metadata so the next bundle generation records the reason.
    */
-  invalidateCache(tenantId: string, customerId?: string): void {
+  invalidateCache(tenantId: string, customerId?: string, meta?: InvalidationMeta): void {
     for (const key of this.cache.keys()) {
       const parts = key.split(':');
       // parts: [type, tenantId, customerId, ...]
       if (parts[1] === tenantId && (!customerId || parts[2] === customerId)) {
         this.cache.delete(key);
       }
+    }
+    if (meta) {
+      this.pendingInvalidation = meta;
     }
   }
 
@@ -123,6 +139,9 @@ export class AlarmBundleService {
 
     // Sign the bundle
     bundle.meta.signature = this.signBundle(bundle);
+
+    // Record version in database
+    await this.recordVersion(params.tenantId, params.customerId, bundle.meta.version, 'full', bundle.meta.rulesCount, bundle.meta.devicesCount);
 
     // Store in cache
     this.cache.set(cacheKey, {
@@ -175,6 +194,9 @@ export class AlarmBundleService {
     // Sign the bundle
     bundle.meta.signature = this.signSimplifiedBundle(bundle);
 
+    // Record version in database
+    await this.recordVersion(tenantId, customerId, bundle.meta.version, 'simple', bundle.meta.rulesCount, bundle.meta.devicesCount);
+
     // Store in cache
     this.cache.set(cacheKey, {
       bundle,
@@ -183,6 +205,49 @@ export class AlarmBundleService {
     });
 
     return bundle;
+  }
+
+  /**
+   * Get version history for a customer's alarm bundles.
+   */
+  async getVersionHistory(tenantId: string, customerId: string, limit?: number): Promise<AlarmBundleVersion[]> {
+    return this.versionRepository.getHistory(tenantId, customerId, limit);
+  }
+
+  /**
+   * Record a new bundle version in the database.
+   * Consumes pendingInvalidation metadata if present.
+   */
+  private async recordVersion(
+    tenantId: string,
+    customerId: string,
+    version: string,
+    bundleType: 'full' | 'simple',
+    rulesCount: number,
+    devicesCount: number
+  ): Promise<void> {
+    const meta = this.pendingInvalidation;
+    this.pendingInvalidation = null;
+
+    const latest = await this.versionRepository.getLatest(tenantId, customerId, bundleType);
+
+    try {
+      await this.versionRepository.record({
+        tenantId,
+        customerId,
+        version,
+        previousVersion: latest?.version,
+        bundleType,
+        reason: meta?.reason || 'cache_expired',
+        entityType: meta?.entityType || 'system',
+        entityId: meta?.entityId,
+        rulesCount,
+        devicesCount,
+        createdBy: meta?.userId,
+      });
+    } catch {
+      // Non-critical: don't break bundle generation if version recording fails
+    }
   }
 
   /**

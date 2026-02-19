@@ -10,6 +10,7 @@ import { CustomerRepository } from '../repositories/CustomerRepository';
 import { CustomerTreeNode, ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
+import { alarmBundleService } from './AlarmBundleService';
 
 export class CustomerService {
   private repository: ICustomerRepository;
@@ -52,6 +53,11 @@ export class CustomerService {
     }
 
     const customer = await this.repository.update(tenantId, id, data, userId);
+
+    alarmBundleService.invalidateCache(tenantId, id, {
+      reason: 'customer_updated', entityType: 'customer', entityId: id, userId,
+    });
+
     return customer;
   }
 
@@ -65,6 +71,10 @@ export class CustomerService {
     }
 
     await this.repository.delete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, id, {
+      reason: 'customer_deleted', entityType: 'customer', entityId: id, userId,
+    });
   }
 
   async list(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>> {

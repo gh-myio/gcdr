@@ -1172,3 +1172,35 @@ export const userBundleCache = pgTable('user_bundle_cache', {
   expiresIdx: index('user_bundle_cache_expires_idx').on(table.expiresAt),
   invalidatedIdx: index('user_bundle_cache_invalidated_idx').on(table.invalidatedAt),
 }));
+
+// =============================================================================
+// ALARM BUNDLE VERSIONS
+// =============================================================================
+
+export const alarmBundleVersions = pgTable('alarm_bundle_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id').notNull(),
+
+  // Version info
+  version: varchar('version', { length: 50 }).notNull(),
+  previousVersion: varchar('previous_version', { length: 50 }),
+  bundleType: varchar('bundle_type', { length: 10 }).notNull(),
+
+  // Change tracking
+  reason: varchar('reason', { length: 255 }).notNull(),
+  entityType: varchar('entity_type', { length: 50 }).notNull(),
+  entityId: uuid('entity_id'),
+
+  // Metadata
+  rulesCount: integer('rules_count').notNull().default(0),
+  devicesCount: integer('devices_count').notNull().default(0),
+
+  // Audit
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  tenantCustomerIdx: index('abv_tenant_customer_idx').on(table.tenantId, table.customerId),
+  versionIdx: index('abv_version_idx').on(table.version),
+  createdAtIdx: index('abv_created_at_idx').on(table.createdAt),
+}));
