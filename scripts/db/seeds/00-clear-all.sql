@@ -6,6 +6,7 @@
 -- =============================================================================
 
 -- Truncate tables in reverse dependency order (CASCADE handles FKs)
+TRUNCATE TABLE alarm_bundle_versions CASCADE;
 TRUNCATE TABLE audit_logs CASCADE;
 TRUNCATE TABLE package_subscriptions CASCADE;
 TRUNCATE TABLE integration_packages CASCADE;
@@ -48,4 +49,5 @@ UNION ALL SELECT 'domain_permissions', COUNT(*) FROM domain_permissions
 UNION ALL SELECT 'maintenance_groups', COUNT(*) FROM maintenance_groups
 UNION ALL SELECT 'user_maintenance_groups', COUNT(*) FROM user_maintenance_groups
 UNION ALL SELECT 'user_bundle_cache', COUNT(*) FROM user_bundle_cache
+UNION ALL SELECT 'alarm_bundle_versions', COUNT(*) FROM alarm_bundle_versions
 ORDER BY table_name;
