@@ -5571,6 +5571,81 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /customers/{customerId}/alarm-rules/bundle/versions:
+    get:
+      tags: [Alarm Bundles]
+      summary: Get alarm bundle version history
+      description: |
+        Returns the version history for a customer's alarm bundles.
+        Supports both JWT and API Key authentication (scope: bundles:read).
+      operationId: getAlarmBundleVersions
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Maximum number of versions to return
+      responses:
+        '200':
+          description: List of alarm bundle versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        tenantId:
+                          type: string
+                          format: uuid
+                        customerId:
+                          type: string
+                          format: uuid
+                        versionId:
+                          type: string
+                          description: Bundle version hash
+                        reason:
+                          type: string
+                          description: Reason for version change
+                        triggeredBy:
+                          type: string
+                          description: Entity type that triggered the change
+                        triggeredById:
+                          type: string
+                          format: uuid
+                        changedBy:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /customers/{customerId}/alarm-rules/bundle/simple:
     get:
       tags: [Alarm Bundles]
@@ -5579,6 +5654,9 @@ paths:
         Returns a simplified bundle with minimal fields for Node-RED processing.
         Includes centralId and slaveId for Modbus integration.
         Supports both JWT and API Key authentication (scope: bundles:read).
+
+        **Cache behavior:** When `X-Version-Id` or `If-None-Match` matches the current version,
+        returns HTTP 200 with `{"versionId": "...", "message": "Not Modified"}` instead of the full bundle.
       operationId: getSimplifiedAlarmBundle
       security:
         - bearerAuth: []
@@ -5595,9 +5673,23 @@ paths:
           in: header
           schema:
             type: string
+          description: ETag for conditional request
+        - name: X-Version-Id
+          in: header
+          schema:
+            type: string
+          description: Bundle version ID for cache validation (simpler alternative to ETag for Node-RED)
+        - name: X-Central-Id
+          in: header
+          schema:
+            type: string
+            format: uuid
+          description: Filter devices by central ID
       responses:
         '200':
-          description: Simplified alarm bundle
+          description: |
+            Simplified alarm bundle, OR a "Not Modified" response when the version matches.
+            Check the `message` field to distinguish: if `message === "Not Modified"`, the bundle has not changed.
           headers:
             ETag:
               schema:
@@ -5608,12 +5700,26 @@ paths:
             X-Bundle-Signature:
               schema:
                 type: string
+            X-Bundle-Rules-Count:
+              schema:
+                type: integer
+            X-Bundle-Devices-Count:
+              schema:
+                type: integer
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SimpleAlarmBundleResponse'
-        '304':
-          description: Not modified
+                oneOf:
+                  - $ref: '#/components/schemas/SimpleAlarmBundleResponse'
+                  - type: object
+                    properties:
+                      versionId:
+                        type: string
+                        description: Current bundle version
+                      message:
+                        type: string
+                        enum: ['Not Modified']
+                    required: [versionId, message]
         '401':
           description: Unauthorized
 
