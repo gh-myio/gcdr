@@ -345,7 +345,7 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
           'Cache-Control': 'private, max-age=300',
           'X-Bundle-Version': cachedVersion,
         });
-        res.status(304).json({ versionId: cachedVersion });
+        res.status(200).json({ versionId: cachedVersion, message: 'Not Modified' });
         return;
       }
     }
@@ -358,25 +358,25 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     const etag = `"${bundle.meta.version}"`;
     const currentVersionId = bundle.meta.version;
 
-    // Return 304 Not Modified if X-Version-Id matches current version
+    // Return 200 Not Modified if X-Version-Id matches current version
     if (clientVersionId && clientVersionId === currentVersionId) {
       res.set({
         'ETag': etag,
         'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
         'X-Bundle-Version': currentVersionId,
       });
-      res.status(304).json({ versionId: currentVersionId });
+      res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
       return;
     }
 
-    // Return 304 Not Modified if ETag matches (standard HTTP caching)
+    // Return 200 Not Modified if ETag matches (standard HTTP caching)
     if (ifNoneMatch && ifNoneMatch === etag) {
       res.set({
         'ETag': etag,
         'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
         'X-Bundle-Version': currentVersionId,
       });
-      res.status(304).json({ versionId: currentVersionId });
+      res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
       return;
     }
 
