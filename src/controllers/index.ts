@@ -5,6 +5,7 @@ export { default as docsController } from './docs.controller';
 
 // Admin routes (development only)
 export { dbAdminController } from './admin/db-admin.controller';
+export { monitorAdminController } from './admin/monitor-admin.controller';
 
 // Protected routes
 export { default as customersController } from './customers.controller';
@@ -17,7 +18,7 @@ export { default as usersController, listByCustomerHandler as usersListByCustome
 export { default as policiesController } from './policies.controller';
 export { default as rolesController } from './roles.controller';
 export { default as authorizationController } from './authorization.controller';
-export { default as rulesController, listByCustomerHandler as rulesListByCustomerHandler, getAlarmBundleHandler, getSimplifiedAlarmBundleHandler } from './rules.controller';
+export { default as rulesController, listByCustomerHandler as rulesListByCustomerHandler, getAlarmBundleHandler, getSimplifiedAlarmBundleHandler, getAlarmBundleVersionsHandler } from './rules.controller';
 export { default as integrationsController } from './integrations.controller';
 export { default as customerApiKeysController } from './customer-api-keys.controller';
 export { auditLogsController } from './audit-logs.controller';

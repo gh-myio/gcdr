@@ -31,11 +31,13 @@ import {
   rulesListByCustomerHandler,
   getAlarmBundleHandler,
   getSimplifiedAlarmBundleHandler,
+  getAlarmBundleVersionsHandler,
   integrationsController,
   customerApiKeysController,
   auditLogsController,
   simulatorController,
   dbAdminController,
+  monitorAdminController,
   centralsController,
   centralsListByCustomerHandler,
   centralsListByAssetHandler,
@@ -50,6 +52,7 @@ import {
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
+import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
 
@@ -67,7 +70,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key', 'X-Admin-Password'],
 }));
 
 // Compression
@@ -93,6 +96,9 @@ app.use('/admin/simulator', simulatorAdminController);
 // Admin User Management (RFC-0011)
 app.use('/admin/users', userAdminController);
 
+// API Monitor UI
+app.use('/admin/monitor', monitorAdminController);
+
 // =============================================================================
 // Security Middleware (after admin routes that need relaxed CSP)
 // =============================================================================
@@ -102,6 +108,9 @@ app.use(helmet());
 
 // Request context
 app.use(contextMiddleware);
+
+// Request monitor (after contextMiddleware to capture tenantId/userId)
+app.use(requestMonitorMiddleware);
 
 // =============================================================================
 // Public Routes (no authentication required)
@@ -127,6 +136,9 @@ apiV1Router.use('/auth', authController);
 
 // Customer-specific nested routes MUST come before the general /customers router
 // to ensure proper route matching (more specific routes first)
+
+// Bundle Versions (must come before /bundle/simple and /bundle)
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/versions', hybridAuthMiddleware('bundles:read'), getAlarmBundleVersionsHandler);
 
 // Customer Alarm Bundle - Simplified (supports JWT or API Key auth for M2M integration)
 // More specific route MUST come first
@@ -243,7 +255,8 @@ if (require.main === module) {
 ║  Health:      ${(baseUrl + '/health').padEnd(42)}║
 ║  Docs:        ${(baseUrl + '/docs').padEnd(42)}║${isDev ? `
 ║  DB Admin:    ${(baseUrl + '/admin/db').padEnd(42)}║
-║  Simulator:   ${(baseUrl + '/admin/simulator').padEnd(42)}║` : ''}
+║  Simulator:   ${(baseUrl + '/admin/simulator').padEnd(42)}║
+║  Monitor:     ${(baseUrl + '/admin/monitor').padEnd(42)}║` : ''}
 ╚════════════════════════════════════════════════════════════╝
     `);
 

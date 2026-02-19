@@ -403,4 +403,26 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
   }
 };
 
+/**
+ * GET /customers/:customerId/alarm-rules/bundle/versions
+ * Get alarm bundle version history
+ */
+export const getAlarmBundleVersionsHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.context;
+    const { customerId } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    const versions = await alarmBundleService.getVersionHistory(tenantId, customerId, limit);
+
+    sendSuccess(res, versions);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default router;
