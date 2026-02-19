@@ -1,0 +1,679 @@
+-- =============================================================================
+-- SEED: DEVICES
+-- =============================================================================
+-- Mock data for devices table
+-- =============================================================================
+
+DO $$
+DECLARE
+    v_tenant_id UUID := '11111111-1111-1111-1111-111111111111';
+    v_company1_id UUID := '33333333-3333-3333-3333-333333333333';
+    v_room1_id UUID := 'ffff4444-4444-4444-4444-444444444444'; -- Server Room
+    v_room2_id UUID := 'ffff5555-5555-5555-5555-555555555555'; -- Meeting Room
+    v_equipment1_id UUID := 'ffff6666-6666-6666-6666-666666666666'; -- AC Unit
+    v_central1_id UUID := 'ccc00001-0001-0001-0001-000000000001'; -- NodeHub Central SRV-01 (from 10-centrals.sql)
+    -- Dimension customer
+    v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
+    v_dim_lab_id UUID := 'dddd2222-2222-2222-2222-222222222222';
+    v_dim_entrada_id UUID := 'dddd3333-3333-3333-3333-333333333333';
+    v_dim_building_id UUID := 'dddd1111-1111-1111-1111-111111111111';
+    v_central_dim_id UUID := '9308af89-94b2-45e6-9e47-ae78f881afd2'; -- Central Dimension (real)
+BEGIN
+    -- Temperature Sensor in Server Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type,
+        ingestion_id, ingestion_gateway_id, last_activity_time
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000001',
+        v_tenant_id,
+        v_room1_id,
+        v_company1_id,
+        'Temperature Sensor SRV-01',
+        'Sensor Temp. Sala Servidores',
+        'TEMP-SRV-01',
+        'SENSOR',
+        'High-precision temperature sensor for server room monitoring',
+        'SN-TEMP-001-2023',
+        'tb-device-temp-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "firmwareVersion": "2.1.0", "serialNumber": "SN-TEMP-001-2023", "protocol": "MQTT", "accuracy": 0.2, "addrLow": 100, "addrHigh": 110, "frequency": 30}',
+        'ONLINE',
+        NOW() - INTERVAL '5 minutes',
+        '{"type": "ACCESS_TOKEN", "accessToken": "temp001_access_token_xyz"}',
+        '{"reportingInterval": 30, "telemetryKeys": ["temperature", "humidity"], "attributeKeys": ["firmware", "battery"]}',
+        '["temperature", "sensor", "critical", "server-room"]',
+        '{"installationDate": "2023-06-15", "calibrationDate": "2024-01-10"}',
+        '{"firmware": "2.1.0", "battery": 95, "lastCalibration": "2024-01-10", "offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        1,                                              -- slave_id (Modbus)
+        v_central1_id,                                  -- central_id
+        'TEMP_SENSOR_SERVER_ROOM_01',                   -- identifier
+        'SENSOR_TEMP_AMBIENTE',                         -- device_profile
+        'SHT40_TEMP_HUMIDITY',                          -- device_type
+        'ce6a7e51-e642-4562-8d3d-8f492929d4df',        -- ingestion_id
+        'd3202744-05dd-46d1-af33-495e9a2ecd52',        -- ingestion_gateway_id
+        NOW() - INTERVAL '5 minutes'                    -- last_activity_time
+    );
+
+    -- Humidity Sensor in Server Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000002',
+        v_tenant_id,
+        v_room1_id,
+        v_company1_id,
+        'Humidity Sensor SRV-01',
+        'Sensor Umidade Sala Servidores',
+        'HUM-SRV-01',
+        'SENSOR',
+        'Humidity sensor for server room environment monitoring',
+        'SN-HUM-001-2023',
+        'tb-device-hum-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "firmwareVersion": "2.1.0", "serialNumber": "SN-HUM-001-2023", "protocol": "MQTT"}',
+        'ONLINE',
+        NOW() - INTERVAL '5 minutes',
+        '{"type": "ACCESS_TOKEN", "accessToken": "hum001_access_token_xyz"}',
+        '{"reportingInterval": 30, "telemetryKeys": ["humidity", "temperature"], "attributeKeys": ["firmware"]}',
+        '["humidity", "sensor", "server-room"]',
+        '{"installationDate": "2023-06-15"}',
+        '{"firmware": "2.1.0", "offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        3,                                              -- slave_id (Modbus)
+        v_central1_id,                                  -- central_id
+        'HUMIDITY_SENSOR_SERVER_ROOM_01',               -- identifier
+        'SENSOR_HUMIDITY_AMBIENTE',                     -- device_profile
+        'SHT40_HUMIDITY'                                -- device_type
+    );
+
+    -- Power Meter in Server Room (with RFC-0008 Modbus fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type,
+        ingestion_id, ingestion_gateway_id, last_activity_time
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000003',
+        v_tenant_id,
+        v_room1_id,
+        v_company1_id,
+        'Power Meter SRV-01',
+        'Medidor de Energia Sala Servidores',
+        'PWR-SRV-01',
+        'METER',
+        'Smart power meter for server room energy monitoring',
+        'SN-PWR-001-2023',
+        'tb-device-pwr-001',
+        '{"manufacturer": "Schneider", "model": "PM5560", "firmwareVersion": "3.0.1", "serialNumber": "SN-PWR-001-2023", "protocol": "MODBUS", "addrLow": 0, "addrHigh": 50, "frequency": 60}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '{"type": "MQTT_BASIC", "username": "pwr001", "password": "encrypted_password"}',
+        '{"reportingInterval": 60, "telemetryKeys": ["power", "voltage", "current", "powerFactor", "energy"], "attributeKeys": ["firmware"]}',
+        '["power", "meter", "energy", "server-room"]',
+        '{"installationDate": "2023-06-15", "maxLoad": 100}',
+        '{"firmware": "3.0.1", "totalEnergy": 125430.5, "offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        2,                                              -- slave_id (Modbus address 2)
+        v_central1_id,                                  -- central_id
+        'POWER_METER_SERVER_ROOM_01',                   -- identifier
+        '3F_MEDIDOR',                                   -- device_profile
+        'PM5560_POWER_METER',                           -- device_type
+        'bf7a8c31-d542-4562-9e3f-7a592929e5ef',        -- ingestion_id
+        'd3202744-05dd-46d1-af33-495e9a2ecd52',        -- ingestion_gateway_id
+        NOW() - INTERVAL '1 minute'                     -- last_activity_time
+    );
+
+    -- Camera in Meeting Room (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000004',
+        v_tenant_id,
+        v_room2_id,
+        v_company1_id,
+        'PTZ Camera MT-A',
+        'Câmera PTZ Sala Reuniões A',
+        'CAM-MTA-01',
+        'CAMERA',
+        'PTZ camera for meeting room video conferencing',
+        'SN-CAM-001-2023',
+        'tb-device-cam-001',
+        '{"manufacturer": "Axis", "model": "P5655-E", "firmwareVersion": "10.12.0", "serialNumber": "SN-CAM-001-2023", "protocol": "HTTP", "resolution": "1080p"}',
+        'ONLINE',
+        NOW() - INTERVAL '30 seconds',
+        '{"type": "BASIC", "username": "admin"}',
+        '{"reportingInterval": 300, "telemetryKeys": ["status", "streamActive"], "attributeKeys": ["firmware", "resolution"]}',
+        '["camera", "video", "meeting-room"]',
+        '{"installationDate": "2023-08-20"}',
+        '{"firmware": "10.12.0", "resolution": "1080p", "ptzEnabled": true}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        10,                                             -- slave_id
+        v_central1_id,                                  -- central_id
+        'PTZ_CAMERA_MEETING_ROOM_A',                    -- identifier
+        'CAMERA_IP_PTZ',                                -- device_profile
+        'P5655E_PTZ'                                    -- device_type
+    );
+
+    -- AC Controller (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000005',
+        v_tenant_id,
+        v_equipment1_id,
+        v_company1_id,
+        'AC Controller SRV-AC01',
+        'Controlador AC Precisão #1',
+        'CTRL-AC-01',
+        'CONTROLLER',
+        'Controller for precision AC unit in server room',
+        'SN-CTRL-001-2023',
+        'tb-device-ctrl-001',
+        '{"manufacturer": "Carrier", "model": "i-Vu", "firmwareVersion": "8.0.2", "serialNumber": "SN-CTRL-001-2023", "protocol": "BACNET"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '{"type": "ACCESS_TOKEN", "accessToken": "ctrl001_access_token"}',
+        '{"reportingInterval": 60, "telemetryKeys": ["setpoint", "supplyTemp", "returnTemp", "fanSpeed", "compressorStatus"], "attributeKeys": ["firmware", "mode"]}',
+        '["controller", "hvac", "ac", "critical"]',
+        '{"installationDate": "2020-03-15"}',
+        '{"firmware": "8.0.2", "mode": "cooling", "setpoint": 22}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        5,                                              -- slave_id
+        v_central1_id,                                  -- central_id
+        'AC_CONTROLLER_SERVER_ROOM_01',                 -- identifier
+        'HVAC_PRECISION_AC',                            -- device_profile
+        'IVU_AC_CONTROLLER'                             -- device_type
+    );
+
+    -- Gateway device (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000006',
+        v_tenant_id,
+        v_room1_id,
+        v_company1_id,
+        'IoT Gateway SRV-01',
+        'Gateway IoT Sala Servidores',
+        'GW-SRV-01',
+        'GATEWAY',
+        'Main IoT gateway for server room devices',
+        'SN-GW-001-2023',
+        'tb-device-gw-001',
+        '{"manufacturer": "Advantech", "model": "UNO-2484G", "firmwareVersion": "1.5.0", "serialNumber": "SN-GW-001-2023", "protocol": "MQTT", "macAddress": "00:1A:2B:3C:4D:5E", "ipAddress": "192.168.1.100"}',
+        'ONLINE',
+        NOW() - INTERVAL '10 seconds',
+        '{"type": "X509_CERTIFICATE", "certificateFingerprint": "AB:CD:EF:12:34:56"}',
+        '{"reportingInterval": 30, "telemetryKeys": ["cpuUsage", "memoryUsage", "diskUsage", "connectedDevices"], "attributeKeys": ["firmware", "uptime"]}',
+        '["gateway", "edge", "server-room"]',
+        '{"installationDate": "2023-06-01"}',
+        '{"firmware": "1.5.0", "uptime": 864000, "connectedDevices": 5}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields (Gateway uses high slave_id)
+        247,                                            -- slave_id (247 for gateway/master)
+        v_central1_id,                                  -- central_id
+        'IOT_GATEWAY_SERVER_ROOM_01',                   -- identifier
+        'GATEWAY_EDGE',                                 -- device_profile
+        'UNO2484G_GATEWAY'                              -- device_type
+    );
+
+    -- Offline device example (with RFC-0008 fields)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at, last_disconnected_at,
+        credentials, telemetry_config, tags, metadata, attributes, status, version,
+        -- RFC-0008 fields
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '11110001-0001-0001-0001-000000000007',
+        v_tenant_id,
+        v_room1_id,
+        v_company1_id,
+        'Smoke Detector SRV-01',
+        'Detector Fumaça Sala Servidores',
+        'SMOKE-SRV-01',
+        'SENSOR',
+        'Smoke detector for server room fire safety',
+        'SN-SMOKE-001-2023',
+        'tb-device-smoke-001',
+        '{"manufacturer": "Honeywell", "model": "5808W3", "firmwareVersion": "1.0.0", "serialNumber": "SN-SMOKE-001-2023", "protocol": "ZIGBEE"}',
+        'OFFLINE',
+        NOW() - INTERVAL '2 days',
+        NOW() - INTERVAL '1 day',
+        '{"type": "ACCESS_TOKEN", "accessToken": "smoke001_token"}',
+        '{"reportingInterval": 300, "telemetryKeys": ["smokeLevel", "batteryLevel"], "attributeKeys": ["firmware", "battery"]}',
+        '["smoke", "sensor", "safety", "server-room"]',
+        '{"installationDate": "2023-06-15"}',
+        '{"firmware": "1.0.0", "battery": 15}',
+        'ACTIVE',
+        1,
+        -- RFC-0008 fields
+        15,                                             -- slave_id
+        v_central1_id,                                  -- central_id
+        'SMOKE_DETECTOR_SERVER_ROOM_01',                -- identifier
+        'SENSOR_SMOKE_FIRE',                            -- device_profile
+        '5808W3_SMOKE'                                  -- device_type
+    );
+
+    -- ==========================================================================
+    -- Dimension Customer Devices
+    -- ==========================================================================
+
+    -- Device 1: Energy Laboratório (lamp)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000001',
+        v_tenant_id,
+        v_dim_lab_id,
+        v_dimension_id,
+        'Energy Laboratório',
+        'Medidor Energia Laboratório',
+        'ENERGY-LAB',
+        'METER',
+        'Energy meter for laboratory lighting',
+        'SN-DIM-ENERGY-LAB-001',
+        'dim-energy-lab-001',
+        '{"manufacturer": "Schneider", "model": "PM5100", "protocol": "MODBUS"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["energy", "lamp", "laboratory"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        1,
+        v_central_dim_id,
+        'ENERGY_LAB_01',
+        'ENERGY_METER',
+        'PM5100_LAMP'
+    );
+
+    -- Device 2: Energy Entrada (lamp) - slaveId=12 (moved from 2)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000002',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Energy Entrada',
+        'Medidor Energia Entrada',
+        'ENERGY-ENT',
+        'METER',
+        'Energy meter for entrance lighting',
+        'SN-DIM-ENERGY-ENT-001',
+        'dim-energy-ent-001',
+        '{"manufacturer": "Schneider", "model": "PM5100", "protocol": "MODBUS"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["energy", "lamp", "entrance"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        12,
+        v_central_dim_id,
+        'ENERGY_ENTRADA_01',
+        'ENERGY_METER',
+        'PM5100_LAMP'
+    );
+
+    -- Device 3: Sensores + Lampada (OUTLET with 2 channels: entrada lamp ch0, lab lamp ch1) - slaveId=2
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000003',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Sensores Lampada',
+        'Controle Lampadas Entrada e Laboratório',
+        'LAMP-DUAL',
+        'OUTLET',
+        'Dual lamp control outlet: Entrance lamp (ch0) and Laboratory lamp (ch1)',
+        'SN-DIM-LAMP-DUAL-001',
+        'dim-lamp-dual-001',
+        '{"manufacturer": "Schneider", "model": "iLC150", "protocol": "MODBUS", "channels": [{"name": "lamp_entrada", "channel": 0, "type": "lamp"}, {"name": "lamp_lab", "channel": 1, "type": "lamp"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["lamp", "control", "laboratory", "entrance", "outlet", "dual-channel"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "lamp"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        2,
+        v_central_dim_id,
+        'LAMP_DUAL_01',
+        'OUTLET_LAMP',
+        'ILC150_DUAL_LAMP'
+    );
+
+    -- Device 4: SW Reuniao (OUTLET with 2 channels: Lampada ch0, Sensor Porta ch1) - slaveId=3
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000004',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'SW Reuniao',
+        'Switch Sala Reunião (Lampada + Sensor Porta)',
+        'SW-REUNIAO',
+        'OUTLET',
+        'Meeting room outlet: Lamp control (ch0) and Door sensor (ch1)',
+        'SN-DIM-REUNIAO-001',
+        'dim-reuniao-001',
+        '{"manufacturer": "Schneider", "model": "iLC150-D", "protocol": "MODBUS", "channels": [{"name": "lamp_reuniao", "channel": 0, "type": "lamp"}, {"name": "door_reuniao", "channel": 1, "type": "door_sensor"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["lamp", "door", "sensor", "meeting-room", "outlet", "dual-channel"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "meeting_room"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        3,
+        v_central_dim_id,
+        'SW_REUNIAO_01',
+        'OUTLET_LAMP_DOOR',
+        'ILC150D_LAMP_DOOR'
+    );
+
+    -- Device 5: 3F Geral (general energy meter) - slaveId=4
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000005',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        '3F Geral',
+        'Medidor Geral 3F',
+        '3F-GERAL',
+        'METER',
+        'General 3-phase energy meter (no channels needed)',
+        'SN-DIM-3F-GERAL-001',
+        'dim-3f-geral-001',
+        '{"manufacturer": "Schneider", "model": "PM5560", "protocol": "MODBUS", "phases": 3}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["energy", "meter", "3-phase", "general"]',
+        '{"installationDate": "2024-01-10"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        4,
+        v_central_dim_id,
+        '3F_GERAL_01',
+        '3F_MEDIDOR',
+        'PM5560_3F'
+    );
+
+    -- Device 6: Infravermelho (infrared sensor with temperature + humidity) - slaveId=6
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000006',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Infravermelho',
+        'Sensor Infravermelho (Temperatura e Umidade)',
+        'IR-TEMPHUM',
+        'INFRARED',
+        'Infrared sensor with temperature and humidity readings (no channels needed)',
+        'SN-DIM-IR-001',
+        'dim-ir-001',
+        '{"manufacturer": "Melexis", "model": "MLX90614", "protocol": "I2C", "metrics": ["temperature", "humidity"]}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["infrared", "temperature", "humidity", "sensor"]',
+        '{"installationDate": "2024-01-15", "deviceIcon": "infrared"}',
+        '{"offset": {"temp": 0.3, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        6,
+        v_central_dim_id,
+        'IR_TEMPHUM_01',
+        'SENSOR_INFRARED',
+        'MLX90614_IR'
+    );
+
+    -- Device 7: Sensor Umidade Entrada (humidity sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000007',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Umidade Entrada',
+        'Sensor Umidade Entrada',
+        'HUM-ENT',
+        'SENSOR',
+        'Humidity sensor for entrance area',
+        'SN-DIM-HUM-ENT-001',
+        'dim-hum-ent-001',
+        '{"manufacturer": "Sensirion", "model": "SHT40", "protocol": "MQTT"}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["humidity", "sensor", "entrance"]',
+        '{"installationDate": "2024-02-01", "deviceIcon": "humidity"}',
+        '{"offset": {"temp": 0, "hum": -1.0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        7,
+        v_central_dim_id,
+        'HUM_ENTRADA_01',
+        'SENSOR_HUMIDITY',
+        'SHT40_HUM'
+    );
+
+    -- Device 8: Temp+Umidade Lab (OUTLET with 2 channels: temperature + humidity)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000008',
+        v_tenant_id,
+        v_dim_lab_id,
+        v_dimension_id,
+        'Temp+Umidade Lab',
+        'Sensor Temperatura e Umidade Laboratório',
+        'TEMPHUM-LAB',
+        'OUTLET',
+        'Multi-channel outlet: temperature (ch0) and humidity (ch1) for laboratory',
+        'SN-DIM-TEMPHUM-LAB-001',
+        'dim-temphum-lab-001',
+        '{"manufacturer": "Sensirion", "model": "SHT45", "protocol": "MQTT", "channels": [{"name": "temperature", "channel": 0, "type": "temperature"}, {"name": "humidity", "channel": 1, "type": "humidity"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["temperature", "humidity", "outlet", "laboratory", "multi-channel"]',
+        '{"installationDate": "2024-02-01", "deviceIcon": "multi_sensor"}',
+        '{"offset": {"temp": 0.2, "hum": -1.5, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        8,
+        v_central_dim_id,
+        'TEMPHUM_LAB_01',
+        'OUTLET_TEMP_HUMIDITY',
+        'SHT45_TEMP_HUM'
+    );
+
+    -- Device 9: Nível Caixa D'Água (water level sensor)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000009',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Nível Caixa Água',
+        'Sensor Nível Caixa D''Água',
+        'WATER-LVL',
+        'SENSOR',
+        'Water tank level sensor (ultrasonic, height adjustment offset)',
+        'SN-DIM-WATER-LVL-001',
+        'dim-water-lvl-001',
+        '{"manufacturer": "Siemens", "model": "SITRANS Probe LU", "protocol": "MODBUS", "range": "0-100%", "tankHeight": 2000}',
+        'ONLINE',
+        NOW() - INTERVAL '3 minutes',
+        '["water", "level", "sensor", "building"]',
+        '{"installationDate": "2024-03-01", "deviceIcon": "water_level"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 5}}',
+        'ACTIVE',
+        1,
+        9,
+        v_central_dim_id,
+        'WATER_LEVEL_01',
+        'SENSOR_WATER_LEVEL',
+        'SITRANS_LU'
+    );
+
+    -- Device 10: Hidr. Mc Donald's (flow sensor OUTLET - Node-RED example)
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000010',
+        v_tenant_id,
+        v_dim_entrada_id,
+        v_dimension_id,
+        'Hidr. Mc Donalds',
+        'Hidrômetro Mc Donald''s',
+        'HIDR-MCD',
+        'OUTLET',
+        'Flow sensor outlet for water metering (Mc Donald''s)',
+        'SN-DIM-HIDR-MCD-001',
+        'dim-hidr-mcd-001',
+        '{"manufacturer": "Elster", "model": "Q4000", "protocol": "MODBUS", "channels": [{"name": "flow_sensor", "channel": 0, "type": "flow"}, {"name": "temperature", "channel": 1, "type": "temperature"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '2 minutes',
+        '["flow", "water", "outlet", "entrance"]',
+        '{"installationDate": "2024-05-10", "deviceIcon": "water_meter"}',
+        '{"offset": {"temp": 0, "hum": 0, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        10,
+        v_central_dim_id,
+        'HIDR_MCD_01',
+        'OUTLET_FLOW',
+        'Q4000_FLOW'
+    );
+
+    -- Device 11: Multi-channel Energy+Temp Outlet
+    INSERT INTO devices (
+        id, tenant_id, asset_id, customer_id, name, display_name, label, type, description,
+        serial_number, external_id, specs, connectivity_status, last_connected_at,
+        tags, metadata, attributes, status, version,
+        slave_id, central_id, identifier, device_profile, device_type
+    )
+    VALUES (
+        '22220001-0001-0001-0001-000000000011',
+        v_tenant_id,
+        v_dim_building_id,
+        v_dimension_id,
+        'Energia+Temp Geral',
+        'Outlet Energia e Temperatura Geral',
+        'ENETEMP-GERAL',
+        'OUTLET',
+        'Multi-channel outlet: energy meter (ch0), temperature (ch1), humidity (ch2)',
+        'SN-DIM-ENETEMP-GERAL-001',
+        'dim-enetemp-geral-001',
+        '{"manufacturer": "Schneider", "model": "PM5560-T", "protocol": "MODBUS", "channels": [{"name": "energy", "channel": 0, "type": "energy"}, {"name": "temperature", "channel": 1, "type": "temperature"}, {"name": "humidity", "channel": 2, "type": "humidity"}]}',
+        'ONLINE',
+        NOW() - INTERVAL '1 minute',
+        '["energy", "temperature", "humidity", "outlet", "building"]',
+        '{"installationDate": "2024-06-01"}',
+        '{"offset": {"temp": -0.3, "hum": 0.5, "pot": 0, "water_level": 0}}',
+        'ACTIVE',
+        1,
+        11,
+        v_central_dim_id,
+        'ENETEMP_GERAL_01',
+        'OUTLET_ENERGY_TEMP',
+        'PM5560T_MULTI'
+    );
+
+    RAISE NOTICE 'Inserted 18 devices';
+END $$;
+
+-- Verify
+SELECT id, name, label, type, connectivity_status, status, slave_id, identifier, device_profile, device_type FROM devices ORDER BY type, name;
