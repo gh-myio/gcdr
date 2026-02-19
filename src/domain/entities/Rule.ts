@@ -61,6 +61,9 @@ export interface AlarmThresholdConfig {
 
   // Channel targeting for OUTLET devices with discrete metrics
   channelId?: number; // Channel index (0, 1, 2...) for multi-channel devices
+
+  // Energy unit multiplier: 1 for W (default), 0.25 for Wh
+  keyMulti?: number;
 }
 
 // SLA Configuration

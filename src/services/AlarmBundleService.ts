@@ -33,6 +33,7 @@ export class AlarmBundleService {
   private ruleRepository: IRuleRepository;
   private deviceRepository: IDeviceRepository;
   private customerRepository: ICustomerRepository;
+  private cache = new Map<string, { bundle: any; version: string; expiresAt: number }>();
 
   constructor(
     ruleRepository?: IRuleRepository,
@@ -45,9 +46,56 @@ export class AlarmBundleService {
   }
 
   /**
+   * Build a cache key from bundle params and type
+   */
+  private getCacheKey(params: GenerateBundleParams, type: 'full' | 'simple'): string {
+    return [
+      type,
+      params.tenantId,
+      params.customerId,
+      params.centralId || '',
+      params.domain || '',
+      params.deviceType || '',
+      String(params.includeDisabled || false),
+    ].join(':');
+  }
+
+  /**
+   * Get cached version string without generating the bundle.
+   * Returns null if cache is missing or expired.
+   */
+  getVersion(params: GenerateBundleParams, type: 'full' | 'simple'): string | null {
+    const key = this.getCacheKey(params, type);
+    const entry = this.cache.get(key);
+    if (entry && Date.now() < entry.expiresAt) {
+      return entry.version;
+    }
+    return null;
+  }
+
+  /**
+   * Invalidate cached entries for a tenant, optionally scoped to a customer.
+   */
+  invalidateCache(tenantId: string, customerId?: string): void {
+    for (const key of this.cache.keys()) {
+      const parts = key.split(':');
+      // parts: [type, tenantId, customerId, ...]
+      if (parts[1] === tenantId && (!customerId || parts[2] === customerId)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
    * Generate a complete alarm rules bundle for a customer
    */
   async generateBundle(params: GenerateBundleParams): Promise<AlarmRulesBundle> {
+    const cacheKey = this.getCacheKey(params, 'full');
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.bundle;
+    }
+
     const { tenantId, customerId, domain, deviceType, includeDisabled = false } = params;
 
     // Validate customer exists
@@ -76,6 +124,13 @@ export class AlarmBundleService {
     // Sign the bundle
     bundle.meta.signature = this.signBundle(bundle);
 
+    // Store in cache
+    this.cache.set(cacheKey, {
+      bundle,
+      version: bundle.meta.version,
+      expiresAt: Date.now() + DEFAULT_TTL_SECONDS * 1000,
+    });
+
     return bundle;
   }
 
@@ -86,6 +141,12 @@ export class AlarmBundleService {
    * - Rules without enabled/tags fields
    */
   async generateSimplifiedBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle> {
+    const cacheKey = this.getCacheKey(params, 'simple');
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.bundle;
+    }
+
     const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false } = params;
 
     // Validate customer exists
@@ -113,6 +174,13 @@ export class AlarmBundleService {
 
     // Sign the bundle
     bundle.meta.signature = this.signSimplifiedBundle(bundle);
+
+    // Store in cache
+    this.cache.set(cacheKey, {
+      bundle,
+      version: bundle.meta.version,
+      expiresAt: Date.now() + DEFAULT_TTL_SECONDS * 1000,
+    });
 
     return bundle;
   }
@@ -572,19 +640,14 @@ export class AlarmBundleService {
   }
 
   /**
-   * Generate a friendly version ID with timestamp and short hash
-   * Format: v1-YYYYMMDD-HHmmss (e.g., v1-20260127-214530)
+   * Generate a deterministic version ID from bundle content using SHA-256.
+   * Same content always produces the same hash, enabling proper 304 caching.
+   * Format: v1-<12-char hex hash> (e.g., v1-a1b2c3d4e5f6)
    */
   private calculateVersionHash(content: object): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-
-    return `v1-${year}${month}${day}-${hours}${minutes}${seconds}`;
+    const serialized = JSON.stringify(content, Object.keys(content).sort());
+    const hash = crypto.createHash('sha256').update(serialized).digest('hex').substring(0, 12);
+    return `v1-${hash}`;
   }
 
   /**

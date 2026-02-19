@@ -253,13 +253,28 @@ export const getAlarmBundleHandler = async (req: Request, res: Response, next: N
     // Check for conditional request (If-None-Match header)
     const ifNoneMatch = req.headers['if-none-match'];
 
-    const bundle = await alarmBundleService.generateBundle({
+    const bundleParams = {
       tenantId,
       customerId,
       domain: domain as string | undefined,
       deviceType: deviceType as string | undefined,
       includeDisabled: includeDisabled === 'true',
-    });
+    };
+
+    // Quick ETag check (cache-only, no DB queries)
+    if (ifNoneMatch) {
+      const cachedVersion = alarmBundleService.getVersion(bundleParams, 'full');
+      if (cachedVersion && ifNoneMatch === `"${cachedVersion}"`) {
+        res.set({
+          'ETag': `"${cachedVersion}"`,
+          'Cache-Control': 'private, max-age=300',
+        });
+        res.status(304).send();
+        return;
+      }
+    }
+
+    const bundle = await alarmBundleService.generateBundle(bundleParams);
 
     const etag = `"${bundle.meta.version}"`;
 
@@ -311,17 +326,34 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
       throw new ValidationError('Customer ID is required');
     }
 
-    // Check for conditional request (If-None-Match header - standard HTTP)
-    const ifNoneMatch = req.headers['if-none-match'];
-
-    const bundle = await alarmBundleService.generateSimplifiedBundle({
+    const bundleParams = {
       tenantId,
       customerId,
       centralId,
       domain: domain as string | undefined,
       deviceType: deviceType as string | undefined,
       includeDisabled: includeDisabled === 'true',
-    });
+    };
+
+    // Quick version check (cache-only, no DB queries)
+    if (clientVersionId) {
+      const cachedVersion = alarmBundleService.getVersion(bundleParams, 'simple');
+      if (cachedVersion && cachedVersion === clientVersionId) {
+        const etag = `"${cachedVersion}"`;
+        res.set({
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=300',
+          'X-Bundle-Version': cachedVersion,
+        });
+        res.status(304).json({ versionId: cachedVersion });
+        return;
+      }
+    }
+
+    // Check for conditional request (If-None-Match header - standard HTTP)
+    const ifNoneMatch = req.headers['if-none-match'];
+
+    const bundle = await alarmBundleService.generateSimplifiedBundle(bundleParams);
 
     const etag = `"${bundle.meta.version}"`;
     const currentVersionId = bundle.meta.version;
