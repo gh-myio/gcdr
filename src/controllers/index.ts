@@ -15,6 +15,7 @@ export { default as domainsController } from './domains.controller';
 export { default as devicesController, listByAssetHandler as devicesListByAssetHandler } from './devices.controller';
 export { default as usersController, listByCustomerHandler as usersListByCustomerHandler } from './users.controller';
 export { default as policiesController } from './policies.controller';
+export { default as rolesController } from './roles.controller';
 export { default as authorizationController } from './authorization.controller';
 export { default as rulesController, listByCustomerHandler as rulesListByCustomerHandler, getAlarmBundleHandler, getSimplifiedAlarmBundleHandler } from './rules.controller';
 export { default as integrationsController } from './integrations.controller';

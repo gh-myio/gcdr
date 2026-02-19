@@ -25,6 +25,7 @@ import {
   usersController,
   usersListByCustomerHandler,
   policiesController,
+  rolesController,
   authorizationController,
   rulesController,
   rulesListByCustomerHandler,
@@ -176,6 +177,9 @@ apiV1Router.use('/users', authMiddleware, usersController);
 
 // Policies
 apiV1Router.use('/policies', authMiddleware, policiesController);
+
+// Roles
+apiV1Router.use('/roles', authMiddleware, rolesController);
 
 // Authorization
 apiV1Router.use('/authorization', authMiddleware, authorizationController);

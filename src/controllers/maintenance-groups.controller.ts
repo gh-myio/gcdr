@@ -130,16 +130,17 @@ router.get('/key/:key', async (req: Request, res: Response, next: NextFunction) 
 
 /**
  * PUT /maintenance-groups/:groupId
+ * PATCH /maintenance-groups/:groupId (alias — same partial-update semantics)
  * Update maintenance group
  */
-router.put('/:groupId',
-  logEvent({
-    eventType: EventType.GROUP_UPDATED,
-    description: (req) => `Maintenance group ${req.params.groupId} updated`,
-    getEntityId: (req) => req.params.groupId,
-    getMetadata: () => ({ groupType: 'maintenance' }),
-  }),
-  async (req: Request, res: Response, next: NextFunction) => {
+const updateGroupAudit = logEvent({
+  eventType: EventType.GROUP_UPDATED,
+  description: (req) => `Maintenance group ${req.params.groupId} updated`,
+  getEntityId: (req) => req.params.groupId,
+  getMetadata: () => ({ groupType: 'maintenance' }),
+});
+
+const updateGroupHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { groupId } = req.params;
@@ -154,7 +155,10 @@ router.put('/:groupId',
   } catch (err) {
     next(err);
   }
-});
+};
+
+router.put('/:groupId', updateGroupAudit, updateGroupHandler);
+router.patch('/:groupId', updateGroupAudit, updateGroupHandler);
 
 /**
  * DELETE /maintenance-groups/:groupId
