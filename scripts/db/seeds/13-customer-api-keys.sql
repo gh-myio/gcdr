@@ -173,7 +173,51 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 8 customer API keys';
+    -- ==========================================================================
+    -- ThingsBoard Connector API Key (RFC-0016)
+    -- ==========================================================================
+    -- Plaintext Key: gcdr_cust_tb_integration_key_2026
+    -- Hash: SHA256('gcdr_cust_tb_integration_key_2026')
+    INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
+    VALUES (
+        'cee00001-0001-0001-0001-000000000008',
+        v_tenant_id,
+        v_company1_id,
+        '97e544537b61f4f29775cf0e1cc2926cabbf0ec868f681ac3cfa734dc34f84d6',
+        'gcdr_cust_',
+        'ThingsBoard Connector',
+        'API key for ThingsBoard entity sync - TEST KEY: gcdr_cust_tb_integration_key_2026',
+        '["customers:read", "customers:write", "assets:read", "assets:write", "devices:read", "devices:write", "sync:write"]',
+        NOW() + INTERVAL '365 days',
+        0,
+        true,
+        v_admin_id,
+        1
+    );
+
+    -- ==========================================================================
+    -- ThingsBoard Master API Key (RFC-0016 - full access)
+    -- ==========================================================================
+    -- Plaintext Key: gcdr_cust_tb_master_key_2026
+    -- Hash: SHA256('gcdr_cust_tb_master_key_2026')
+    INSERT INTO customer_api_keys (id, tenant_id, customer_id, key_hash, key_prefix, name, description, scopes, expires_at, usage_count, is_active, created_by, version)
+    VALUES (
+        'cee00001-0001-0001-0001-000000000009',
+        v_tenant_id,
+        v_company1_id,
+        'c0fa41b622ebf822e98dd894bb11e306f577698a5f594bd47567ddc163b3f9e3',
+        'gcdr_cust_',
+        'ThingsBoard Master Key',
+        'Full access API key for ThingsBoard integration - TEST KEY: gcdr_cust_tb_master_key_2026',
+        '["*:read", "bundles:read", "rules:read", "rules:write", "devices:read", "devices:write", "customers:read", "customers:write", "assets:read", "assets:write", "alarms:read", "alarms:write", "telemetry:read", "telemetry:write", "sync:write"]',
+        NOW() + INTERVAL '365 days',
+        0,
+        true,
+        v_admin_id,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 10 customer API keys';
 END $$;
 
 -- Verify
