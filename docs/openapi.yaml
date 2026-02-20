@@ -5455,6 +5455,19 @@ paths:
           in: query
           schema:
             type: string
+        - name: centralId
+          in: query
+          description: Filter by central/gateway UUID
+          schema:
+            type: string
+            format: uuid
+        - name: slaveId
+          in: query
+          description: Filter by Modbus slave ID (use with centralId for exact device lookup)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 247
       responses:
         '200':
           description: List of devices

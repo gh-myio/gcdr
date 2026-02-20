@@ -157,6 +157,7 @@ export interface ListDevicesParams extends PaginationParams {
 
   // RFC-0008: New filter options
   centralId?: string;
+  slaveId?: number;
   identifier?: string;
   deviceProfile?: string;
   deviceType?: string;

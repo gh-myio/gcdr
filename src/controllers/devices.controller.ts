@@ -48,7 +48,7 @@ router.post('/',
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { assetId, customerId, type, status, connectivityStatus, limit, cursor } = req.query;
+    const { assetId, customerId, type, status, connectivityStatus, centralId, slaveId, limit, cursor } = req.query;
 
     const params: ListDevicesParams = {
       assetId: assetId as string | undefined,
@@ -56,6 +56,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       type: type as string | undefined,
       status: status as string | undefined,
       connectivityStatus: connectivityStatus as string | undefined,
+      centralId: centralId as string | undefined,
+      slaveId: slaveId ? parseInt(slaveId as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       cursor: cursor as string | undefined,
     };

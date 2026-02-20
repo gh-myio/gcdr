@@ -168,6 +168,14 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
     }
 
+    if (params?.centralId) {
+      conditions.push(eq(devices.centralId, params.centralId));
+    }
+
+    if (params?.slaveId !== undefined) {
+      conditions.push(eq(devices.slaveId, params.slaveId));
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(devices)
