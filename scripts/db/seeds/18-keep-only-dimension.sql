@@ -3,12 +3,11 @@
 -- =============================================================================
 -- Removes all seed/mock data NOT related to the Dimension customer.
 -- Keeps:
---   - Dimension customer (77777777-7777-7777-7777-777777777777)
---   - ACME Holdings (22222222-...) as parent (FK dependency)
---   - Admin + Service Account users (system-level)
+--   - Dimension customer (77777777-7777-7777-7777-777777777777) as root (no parent)
+--   - Admin + Service Account users (reassigned to Dimension)
 --   - Global entities: policies, roles, domain_permissions, integration_packages, partners
 -- Deletes:
---   - ACME Tech, ACME Industrial, Branch SP, Branch RJ (customers)
+--   - ALL other customers (ACME Holdings, ACME Tech, ACME Industrial, branches)
 --   - All assets, devices, centrals, rules NOT owned by Dimension
 --   - All customer API keys NOT owned by Dimension
 --   - All groups, look_and_feels, maintenance_groups for non-Dimension
@@ -18,10 +17,11 @@
 
 DO $$
 DECLARE
+    v_tenant_id    UUID := '11111111-1111-1111-1111-111111111111';
     v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
-    v_holding_id  UUID := '22222222-2222-2222-2222-222222222222';
-    v_admin_id    UUID := 'bbbb1111-1111-1111-1111-111111111111';
-    v_service_id  UUID := 'bbbb5555-5555-5555-5555-555555555555';
+    v_holding_id   UUID := '22222222-2222-2222-2222-222222222222';
+    v_admin_id     UUID := 'bbbb1111-1111-1111-1111-111111111111';
+    v_service_id   UUID := 'bbbb5555-5555-5555-5555-555555555555';
     v_count INT;
 BEGIN
     RAISE NOTICE '=== Starting cleanup: keep only Dimension entities ===';
@@ -155,10 +155,28 @@ BEGIN
     RAISE NOTICE 'Deleted % users', v_count;
 
     -- =========================================================================
-    -- 16. CUSTOMERS (keep Dimension + ACME Holdings parent)
+    -- 16. REASSIGN admin + service account to Dimension
+    -- =========================================================================
+    UPDATE users
+    SET customer_id = v_dimension_id
+    WHERE id IN (v_admin_id, v_service_id);
+    RAISE NOTICE 'Reassigned admin + service account to Dimension';
+
+    -- =========================================================================
+    -- 17. MAKE Dimension a root customer (no parent)
+    -- =========================================================================
+    UPDATE customers
+    SET parent_customer_id = NULL,
+        path = '/' || v_tenant_id || '/' || v_dimension_id,
+        depth = 0
+    WHERE id = v_dimension_id;
+    RAISE NOTICE 'Dimension is now root customer (parent_customer_id = NULL)';
+
+    -- =========================================================================
+    -- 18. DELETE ALL other customers (including ACME Holdings)
     -- =========================================================================
     DELETE FROM customers
-    WHERE id NOT IN (v_dimension_id, v_holding_id);
+    WHERE id != v_dimension_id;
     GET DIAGNOSTICS v_count = ROW_COUNT;
     RAISE NOTICE 'Deleted % customers', v_count;
 
