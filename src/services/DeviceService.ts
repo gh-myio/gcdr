@@ -29,10 +29,12 @@ export class DeviceService {
       throw new NotFoundError(`Asset ${data.assetId} not found`);
     }
 
-    // Check for duplicate serial number
-    const existingSerial = await this.repository.getBySerialNumber(tenantId, data.serialNumber);
-    if (existingSerial) {
-      throw new ConflictError(`Device with serial number ${data.serialNumber} already exists`);
+    // Check for duplicate serial number (if provided)
+    if (data.serialNumber) {
+      const existingSerial = await this.repository.getBySerialNumber(tenantId, data.serialNumber);
+      if (existingSerial) {
+        throw new ConflictError(`Device with serial number ${data.serialNumber} already exists`);
+      }
     }
 
     // Check for duplicate external ID if provided
