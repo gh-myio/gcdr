@@ -48,11 +48,11 @@ BEGIN
     RAISE NOTICE 'Deleted % package_subscriptions', v_count;
 
     -- =========================================================================
-    -- 4. CUSTOMER API KEYS (customer_id)
+    -- 4. CUSTOMER API KEYS (reassign all to Dimension)
     -- =========================================================================
-    DELETE FROM customer_api_keys WHERE customer_id != v_dimension_id;
+    UPDATE customer_api_keys SET customer_id = v_dimension_id WHERE customer_id != v_dimension_id;
     GET DIAGNOSTICS v_count = ROW_COUNT;
-    RAISE NOTICE 'Deleted % customer_api_keys', v_count;
+    RAISE NOTICE 'Reassigned % customer_api_keys to Dimension', v_count;
 
     -- =========================================================================
     -- 5. LOOK AND FEELS (customer_id)
