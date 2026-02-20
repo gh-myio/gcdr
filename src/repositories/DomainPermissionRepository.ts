@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, ilike } from 'drizzle-orm';
+import { eq, and, or, isNull, ilike, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { DomainPermission, formatDomainPermissionKey } from '../domain/entities/DomainPermission';
 import { CreateDomainPermissionDTO, UpdateDomainPermissionDTO } from '../dto/request/AccessBundleDTO';
@@ -6,6 +6,7 @@ import { PaginatedResult } from '../shared/types';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { domainPermissions } = schema;
 
@@ -171,13 +172,15 @@ export class DomainPermissionRepository {
       conditions.push(eq(domainPermissions.isActive, params.isActive));
     }
 
-    const results = await db
-      .select()
-      .from(domainPermissions)
-      .where(and(...conditions))
-      .orderBy(domainPermissions.domain, domainPermissions.equipment, domainPermissions.location, domainPermissions.action)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(domainPermissions)
+        .where(and(...conditions))
+        .orderBy(domainPermissions.domain, domainPermissions.equipment, domainPermissions.location, domainPermissions.action)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(domainPermissions, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -185,6 +188,8 @@ export class DomainPermissionRepository {
     return {
       items: items.map(r => this.mapToEntity(r)),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

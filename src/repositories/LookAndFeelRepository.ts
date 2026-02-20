@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   LookAndFeel,
@@ -13,6 +13,7 @@ import { ILookAndFeelRepository } from './interfaces/ILookAndFeelRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { lookAndFeels } = schema;
 
@@ -152,13 +153,17 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(lookAndFeels)
-      .where(eq(lookAndFeels.tenantId, tenantId))
-      .orderBy(lookAndFeels.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(lookAndFeels.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(lookAndFeels)
+        .where(and(...conditions))
+        .orderBy(lookAndFeels.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(lookAndFeels, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -166,6 +171,8 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

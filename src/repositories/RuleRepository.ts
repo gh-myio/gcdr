@@ -7,6 +7,7 @@ import { IRuleRepository, ListRulesParams } from './interfaces/IRuleRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { rules } = schema;
 
@@ -115,13 +116,17 @@ export class RuleRepository implements IRuleRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(rules)
-      .where(eq(rules.tenantId, tenantId))
-      .orderBy(rules.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(rules.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(rules)
+        .where(and(...conditions))
+        .orderBy(rules.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(rules, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -129,6 +134,8 @@ export class RuleRepository implements IRuleRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -162,13 +169,15 @@ export class RuleRepository implements IRuleRepository {
       conditions.push(eq(rules.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(rules)
-      .where(and(...conditions))
-      .orderBy(rules.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(rules)
+        .where(and(...conditions))
+        .orderBy(rules.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(rules, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -176,6 +185,8 @@ export class RuleRepository implements IRuleRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

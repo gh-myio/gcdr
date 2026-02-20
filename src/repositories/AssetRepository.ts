@@ -7,6 +7,7 @@ import { IAssetRepository, AssetTreeNode } from './interfaces/IAssetRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { assets } = schema;
 
@@ -156,13 +157,15 @@ export class AssetRepository implements IAssetRepository {
       conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(assets)
-      .where(and(...conditions))
-      .orderBy(assets.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(assets)
+        .where(and(...conditions))
+        .orderBy(assets.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(assets, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -170,6 +173,8 @@ export class AssetRepository implements IAssetRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -194,13 +199,15 @@ export class AssetRepository implements IAssetRepository {
       conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(assets)
-      .where(and(...conditions))
-      .orderBy(assets.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(assets)
+        .where(and(...conditions))
+        .orderBy(assets.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(assets, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -208,6 +215,8 @@ export class AssetRepository implements IAssetRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

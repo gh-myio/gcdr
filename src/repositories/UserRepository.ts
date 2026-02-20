@@ -13,6 +13,7 @@ import { IUserRepository } from './interfaces/IUserRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { users } = schema;
 
@@ -413,13 +414,15 @@ export class UserRepository implements IUserRepository {
       conditions.push(ilike(users.email, `%${params.search.toLowerCase()}%`));
     }
 
-    const results = await db
-      .select()
-      .from(users)
-      .where(and(...conditions))
-      .orderBy(users.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(users)
+        .where(and(...conditions))
+        .orderBy(users.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(users, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -427,6 +430,8 @@ export class UserRepository implements IUserRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

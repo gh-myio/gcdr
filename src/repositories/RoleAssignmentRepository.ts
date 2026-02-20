@@ -7,6 +7,7 @@ import { IRoleAssignmentRepository, UpdateRoleAssignmentDTO } from './interfaces
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { roleAssignments } = schema;
 
@@ -98,13 +99,17 @@ export class RoleAssignmentRepository implements IRoleAssignmentRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(roleAssignments)
-      .where(eq(roleAssignments.tenantId, tenantId))
-      .orderBy(roleAssignments.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(roleAssignments.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(roleAssignments)
+        .where(and(...conditions))
+        .orderBy(roleAssignments.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(roleAssignments, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -112,6 +117,8 @@ export class RoleAssignmentRepository implements IRoleAssignmentRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

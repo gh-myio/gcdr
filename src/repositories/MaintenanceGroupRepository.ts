@@ -14,6 +14,7 @@ import { PaginatedResult } from '../shared/types';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { maintenanceGroups, userMaintenanceGroups, users } = schema;
 
@@ -160,13 +161,15 @@ export class MaintenanceGroupRepository {
       );
     }
 
-    const results = await db
-      .select()
-      .from(maintenanceGroups)
-      .where(and(...conditions))
-      .orderBy(maintenanceGroups.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(maintenanceGroups)
+        .where(and(...conditions))
+        .orderBy(maintenanceGroups.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(maintenanceGroups, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -174,6 +177,8 @@ export class MaintenanceGroupRepository {
     return {
       items: items.map(r => this.mapToEntity(r)),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

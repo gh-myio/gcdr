@@ -7,6 +7,7 @@ import { IGroupRepository, ListGroupsParams } from './interfaces/IGroupRepositor
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { groups } = schema;
 
@@ -225,13 +226,15 @@ export class GroupRepository implements IGroupRepository {
       );
     }
 
-    const results = await db
-      .select()
-      .from(groups)
-      .where(and(...conditions))
-      .orderBy(groups.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(groups)
+        .where(and(...conditions))
+        .orderBy(groups.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(groups, conditions),
+    ]);
 
     let filteredResults = results;
 
@@ -257,6 +260,8 @@ export class GroupRepository implements IGroupRepository {
     return {
       items: items.map(r => this.toSummary(this.mapToEntity(r))),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

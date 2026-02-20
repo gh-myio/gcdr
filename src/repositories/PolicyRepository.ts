@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Policy } from '../domain/entities/Policy';
 import { CreatePolicyDTO } from '../dto/request/AuthorizationDTO';
@@ -7,6 +7,7 @@ import { IPolicyRepository, UpdatePolicyDTO, ListPoliciesParams } from './interf
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { policies } = schema;
 
@@ -138,13 +139,17 @@ export class PolicyRepository implements IPolicyRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(policies)
-      .where(eq(policies.tenantId, tenantId))
-      .orderBy(policies.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(policies.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(policies)
+        .where(and(...conditions))
+        .orderBy(policies.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(policies, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -152,6 +157,8 @@ export class PolicyRepository implements IPolicyRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -173,13 +180,15 @@ export class PolicyRepository implements IPolicyRepository {
       conditions.push(eq(policies.isSystem, params.isSystem));
     }
 
-    const results = await db
-      .select()
-      .from(policies)
-      .where(and(...conditions))
-      .orderBy(policies.displayName)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(policies)
+        .where(and(...conditions))
+        .orderBy(policies.displayName)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(policies, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -187,6 +196,8 @@ export class PolicyRepository implements IPolicyRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

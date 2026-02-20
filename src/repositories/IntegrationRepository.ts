@@ -12,6 +12,7 @@ import { IIntegrationPackageRepository, ISubscriptionRepository } from './interf
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { integrationPackages, packageSubscriptions } = schema;
 
@@ -170,13 +171,15 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
     // Note: pricing filter would need JSONB operator
     // For simplicity, we'll filter in memory if needed
 
-    const results = await db
-      .select()
-      .from(integrationPackages)
-      .where(and(...conditions))
-      .orderBy(integrationPackages.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(integrationPackages)
+        .where(and(...conditions))
+        .orderBy(integrationPackages.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(integrationPackages, conditions),
+    ]);
 
     let filteredResults = results;
 
@@ -210,6 +213,8 @@ export class IntegrationPackageRepository implements IIntegrationPackageReposito
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

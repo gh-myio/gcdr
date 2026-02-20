@@ -7,6 +7,7 @@ import { IDeviceRepository } from './interfaces/IDeviceRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { devices } = schema;
 
@@ -167,13 +168,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -181,6 +184,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -209,13 +214,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -223,6 +230,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -251,13 +260,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -265,6 +276,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -399,13 +412,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -413,6 +428,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -459,13 +476,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -473,6 +492,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -492,13 +513,15 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
-    const results = await db
-      .select()
-      .from(devices)
-      .where(and(...conditions))
-      .orderBy(devices.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(devices)
+        .where(and(...conditions))
+        .orderBy(devices.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(devices, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -506,6 +529,8 @@ export class DeviceRepository implements IDeviceRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

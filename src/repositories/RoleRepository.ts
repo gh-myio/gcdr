@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Role } from '../domain/entities/Role';
 import { CreateRoleDTO, UpdateRoleDTO } from '../dto/request/AuthorizationDTO';
@@ -7,6 +7,7 @@ import { IRoleRepository, ListRolesParams } from './interfaces/IRoleRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { roles } = schema;
 
@@ -136,13 +137,17 @@ export class RoleRepository implements IRoleRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.tenantId, tenantId))
-      .orderBy(roles.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(roles.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(roles)
+        .where(and(...conditions))
+        .orderBy(roles.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(roles, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -150,6 +155,8 @@ export class RoleRepository implements IRoleRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -171,13 +178,15 @@ export class RoleRepository implements IRoleRepository {
       conditions.push(eq(roles.isSystem, params.isSystem));
     }
 
-    const results = await db
-      .select()
-      .from(roles)
-      .where(and(...conditions))
-      .orderBy(roles.displayName)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(roles)
+        .where(and(...conditions))
+        .orderBy(roles.displayName)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(roles, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -185,6 +194,8 @@ export class RoleRepository implements IRoleRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

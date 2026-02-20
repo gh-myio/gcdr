@@ -7,6 +7,7 @@ import { IPartnerRepository, ListPartnersParams } from './interfaces/IPartnerRep
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { partners } = schema;
 
@@ -119,13 +120,17 @@ export class PartnerRepository implements IPartnerRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(partners)
-      .where(eq(partners.tenantId, tenantId))
-      .orderBy(partners.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(partners.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(partners)
+        .where(and(...conditions))
+        .orderBy(partners.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(partners, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -133,6 +138,8 @@ export class PartnerRepository implements IPartnerRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -150,13 +157,15 @@ export class PartnerRepository implements IPartnerRepository {
       conditions.push(eq(partners.status, params.status));
     }
 
-    const results = await db
-      .select()
-      .from(partners)
-      .where(and(...conditions))
-      .orderBy(partners.companyName)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(partners)
+        .where(and(...conditions))
+        .orderBy(partners.companyName)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(partners, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -164,6 +173,8 @@ export class PartnerRepository implements IPartnerRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

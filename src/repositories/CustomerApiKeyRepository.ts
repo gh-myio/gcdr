@@ -3,6 +3,7 @@ import { db, schema } from '../infrastructure/database/drizzle/db';
 import { CustomerApiKey } from '../domain/entities/CustomerApiKey';
 import { ICustomerApiKeyRepository } from './interfaces/ICustomerApiKeyRepository';
 import { PaginatedResult, PaginationParams } from '../shared/types';
+import { countWhere } from './helpers/countQuery';
 
 const { customerApiKeys } = schema;
 
@@ -83,13 +84,15 @@ export class CustomerApiKeyRepository implements ICustomerApiKeyRepository {
       conditions.push(eq(customerApiKeys.isActive, options.isActive));
     }
 
-    const results = await db
-      .select()
-      .from(customerApiKeys)
-      .where(and(...conditions))
-      .orderBy(customerApiKeys.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(customerApiKeys)
+        .where(and(...conditions))
+        .orderBy(customerApiKeys.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(customerApiKeys, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -97,6 +100,8 @@ export class CustomerApiKeyRepository implements ICustomerApiKeyRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

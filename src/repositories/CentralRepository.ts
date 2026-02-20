@@ -7,6 +7,7 @@ import { ICentralRepository } from './interfaces/ICentralRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { centrals } = schema;
 
@@ -142,13 +143,15 @@ export class CentralRepository implements ICentralRepository {
       conditions.push(eq(centrals.connectionStatus, params.connectionStatus));
     }
 
-    const results = await db
-      .select()
-      .from(centrals)
-      .where(and(...conditions))
-      .orderBy(centrals.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(centrals)
+        .where(and(...conditions))
+        .orderBy(centrals.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(centrals, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -156,6 +159,8 @@ export class CentralRepository implements ICentralRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

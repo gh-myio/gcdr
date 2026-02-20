@@ -7,6 +7,7 @@ import { ICustomerRepository, CustomerTreeNode } from './interfaces/ICustomerRep
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
+import { countWhere } from './helpers/countQuery';
 
 const { customers } = schema;
 
@@ -140,13 +141,17 @@ export class CustomerRepository implements ICustomerRepository {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
-    const results = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.tenantId, tenantId))
-      .orderBy(customers.createdAt)
-      .limit(limit + 1)
-      .offset(offset);
+    const conditions = [eq(customers.tenantId, tenantId)];
+
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(customers)
+        .where(and(...conditions))
+        .orderBy(customers.createdAt)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(customers, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -154,6 +159,8 @@ export class CustomerRepository implements ICustomerRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
@@ -183,13 +190,15 @@ export class CustomerRepository implements ICustomerRepository {
       }
     }
 
-    const results = await db
-      .select()
-      .from(customers)
-      .where(and(...conditions))
-      .orderBy(customers.name)
-      .limit(limit + 1)
-      .offset(offset);
+    const [results, total] = await Promise.all([
+      db.select()
+        .from(customers)
+        .where(and(...conditions))
+        .orderBy(customers.name)
+        .limit(limit + 1)
+        .offset(offset),
+      countWhere(customers, conditions),
+    ]);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
@@ -197,6 +206,8 @@ export class CustomerRepository implements ICustomerRepository {
     return {
       items: items.map(this.mapToEntity),
       pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
         hasMore,
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },

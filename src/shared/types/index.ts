@@ -19,6 +19,7 @@ export interface PaginatedResult<T> {
   items: T[];
   pagination: {
     total?: number;
+    totalPages?: number;
     hasMore: boolean;
     nextCursor?: string;
   };
