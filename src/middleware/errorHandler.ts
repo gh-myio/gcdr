@@ -13,7 +13,13 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('Error:', err);
+  // Only log full stack trace for unexpected errors (5xx / non-operational)
+  // Operational errors (4xx) are expected and get a brief log line
+  if (err instanceof AppError && err.isOperational) {
+    console.warn(`[${err.statusCode}] ${err.code}: ${err.message}`);
+  } else {
+    console.error('Error:', err);
+  }
 
   const requestId = req.context?.requestId || uuidv4();
   const timestamp = new Date().toISOString();
