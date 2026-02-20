@@ -122,6 +122,7 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope) {
 
         // Set context from API Key
         req.context.tenantId = apiKeyContext.tenantId;
+        req.context.userId = apiKeyContext.keyId;
         req.context.customerId = apiKeyContext.customerId;
         req.context.apiKeyId = apiKeyContext.keyId;
         req.context.apiKeyScopes = apiKeyContext.scopes;
