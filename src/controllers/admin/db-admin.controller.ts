@@ -217,6 +217,7 @@ router.get('/api/scripts', (req: Request, res: Response) => {
           sizeFormatted: `${(stats.size / 1024).toFixed(1)} KB`,
           isSetup: file.startsWith('00-'),
           isVerify: file.startsWith('99-'),
+          isManual: file.startsWith('90-'),
         };
       });
     res.json({ scripts: files });
@@ -273,7 +274,7 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
 
   try {
     const files = fs.readdirSync(SEEDS_DIR)
-      .filter(f => f.endsWith('.sql') && !f.startsWith('00-') && !f.startsWith('99-'))
+      .filter(f => f.endsWith('.sql') && !f.startsWith('00-') && !f.startsWith('90-') && !f.startsWith('99-'))
       .sort();
 
     const results: Array<{ script: string; success: boolean; duration: number; error?: string }> = [];
@@ -837,6 +838,8 @@ function getHtmlPage(): string {
 
     .script-item.setup { border-left: 3px solid var(--error); }
     .script-item.verify { border-left: 3px solid var(--info); }
+    .script-item.manual { border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.08); }
+    .script-badge-manual { background: #f59e0b; color: #000; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-weight: 600; }
 
     .script-name { font-family: monospace; font-size: 0.9rem; }
     .script-size { color: var(--text-secondary); font-size: 0.8rem; }
@@ -1645,10 +1648,11 @@ function getHtmlPage(): string {
 
         const container = document.getElementById('scripts-list');
         container.innerHTML = data.scripts.map(s => \`
-          <div class="script-item \${s.isSetup ? 'setup' : ''} \${s.isVerify ? 'verify' : ''}">
+          <div class="script-item \${s.isSetup ? 'setup' : ''} \${s.isVerify ? 'verify' : ''} \${s.isManual ? 'manual' : ''}">
             <div>
               <span class="script-name">\${s.name}</span>
               <span class="script-size">(\${s.sizeFormatted})</span>
+              \${s.isManual ? '<span class="script-badge-manual">Manual only - excluded from Seed All</span>' : ''}
             </div>
             <button class="btn btn-secondary" onclick="runScript('\${s.name}')"
                     id="btn-\${s.name}" \${s.isSetup || s.isVerify ? 'disabled' : ''}>
