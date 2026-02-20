@@ -1365,6 +1365,306 @@ components:
           type: object
 
     # Rule Schemas
+    # ── Decision Engine Guard Configs ──────────────────────────────────
+    DedupGuardConfig:
+      type: object
+      description: Deduplication guard - suppresses duplicate alarms within a time window
+      required: [enabled, ttlSeconds]
+      properties:
+        enabled:
+          type: boolean
+        ttlSeconds:
+          type: integer
+          minimum: 1
+          description: Time window in seconds to consider duplicates (default 300)
+
+    CooldownGuardConfig:
+      type: object
+      description: Cooldown guard - minimum time between notifications
+      required: [enabled, seconds, perChannel]
+      properties:
+        enabled:
+          type: boolean
+        seconds:
+          type: integer
+          minimum: 1
+          description: Minimum seconds between notifications (default 60)
+        perChannel:
+          type: boolean
+          description: If true, cooldown is tracked per dispatch channel
+
+    HysteresisGuardConfig:
+      type: object
+      description: Hysteresis guard - prevents flapping by limiting state transitions
+      required: [enabled, windowSeconds, maxTransitions]
+      properties:
+        enabled:
+          type: boolean
+        windowSeconds:
+          type: integer
+          minimum: 1
+          description: Time window in seconds to count transitions (default 120)
+        maxTransitions:
+          type: integer
+          minimum: 1
+          description: Max state changes before suppression (default 3)
+
+    DigestGuardConfig:
+      type: object
+      description: Digest guard - aggregates multiple alarms into a single notification
+      required: [enabled, windowSeconds, threshold]
+      properties:
+        enabled:
+          type: boolean
+        windowSeconds:
+          type: integer
+          minimum: 1
+          description: Digest aggregation window in seconds (default 600)
+        threshold:
+          type: integer
+          minimum: 1
+          description: Min alarms in window to trigger digest (default 5)
+
+    # ── Alarm Threshold Config ─────────────────────────────────────────
+    AlarmThresholdConfig:
+      type: object
+      description: Configuration for ALARM_THRESHOLD rules
+      required: [metric, operator, value]
+      properties:
+        metric:
+          type: string
+          description: "Metric domain (e.g. temperature, humidity, instantaneous_power, energy_consumption, water_flow, sensor, presence_sensor, door_sensor, lamp)"
+        operator:
+          type: string
+          enum: [GT, GTE, LT, LTE, EQ, NEQ, BETWEEN, OUTSIDE]
+        value:
+          type: number
+          description: Threshold value (lower bound for BETWEEN/OUTSIDE)
+        valueHigh:
+          type: number
+          nullable: true
+          description: Upper bound for BETWEEN/OUTSIDE operators
+        unit:
+          type: string
+          description: "Unit of measurement (e.g. °C, %, W, Wh, l)"
+        hysteresis:
+          type: number
+          minimum: 0
+          description: Tolerance band to prevent flapping (threshold tolerance, not guard)
+        hysteresisType:
+          type: string
+          enum: [PERCENTAGE, ABSOLUTE]
+        duration:
+          type: number
+          minimum: 0
+          description: Seconds the condition must persist before triggering
+        aggregation:
+          type: string
+          enum: [AVG, MIN, MAX, SUM, COUNT, LAST]
+        aggregationWindow:
+          type: number
+          minimum: 1
+          description: Window in seconds for aggregation
+        offset:
+          type: object
+          additionalProperties:
+            type: number
+          description: "Calibration offset per metric (e.g. { temp: -0.5, hum: 0 })"
+        startAt:
+          type: string
+          pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+          description: "Schedule start time HH:mm (e.g. 08:00)"
+        endAt:
+          type: string
+          pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+          description: "Schedule end time HH:mm (e.g. 18:00)"
+        daysOfWeek:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 6
+          description: "Days when rule is active (0=Sun, 6=Sat)"
+        channelId:
+          type: integer
+          minimum: 0
+          description: Channel index for OUTLET/multi-channel devices (0, 1, 2...)
+        keyMulti:
+          type: number
+          description: "Energy unit multiplier: 1 for W (default), 0.25 for Wh"
+        dedup:
+          $ref: '#/components/schemas/DedupGuardConfig'
+        cooldown:
+          $ref: '#/components/schemas/CooldownGuardConfig'
+        hysteresisGuard:
+          $ref: '#/components/schemas/HysteresisGuardConfig'
+        digest:
+          $ref: '#/components/schemas/DigestGuardConfig'
+
+    # ── SLA Config ─────────────────────────────────────────────────────
+    SLAConfig:
+      type: object
+      description: Configuration for SLA rules
+      required: [metric, target, unit, period, calculationMethod]
+      properties:
+        metric:
+          type: string
+        target:
+          type: number
+        unit:
+          type: string
+          description: "e.g. percent, ms, count"
+        period:
+          type: string
+          enum: [HOURLY, DAILY, WEEKLY, MONTHLY]
+        calculationMethod:
+          type: string
+          enum: [AVAILABILITY, RESPONSE_TIME, ERROR_RATE, THROUGHPUT, CUSTOM]
+        excludeMaintenanceWindows:
+          type: boolean
+        breachNotification:
+          type: boolean
+        warningThreshold:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of target to trigger warning
+
+    # ── Escalation Config ──────────────────────────────────────────────
+    EscalationLevel:
+      type: object
+      required: [level, delayMinutes, notifyChannels]
+      properties:
+        level:
+          type: integer
+          minimum: 1
+        delayMinutes:
+          type: integer
+          minimum: 0
+        notifyChannels:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        notifyUsers:
+          type: array
+          items:
+            type: string
+        notifyGroups:
+          type: array
+          items:
+            type: string
+        autoAcknowledge:
+          type: boolean
+        repeatInterval:
+          type: integer
+          minimum: 1
+          description: Minutes between repeat notifications
+        maxRepeats:
+          type: integer
+          minimum: 0
+
+    EscalationConfig:
+      type: object
+      description: Configuration for ESCALATION rules
+      required: [levels]
+      properties:
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscalationLevel'
+          minItems: 1
+        autoResolveAfterMinutes:
+          type: integer
+          minimum: 1
+        businessHoursOnly:
+          type: boolean
+        businessHours:
+          type: object
+          properties:
+            timezone:
+              type: string
+            start:
+              type: string
+              pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+            end:
+              type: string
+              pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+            workdays:
+              type: array
+              items:
+                type: integer
+                minimum: 0
+                maximum: 6
+
+    # ── Maintenance Window Config ──────────────────────────────────────
+    MaintenanceWindowConfig:
+      type: object
+      description: Configuration for MAINTENANCE_WINDOW rules
+      required: [startTime, timezone]
+      properties:
+        startTime:
+          type: string
+          description: ISO 8601 datetime or cron expression
+        endTime:
+          type: string
+          description: ISO 8601 datetime (for one-time windows)
+        duration:
+          type: integer
+          minimum: 1
+          description: Duration in minutes (for recurring windows)
+        recurrence:
+          type: string
+          enum: [ONCE, DAILY, WEEKLY, MONTHLY]
+        recurrenceDays:
+          type: array
+          items:
+            type: integer
+          description: "Days of week (0-6) or days of month (1-31)"
+        timezone:
+          type: string
+        suppressAlarms:
+          type: boolean
+        suppressNotifications:
+          type: boolean
+        affectedRules:
+          type: array
+          items:
+            type: string
+          description: Rule IDs to suppress (empty = all)
+
+    # ── Notification Channel ───────────────────────────────────────────
+    NotificationChannel:
+      type: object
+      required: [type, config]
+      properties:
+        type:
+          type: string
+          enum: [EMAIL, SMS, WEBHOOK, SLACK, TEAMS, PAGERDUTY, CUSTOM]
+        config:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+
+    # ── Rule Scope ─────────────────────────────────────────────────────
+    RuleScope:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [GLOBAL, CUSTOMER, ASSET, DEVICE]
+        entityId:
+          type: string
+          description: Required for non-GLOBAL scope types
+        inherited:
+          type: boolean
+          description: If true, rule applies to all children of the entity
+
+    # ── Rule Entity ────────────────────────────────────────────────────
     Rule:
       type: object
       properties:
@@ -1383,30 +1683,38 @@ components:
           type: string
         type:
           type: string
-          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW, AUTOMATION, NOTIFICATION]
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE, DRAFT]
+          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW]
         priority:
-          type: integer
-          minimum: 1
-          maximum: 100
-        config:
-          type: object
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
         scope:
           $ref: '#/components/schemas/RuleScope'
-        schedule:
-          $ref: '#/components/schemas/RuleSchedule'
-        actions:
+        alarmConfig:
+          $ref: '#/components/schemas/AlarmThresholdConfig'
+        slaConfig:
+          $ref: '#/components/schemas/SLAConfig'
+        escalationConfig:
+          $ref: '#/components/schemas/EscalationConfig'
+        maintenanceConfig:
+          $ref: '#/components/schemas/MaintenanceWindowConfig'
+        notificationChannels:
           type: array
           items:
-            $ref: '#/components/schemas/RuleAction'
+            $ref: '#/components/schemas/NotificationChannel'
         tags:
           type: array
           items:
             type: string
-        metadata:
-          type: object
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+        enabled:
+          type: boolean
+        lastTriggeredAt:
+          type: string
+          format: date-time
+        triggerCount:
+          type: integer
         createdAt:
           type: string
           format: date-time
@@ -1414,130 +1722,119 @@ components:
           type: string
           format: date-time
 
-    RuleScope:
-      type: object
-      properties:
-        assetIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        deviceIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        deviceTypes:
-          type: array
-          items:
-            type: string
-        tags:
-          type: array
-          items:
-            type: string
-        includeDescendants:
-          type: boolean
-
-    RuleSchedule:
-      type: object
-      properties:
-        timezone:
-          type: string
-        activeDays:
-          type: array
-          items:
-            type: integer
-            minimum: 0
-            maximum: 6
-        activeHours:
-          type: object
-          properties:
-            start:
-              type: string
-            end:
-              type: string
-        exceptions:
-          type: array
-          items:
-            type: object
-
-    RuleAction:
-      type: object
-      properties:
-        type:
-          type: string
-          enum: [NOTIFY, WEBHOOK, COMMAND, ESCALATE, LOG]
-        config:
-          type: object
-        delay:
-          type: integer
-        retries:
-          type: integer
-
+    # ── Create Rule DTO ────────────────────────────────────────────────
     CreateRule:
       type: object
       required:
         - customerId
         - name
         - type
-        - config
+        - scope
       properties:
         customerId:
           type: string
           format: uuid
         name:
           type: string
-          minLength: 3
+          minLength: 1
           maxLength: 255
         description:
           type: string
           maxLength: 1000
         type:
           type: string
-          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW, AUTOMATION, NOTIFICATION]
+          enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW]
         priority:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 50
-        config:
-          type: object
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          default: MEDIUM
         scope:
           $ref: '#/components/schemas/RuleScope'
-        schedule:
-          $ref: '#/components/schemas/RuleSchedule'
-        actions:
+        alarmConfig:
+          $ref: '#/components/schemas/AlarmThresholdConfig'
+        slaConfig:
+          $ref: '#/components/schemas/SLAConfig'
+        escalationConfig:
+          $ref: '#/components/schemas/EscalationConfig'
+        maintenanceConfig:
+          $ref: '#/components/schemas/MaintenanceWindowConfig'
+        notificationChannels:
           type: array
           items:
-            $ref: '#/components/schemas/RuleAction'
+            $ref: '#/components/schemas/NotificationChannel'
         tags:
           type: array
           items:
             type: string
-        metadata:
-          type: object
+          default: []
+        enabled:
+          type: boolean
+          default: true
+      description: |
+        The correct config must be provided based on type:
+        - ALARM_THRESHOLD → alarmConfig (required)
+        - SLA → slaConfig (required)
+        - ESCALATION → escalationConfig (required)
+        - MAINTENANCE_WINDOW → maintenanceConfig (required)
 
+    # ── Update Rule DTO ────────────────────────────────────────────────
+    UpdateRule:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        scope:
+          $ref: '#/components/schemas/RuleScope'
+        alarmConfig:
+          $ref: '#/components/schemas/AlarmThresholdConfig'
+        slaConfig:
+          $ref: '#/components/schemas/SLAConfig'
+        escalationConfig:
+          $ref: '#/components/schemas/EscalationConfig'
+        maintenanceConfig:
+          $ref: '#/components/schemas/MaintenanceWindowConfig'
+        notificationChannels:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationChannel'
+        tags:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+
+    # ── Toggle Rule DTO ────────────────────────────────────────────────
+    ToggleRule:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 500
+
+    # ── Evaluate Rule DTO ──────────────────────────────────────────────
     EvaluateRuleRequest:
       type: object
       required:
-        - customerId
-        - deviceId
-        - dataPoint
-        - value
+        - ruleId
+        - sampleData
       properties:
-        customerId:
+        ruleId:
           type: string
-          format: uuid
-        deviceId:
-          type: string
-          format: uuid
-        dataPoint:
-          type: string
-        value:
-          type: number
-        timestamp:
-          type: string
-          format: date-time
+        sampleData:
+          type: object
+          description: Sample telemetry data to evaluate the rule against
 
     # Integration Package Schemas
     IntegrationPackage:
@@ -5342,10 +5639,21 @@ paths:
           in: query
           schema:
             type: string
+            enum: [ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
         - name: status
           in: query
           schema:
             type: string
+            enum: [ACTIVE, INACTIVE, SUSPENDED]
       responses:
         '200':
           description: List of rules
@@ -5385,7 +5693,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateRule'
+              $ref: '#/components/schemas/UpdateRule'
       responses:
         '200':
           description: Rule updated
@@ -5433,11 +5741,17 @@ paths:
   /rules/{id}/toggle:
     post:
       tags: [Rules]
-      summary: Toggle rule active/inactive
+      summary: Toggle rule enabled/disabled
       operationId: toggleRule
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToggleRule'
       responses:
         '200':
           description: Rule toggled
