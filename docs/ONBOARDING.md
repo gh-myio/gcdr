@@ -91,9 +91,9 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Partners** | 15 | Parceiros, API Keys, OAuth Clients, Webhooks |
 | **Authorization** | 18 | RBAC completo (Roles, Policies, Assignments) |
 | **Assets** | 11 | Ativos com hierarquia (SITE → BUILDING → FLOOR → AREA → EQUIPMENT) |
-| **Devices** | 9 | Dispositivos IoT com conectividade |
-| **Rules** | 10 | Regras de negócio (ALARM, SLA, ESCALATION, MAINTENANCE) |
-| **Alarm Bundles** | 2 | Bundle de regras para integração Node-RED (M2M) |
+| **Devices** | 9 | Dispositivos IoT com conectividade (filtros por `centralId`, `slaveId`) |
+| **Rules** | 10 | Regras de negócio (ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW) com guard configs para Decision Engine |
+| **Alarm Bundles** | 3 | Bundle de regras para integração Node-RED (M2M) com versionamento |
 | **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./SIMULATOR-MANUAL.md)) |
 | **Customer API Keys** | 4 | Gerenciamento de API Keys por customer |
 | **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
@@ -214,6 +214,34 @@ curl http://localhost:3015/customers/33333333-3333-3333-3333-333333333333/alarm-
 - `versionId`: Formato amigável `v1-YYYYMMDD-HHmmss`
 - `daysOfWeek`: Objeto com chaves 0-6 (0=Domingo), valores boolean
 
+#### Buscar Device por Central + Slave ID (para alarms-backend)
+```bash
+# Resolver device Modbus pelo centralId + slaveId
+curl "http://localhost:3015/api/v1/devices?centralId=9308af89-94b2-45e6-9e47-ae78f881afd2&slaveId=4" \
+  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>"
+```
+
+Resposta:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [{
+      "id": "22220001-0001-0001-0001-000000000001",
+      "name": "Energy Laboratório",
+      "displayName": "Medidor Energia Lab",
+      "slaveId": 4,
+      "centralId": "9308af89-...",
+      "assetId": "ffff8888-..."
+    }],
+    "pagination": { "total": 1, "totalPages": 1, "hasMore": false }
+  }
+}
+```
+
+> **Uso**: O alarms-backend usa este endpoint para enriquecer alarmes com `deviceName` (`displayName ?? name`) e resolver o UUID do device a partir do Modbus `localId`.
+
 #### Criar API Key para Customer
 ```bash
 curl -X POST http://localhost:3015/customers/{customerId}/api-keys \
@@ -270,18 +298,23 @@ Todas as respostas seguem o formato:
 ```json
 {
   "success": true,
-  "data": [ ... ],
+  "data": {
+    "items": [ ... ],
+    "pagination": {
+      "total": 47,
+      "totalPages": 3,
+      "hasMore": true,
+      "nextCursor": "20"
+    }
+  },
   "meta": {
     "requestId": "uuid",
-    "timestamp": "2026-01-21T00:00:00.000Z",
-    "pagination": {
-      "limit": 20,
-      "cursor": "eyJpZCI6Ijk5OSJ9",
-      "hasMore": true
-    }
+    "timestamp": "2026-01-21T00:00:00.000Z"
   }
 }
 ```
+
+> **Nota**: Todos os endpoints paginados retornam `total` (contagem total de registros) e `totalPages` (total de páginas baseado no `limit`).
 
 ### Códigos de Erro HTTP
 
@@ -388,8 +421,11 @@ curl -X POST https://api.gcdr.io/dev/customers/{customerId}/api-keys \
 **Scopes disponiveis:**
 - `bundles:read` - Bundles de alarme
 - `devices:read` - Leitura de devices
+- `devices:write` - Leitura/escrita de devices (usado pelo hybridAuth em `GET /devices`)
 - `rules:read` - Leitura de regras
 - `assets:read` - Leitura de assets
+- `assets:write` - Leitura/escrita de assets (usado pelo hybridAuth em `GET /assets`)
+- `customers:write` - Leitura/escrita de customers (usado pelo hybridAuth)
 - `groups:read` - Leitura de grupos
 - `*:read` - Leitura de todos os recursos
 
@@ -1640,7 +1676,10 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
 - [RFC-0011: User Registration Workflow](./RFC-0011-User-Registration-Approval-Workflow.md) - Auto-cadastro e aprovação de usuários
 - [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
+- [RFC-0015: Alarm Bundle Version History](./RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
+- [RFC-0016: ThingsBoard Entity Mapping](./RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
+- [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 
 ### Documentação Externa
 
@@ -1703,6 +1742,33 @@ Use este checklist para acompanhar seu progresso:
 ---
 
 ## Changelog
+
+### 2026-02-20
+
+**Decision Engine Guard Configs**
+- Adicionados guard configs ao `AlarmThresholdConfig`: `dedup`, `cooldown`, `hysteresisGuard`, `digest`
+- Interfaces TypeScript e schemas Zod sincronizados
+- Todas as seed rules Dimension atualizadas com guard defaults por prioridade
+- Campos sincronizados no Zod: `offset`, `startAt`, `endAt`, `daysOfWeek`, `channelId`, `keyMulti`
+
+**Device Lookup por centralId + slaveId**
+- `GET /devices` agora aceita filtros `centralId` e `slaveId` na query string
+- Permite ao alarms-backend resolver o device UUID e `deviceName` a partir do Modbus address
+- Repository e controller atualizados
+
+**Paginação com total e totalPages**
+- Todos os 27 endpoints paginados agora retornam `total` e `totalPages` no objeto `pagination`
+- Helper `countWhere()` criado para queries de contagem reutilizáveis
+
+**OpenAPI Spec atualizada**
+- Schemas de Rule completamente reescritos (antes: `config` genérico, `priority` integer)
+- Agora: 4 configs tipados, priority enum, guard configs, UpdateRule, ToggleRule
+- Novos query params documentados: `centralId`, `slaveId` em `GET /devices`
+
+**Error Handler melhorado**
+- Erros operacionais (4xx) agora logam apenas `[401] UNAUTHORIZED: mensagem` em vez de stack trace completo
+- Erros inesperados (5xx) mantêm stack trace para debugging
+- Reduz ruído nos logs do DokPloy
 
 ### 2026-02-11
 
