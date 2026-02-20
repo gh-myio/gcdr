@@ -89,6 +89,22 @@ export function errorHandler(
     return;
   }
 
+  // PostgreSQL unique constraint violation (duplicate key)
+  if (err instanceof Error && (err.message?.includes('duplicate key value') || (err as any).code === '23505')) {
+    const detail = (err as any).detail || (err as any).cause?.detail || '';
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: detail || 'A resource with the same unique value already exists',
+        code: 'CONFLICT',
+      },
+      meta: { requestId, timestamp },
+    };
+
+    res.status(409).json(response);
+    return;
+  }
+
   // Unknown errors
   const message = err instanceof Error ? err.message : 'An unexpected error occurred';
   const response: ApiResponse = {

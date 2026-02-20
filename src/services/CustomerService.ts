@@ -20,12 +20,11 @@ export class CustomerService {
   }
 
   async create(tenantId: string, data: CreateCustomerDTO, userId: string): Promise<Customer> {
-    // Check for duplicate code
-    if (data.code) {
-      const existing = await this.repository.getByCode(tenantId, data.code);
-      if (existing) {
-        throw new ConflictError(`Customer with code ${data.code} already exists`);
-      }
+    // Check for duplicate code (explicit or auto-generated from name)
+    const code = data.code || data.name.toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 50);
+    const existing = await this.repository.getByCode(tenantId, code);
+    if (existing) {
+      throw new ConflictError(`Customer with code ${code} already exists`);
     }
 
     const customer = await this.repository.create(tenantId, data, userId);
