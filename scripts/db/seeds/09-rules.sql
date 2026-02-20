@@ -564,7 +564,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
         false,
-        '{"metric": "temperature", "operator": "GT", "value": 28, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "temperature", "operator": "GT", "value": 28, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
         '["temperature", "laboratory", "high"]',
         'ACTIVE',
@@ -585,7 +585,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
         false,
-        '{"metric": "temperature", "operator": "LT", "value": 18, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "temperature", "operator": "LT", "value": 18, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
         '["temperature", "laboratory", "low"]',
         'ACTIVE',
@@ -606,7 +606,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000006', -- Temp. Sala sensor
         false,
-        '{"metric": "temperature", "operator": "OUTSIDE", "value": 20, "valueHigh": 26, "unit": "°C", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 20, "valueHigh": 26, "unit": "°C", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 1, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
         '["temperature", "room", "comfort", "outside"]',
         'ACTIVE',
@@ -627,7 +627,7 @@ BEGIN
         'CUSTOMER',
         v_dimension_id,
         true,
-        '{"metric": "temperature", "operator": "BETWEEN", "value": 22, "valueHigh": 24, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "temperature", "operator": "BETWEEN", "value": 22, "valueHigh": 24, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/comfort-status"}, "enabled": true}]',
         '["temperature", "comfort", "between"]',
         'ACTIVE',
@@ -648,7 +648,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
         false,
-        '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br"]}, "enabled": true}]',
         '["power", "3f", "high"]',
         'ACTIVE',
@@ -669,7 +669,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
         false,
-        '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
+        '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5], "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
         '["power", "3f", "low", "equipment-off"]',
         'ACTIVE',
@@ -690,7 +690,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
         false,
-        '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/power-status"}, "enabled": true}]',
         '["power", "3f", "normal", "between"]',
         'ACTIVE',
@@ -711,7 +711,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
         false,
-        '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
         '["power", "3f", "anomaly", "outside"]',
         'ACTIVE',
@@ -732,7 +732,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000001', -- Energy Laboratório meter
         false,
-        '{"metric": "instantaneous_power", "operator": "GT", "value": 200, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120}',
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 200, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
         '["energy", "laboratory", "high"]',
         'ACTIVE',
@@ -753,7 +753,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000003', -- Sensores Lampada (OUTLET)
         false,
-        '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1}',
+        '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["lamp", "laboratory", "energy-saving", "after-hours", "channel-1"]',
         'ACTIVE',
@@ -774,7 +774,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000003', -- Sensores Lampada (OUTLET)
         false,
-        '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 0}',
+        '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 0, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["lamp", "entrance", "energy-saving", "after-hours", "channel-0"]',
         'ACTIVE',
@@ -795,7 +795,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000004', -- Sala Reunião (OUTLET)
         false,
-        '{"metric": "door_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1}',
+        '{"metric": "door_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["security@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
         '["door", "meeting-room", "security", "after-hours", "channel-1"]',
         'ACTIVE',
@@ -816,7 +816,7 @@ BEGIN
         'CUSTOMER',
         v_dimension_id,
         true,
-        '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 32, "unit": "°C", "duration": 2, "aggregation": "LAST", "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 32, "unit": "°C", "duration": 2, "aggregation": "LAST", "hysteresis": 1, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
         '["temperature", "critical", "customer-wide"]',
         'ACTIVE',
@@ -837,7 +837,7 @@ BEGIN
         'CUSTOMER',
         v_dimension_id,
         true,
-        '{"metric": "instantaneous_power", "operator": "GT", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST"}',
+        '{"metric": "instantaneous_power", "operator": "GT", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
         '["power", "surge", "critical", "customer-wide"]',
         'ACTIVE',
@@ -862,7 +862,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
         false,
-        '{"metric": "humidity", "operator": "GT", "value": 70, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "humidity", "operator": "GT", "value": 70, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
         '["humidity", "entrance", "high"]',
         'ACTIVE',
@@ -883,7 +883,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
         false,
-        '{"metric": "humidity", "operator": "LT", "value": 30, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120}',
+        '{"metric": "humidity", "operator": "LT", "value": 30, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
         '["humidity", "entrance", "low"]',
         'ACTIVE',
@@ -904,7 +904,7 @@ BEGIN
         'CUSTOMER',
         v_dimension_id,
         true,
-        '{"metric": "humidity", "operator": "OUTSIDE", "value": 40, "valueHigh": 60, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 3, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "humidity", "operator": "OUTSIDE", "value": 40, "valueHigh": 60, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 3, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
         '["humidity", "comfort", "outside", "customer-wide"]',
         'ACTIVE',
@@ -925,7 +925,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000008', -- Temp+Umidade Lab
         false,
-        '{"metric": "humidity", "operator": "GT", "value": 65, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "humidity", "operator": "GT", "value": 65, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
         '["humidity", "laboratory", "high", "multi-sensor"]',
         'ACTIVE',
@@ -950,7 +950,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
         false,
-        '{"metric": "water_level_continuous", "operator": "LT", "value": 20, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 3, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "water_level_continuous", "operator": "LT", "value": 20, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 3, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
         '["water", "level", "low"]',
         'ACTIVE',
@@ -971,7 +971,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
         false,
-        '{"metric": "water_level_continuous", "operator": "LT", "value": 10, "unit": "%", "duration": 0, "aggregation": "LAST"}',
+        '{"metric": "water_level_continuous", "operator": "LT", "value": 10, "unit": "%", "duration": 0, "aggregation": "LAST", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
         '["water", "level", "critical", "emergency"]',
         'ACTIVE',
@@ -992,7 +992,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
         false,
-        '{"metric": "water_level_continuous", "operator": "BETWEEN", "value": 40, "valueHigh": 80, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
+        '{"metric": "water_level_continuous", "operator": "BETWEEN", "value": 40, "valueHigh": 80, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/water-status"}, "enabled": true}]',
         '["water", "level", "normal", "between"]',
         'ACTIVE',
@@ -1013,7 +1013,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
         false,
-        '{"metric": "water_level_continuous", "operator": "OUTSIDE", "value": 15, "valueHigh": 95, "unit": "%", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE"}',
+        '{"metric": "water_level_continuous", "operator": "OUTSIDE", "value": 15, "valueHigh": 95, "unit": "%", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
         '["water", "level", "outside", "safety"]',
         'ACTIVE',
@@ -1038,7 +1038,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral
         false,
-        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 960000, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": [1, 2, 3, 4, 5, 6], "keyMulti": 1}',
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 960000, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": [1, 2, 3, 4, 5, 6], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["elevator", "energy", "standby", "weekday"]',
         'ACTIVE',
@@ -1059,7 +1059,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral
         false,
-        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 901000, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": [0], "keyMulti": 1}',
+        '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 901000, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": [0], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["elevator", "energy", "standby", "sunday"]',
         'ACTIVE',
@@ -1080,7 +1080,7 @@ BEGIN
         'DEVICE',
         '22220001-0001-0001-0001-000000000005', -- 3F Geral
         false,
-        '{"metric": "energy", "operator": "GT", "value": 10000, "unit": "Wh", "duration": 0, "aggregation": "SUM", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 0.25}',
+        '{"metric": "energy", "operator": "GT", "value": 10000, "unit": "Wh", "duration": 0, "aggregation": "SUM", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 0.25, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
         '["energy", "daily-limit", "consumption", "kwh"]',
         'ACTIVE',

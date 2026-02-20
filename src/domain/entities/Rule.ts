@@ -38,6 +38,30 @@ export type MetricDomain =
   | 'door_sensor'
   | 'lamp';
 
+// Guard configurations for Decision Engine (alarms-backend)
+export interface DedupGuardConfig {
+  enabled: boolean;
+  ttlSeconds: number; // Time window to consider duplicates (default: 300)
+}
+
+export interface CooldownGuardConfig {
+  enabled: boolean;
+  seconds: number; // Minimum time between notifications (default: 60)
+  perChannel: boolean; // If true, cooldown is per dispatch channel
+}
+
+export interface HysteresisGuardConfig {
+  enabled: boolean;
+  windowSeconds: number; // Time window to count transitions (default: 120)
+  maxTransitions: number; // Max state changes before suppression (default: 3)
+}
+
+export interface DigestGuardConfig {
+  enabled: boolean;
+  windowSeconds: number; // Digest aggregation window (default: 600)
+  threshold: number; // Min alarms in window to trigger digest (default: 5)
+}
+
 // Alarm Threshold Configuration
 export interface AlarmThresholdConfig {
   metric: MetricDomain;
@@ -64,6 +88,12 @@ export interface AlarmThresholdConfig {
 
   // Energy unit multiplier: 1 for W (default), 0.25 for Wh
   keyMulti?: number;
+
+  // Decision Engine guard configs (alarms-backend)
+  dedup?: DedupGuardConfig;
+  cooldown?: CooldownGuardConfig;
+  hysteresisGuard?: HysteresisGuardConfig; // Named differently from `hysteresis` (threshold tolerance)
+  digest?: DigestGuardConfig;
 }
 
 // SLA Configuration

@@ -7,6 +7,30 @@ const ComparisonOperatorSchema = z.enum(['GT', 'GTE', 'LT', 'LTE', 'EQ', 'NEQ', 
 const ScopTypeSchema = z.enum(['GLOBAL', 'CUSTOMER', 'ASSET', 'DEVICE']);
 const NotificationTypeSchema = z.enum(['EMAIL', 'SMS', 'WEBHOOK', 'SLACK', 'TEAMS', 'PAGERDUTY', 'CUSTOM']);
 
+// Decision Engine guard config schemas
+const DedupGuardConfigSchema = z.object({
+  enabled: z.boolean(),
+  ttlSeconds: z.number().int().min(1),
+});
+
+const CooldownGuardConfigSchema = z.object({
+  enabled: z.boolean(),
+  seconds: z.number().int().min(1),
+  perChannel: z.boolean(),
+});
+
+const HysteresisGuardConfigSchema = z.object({
+  enabled: z.boolean(),
+  windowSeconds: z.number().int().min(1),
+  maxTransitions: z.number().int().min(1),
+});
+
+const DigestGuardConfigSchema = z.object({
+  enabled: z.boolean(),
+  windowSeconds: z.number().int().min(1),
+  threshold: z.number().int().min(1),
+});
+
 // Alarm Threshold Config Schema
 const AlarmThresholdConfigSchema = z.object({
   metric: z.string().min(1),
@@ -19,6 +43,21 @@ const AlarmThresholdConfigSchema = z.object({
   duration: z.number().min(0).optional(),
   aggregation: z.enum(['AVG', 'MIN', 'MAX', 'SUM', 'COUNT', 'LAST']).optional(),
   aggregationWindow: z.number().min(1).optional(),
+  // Calibration offset per metric
+  offset: z.record(z.number()).optional(),
+  // Schedule configuration
+  startAt: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/).optional(),
+  endAt: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/).optional(),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+  // Channel targeting for OUTLET devices
+  channelId: z.number().int().min(0).optional(),
+  // Energy unit multiplier
+  keyMulti: z.number().optional(),
+  // Decision Engine guard configs
+  dedup: DedupGuardConfigSchema.optional(),
+  cooldown: CooldownGuardConfigSchema.optional(),
+  hysteresisGuard: HysteresisGuardConfigSchema.optional(),
+  digest: DigestGuardConfigSchema.optional(),
 });
 
 // SLA Config Schema
