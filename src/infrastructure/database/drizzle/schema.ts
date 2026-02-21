@@ -167,6 +167,9 @@ export const customers = pgTable('customers', {
   phone: varchar('phone', { length: 50 }),
   address: jsonb('address'),
 
+  // External integration
+  externalId: varchar('external_id', { length: 255 }),
+
   // Configuration
   settings: jsonb('settings').notNull().default({}),
   theme: jsonb('theme'),
@@ -189,6 +192,7 @@ export const customers = pgTable('customers', {
   tenantPathIdx: index('customers_tenant_path_idx').on(table.tenantId, table.path),
   tenantTypeIdx: index('customers_tenant_type_idx').on(table.tenantId, table.type),
   tenantStatusIdx: index('customers_tenant_status_idx').on(table.tenantId, table.status),
+  externalIdIdx: index('customers_external_id_idx').on(table.externalId),
 }));
 
 // =============================================================================

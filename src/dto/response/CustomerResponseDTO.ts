@@ -7,6 +7,7 @@ export interface CustomerResponseDTO {
   parentCustomerId: string | null;
   path: string;
   depth: number;
+  externalId?: string;
   name: string;
   displayName: string;
   code: string;
@@ -45,6 +46,7 @@ export function toCustomerResponseDTO(customer: Customer): CustomerResponseDTO {
     parentCustomerId: customer.parentCustomerId,
     path: customer.path,
     depth: customer.depth,
+    externalId: customer.externalId,
     name: customer.name,
     displayName: customer.displayName,
     code: customer.code,

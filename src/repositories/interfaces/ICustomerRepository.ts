@@ -9,6 +9,7 @@ export interface CustomerTreeNode extends Customer {
 
 export interface ICustomerRepository extends IRepository<Customer, CreateCustomerDTO, UpdateCustomerDTO> {
   getByCode(tenantId: string, code: string): Promise<Customer | null>;
+  getByExternalId(tenantId: string, externalId: string): Promise<Customer | null>;
   getChildren(tenantId: string, parentCustomerId: string | null): Promise<Customer[]>;
   getDescendants(tenantId: string, customerId: string, maxDepth?: number): Promise<Customer[]>;
   getAncestors(tenantId: string, customerId: string): Promise<Customer[]>;

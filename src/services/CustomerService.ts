@@ -27,6 +27,13 @@ export class CustomerService {
       throw new ConflictError(`Customer with code ${code} already exists`);
     }
 
+    if (data.externalId) {
+      const existingExternal = await this.repository.getByExternalId(tenantId, data.externalId);
+      if (existingExternal) {
+        throw new ConflictError(`Customer with external ID ${data.externalId} already exists`);
+      }
+    }
+
     const customer = await this.repository.create(tenantId, data, userId);
     return customer;
   }
@@ -39,15 +46,31 @@ export class CustomerService {
     return customer;
   }
 
+  async getByExternalId(tenantId: string, externalId: string): Promise<Customer> {
+    const customer = await this.repository.getByExternalId(tenantId, externalId);
+    if (!customer) {
+      throw new NotFoundError(`Customer with external ID ${externalId} not found`);
+    }
+    return customer;
+  }
+
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, userId: string): Promise<Customer> {
     // Check if customer exists
-    await this.getById(tenantId, id);
+    const existingCustomer = await this.getById(tenantId, id);
 
     // Check for duplicate code if updating
     if (data.code) {
       const existing = await this.repository.getByCode(tenantId, data.code);
       if (existing && existing.id !== id) {
         throw new ConflictError(`Customer with code ${data.code} already exists`);
+      }
+    }
+
+    // Check for duplicate externalId if updating
+    if (data.externalId && data.externalId !== existingCustomer.externalId) {
+      const duplicateExternal = await this.repository.getByExternalId(tenantId, data.externalId);
+      if (duplicateExternal && duplicateExternal.id !== id) {
+        throw new ConflictError(`Customer with external ID ${data.externalId} already exists`);
       }
     }
 

@@ -49,6 +49,7 @@ export class CustomerRepository implements ICustomerRepository {
       email: data.email,
       phone: data.phone,
       address: data.address,
+      externalId: data.externalId || null,
       settings: data.settings ? { ...createDefaultCustomerSettings(), ...data.settings } : createDefaultCustomerSettings(),
       metadata: data.metadata || {},
       status: 'ACTIVE',
@@ -81,6 +82,16 @@ export class CustomerRepository implements ICustomerRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  async getByExternalId(tenantId: string, externalId: string): Promise<Customer | null> {
+    const [result] = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.externalId, externalId)))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, updatedBy: string): Promise<Customer> {
     const existing = await this.getById(tenantId, id);
     if (!existing) {
@@ -101,6 +112,7 @@ export class CustomerRepository implements ICustomerRepository {
     if (data.email !== undefined) updateData.email = data.email;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.address !== undefined) updateData.address = data.address;
+    if (data.externalId !== undefined) updateData.externalId = data.externalId;
     if (data.settings !== undefined) updateData.settings = { ...existing.settings, ...data.settings };
     if (data.theme !== undefined) updateData.theme = data.theme;
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
@@ -423,6 +435,7 @@ export class CustomerRepository implements ICustomerRepository {
       parentCustomerId: row.parentCustomerId,
       path: row.path,
       depth: row.depth,
+      externalId: row.externalId || undefined,
       name: row.name,
       displayName: row.displayName,
       code: row.code,

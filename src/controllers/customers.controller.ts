@@ -63,6 +63,26 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /customers/external/:externalId
+ * Get customer by ThingsBoard / external ID — returns enriched payload with CUSTOMER-scoped rules
+ */
+router.get('/external/:externalId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { externalId } = req.params;
+
+    if (!externalId) {
+      throw new ValidationError('External ID is required');
+    }
+
+    const customer = await customerService.getByExternalId(tenantId, externalId);
+    sendSuccess(res, customer, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /customers/:id
  * Get customer by ID
  */

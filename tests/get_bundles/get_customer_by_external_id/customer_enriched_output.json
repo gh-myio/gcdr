@@ -1,0 +1,11 @@
+{
+  "success": false,
+  "error": {
+    "message": "Route GET /api/v1/customers/external/84e0370e-636a-4741-9874-504b5e0b3577 not found",
+    "code": "NOT_FOUND"
+  },
+  "meta": {
+    "requestId": "6cdedf78-e321-4cec-adde-5c8f3a468b0c",
+    "timestamp": "2026-02-21T19:08:07.532Z"
+  }
+}

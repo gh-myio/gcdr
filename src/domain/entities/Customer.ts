@@ -28,6 +28,9 @@ export interface Customer extends BaseEntity {
   path: string;
   depth: number;
 
+  // External integration
+  externalId?: string;
+
   // Basic Info
   name: string;
   displayName: string;
