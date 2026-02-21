@@ -1,6 +1,9 @@
 #!/bin/bash
 # Fetch customer by ThingsBoard externalId
-# Payload returns the full customer object (externalId field included)
+# Flags:
+#   deep=1                        → include assets + devices
+#   allRules=1                    → attach ruleIds to each device + rules dict with meta
+#   filterOnlyDevicesWithRules=1  → exclude devices with no applicable rules
 
 # Configuration - Change API_URL for different environments
 # Local: http://localhost:3015
@@ -17,15 +20,21 @@ TENANT_ID="11111111-1111-1111-1111-111111111111"
 # ThingsBoard ID: 5085bf40-b4dd-11f0-be7f-e760d1498268
 EXTERNAL_ID="5085bf40-b4dd-11f0-be7f-e760d1498268"
 
+# Flags (1=enabled, 0=disabled)
+DEEP=1
+ALL_RULES=1
+FILTER_ONLY_WITH_RULES=1
+
 OUTPUT_FILE="$(dirname "$0")/customer_enriched_output.json"
 
 echo "Fetching customer by externalId..."
 echo "Customer   : Moxuara (GCDR: 84e0370e-636a-4741-9874-504b5e0b3577)"
 echo "ExternalId : $EXTERNAL_ID"
 echo "Tenant     : $TENANT_ID"
+echo "Flags      : deep=$DEEP allRules=$ALL_RULES filterOnlyDevicesWithRules=$FILTER_ONLY_WITH_RULES"
 echo ""
 
-curl -s "${API_URL}/api/v1/customers/external/${EXTERNAL_ID}?deep=1" \
+curl -s "${API_URL}/api/v1/customers/external/${EXTERNAL_ID}?deep=${DEEP}&allRules=${ALL_RULES}&filterOnlyDevicesWithRules=${FILTER_ONLY_WITH_RULES}" \
   -H "X-API-Key: ${API_KEY}" \
   -H "X-Tenant-ID: ${TENANT_ID}" \
   -H "Accept: application/json" \
