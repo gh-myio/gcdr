@@ -13,9 +13,9 @@ API_KEY="gcdr_cust_tb_integration_key_2026"
 TENANT_ID="11111111-1111-1111-1111-111111111111"
 
 # Customer: "Moxuara"
-# GCDR ID  : 84e0370e-636a-4741-9874-504b5e0b3577
-# Set the ThingsBoard customer ID as EXTERNAL_ID below
-EXTERNAL_ID="84e0370e-636a-4741-9874-504b5e0b3577"
+# GCDR ID       : 84e0370e-636a-4741-9874-504b5e0b3577
+# ThingsBoard ID: 5085bf40-b4dd-11f0-be7f-e760d1498268
+EXTERNAL_ID="5085bf40-b4dd-11f0-be7f-e760d1498268"
 
 OUTPUT_FILE="$(dirname "$0")/customer_enriched_output.json"
 
@@ -25,7 +25,7 @@ echo "ExternalId : $EXTERNAL_ID"
 echo "Tenant     : $TENANT_ID"
 echo ""
 
-curl -s "${API_URL}/api/v1/customers/external/${EXTERNAL_ID}" \
+curl -s "${API_URL}/api/v1/customers/external/${EXTERNAL_ID}?deep=1" \
   -H "X-API-Key: ${API_KEY}" \
   -H "X-Tenant-ID: ${TENANT_ID}" \
   -H "Accept: application/json" \

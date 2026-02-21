@@ -1,4 +1,7 @@
 import { Customer } from '../domain/entities/Customer';
+import { Asset } from '../domain/entities/Asset';
+import { Device } from '../domain/entities/Device';
+import { Rule } from '../domain/entities/Rule';
 import {
   CreateCustomerDTO,
   UpdateCustomerDTO,
@@ -8,15 +11,95 @@ import {
 } from '../dto/request/CustomerDTO';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { CustomerTreeNode, ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { AssetRepository } from '../repositories/AssetRepository';
+import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
+import { DeviceRepository } from '../repositories/DeviceRepository';
+import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
+import { RuleRepository } from '../repositories/RuleRepository';
+import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
 
+export interface RuleMeta {
+  id: string;
+  name: string;
+  scope: { type: string; entityId?: string };
+  metric: string;
+  operator: string;
+  value: number;
+  valueHigh?: number;
+  duration?: number;
+  hysteresis?: number;
+  aggregation?: string;
+  startAt?: string;
+  endAt?: string;
+  daysOfWeek?: Record<string, boolean>;
+  channelId?: number;
+  keyMulti?: number;
+}
+
+export interface EnrichedCustomer {
+  customer: Customer;
+  assets: Asset[];
+  devices: (Device & { ruleIds?: string[] })[];
+  rules?: Record<string, RuleMeta>;
+}
+
 export class CustomerService {
   private repository: ICustomerRepository;
+  private assetRepository: IAssetRepository;
+  private deviceRepository: IDeviceRepository;
+  private ruleRepository: IRuleRepository;
 
-  constructor(repository?: ICustomerRepository) {
+  constructor(
+    repository?: ICustomerRepository,
+    assetRepository?: IAssetRepository,
+    deviceRepository?: IDeviceRepository,
+    ruleRepository?: IRuleRepository,
+  ) {
     this.repository = repository || new CustomerRepository();
+    this.assetRepository = assetRepository || new AssetRepository();
+    this.deviceRepository = deviceRepository || new DeviceRepository();
+    this.ruleRepository = ruleRepository || new RuleRepository();
+  }
+
+  private buildRuleMeta(rule: Rule): RuleMeta {
+    const cfg = rule.alarmConfig;
+    if (!cfg) {
+      return {
+        id: rule.id,
+        name: rule.name,
+        scope: rule.scope,
+        metric: '',
+        operator: '',
+        value: 0,
+      };
+    }
+
+    // Convert daysOfWeek array [0,1,2...] → { "0": true, "1": false, ... }
+    const daysOfWeek: Record<string, boolean> = {};
+    for (let d = 0; d <= 6; d++) {
+      daysOfWeek[String(d)] = cfg.daysOfWeek ? cfg.daysOfWeek.includes(d) : true;
+    }
+
+    return {
+      id: rule.id,
+      name: rule.name,
+      scope: rule.scope,
+      metric: cfg.metric,
+      operator: cfg.operator,
+      value: cfg.value,
+      ...(cfg.valueHigh !== undefined && { valueHigh: cfg.valueHigh }),
+      ...(cfg.duration !== undefined && { duration: cfg.duration }),
+      ...(cfg.hysteresis !== undefined && { hysteresis: cfg.hysteresis }),
+      ...(cfg.aggregation !== undefined && { aggregation: cfg.aggregation }),
+      ...(cfg.startAt !== undefined && { startAt: cfg.startAt }),
+      ...(cfg.endAt !== undefined && { endAt: cfg.endAt }),
+      daysOfWeek,
+      ...(cfg.channelId !== undefined && { channelId: cfg.channelId }),
+      keyMulti: cfg.keyMulti ?? 1,
+    };
   }
 
   async create(tenantId: string, data: CreateCustomerDTO, userId: string): Promise<Customer> {
@@ -52,6 +135,82 @@ export class CustomerService {
       throw new NotFoundError(`Customer with external ID ${externalId} not found`);
     }
     return customer;
+  }
+
+  async getEnrichedByExternalId(
+    tenantId: string,
+    externalId: string,
+    deep: boolean,
+    allRules: boolean,
+    filterOnlyDevicesWithRules: boolean,
+  ): Promise<EnrichedCustomer> {
+    const customer = await this.getByExternalId(tenantId, externalId);
+
+    if (!deep) {
+      return { customer, assets: [], devices: [] };
+    }
+
+    const [assetsResult, devicesResult] = await Promise.all([
+      this.assetRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
+      this.deviceRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
+    ]);
+
+    const assets = assetsResult.items;
+    let devices: (Device & { ruleIds?: string[] })[] = devicesResult.items;
+
+    if (!allRules) {
+      return { customer, assets, devices };
+    }
+
+    // Fetch rules at all 3 scopes in parallel
+    const [customerRules, ...assetRulesArrays] = await Promise.all([
+      this.ruleRepository.getByScope(tenantId, 'CUSTOMER', customer.id),
+      ...assets.map((a) => this.ruleRepository.getByScope(tenantId, 'ASSET', a.id)),
+    ]);
+
+    // Build assetId → Rule[] map
+    const assetRulesMap = new Map<string, Rule[]>();
+    assets.forEach((a, i) => assetRulesMap.set(a.id, assetRulesArrays[i] ?? []));
+
+    // Fetch DEVICE-scoped rules for every device in parallel
+    const deviceRulesArrays = await Promise.all(
+      devices.map((d) => this.ruleRepository.getByScope(tenantId, 'DEVICE', d.id)),
+    );
+
+    // Build unified rules dictionary (deduped by id)
+    const rulesDict: Record<string, RuleMeta> = {};
+    const addRules = (ruleList: Rule[]) => {
+      ruleList.forEach((r) => {
+        if (!rulesDict[r.id]) rulesDict[r.id] = this.buildRuleMeta(r);
+      });
+    };
+
+    addRules(customerRules);
+    assetRulesArrays.forEach(addRules);
+    deviceRulesArrays.forEach(addRules);
+
+    // Attach ruleIds to each device
+    devices = devices.map((device, i) => {
+      const effectiveRuleIds = [
+        ...deviceRulesArrays[i].map((r) => r.id),
+        ...(assetRulesMap.get(device.assetId) ?? []).map((r) => r.id),
+        ...customerRules.map((r) => r.id),
+      ];
+      // deduplicate preserving order
+      const seen = new Set<string>();
+      const ruleIds = effectiveRuleIds.filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      return { ...device, ruleIds };
+    });
+
+    if (filterOnlyDevicesWithRules) {
+      devices = devices.filter((d) => (d.ruleIds?.length ?? 0) > 0);
+    }
+
+    return { customer, assets, devices, rules: rulesDict };
   }
 
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, userId: string): Promise<Customer> {

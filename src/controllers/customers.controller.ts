@@ -64,19 +64,27 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 /**
  * GET /customers/external/:externalId
- * Get customer by ThingsBoard / external ID — returns enriched payload with CUSTOMER-scoped rules
+ *   ?deep=0|1                    (default 0) — include assets + devices
+ *   &allRules=0|1                (default 0) — attach rule meta to each device
+ *   &filterOnlyDevicesWithRules=0|1 (default 0) — exclude devices with no rules
  */
 router.get('/external/:externalId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const { externalId } = req.params;
+    const deep                    = req.query.deep === '1';
+    const allRules                = req.query.allRules === '1';
+    const filterOnlyDevicesWithRules = req.query.filterOnlyDevicesWithRules === '1';
 
     if (!externalId) {
       throw new ValidationError('External ID is required');
     }
 
-    const customer = await customerService.getByExternalId(tenantId, externalId);
-    sendSuccess(res, customer, 200, requestId);
+    const result = await customerService.getEnrichedByExternalId(
+      tenantId, externalId, deep, allRules, filterOnlyDevicesWithRules,
+    );
+
+    sendSuccess(res, deep ? result : result.customer, 200, requestId);
   } catch (err) {
     next(err);
   }
