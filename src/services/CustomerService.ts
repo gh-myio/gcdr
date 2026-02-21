@@ -159,7 +159,8 @@ export class CustomerService {
     let devices: (Device & { ruleIds?: string[] })[] = devicesResult.items;
 
     if (!allRules) {
-      return { customer, assets, devices };
+      const deviceAssetIds = new Set(devices.map((d) => d.assetId).filter(Boolean));
+      return { customer, assets: assets.filter((a) => deviceAssetIds.has(a.id)), devices };
     }
 
     // Fetch rules at all 3 scopes in parallel
@@ -210,7 +211,11 @@ export class CustomerService {
       devices = devices.filter((d) => (d.ruleIds?.length ?? 0) > 0);
     }
 
-    return { customer, assets, devices, rules: rulesDict };
+    // Only return assets that have at least one device in the result
+    const deviceAssetIds = new Set(devices.map((d) => d.assetId).filter(Boolean));
+    const filteredAssets = assets.filter((a) => deviceAssetIds.has(a.id));
+
+    return { customer, assets: filteredAssets, devices, rules: rulesDict };
   }
 
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, userId: string): Promise<Customer> {
