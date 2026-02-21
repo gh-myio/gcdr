@@ -71,7 +71,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 /**
  * GET /devices/external/:externalId
- * Get device by ThingsBoard / external ID
+ * Get device by ThingsBoard / external ID — returns enriched payload with asset, customer and rules
  */
 router.get('/external/:externalId', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -82,8 +82,46 @@ router.get('/external/:externalId', async (req: Request, res: Response, next: Ne
       throw new ValidationError('External ID is required');
     }
 
-    const device = await deviceService.getByExternalId(tenantId, externalId);
-    sendSuccess(res, device, 200, requestId);
+    const { device, asset, customer, rules } = await deviceService.getEnrichedByExternalId(tenantId, externalId);
+
+    const payload = {
+      device,
+      asset: asset ? {
+        id: asset.id,
+        name: asset.name,
+        displayName: asset.displayName,
+        code: asset.code,
+        type: asset.type,
+        status: asset.status,
+      } : null,
+      customer: customer ? {
+        id: customer.id,
+        name: customer.name,
+        displayName: customer.displayName,
+        code: customer.code,
+        type: customer.type,
+        status: customer.status,
+      } : null,
+      rules: rules.map((r) => ({
+        id: r.id,
+        name: r.name,
+        type: r.type,
+        priority: r.priority,
+        enabled: r.enabled,
+        status: r.status,
+        scope: r.scope,
+        alarmConfig: r.alarmConfig,
+        slaConfig: r.slaConfig,
+        escalationConfig: r.escalationConfig,
+        maintenanceConfig: r.maintenanceConfig,
+        notificationChannels: r.notificationChannels,
+        tags: r.tags,
+        lastTriggeredAt: r.lastTriggeredAt,
+        triggerCount: r.triggerCount,
+      })),
+    };
+
+    sendSuccess(res, payload, 200, requestId);
   } catch (err) {
     next(err);
   }

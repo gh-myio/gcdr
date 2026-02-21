@@ -1,4 +1,7 @@
 import { Device, ConnectivityStatus } from '../domain/entities/Device';
+import { Asset } from '../domain/entities/Asset';
+import { Customer } from '../domain/entities/Customer';
+import { Rule } from '../domain/entities/Rule';
 import {
   CreateDeviceDTO,
   UpdateDeviceDTO,
@@ -9,17 +12,37 @@ import { DeviceRepository } from '../repositories/DeviceRepository';
 import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
+import { CustomerRepository } from '../repositories/CustomerRepository';
+import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { RuleRepository } from '../repositories/RuleRepository';
+import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
 
+export interface EnrichedDevice {
+  device: Device;
+  asset: Asset | null;
+  customer: Customer | null;
+  rules: Rule[];
+}
+
 export class DeviceService {
   private repository: IDeviceRepository;
   private assetRepository: IAssetRepository;
+  private customerRepository: ICustomerRepository;
+  private ruleRepository: IRuleRepository;
 
-  constructor(repository?: IDeviceRepository, assetRepository?: IAssetRepository) {
+  constructor(
+    repository?: IDeviceRepository,
+    assetRepository?: IAssetRepository,
+    customerRepository?: ICustomerRepository,
+    ruleRepository?: IRuleRepository,
+  ) {
     this.repository = repository || new DeviceRepository();
     this.assetRepository = assetRepository || new AssetRepository();
+    this.customerRepository = customerRepository || new CustomerRepository();
+    this.ruleRepository = ruleRepository || new RuleRepository();
   }
 
   async create(tenantId: string, data: CreateDeviceDTO, userId: string): Promise<Device> {
@@ -76,6 +99,18 @@ export class DeviceService {
       throw new NotFoundError(`Device with external ID ${externalId} not found`);
     }
     return device;
+  }
+
+  async getEnrichedByExternalId(tenantId: string, externalId: string): Promise<EnrichedDevice> {
+    const device = await this.getByExternalId(tenantId, externalId);
+
+    const [asset, customer, rules] = await Promise.all([
+      device.assetId ? this.assetRepository.getById(tenantId, device.assetId) : Promise.resolve(null),
+      device.customerId ? this.customerRepository.getById(tenantId, device.customerId) : Promise.resolve(null),
+      this.ruleRepository.getByScope(tenantId, 'DEVICE', device.id),
+    ]);
+
+    return { device, asset, customer, rules };
   }
 
   async update(tenantId: string, id: string, data: UpdateDeviceDTO, userId: string): Promise<Device> {
