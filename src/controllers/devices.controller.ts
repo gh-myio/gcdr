@@ -70,6 +70,26 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /devices/external/:externalId
+ * Get device by ThingsBoard / external ID
+ */
+router.get('/external/:externalId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { externalId } = req.params;
+
+    if (!externalId) {
+      throw new ValidationError('External ID is required');
+    }
+
+    const device = await deviceService.getByExternalId(tenantId, externalId);
+    sendSuccess(res, device, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /devices/:id
  * Get device by ID
  */

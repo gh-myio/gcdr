@@ -70,6 +70,14 @@ export class DeviceService {
     return device;
   }
 
+  async getByExternalId(tenantId: string, externalId: string): Promise<Device> {
+    const device = await this.repository.getByExternalId(tenantId, externalId);
+    if (!device) {
+      throw new NotFoundError(`Device with external ID ${externalId} not found`);
+    }
+    return device;
+  }
+
   async update(tenantId: string, id: string, data: UpdateDeviceDTO, userId: string): Promise<Device> {
     const existing = await this.getById(tenantId, id);
 
