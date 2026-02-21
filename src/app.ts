@@ -22,6 +22,7 @@ import {
   domainsController,
   devicesController,
   devicesListByAssetHandler,
+  devicesListByCustomerHandler,
   usersController,
   usersListByCustomerHandler,
   policiesController,
@@ -152,6 +153,9 @@ apiV1Router.use('/customers/:customerId/api-keys', authMiddleware, customerApiKe
 
 // Customer Users (nested route)
 apiV1Router.get('/customers/:customerId/users', authMiddleware, usersListByCustomerHandler);
+
+// Customer Devices (nested route)
+apiV1Router.get('/customers/:customerId/devices', authMiddleware, devicesListByCustomerHandler);
 
 // Customer Rules (nested route)
 apiV1Router.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);

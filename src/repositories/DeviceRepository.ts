@@ -156,6 +156,10 @@ export class DeviceRepository implements IDeviceRepository {
     // Build conditions
     const conditions = [eq(devices.tenantId, tenantId)];
 
+    if (params?.customerId) {
+      conditions.push(eq(devices.customerId, params.customerId));
+    }
+
     if (params?.type) {
       conditions.push(eq(devices.type, params.type as typeof devices.type.enumValues[number]));
     }

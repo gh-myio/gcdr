@@ -234,4 +234,34 @@ export const listByAssetHandler = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * GET /customers/:customerId/devices
+ * List devices by customer (mounted in app.ts)
+ */
+export const listByCustomerHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+    const { type, status, connectivityStatus, limit, cursor } = req.query;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    const params: ListDevicesParams = {
+      customerId,
+      type: type as string | undefined,
+      status: status as string | undefined,
+      connectivityStatus: connectivityStatus as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      cursor: cursor as string | undefined,
+    };
+
+    const result = await deviceService.list(tenantId, params);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default router;
