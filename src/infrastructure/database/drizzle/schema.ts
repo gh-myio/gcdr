@@ -549,6 +549,7 @@ export const rules = pgTable('rules', {
   // Scope - using enum for better querying
   scopeType: scopeTypeEnum('scope_type').notNull().default('GLOBAL'),
   scopeEntityId: uuid('scope_entity_id'),
+  scopeEntityIds: uuid('scope_entity_ids').array(),
   scopeInherited: boolean('scope_inherited').notNull().default(false),
 
   // Type-specific configuration (JSONB)

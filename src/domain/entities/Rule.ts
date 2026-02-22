@@ -155,7 +155,8 @@ export interface NotificationChannel {
 // Rule Scope - determines where the rule applies
 export interface RuleScope {
   type: 'GLOBAL' | 'CUSTOMER' | 'ASSET' | 'DEVICE';
-  entityId?: string; // Required for CUSTOMER, ASSET, DEVICE
+  entityId?: string;   // Single entity (CUSTOMER, ASSET, or single DEVICE)
+  entityIds?: string[]; // Multiple devices — used when scope_type = DEVICE
   inherited?: boolean; // If true, applies to all children
 }
 

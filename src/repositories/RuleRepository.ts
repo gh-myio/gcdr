@@ -260,7 +260,7 @@ export class RuleRepository implements IRuleRepository {
       .where(and(
         eq(rules.tenantId, tenantId),
         eq(rules.scopeType, scopeType as 'GLOBAL' | 'CUSTOMER' | 'ASSET' | 'DEVICE'),
-        eq(rules.scopeEntityId, entityId)
+        sql`(${rules.scopeEntityId} = ${entityId} OR ${rules.scopeEntityIds} @> ARRAY[${entityId}::uuid])`
       ))
       .orderBy(rules.priority);
 
@@ -291,6 +291,7 @@ export class RuleRepository implements IRuleRepository {
     const scope: RuleScope = {
       type: row.scopeType,
       entityId: row.scopeEntityId || undefined,
+      entityIds: (row.scopeEntityIds?.length ?? 0) > 0 ? row.scopeEntityIds as string[] : undefined,
       inherited: row.scopeInherited,
     };
 

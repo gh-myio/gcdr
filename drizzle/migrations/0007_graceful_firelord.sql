@@ -1,0 +1,1 @@
+ALTER TABLE "rules" ADD COLUMN "scope_entity_ids" uuid[];
