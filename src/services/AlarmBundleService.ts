@@ -643,8 +643,10 @@ export class AlarmBundleService {
             (scope.inherited === true && device.assetId !== undefined);
           break;
         case 'DEVICE':
-          // Device-scoped rules apply only to the specific device
-          isApplicable = scope.entityId === device.id;
+          // Device-scoped rules apply to the specific device (single or array)
+          isApplicable =
+            scope.entityId === device.id ||
+            (scope.entityIds?.includes(device.id) ?? false);
           break;
       }
 
@@ -684,7 +686,10 @@ export class AlarmBundleService {
             (scope.inherited === true && device.assetId !== undefined);
           break;
         case 'DEVICE':
-          isApplicable = scope.entityId === device.id;
+          // Device-scoped rules apply to the specific device (single or array)
+          isApplicable =
+            scope.entityId === device.id ||
+            (scope.entityIds?.includes(device.id) ?? false);
           break;
       }
 
