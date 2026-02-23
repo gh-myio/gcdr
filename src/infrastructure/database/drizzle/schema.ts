@@ -378,6 +378,7 @@ export const devices = pgTable('devices', {
   // RFC-0008: Unique constraints
   tenantIdentifierUnique: uniqueIndex('devices_tenant_identifier_unique').on(table.tenantId, table.identifier),
   tenantCentralSlaveUnique: uniqueIndex('devices_tenant_central_slave_unique').on(table.tenantId, table.centralId, table.slaveId),
+  tenantCustomerNameUnique: uniqueIndex('devices_tenant_customer_name_unique').on(table.tenantId, table.customerId, table.name),
 
   // RFC-0008: Check constraint for valid Modbus slave_id (1-247)
   validSlaveId: check('valid_slave_id', sql`${table.slaveId} IS NULL OR (${table.slaveId} >= 1 AND ${table.slaveId} <= 247)`),

@@ -404,6 +404,33 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
 };
 
 /**
+ * DELETE /customers/:customerId/alarm-rules/bundle/cache
+ * Invalidate in-memory alarm bundle cache for a customer
+ * Forces next GET /bundle or /bundle/simple to regenerate from DB
+ */
+export const invalidateAlarmBundleCacheHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId } = req.context;
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    alarmBundleService.invalidateCache(tenantId, customerId, {
+      reason: 'manual_invalidation',
+      entityType: 'customer',
+      entityId: customerId,
+      userId,
+    });
+
+    sendNoContent(res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * GET /customers/:customerId/alarm-rules/bundle/versions
  * Get alarm bundle version history
  */

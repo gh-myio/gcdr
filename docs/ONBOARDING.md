@@ -1743,6 +1743,24 @@ Use este checklist para acompanhar seu progresso:
 
 ## Changelog
 
+### 2026-02-23
+
+**Alarm Bundle: endpoint de invalidação de cache**
+- `DELETE /customers/:customerId/alarm-rules/bundle/cache` — invalida o cache em memória do bundle (full + simple) para o customer
+- Útil após updates diretos no banco (slave_id, rules, devices) sem precisar reiniciar o serviço ou aguardar o TTL de 5 minutos
+- Requer autenticação JWT (não aceita API Key)
+- Resposta: `204 No Content`
+
+```bash
+curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-504b5e0b3577/alarm-rules/bundle/cache \
+  -H "Authorization: Bearer <jwt>"
+```
+
+**Device: unicidade de nome por customer**
+- Constraint `devices_tenant_customer_name_unique` adicionada: `UNIQUE(tenant_id, customer_id, name)`
+- Impede criação/rename de device com nome duplicado dentro do mesmo customer
+- Migration: `0008_device_name_unique.sql`
+
 ### 2026-02-22
 
 **ExternalId lookup endpoints (ThingsBoard integration)**
