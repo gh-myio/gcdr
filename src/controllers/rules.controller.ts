@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ruleService } from '../services/RuleService';
 import { alarmBundleService } from '../services/AlarmBundleService';
+import { DeviceRepository } from '../repositories/DeviceRepository';
 import {
   CreateRuleSchema,
   UpdateRuleSchema,
@@ -105,6 +106,31 @@ router.post('/evaluate', async (req: Request, res: Response, next: NextFunction)
     const data = EvaluateRuleSchema.parse(req.body);
     const result = await ruleService.evaluate(tenantId, data.ruleId, data.sampleData);
     sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /rules/:id/devices
+ * List devices associated to a rule via scope_entity_id or scope_entity_ids
+ */
+router.get('/:id/devices', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    const rule = await ruleService.getById(tenantId, id);
+
+    // Collect all device IDs from both scope fields
+    const ids = new Set<string>();
+    if (rule.scope.entityId) ids.add(rule.scope.entityId);
+    if (rule.scope.entityIds) rule.scope.entityIds.forEach(eid => ids.add(eid));
+
+    const deviceRepo = new DeviceRepository();
+    const items = await deviceRepo.listByIds(tenantId, [...ids]);
+
+    sendSuccess(res, { items, count: items.length }, 200, requestId);
   } catch (err) {
     next(err);
   }

@@ -1,4 +1,4 @@
-import { eq, and, sql, lt, isNotNull } from 'drizzle-orm';
+import { eq, and, sql, lt, isNotNull, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Device, ConnectivityStatus, createDefaultDeviceSpecs, createDefaultTelemetryConfig } from '../domain/entities/Device';
 import { CreateDeviceDTO, UpdateDeviceDTO, ListDevicesParams } from '../dto/request/DeviceDTO';
@@ -446,6 +446,16 @@ export class DeviceRepository implements IDeviceRepository {
         nextCursor: hasMore ? String(offset + limit) : undefined,
       },
     };
+  }
+
+  async listByIds(tenantId: string, ids: string[]): Promise<Device[]> {
+    if (ids.length === 0) return [];
+    const results = await db
+      .select()
+      .from(devices)
+      .where(and(eq(devices.tenantId, tenantId), inArray(devices.id, ids)))
+      .orderBy(devices.name);
+    return results.map(this.mapToEntity);
   }
 
   async findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null> {
