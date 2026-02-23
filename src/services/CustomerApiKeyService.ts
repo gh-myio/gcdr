@@ -16,8 +16,8 @@ import { CreateCustomerApiKeyDTO, UpdateCustomerApiKeyDTO } from '../dto/request
 import { NotFoundError, UnauthorizedError } from '../shared/errors/AppError';
 import { PaginatedResult, PaginationParams } from '../shared/types';
 
-// Key format: gcdr_cust_<32 random chars>
-const KEY_PREFIX = 'gcdr_cust_';
+// Key format: gcdr_<type>_<value>  e.g. gcdr_cust_xxx, gcdr_alarm_xxx, gcdr_dim_xxx
+const KEY_PREFIX = 'gcdr_';
 const KEY_RANDOM_LENGTH = 32;
 
 export class CustomerApiKeyService {
