@@ -1659,7 +1659,14 @@ components:
           enum: [GLOBAL, CUSTOMER, ASSET, DEVICE]
         entityId:
           type: string
-          description: Required for non-GLOBAL scope types
+          format: uuid
+          description: Single entity for CUSTOMER, ASSET or single DEVICE scope
+        entityIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Multiple device IDs — used when one rule applies to many devices (scope_type = DEVICE)
         inherited:
           type: boolean
           description: If true, rule applies to all children of the entity
@@ -4131,6 +4138,89 @@ paths:
                             items:
                               $ref: '#/components/schemas/Customer'
 
+  /customers/external/{externalId}:
+    get:
+      tags: [Customers]
+      summary: Get customer by ThingsBoard externalId (enriched)
+      operationId: getCustomerByExternalId
+      description: |
+        Fetches a customer by its ThingsBoard UUID (`externalId`).
+        Supports optional deep enrichment with assets, devices and applicable rules.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: externalId
+          in: path
+          required: true
+          description: ThingsBoard entity UUID stored in customers.external_id
+          schema:
+            type: string
+            format: uuid
+        - name: deep
+          in: query
+          description: Include assets and devices (default 0)
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+        - name: allRules
+          in: query
+          description: Attach applicable rules (DEVICE + ASSET + CUSTOMER scope) to each device and return a unified rules dict (default 0)
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+        - name: filterOnlyDevicesWithRules
+          in: query
+          description: Exclude devices that have no applicable rules (default 0)
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        '200':
+          description: |
+            When deep=0: returns the Customer object directly.
+            When deep=1: returns EnrichedCustomer with customer, assets, devices (and rules when allRules=1).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/Customer'
+                          - type: object
+                            properties:
+                              customer:
+                                $ref: '#/components/schemas/Customer'
+                              assets:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/Asset'
+                              devices:
+                                type: array
+                                items:
+                                  allOf:
+                                    - $ref: '#/components/schemas/Device'
+                                    - properties:
+                                        ruleIds:
+                                          type: array
+                                          items:
+                                            type: string
+                                            format: uuid
+                              rules:
+                                type: object
+                                additionalProperties:
+                                  $ref: '#/components/schemas/RuleMeta'
+                                description: Unified rules dictionary keyed by rule ID (present when allRules=1)
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /customers/{id}:
     get:
       tags: [Customers]
@@ -5475,6 +5565,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedResponse'
+
+  /devices/external/{externalId}:
+    get:
+      tags: [Devices]
+      summary: Get device by ThingsBoard externalId (enriched)
+      operationId: getDeviceByExternalId
+      description: |
+        Fetches a device by its ThingsBoard UUID (`externalId`) and returns an enriched
+        payload including the parent asset, customer, and DEVICE-scoped rules.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: externalId
+          in: path
+          required: true
+          description: ThingsBoard entity UUID stored in devices.external_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Enriched device payload
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          device:
+                            $ref: '#/components/schemas/Device'
+                          asset:
+                            $ref: '#/components/schemas/Asset'
+                          customer:
+                            $ref: '#/components/schemas/Customer'
+                          rules:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Rule'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /customers/{customerId}/devices:
+    get:
+      tags: [Devices]
+      summary: List devices by customer
+      operationId: listDevicesByCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of devices for the customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /devices/{id}:
     get:

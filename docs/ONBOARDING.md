@@ -1743,6 +1743,34 @@ Use este checklist para acompanhar seu progresso:
 
 ## Changelog
 
+### 2026-02-22
+
+**ExternalId lookup endpoints (ThingsBoard integration)**
+- `GET /customers/external/:externalId` — busca customer por TB UUID com enrichment opcional
+  - `?deep=1` inclui assets e devices (assets sem devices são filtrados automaticamente)
+  - `?allRules=1` anexa `ruleIds` a cada device e retorna dict `rules` com meta (DEVICE+ASSET+CUSTOMER scope)
+  - `?filterOnlyDevicesWithRules=1` exclui devices sem rules aplicáveis
+- `GET /devices/external/:externalId` — busca device por TB UUID com asset, customer e rules DEVICE-scoped
+- `GET /customers/:customerId/devices` — lista devices de um customer
+- Coluna `external_id` adicionada à tabela `customers` (migration `0006_melodic_satana.sql`)
+- RFC-0017 criado documentando os endpoints
+
+**Rules: suporte a múltiplos devices por rule (`scope_entity_ids`)**
+- Nova coluna `scope_entity_ids uuid[]` na tabela `rules` (migration `0007_graceful_firelord.sql`)
+- `RuleScope.entityIds?: string[]` adicionado à entidade TypeScript
+- `RuleRepository.getByScope` agora faz match em `scope_entity_id = X OR scope_entity_ids @> ARRAY[X]`
+- Check constraint `valid_scope_entity` atualizado para aceitar `scope_entity_ids` como alternativa
+- Permite mapear uma única rule a N devices sem replicar o registro
+
+**Scripts operacionais (scripts/db/ops/)**
+- `moxuara-asset-central-setup.sql` — cria asset `Central_Asset_Moxuara`
+- `moxuara-central-insert.sql` — insere central `SCMXGATEWAY01` (GATEWAY) para Moxuara
+- `moxuara-elevator-rules.sql` — referência para mapear devices elevador via `scope_entity_ids`
+
+**OpenAPI / Swagger**
+- Novos endpoints: `/customers/external/{externalId}`, `/devices/external/{externalId}`, `/customers/{customerId}/devices`
+- `RuleScope` atualizado com campo `entityIds` (array de UUIDs)
+
 ### 2026-02-20
 
 **Decision Engine Guard Configs**
