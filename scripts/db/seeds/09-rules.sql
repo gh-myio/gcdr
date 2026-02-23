@@ -1088,7 +1088,33 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 50 rules (25 ACME + 25 Dimension)';
+    -- ==========================================================================
+    -- ELEVATOR OFFLINE - Frozen Power (all days)
+    -- operator: UNCHANGED — triggers when metric value stays exactly the same
+    -- for the full duration window (requires UNCHANGED support in alarms-backend)
+    -- ==========================================================================
+    -- Duration: 12h 21min = 44460000 ms
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    VALUES (
+        'bbbb0001-0001-0001-0001-000000000026',
+        v_tenant_id,
+        v_dimension_id,
+        'Elevador OFFLINE - Potência Congelada - Todos os dias',
+        'Alerta quando a potência do elevador permanece exatamente igual por 12h21min — indica sensor congelado ou elevador offline',
+        'ALARM_THRESHOLD',
+        'HIGH',
+        'DEVICE',
+        '22220001-0001-0001-0001-000000000005', -- 3F Geral (template device)
+        false,
+        '{"metric": "power", "operator": "UNCHANGED", "value": 0, "duration": 44460000, "aggregation": "LAST", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
+        '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
+        '["elevator", "power", "frozen", "offline", "unchanged"]',
+        'ACTIVE',
+        true,
+        1
+    );
+
+    RAISE NOTICE 'Inserted 51 rules (25 ACME + 26 Dimension)';
 END $$;
 
 -- Verify
