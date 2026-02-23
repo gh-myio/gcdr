@@ -968,26 +968,32 @@ function getHtmlPage(): string {
       cursor: pointer;
       padding: 2px 6px;
       background: var(--bg-tertiary);
+      border: 1px solid var(--border);
       border-radius: 4px;
       font-family: monospace;
       font-size: 0.8rem;
       display: inline-block;
-      max-width: 200px;
+      max-width: 240px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       vertical-align: middle;
       transition: all 0.2s;
+      color: var(--primary);
+      text-decoration: underline dotted;
     }
 
     .json-value:hover {
       background: var(--primary);
       color: white;
+      border-color: var(--primary);
+      text-decoration: none;
     }
 
     .json-value::after {
-      content: ' 👁';
+      content: ' ↗';
       font-size: 0.7rem;
+      opacity: 0.7;
     }
 
     /* Modal */
@@ -1936,13 +1942,16 @@ function getHtmlPage(): string {
       if (val === null) return '<span style="color: var(--text-secondary);">NULL</span>';
       if (typeof val === 'object') {
         const json = JSON.stringify(val, null, 2);
-        const preview = JSON.stringify(val).substring(0, 40);
+        const flat = JSON.stringify(val);
+        const preview = flat.substring(0, 40);
         const escaped = json.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
-        return \`<span class="json-value" onclick="showModal('JSON Data', '\${escaped}')">\${preview}\${preview.length >= 40 ? '...' : ''}</span>\`;
+        const titleAttr = flat.replace(/"/g, '&quot;');
+        return \`<span class="json-value" title="\${titleAttr}" onclick="showModal('JSON Data', '\${escaped}')">\${preview}\${flat.length > 40 ? '...' : ''}</span>\`;
       }
       if (typeof val === 'string' && val.length > 50) {
         const escaped = val.replace(/'/g, "\\\\'").replace(/"/g, '&quot;').replace(/\\n/g, '\\\\n');
-        return \`<span class="json-value" onclick="showModal('Text Data', '\${escaped}')">\${val.substring(0, 40)}...</span>\`;
+        const titleAttr = val.replace(/"/g, '&quot;');
+        return \`<span class="json-value" title="\${titleAttr}" onclick="showModal('Text Data', '\${escaped}')">\${val.substring(0, 40)}...</span>\`;
       }
       return String(val);
     }

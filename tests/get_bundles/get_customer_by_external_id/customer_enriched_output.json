@@ -247,7 +247,10 @@
         "updatedAt": "2026-02-20T11:49:16.906Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["b2253cb8-2f86-42b2-b961-6054ae5e45c5"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "cb29bc74-6531-460c-abca-98c678112388",
@@ -280,7 +283,10 @@
         "updatedAt": "2026-02-20T11:49:17.357Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["8970f1cc-e1aa-4764-90ef-6de38f7f1857"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "e9dce3c5-efa0-4df3-8352-8d09e60a1ea7",
@@ -313,7 +319,10 @@
         "updatedAt": "2026-02-20T11:49:17.854Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["626cbe84-8ddb-45c0-ac57-762933377c84"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "f3d80c84-c2b0-4325-b73a-d48d2f8f8c0f",
@@ -346,7 +355,10 @@
         "updatedAt": "2026-02-20T11:49:18.451Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["8f7db0cc-85cd-4eba-8174-d965ff32ae20"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "7e3aaf6a-31e7-4c45-a70d-f978bcfe0a46",
@@ -379,7 +391,10 @@
         "updatedAt": "2026-02-20T11:49:18.996Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["b6b383a3-0228-4db9-b405-08d7c1f709dc"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "463a38ed-e5b3-4aac-a4d0-f86a35cfbb77",
@@ -412,7 +427,10 @@
         "updatedAt": "2026-02-20T11:49:19.444Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["deca7767-9dbc-41ff-9dda-0b6e230fbc00"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       },
       {
         "id": "9264f262-6b5c-4f7e-ac12-5760fc225e33",
@@ -445,22 +463,34 @@
         "updatedAt": "2026-02-20T11:49:19.909Z",
         "createdBy": "cee00001-0001-0001-0001-000000000009",
         "version": 1,
-        "ruleIds": ["d1a2d7e3-8f7c-444a-99ae-c87dd262564e"]
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000023",
+          "bbbb0001-0001-0001-0001-000000000024"
+        ]
       }
     ],
     "rules": {
-      "b2253cb8-2f86-42b2-b961-6054ae5e45c5": {
-        "id": "b2253cb8-2f86-42b2-b961-6054ae5e45c5",
+      "bbbb0001-0001-0001-0001-000000000023": {
+        "id": "bbbb0001-0001-0001-0001-000000000023",
         "name": "Elevador energizado e não usado (seg-sáb)",
         "scope": {
           "type": "DEVICE",
-          "entityId": "a83ebc33-25ac-4792-99ca-08a2cc86aff1",
+          "entityId": "22220001-0001-0001-0001-000000000005",
+          "entityIds": [
+            "9264f262-6b5c-4f7e-ac12-5760fc225e33",
+            "7e3aaf6a-31e7-4c45-a70d-f978bcfe0a46",
+            "cb29bc74-6531-460c-abca-98c678112388",
+            "a83ebc33-25ac-4792-99ca-08a2cc86aff1",
+            "463a38ed-e5b3-4aac-a4d0-f86a35cfbb77",
+            "e9dce3c5-efa0-4df3-8352-8d09e60a1ea7",
+            "f3d80c84-c2b0-4325-b73a-d48d2f8f8c0f"
+          ],
           "inherited": false
         },
         "metric": "energy",
         "operator": "LT",
-        "value": 210,
-        "duration": 960000,
+        "value": 110,
+        "duration": 1200000,
         "aggregation": "MAX",
         "startAt": "10:00",
         "endAt": "22:00",
@@ -475,166 +505,45 @@
         },
         "keyMulti": 1
       },
-      "8970f1cc-e1aa-4764-90ef-6de38f7f1857": {
-        "id": "8970f1cc-e1aa-4764-90ef-6de38f7f1857",
-        "name": "Elevador energizado e não usado (seg-sáb)",
+      "bbbb0001-0001-0001-0001-000000000024": {
+        "id": "bbbb0001-0001-0001-0001-000000000024",
+        "name": "Elevador energizado e não usado (domingo)",
         "scope": {
           "type": "DEVICE",
-          "entityId": "cb29bc74-6531-460c-abca-98c678112388",
+          "entityId": "22220001-0001-0001-0001-000000000005",
+          "entityIds": [
+            "9264f262-6b5c-4f7e-ac12-5760fc225e33",
+            "7e3aaf6a-31e7-4c45-a70d-f978bcfe0a46",
+            "cb29bc74-6531-460c-abca-98c678112388",
+            "a83ebc33-25ac-4792-99ca-08a2cc86aff1",
+            "463a38ed-e5b3-4aac-a4d0-f86a35cfbb77",
+            "e9dce3c5-efa0-4df3-8352-8d09e60a1ea7",
+            "f3d80c84-c2b0-4325-b73a-d48d2f8f8c0f"
+          ],
           "inherited": false
         },
         "metric": "energy",
         "operator": "LT",
-        "value": 210,
-        "duration": 960000,
+        "value": 110,
+        "duration": 1200000,
         "aggregation": "MAX",
-        "startAt": "10:00",
+        "startAt": "12:00",
         "endAt": "22:00",
         "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
-        },
-        "keyMulti": 1
-      },
-      "626cbe84-8ddb-45c0-ac57-762933377c84": {
-        "id": "626cbe84-8ddb-45c0-ac57-762933377c84",
-        "name": "Elevador energizado e não usado (seg-sáb)",
-        "scope": {
-          "type": "DEVICE",
-          "entityId": "e9dce3c5-efa0-4df3-8352-8d09e60a1ea7",
-          "inherited": false
-        },
-        "metric": "energy",
-        "operator": "LT",
-        "value": 210,
-        "duration": 960000,
-        "aggregation": "MAX",
-        "startAt": "10:00",
-        "endAt": "22:00",
-        "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
-        },
-        "keyMulti": 1
-      },
-      "8f7db0cc-85cd-4eba-8174-d965ff32ae20": {
-        "id": "8f7db0cc-85cd-4eba-8174-d965ff32ae20",
-        "name": "Elevador energizado e não usado (seg-sáb)",
-        "scope": {
-          "type": "DEVICE",
-          "entityId": "f3d80c84-c2b0-4325-b73a-d48d2f8f8c0f",
-          "inherited": false
-        },
-        "metric": "energy",
-        "operator": "LT",
-        "value": 210,
-        "duration": 960000,
-        "aggregation": "MAX",
-        "startAt": "10:00",
-        "endAt": "22:00",
-        "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
-        },
-        "keyMulti": 1
-      },
-      "b6b383a3-0228-4db9-b405-08d7c1f709dc": {
-        "id": "b6b383a3-0228-4db9-b405-08d7c1f709dc",
-        "name": "Elevador energizado e não usado (seg-sáb)",
-        "scope": {
-          "type": "DEVICE",
-          "entityId": "7e3aaf6a-31e7-4c45-a70d-f978bcfe0a46",
-          "inherited": false
-        },
-        "metric": "energy",
-        "operator": "LT",
-        "value": 210,
-        "duration": 960000,
-        "aggregation": "MAX",
-        "startAt": "10:00",
-        "endAt": "22:00",
-        "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
-        },
-        "keyMulti": 1
-      },
-      "deca7767-9dbc-41ff-9dda-0b6e230fbc00": {
-        "id": "deca7767-9dbc-41ff-9dda-0b6e230fbc00",
-        "name": "Elevador energizado e não usado (seg-sáb)",
-        "scope": {
-          "type": "DEVICE",
-          "entityId": "463a38ed-e5b3-4aac-a4d0-f86a35cfbb77",
-          "inherited": false
-        },
-        "metric": "energy",
-        "operator": "LT",
-        "value": 210,
-        "duration": 960000,
-        "aggregation": "MAX",
-        "startAt": "10:00",
-        "endAt": "22:00",
-        "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
-        },
-        "keyMulti": 1
-      },
-      "d1a2d7e3-8f7c-444a-99ae-c87dd262564e": {
-        "id": "d1a2d7e3-8f7c-444a-99ae-c87dd262564e",
-        "name": "Elevador energizado e não usado (seg-sáb)",
-        "scope": {
-          "type": "DEVICE",
-          "entityId": "9264f262-6b5c-4f7e-ac12-5760fc225e33",
-          "inherited": false
-        },
-        "metric": "energy",
-        "operator": "LT",
-        "value": 210,
-        "duration": 960000,
-        "aggregation": "MAX",
-        "startAt": "10:00",
-        "endAt": "22:00",
-        "daysOfWeek": {
-          "0": false,
-          "1": true,
-          "2": true,
-          "3": true,
-          "4": true,
-          "5": true,
-          "6": true
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
         },
         "keyMulti": 1
       }
     }
   },
   "meta": {
-    "requestId": "20590db1-d4bc-4718-908f-5d88551a6131",
-    "timestamp": "2026-02-22T02:51:36.959Z"
+    "requestId": "fcb79c5a-cca4-468c-94af-78f00e607ab1",
+    "timestamp": "2026-02-22T05:36:40.893Z"
   }
 }
