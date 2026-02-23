@@ -140,7 +140,7 @@ apiV1Router.use('/auth', authController);
 // to ensure proper route matching (more specific routes first)
 
 // Bundle Cache Invalidation (must come before /bundle routes)
-apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', authMiddleware, invalidateAlarmBundleCacheHandler);
+apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware('bundles:read'), invalidateAlarmBundleCacheHandler);
 
 // Bundle Versions (must come before /bundle/simple and /bundle)
 apiV1Router.get('/customers/:customerId/alarm-rules/bundle/versions', hybridAuthMiddleware('bundles:read'), getAlarmBundleVersionsHandler);
