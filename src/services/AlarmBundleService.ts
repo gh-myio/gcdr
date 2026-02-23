@@ -322,6 +322,9 @@ export class AlarmBundleService {
 
       // Note: centralId is now passed via X-Central-Id header (filters devices)
       // Note: channels are included in rule entries with channelId when applicable
+      // Only include devices that have at least one applicable rule
+      if (applicableRuleIds.length === 0) continue;
+
       const mapping: SimpleDeviceMapping = {
         deviceName: device.name,
         slaveId: device.slaveId,
