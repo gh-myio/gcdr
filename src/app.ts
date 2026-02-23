@@ -205,8 +205,8 @@ apiV1Router.use('/roles', authMiddleware, rolesController);
 // Authorization
 apiV1Router.use('/authorization', authMiddleware, authorizationController);
 
-// Rules
-apiV1Router.use('/rules', authMiddleware, rulesController);
+// Rules (hybridAuth: API keys with bundles:read can read rules for alarm resolution)
+apiV1Router.use('/rules', hybridAuthMiddleware('bundles:read'), rulesController);
 
 // Integrations
 apiV1Router.use('/integrations', authMiddleware, integrationsController);
