@@ -157,6 +157,10 @@ export class AssetRepository implements IAssetRepository {
       conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
+    if (params?.search) {
+      conditions.push(sql`(${assets.name} ILIKE ${`%${params.search}%`} OR ${assets.displayName} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(assets)
@@ -197,6 +201,10 @@ export class AssetRepository implements IAssetRepository {
 
     if (params?.status) {
       conditions.push(eq(assets.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
+    }
+
+    if (params?.search) {
+      conditions.push(sql`(${assets.name} ILIKE ${`%${params.search}%`} OR ${assets.displayName} ILIKE ${`%${params.search}%`})`);
     }
 
     const [results, total] = await Promise.all([

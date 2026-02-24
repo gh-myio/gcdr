@@ -169,6 +169,10 @@ export class RuleRepository implements IRuleRepository {
       conditions.push(eq(rules.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
 
+    if (params.search) {
+      conditions.push(sql`(${rules.name} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(rules)

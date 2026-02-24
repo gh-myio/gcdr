@@ -194,6 +194,7 @@ export const ListRulesParamsSchema = z.object({
   customerId: z.string().optional(),
   enabled: z.coerce.boolean().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
+  search: z.string().optional(),
 });
 
 export type ListRulesParams = z.infer<typeof ListRulesParamsSchema>;

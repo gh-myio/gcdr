@@ -157,6 +157,10 @@ export class PartnerRepository implements IPartnerRepository {
       conditions.push(eq(partners.status, params.status));
     }
 
+    if (params.search) {
+      conditions.push(sql`(${partners.companyName} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(partners)
