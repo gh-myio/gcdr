@@ -718,7 +718,11 @@ export class AlarmBundleService {
    * Format: v1-<12-char hex hash> (e.g., v1-a1b2c3d4e5f6)
    */
   private calculateVersionHash(content: object): string {
-    const serialized = JSON.stringify(content, Object.keys(content).sort());
+    const serialized = JSON.stringify(content, (_key, value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).sort())
+        : value
+    );
     const hash = crypto.createHash('sha256').update(serialized).digest('hex').substring(0, 12);
     return `v1-${hash}`;
   }
