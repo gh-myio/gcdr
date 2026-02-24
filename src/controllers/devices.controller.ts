@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { deviceService } from '../services/DeviceService';
+import { RuleRepository } from '../repositories/RuleRepository';
 import {
   CreateDeviceSchema,
   UpdateDeviceSchema,
@@ -122,6 +123,30 @@ router.get('/external/:externalId', async (req: Request, res: Response, next: Ne
     };
 
     sendSuccess(res, payload, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /devices/:id/rules
+ * List rules applicable to a device (GLOBAL + CUSTOMER + ASSET + DEVICE scope)
+ */
+router.get('/:id/rules', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    const device = await deviceService.getById(tenantId, id);
+    const ruleRepo = new RuleRepository();
+    const items = await ruleRepo.getApplicableForDevice(
+      tenantId,
+      device.id,
+      device.customerId,
+      device.assetId
+    );
+
+    sendSuccess(res, { items, count: items.length }, 200, requestId);
   } catch (err) {
     next(err);
   }

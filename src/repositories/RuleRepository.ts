@@ -253,6 +253,38 @@ export class RuleRepository implements IRuleRepository {
     return results.map(this.mapToEntity);
   }
 
+  async getApplicableForDevice(
+    tenantId: string,
+    deviceId: string,
+    customerId: string,
+    assetId?: string
+  ): Promise<Rule[]> {
+    const assetCondition = assetId
+      ? sql`(${rules.scopeType} = 'ASSET' AND ${rules.scopeEntityId} = ${assetId})`
+      : sql`FALSE`;
+
+    const results = await db
+      .select()
+      .from(rules)
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.customerId, customerId),
+        eq(rules.enabled, true),
+        sql`(
+          ${rules.scopeType} = 'GLOBAL'
+          OR (${rules.scopeType} = 'CUSTOMER' AND ${rules.scopeEntityId} = ${customerId})
+          OR ${assetCondition}
+          OR (${rules.scopeType} = 'DEVICE' AND (
+            ${rules.scopeEntityId} = ${deviceId}
+            OR ${rules.scopeEntityIds} @> ARRAY[${deviceId}::uuid]
+          ))
+        )`
+      ))
+      .orderBy(rules.priority);
+
+    return results.map(this.mapToEntity);
+  }
+
   async getByScope(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]> {
     const results = await db
       .select()
