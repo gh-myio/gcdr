@@ -45,7 +45,7 @@ router.post('/',
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { limit, cursor, type, status, parentCustomerId } = req.query;
+    const { limit, cursor, type, status, parentCustomerId, search } = req.query;
 
     const params: ListCustomersParams = {
       limit: limit ? parseInt(limit as string, 10) : 20,
@@ -53,6 +53,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       type: type as CustomerType | undefined,
       status: status as 'ACTIVE' | 'INACTIVE' | undefined,
       parentCustomerId: parentCustomerId === 'null' ? null : (parentCustomerId as string | undefined),
+      search: search as string | undefined,
     };
 
     const result = await customerService.list(tenantId, params);

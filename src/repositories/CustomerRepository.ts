@@ -202,6 +202,10 @@ export class CustomerRepository implements ICustomerRepository {
       }
     }
 
+    if (params.search) {
+      conditions.push(sql`(${customers.name} ILIKE ${`%${params.search}%`} OR ${customers.displayName} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(customers)

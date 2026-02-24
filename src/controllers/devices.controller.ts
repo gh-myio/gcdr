@@ -49,7 +49,20 @@ router.post('/',
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { assetId, customerId, type, status, connectivityStatus, centralId, slaveId, limit, cursor } = req.query;
+    const {
+      assetId, customerId, type, status, connectivityStatus,
+      centralId, slaveId,
+      search, name,
+      limit, cursor, page, pageSize,
+    } = req.query;
+
+    const resolvedLimit = pageSize
+      ? parseInt(pageSize as string, 10)
+      : limit ? parseInt(limit as string, 10) : 20;
+
+    const resolvedCursor = page
+      ? String((parseInt(page as string, 10) - 1) * resolvedLimit)
+      : cursor as string | undefined;
 
     const params: ListDevicesParams = {
       assetId: assetId as string | undefined,
@@ -59,8 +72,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       connectivityStatus: connectivityStatus as string | undefined,
       centralId: centralId as string | undefined,
       slaveId: slaveId ? parseInt(slaveId as string, 10) : undefined,
-      limit: limit ? parseInt(limit as string, 10) : undefined,
-      cursor: cursor as string | undefined,
+      search: (search || name) as string | undefined,
+      limit: resolvedLimit,
+      cursor: resolvedCursor,
     };
 
     const result = await deviceService.list(tenantId, params);

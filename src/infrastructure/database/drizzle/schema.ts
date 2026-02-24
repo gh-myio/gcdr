@@ -302,6 +302,7 @@ export const devices = pgTable('devices', {
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
   displayName: varchar('display_name', { length: 255 }).notNull(),
+  code: varchar('code', { length: 50 }),
   label: varchar('label', { length: 100 }),
   type: deviceTypeEnum('type').notNull(),
   description: text('description'),

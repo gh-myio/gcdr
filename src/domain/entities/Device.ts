@@ -103,6 +103,7 @@ export interface Device extends BaseEntity {
   // Basic Info
   name: string;
   displayName: string;
+  code?: string;
   label?: string;
   type: DeviceType;
   description?: string;
@@ -113,6 +114,11 @@ export interface Device extends BaseEntity {
 
   // Specifications
   specs: DeviceSpecs;
+
+  // Top-level convenience aliases (read from specs)
+  manufacturer?: string;
+  model?: string;
+  firmwareVersion?: string;
 
   // Connectivity
   connectivityStatus: ConnectivityStatus;

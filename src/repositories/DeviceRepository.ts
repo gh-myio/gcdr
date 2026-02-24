@@ -24,12 +24,18 @@ export class DeviceRepository implements IDeviceRepository {
       customerId,
       name: data.name,
       displayName: data.displayName || data.name,
+      code: data.code,
       label: data.label,
       type: data.type,
       description: data.description,
       serialNumber: data.serialNumber || `AUTO-${id.substring(0, 8)}`,
       externalId: data.externalId,
-      specs: data.specs || createDefaultDeviceSpecs(data.serialNumber || `AUTO-${id.substring(0, 8)}`),
+      specs: {
+        ...(data.specs || createDefaultDeviceSpecs(data.serialNumber || `AUTO-${id.substring(0, 8)}`)),
+        ...(data.manufacturer !== undefined && { manufacturer: data.manufacturer }),
+        ...(data.model !== undefined && { model: data.model }),
+        ...(data.firmwareVersion !== undefined && { firmwareVersion: data.firmwareVersion }),
+      },
       connectivityStatus: 'UNKNOWN',
       credentials: data.credentials || {},
       telemetryConfig: data.telemetryConfig || createDefaultTelemetryConfig(),
@@ -105,11 +111,19 @@ export class DeviceRepository implements IDeviceRepository {
     // Only update fields that are provided
     if (data.name !== undefined) updateData.name = data.name;
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.code !== undefined) updateData.code = data.code;
     if (data.label !== undefined) updateData.label = data.label;
     if (data.type !== undefined) updateData.type = data.type;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.externalId !== undefined) updateData.externalId = data.externalId;
-    if (data.specs !== undefined) updateData.specs = { ...existing.specs, ...data.specs };
+    const specsOverride: Record<string, unknown> = {};
+    if (data.manufacturer !== undefined) specsOverride.manufacturer = data.manufacturer;
+    if (data.model !== undefined) specsOverride.model = data.model;
+    if (data.firmwareVersion !== undefined) specsOverride.firmwareVersion = data.firmwareVersion;
+
+    if (data.specs !== undefined || Object.keys(specsOverride).length > 0) {
+      updateData.specs = { ...existing.specs, ...(data.specs || {}), ...specsOverride };
+    }
     if (data.credentials !== undefined) updateData.credentials = data.credentials;
     if (data.telemetryConfig !== undefined) updateData.telemetryConfig = { ...existing.telemetryConfig, ...data.telemetryConfig };
     if (data.tags !== undefined) updateData.tags = data.tags;
@@ -180,6 +194,10 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.slaveId, params.slaveId));
     }
 
+    if (params?.search) {
+      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(devices)
@@ -226,6 +244,10 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
     }
 
+    if (params?.search) {
+      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
+    }
+
     const [results, total] = await Promise.all([
       db.select()
         .from(devices)
@@ -270,6 +292,10 @@ export class DeviceRepository implements IDeviceRepository {
 
     if (params?.connectivityStatus) {
       conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
+    }
+
+    if (params?.search) {
+      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
     }
 
     const [results, total] = await Promise.all([
@@ -373,6 +399,7 @@ export class DeviceRepository implements IDeviceRepository {
       customerId: row.customerId,
       name: row.name,
       displayName: row.displayName,
+      code: row.code || undefined,
       label: row.label || undefined,
       type: row.type,
       description: row.description || undefined,

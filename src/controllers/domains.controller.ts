@@ -239,12 +239,26 @@ const PRIORITY_DEFINITIONS: PriorityDefinition[] = [
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
+    const { search } = req.query;
+
+    let metrics = METRIC_DEFINITIONS;
+    let operators = OPERATOR_DEFINITIONS;
+    let aggregations = AGGREGATION_DEFINITIONS;
+    let priorities = PRIORITY_DEFINITIONS;
+
+    if (search) {
+      const s = (search as string).toLowerCase();
+      metrics = metrics.filter(m => m.name.toLowerCase().includes(s));
+      operators = operators.filter(o => o.name.toLowerCase().includes(s));
+      aggregations = aggregations.filter(a => a.name.toLowerCase().includes(s));
+      priorities = priorities.filter(p => p.name.toLowerCase().includes(s));
+    }
 
     sendSuccess(res, {
-      metrics: METRIC_DEFINITIONS,
-      operators: OPERATOR_DEFINITIONS,
-      aggregations: AGGREGATION_DEFINITIONS,
-      priorities: PRIORITY_DEFINITIONS,
+      metrics,
+      operators,
+      aggregations,
+      priorities,
     }, 200, requestId);
   } catch (err) {
     next(err);
@@ -258,12 +272,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/metrics', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
-    const { category } = req.query;
+    const { category, search } = req.query;
 
     let metrics = METRIC_DEFINITIONS;
 
     if (category === 'continuous' || category === 'discrete') {
       metrics = metrics.filter(m => m.category === category);
+    }
+
+    if (search) {
+      const s = (search as string).toLowerCase();
+      metrics = metrics.filter(m => m.name.toLowerCase().includes(s));
     }
 
     sendSuccess(res, metrics, 200, requestId);
@@ -311,7 +330,15 @@ router.get('/metrics/:id', async (req: Request, res: Response, next: NextFunctio
 router.get('/operators', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
-    sendSuccess(res, OPERATOR_DEFINITIONS, 200, requestId);
+    const { search } = req.query;
+
+    let operators = OPERATOR_DEFINITIONS;
+    if (search) {
+      const s = (search as string).toLowerCase();
+      operators = operators.filter(o => o.name.toLowerCase().includes(s));
+    }
+
+    sendSuccess(res, operators, 200, requestId);
   } catch (err) {
     next(err);
   }
@@ -324,7 +351,15 @@ router.get('/operators', async (req: Request, res: Response, next: NextFunction)
 router.get('/aggregations', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
-    sendSuccess(res, AGGREGATION_DEFINITIONS, 200, requestId);
+    const { search } = req.query;
+
+    let aggregations = AGGREGATION_DEFINITIONS;
+    if (search) {
+      const s = (search as string).toLowerCase();
+      aggregations = aggregations.filter(a => a.name.toLowerCase().includes(s));
+    }
+
+    sendSuccess(res, aggregations, 200, requestId);
   } catch (err) {
     next(err);
   }
@@ -337,7 +372,15 @@ router.get('/aggregations', async (req: Request, res: Response, next: NextFuncti
 router.get('/priorities', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
-    sendSuccess(res, PRIORITY_DEFINITIONS, 200, requestId);
+    const { search } = req.query;
+
+    let priorities = PRIORITY_DEFINITIONS;
+    if (search) {
+      const s = (search as string).toLowerCase();
+      priorities = priorities.filter(p => p.name.toLowerCase().includes(s));
+    }
+
+    sendSuccess(res, priorities, 200, requestId);
   } catch (err) {
     next(err);
   }

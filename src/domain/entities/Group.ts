@@ -116,6 +116,8 @@ export interface GroupSummary {
   customerId: string;
   name: string;
   displayName: string;
+  description?: string;
+  code?: string;
   type: GroupType;
   purposes: GroupPurpose[];
   memberCount: number;
