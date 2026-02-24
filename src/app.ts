@@ -7,6 +7,7 @@ import {
   contextMiddleware,
   authMiddleware,
   hybridAuthMiddleware,
+  hybridAuthByMethod,
   errorHandler,
   notFoundHandler,
 } from './middleware';
@@ -173,13 +174,13 @@ apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCus
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
-apiV1Router.use('/customers', hybridAuthMiddleware('customers:write'), customersController);
+apiV1Router.use('/customers', hybridAuthByMethod('customers:read', 'customers:write'), customersController);
 
 // Devices (hybridAuth for ThingsBoard integration)
-apiV1Router.use('/devices', hybridAuthMiddleware('devices:write'), devicesController);
+apiV1Router.use('/devices', hybridAuthByMethod('devices:read', 'devices:write'), devicesController);
 
 // Assets (hybridAuth for ThingsBoard integration)
-apiV1Router.use('/assets', hybridAuthMiddleware('assets:write'), assetsController);
+apiV1Router.use('/assets', hybridAuthByMethod('assets:read', 'assets:write'), assetsController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);

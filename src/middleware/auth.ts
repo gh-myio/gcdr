@@ -149,3 +149,16 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope) {
     next(new UnauthorizedError('Token de acesso ou API Key não fornecido'));
   };
 }
+
+/**
+ * Middleware that applies different scopes based on HTTP method.
+ * GET/HEAD/OPTIONS → readScope
+ * POST/PUT/PATCH/DELETE → writeScope
+ */
+export function hybridAuthByMethod(readScope: ApiKeyScope, writeScope: ApiKeyScope) {
+  const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+  return (req: Request, res: Response, next: NextFunction) => {
+    const scope = READ_METHODS.has(req.method) ? readScope : writeScope;
+    return hybridAuthMiddleware(scope)(req, res, next);
+  };
+}
