@@ -221,8 +221,8 @@
         "duration": 600000,
         "hysteresis": 0,
         "aggregation": "AVG",
-        "startAt": "08:00",
-        "endAt": "18:00",
+        "startAt": "10:00",
+        "endAt": "22:00",
         "daysOfWeek": {
           "0": false,
           "1": true,
@@ -230,7 +230,7 @@
           "3": true,
           "4": true,
           "5": true,
-          "6": false
+          "6": true
         }
       },
       "bbbb0001-0001-0001-0001-000000000007": {

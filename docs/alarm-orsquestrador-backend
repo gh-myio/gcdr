@@ -1077,3 +1077,163 @@ O Traefik (que o Dokploy usa) já suporta WebSocket automaticamente desde a v2. 
   │ Código        │ ✅ Pronto                 │
   └───────────────┴───────────────────────────┘
   Pode fazer deploy. Se der erro 101 (Switching Protocols) ou timeout, me avisa que ajustamos.
+
+
+
+----
+
+
+Queries de alarmes trigados de fato                                                                                                                                                                                                                                                                                                                           
+  Todo registro na tabela alarms é um alarme que passou pelos guards e gerou ação OPEN. Eventos suprimidos (dedup, cooldown, etc.) nunca são gravados. Então "trigado de fato" =  
+  qualquer linha da tabela.
+                                                                                                                                                                                    -- Todos os alarmes ativos agora (OPEN + ACK + ESCALATED)                                                                                                                         SELECT                                                                                                                                                                          
+    id,
+    alarm_type,
+    title,
+    severity,
+    state,
+    customer_id,
+    device_id,
+    raised_at,
+    occurrence_count,
+    metadata->>'ruleId'   AS rule_id,
+    metadata->>'ruleName' AS rule_name,
+    metadata->>'value'    AS last_value
+  FROM alarms
+  WHERE state IN ('OPEN', 'ACK', 'ESCALATED')
+  ORDER BY raised_at DESC;
+
+  -- Trigados nas últimas 24h (qualquer estado)
+  SELECT
+    id, alarm_type, title, severity, state,
+    customer_id, device_id, raised_at,
+    metadata->>'value' AS value
+  FROM alarms
+  WHERE raised_at >= NOW() - INTERVAL '24 hours'
+  ORDER BY raised_at DESC;
+
+  -- Por tipo de alarme — quantos de cada
+  SELECT
+    alarm_type,
+    COUNT(*)                                          AS total,
+    COUNT(*) FILTER (WHERE state IN ('OPEN','ACK','ESCALATED')) AS ativos,
+    COUNT(*) FILTER (WHERE state = 'CLOSED')          AS fechados,
+    MAX(raised_at)                                    AS ultimo
+  FROM alarms
+  GROUP BY alarm_type
+  ORDER BY total DESC;
+
+  -- Alarmes que dispararam mais de uma vez (recorrentes)
+  SELECT
+    id, alarm_type, title, device_id,
+    occurrence_count,
+    raised_at,
+    last_updated_at
+  FROM alarms
+  WHERE occurrence_count > 1
+  ORDER BY occurrence_count DESC;
+
+  -- Tudo que chegou da integração Moxuara (customer_id fixo)
+  SELECT
+    id, alarm_type, title, severity, state,
+    device_id, raised_at,
+    metadata->>'ruleName' AS rule_name,
+    metadata->>'value'    AS value
+  FROM alarms
+  WHERE customer_id = '84e0370e-636a-4741-9874-504b5e0b3577'
+  ORDER BY raised_at DESC
+  LIMIT 50;
+
+  ---
+  2 — alarm-events vs alarm-events-dlq
+
+  Central / Verify Worker
+          │
+          │  AlarmCandidateRaised
+          ▼
+  ┌─────────────────────┐
+  │    alarm-events     │  ← fila principal
+  │  (BullMQ queue)     │
+  └──────────┬──────────┘
+             │ consome
+             ▼
+     Orchestrator Worker
+     - valida schema
+     - Decision Engine
+     - Guards (dedup, cooldown…)
+     - grava no PostgreSQL
+             │
+      falhou? retry automático
+      (até 3x, backoff exp.)
+             │
+      ainda falhou?
+             ▼
+  ┌──────────────────────┐
+  │  alarm-events-dlq    │  ← Dead Letter Queue
+  │  (BullMQ queue)      │
+  └──────────────────────┘
+
+  ┌─────────────────┬─────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────┐
+  │                 │                        alarm-events                         │                               alarm-events-dlq                                │
+  ├─────────────────┼─────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ O que contém    │ Eventos aguardando processamento ou sendo processados agora │ Eventos que falharam todas as tentativas de retry                             │
+  ├─────────────────┼─────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ Estado normal   │ Poucos jobs em waiting/active; muitos em completed          │ Deve estar vazia em operação normal                                           │
+  ├─────────────────┼─────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ Quando cresce   │ Sempre que uma central ou o verify envia um candidato       │ Quando o orchestrator tem erro persistente (DB offline, schema inválido, bug) │
+  ├─────────────────┼─────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ Retenção        │ Jobs completed guardados por 7 dias                         │ Jobs guardados indefinidamente até replay ou limpeza manual                   │
+  ├─────────────────┼─────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ Ação necessária │ Nenhuma — processamento automático                          │ Investigar o payload + erro; replay manual pelo Bull Board                    │
+  └─────────────────┴─────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────┘
+
+  Regra prática: se alarm-events-dlq tem itens, algo está quebrado. Ver o erro do job no Bull Board (/admin/bull-board) mostra exatamente qual evento e qual exceção foi lançada. 
+
+✻ Baked for 42s
+
+
+
+---
+
+
+Como o DedupGuard funciona                                                                                                                                                                                                                                                                                                                                        
+  AlarmCandidateRaised chega                                                                                                                                                                │                                                                                                                                                                                 ▼                                                                                                                                                                         DedupGuard.evaluate()                                                                                                                                                               1. dedupKey = tenantId:centralId:deviceId:alarmType:fingerprint                                                                                                               
+    2. alarmRepository.findByDedupKey(dedupKey)  ← consulta PostgreSQL
+    3. existe alarme com state != 'CLOSED'?
+       ├─ SIM → DENY (DUPLICATE) — evento descartado
+       └─ NÃO → ALLOW — segue para o próximo guard
+
+  Ponto chave: o dedup é baseado no banco de dados, não em TTL/Redis. Enquanto o alarme existir com state OPEN, ACK, SNOOZED ou ESCALATED, qualquer novo candidato com o mesmo    
+  fingerprint é suprimido — para sempre, não tem expiração.
+
+  ---
+  Por que o alarme de ontem bloqueia hoje
+
+  fingerprint = "11111111-...:e9dce3c5-...:184:instantaneous_power"
+                                                           ↑
+                                                 SEM DATA AQUI
+
+  Ontem 23:57  →  alarme OPEN  →  dedupKey = hash(fingerprint)
+  Hoje  19:33  →  mesmo fingerprint → findByDedupKey → encontrou OPEN → SUPPRESS
+
+  O fingerprint não tem data, então o alarme de ontem bloqueia hoje, amanhã, e para sempre até alguém fechar.
+
+  ---
+  Fix: adicionar a data ao fingerprint
+
+  A linha 246 do orchestrator.worker.ts:
+
+  // HOJE (sem data — bloqueia entre dias)
+  const fingerprint = `${tenantId}:${centralId}:${deviceId}:${alarmType}`;
+
+  // FIX (com data UTC — reseta a cada dia)
+  const slotDate = (candidate.time ?? new Date().toISOString()).slice(0, 10); // "2026-02-24"
+  const fingerprint = `${tenantId}:${centralId}:${deviceId}:${alarmType}:${slotDate}`;
+
+  Resultado:
+  2026-02-23  →  fingerprint: "...:184:instantaneous_power:2026-02-23"  →  OPEN
+  2026-02-24  →  fingerprint: "...:184:instantaneous_power:2026-02-24"  →  OPEN (novo) ✓
+
+  Cada dia gera um alarme independente. Os anteriores ficam como histórico e podem ser fechados automaticamente ou manualmente.
+
+  Quer que eu aplique o fix?
