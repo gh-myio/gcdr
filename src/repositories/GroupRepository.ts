@@ -127,6 +127,7 @@ export class GroupRepository implements IGroupRepository {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.code !== undefined) updateData.code = data.code;
     if (data.purposes !== undefined) updateData.purposes = data.purposes;
     if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
     if (data.tags !== undefined) updateData.tags = data.tags;
@@ -541,6 +542,8 @@ export class GroupRepository implements IGroupRepository {
       customerId: group.customerId,
       name: group.name,
       displayName: group.displayName,
+      description: group.description,
+      code: group.code,
       type: group.type,
       purposes: group.purposes,
       memberCount: group.memberCount,

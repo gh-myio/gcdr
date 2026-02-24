@@ -101,6 +101,7 @@ export interface ListCustomersParams {
   type?: CustomerType;
   status?: 'ACTIVE' | 'INACTIVE';
   parentCustomerId?: string | null;
+  search?: string;
 }
 
 export interface GetDescendantsParams {

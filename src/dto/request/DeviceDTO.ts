@@ -80,6 +80,7 @@ export const CreateDeviceSchema = z.object({
   assetId: z.string().uuid(),
   name: z.string().min(1).max(255),
   displayName: z.string().max(255).optional(),
+  code: z.string().max(50).optional(),
   label: z.string().max(100).optional(),
   type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'INFRARED', 'OTHER']),
   description: z.string().max(1000).optional(),
@@ -91,6 +92,11 @@ export const CreateDeviceSchema = z.object({
   tags: z.array(z.string().max(50)).max(20).optional(),
   metadata: z.record(z.unknown()).optional(),
   attributes: z.record(z.unknown()).optional(),
+
+  // Top-level aliases for common specs fields (merged into specs on save)
+  manufacturer: z.string().max(200).optional(),
+  model: z.string().max(200).optional(),
+  firmwareVersion: z.string().max(50).optional(),
 
   // RFC-0008: New fields
   slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
@@ -108,6 +114,7 @@ export type CreateDeviceDTO = z.infer<typeof CreateDeviceSchema>;
 export const UpdateDeviceSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   displayName: z.string().max(255).optional(),
+  code: z.string().max(50).optional(),
   label: z.string().max(100).optional(),
   type: z.enum(['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'INFRARED', 'OTHER']).optional(),
   description: z.string().max(1000).optional(),
@@ -119,6 +126,11 @@ export const UpdateDeviceSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   attributes: z.record(z.unknown()).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+
+  // Top-level aliases for common specs fields (merged into specs on save)
+  manufacturer: z.string().max(200).optional(),
+  model: z.string().max(200).optional(),
+  firmwareVersion: z.string().max(50).optional(),
 
   // RFC-0008: New fields
   slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
@@ -154,6 +166,7 @@ export interface ListDevicesParams extends PaginationParams {
   status?: string;
   connectivityStatus?: string;
   serialNumber?: string;
+  search?: string;
 
   // RFC-0008: New filter options
   centralId?: string;

@@ -7,6 +7,7 @@ export interface ListPartnersParams {
   limit?: number;
   cursor?: string;
   status?: PartnerStatus;
+  search?: string;
 }
 
 export interface IPartnerRepository extends IRepository<Partner, RegisterPartnerDTO, UpdatePartnerDTO> {

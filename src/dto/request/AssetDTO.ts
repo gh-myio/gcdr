@@ -78,6 +78,7 @@ export interface ListAssetsParams extends PaginationParams {
   type?: string;
   status?: string;
   includeDescendants?: boolean;
+  search?: string;
 }
 
 // Get Descendants Params

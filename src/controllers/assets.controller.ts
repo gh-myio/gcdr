@@ -43,13 +43,14 @@ router.post('/',
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { customerId, parentAssetId, type, status, limit, cursor } = req.query;
+    const { customerId, parentAssetId, type, status, search, limit, cursor } = req.query;
 
     const params: ListAssetsParams = {
       customerId: customerId as string | undefined,
       parentAssetId: parentAssetId as string | undefined,
       type: type as string | undefined,
       status: status as string | undefined,
+      search: search as string | undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       cursor: cursor as string | undefined,
     };

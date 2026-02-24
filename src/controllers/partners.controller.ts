@@ -47,10 +47,11 @@ router.post('/',
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { status, limit, cursor } = req.query;
+    const { status, search, limit, cursor } = req.query;
 
     const params: ListPartnersParams = {
       status: status as PartnerStatus | undefined,
+      search: search as string | undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       cursor: cursor as string | undefined,
     };
