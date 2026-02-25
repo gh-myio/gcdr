@@ -163,7 +163,7 @@ apiV1Router.get('/customers/:customerId/users', authMiddleware, usersListByCusto
 apiV1Router.get('/customers/:customerId/devices', authMiddleware, devicesListByCustomerHandler);
 
 // Customer Rules (nested route)
-apiV1Router.get('/customers/:customerId/rules', authMiddleware, rulesListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/rules', hybridAuthMiddleware('customers:read'), rulesListByCustomerHandler);
 
 // Customer Centrals (nested route)
 apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
