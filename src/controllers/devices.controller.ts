@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { deviceService } from '../services/DeviceService';
-import { RuleRepository } from '../repositories/RuleRepository';
+import { ruleService } from '../services/RuleService';
 import {
   CreateDeviceSchema,
   UpdateDeviceSchema,
@@ -152,8 +152,7 @@ router.get('/:id/rules', async (req: Request, res: Response, next: NextFunction)
     const { id } = req.params;
 
     const device = await deviceService.getById(tenantId, id);
-    const ruleRepo = new RuleRepository();
-    const items = await ruleRepo.getApplicableForDevice(
+    const items = await ruleService.getApplicableForDevice(
       tenantId,
       device.id,
       device.customerId,

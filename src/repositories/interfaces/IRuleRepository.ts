@@ -20,6 +20,7 @@ export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, Update
   getActiveMaintenanceWindows(tenantId: string): Promise<Rule[]>;
   getEnabledRules(tenantId: string): Promise<Rule[]>;
   getByScope(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]>;
+  getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]>;
   incrementTriggerCount(tenantId: string, ruleId: string): Promise<void>;
   updateLastTriggered(tenantId: string, ruleId: string): Promise<void>;
 }

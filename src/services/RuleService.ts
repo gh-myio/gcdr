@@ -107,6 +107,10 @@ export class RuleService {
     return this.repository.getByCustomerId(tenantId, customerId);
   }
 
+  async getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]> {
+    return this.repository.getApplicableForDevice(tenantId, deviceId, customerId, assetId);
+  }
+
   async toggle(tenantId: string, id: string, enabled: boolean, userId: string, reason?: string): Promise<Rule> {
     const rule = await this.getById(tenantId, id);
 
