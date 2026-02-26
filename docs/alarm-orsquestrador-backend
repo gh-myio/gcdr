@@ -1237,3 +1237,208 @@ Como o DedupGuard funciona
   Cada dia gera um alarme independente. Os anteriores ficam como histórico e podem ser fechados automaticamente ou manualmente.
 
   Quer que eu aplique o fix?
+  
+  
+mas vamos ao cenário
+ontem o elevador funcionou sempre acima de 300W
+aí as 16:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 16:30 ele voltou a se movimentar
+as 18:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 18:30 ele voltou a se movimentar
+as 23:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 23:30 ele voltou a se movimentar
+hoje as 11:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 11:30 ele voltou a se movimentar
+e o usuário não tratou nenhum alarme
+penso que o fingerprint deve tratar assim
+se chegar várias vezes o alarme
+aí as 16:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 16:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 16:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+aí as 16:00 ele ficou 30 mins parado com potência máxima de 100W, gera o alarme
+ele para esse caso cria apenas um registro de alarme
+mas não parece que está acontecendo isso
+
+
+
+-	-	-	-	-
+|	Label - name	|	Etiqueta	|
+|	Label - name	|	<input da etiqueta>	|
+|	ícone	|	Andar / Localização	|
+|	ícone	|	<input da Andar>	|
+|	ícone	|	Identificador / LUC / SUC	|
+|	ícone	|	<input do Identificador>	|
+-	-	-	-	-
+
+
+-----
+0.json
+na rule "bbbb0001-0001-0001-0001-000000000011" 
+temos o device
+        "22220001-0001-0001-0001-000000000006": {
+          "triggered": true,
+          "value": 33.3,
+          "values": [
+            33.3
+          ],
+          "alldata": {
+            "1771964178758": 33.3
+          },
+          "time": "2026-02-24T20:18:18.571Z",  >>>> esse é exatamente o horário que foi para "triggered": true e analogamente para "triggered": false
+          "local_id": "6",
+          "status": "online"
+        },
+logo o DedupGuard precisa DENY  (DUPLICATE) — evento descartado SE E SOMENTE SE O TIME FOR O MESMO 
+
+
+
+		
+"bbbb0001-0001-0001-0001-000000000025": {
+        "4": {
+          "triggered": true,
+          "local_id": "4",
+          "time": "2026-02-23T23:13:42.910Z",
+          "status": "online",
+          "value": 18396.93
+        }
+      },.
+	  --------
+bbbb0001-0001-0001-0001-000000000023
+	          "188": {
+          "triggered": true,
+          "local_id": "188",
+          "time": "2026-02-24T20:18:38.608Z",
+          "status": "online",
+          "value": 203
+        }
+	  
+	  
+	          "184": {
+          "triggered": true,
+          "local_id": "184",
+          "time": "2026-02-24T20:18:38.608Z",
+          "status": "online",
+          "value": 133
+        },
+		
+bbbb0001-0001-0001-0001-000000000023
+		        "184": {
+          "triggered": true,
+          "local_id": "184",
+          "time": "2026-02-24T20:23:38.015Z",
+          "status": "online",
+          "value": 133
+        },
+		
+----
+
+Em <metric = energy, não envia allData, pois consulta banco>
+
+
+
+---
+
+
+No Orchestrator Worker (alarms-orchestrator). O fluxo completo:                                                                                                        
+  Node-RED central                                                                                                                                                     
+       │
+       │ POST /api/v1/events/ingest-candidate                                                                                                                                 ▼                                                                                                                                                               
+  alarms-API  (ingest-candidate.routes.ts)
+       │  enfileira todos os candidatos
+       ▼
+  fila: alarm-candidates  (Redis/BullMQ)
+       │
+       │ consome
+       ▼
+  alarms-ORCHESTRATOR  ← RFC-0014 roda aqui
+    createCandidateHandler()
+       │
+       ├─ triggered=true  → emite AlarmCandidateRaised  →┐
+       │                                                  │
+       └─ triggered=false → findByDedupKey                │
+             └─ alarme aberto? → emite AlarmCandidateResolved →┤
+                                                          │
+                                              fila: alarm-events
+                                                          │
+                                              DecisionEngine
+                                              (OPEN / SUPPRESS / CLOSE)
+
+  ┌─────────────────────┬───────────────────────────────────────────────────────┐
+  │       Serviço       │                    Papel nesta RFC                    │
+  ├─────────────────────┼───────────────────────────────────────────────────────┤
+  │ alarms-api          │ Recebe o POST da central e enfileira — nada mais      │
+  ├─────────────────────┼───────────────────────────────────────────────────────┤
+  │ alarms-orchestrator │ Roda a máquina de estados (toda a lógica do RFC-0014) │
+  ├─────────────────────┼───────────────────────────────────────────────────────┤
+  │ alarms-verify       │ Não envolvido — é outro path (polls ThingsBoard)      │
+  ├─────────────────────┼───────────────────────────────────────────────────────┤
+  │ alarms-dispatcher   │ Não envolvido — só despacha notificações              │
+  └─────────────────────┴───────────────────────────────────────────────────────┘
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ exe 
+
+
+    790 +        gcdrCustomerId: _GCDR_CUSTOMER_ID,                                                                                
+      791 +        gcdrTenantId: _GCDR_TENANT_ID,
+      792 +        gcdrApiBaseUrl: _GCDR_API_BASE_URL
+	  
+	  
+	  
+connectionStatus: "offline"
+deviceIdentifier: "ELEVADORES"
+deviceProfile: "ELEVADOR"
+deviceStatus: "offline"
+deviceType: "3F_MEDIDOR"
+entityId: "31239400-b4de-11f0-be7f-e760d1498268"
+ingestionId: "f6f2f3cd-00bb-4899-901d-e4398d139f51"
+labelOrName: "Elevador 1 L2"
+lastActivityTime: 1761752684864
+name: "3F SCMOXUARAAC_EL1_L2"
+mas falta e tem com certeza
+centralId, gcdrDeviceId, centralName, slaveId, lastConnectTime, lastDisconnectTime, identifier
+
+
+active
+true
+addrHigh
+248
+addrLow
+182
+centralId
+e982edf9-edb1-4aa6-8a14-4782465ae5a3
+centralName
+Central Moxuara
+deviceProfile
+ELEVADOR
+deviceType
+3F_MEDIDOR
+gcdrDeviceId
+a83ebc33-25ac-4792-99ca-08a2cc86aff1
+gcdrId
+a83ebc33-25ac-4792-99ca-08a2cc86aff1
+gcdrSyncedAt
+2026-02-20T11:49:17.089Z
+identifier
+ELEVADORES
+inactivityAlarmTime
+1770782881938
+ingestionDeviceType
+energy
+ingestionGatewayId
+e982edf9-edb1-4aa6-8a14-4782465ae5a3
+ingestionId
+f6f2f3cd-00bb-4899-901d-e4398d139f51
+lastActivityTime
+1771983104616
+lastConnectTime
+1771976290786
+lastDisconnectTime
+1771976259607
+slaveId
+182
+
+
+curl https://gcdr-api.a.myio-bas.com/api/v1/customers/84e0370e-636a-4741-9874-504b5e0b3577/rules -H "X-API-Key: gcdr_alarm_integration_key_2026"
+
+curl https://gcdr-api.a.myio-bas.com/api/v1/customers/84e0370e-636a-4741-9874-504b5e0b3577/rules -H "X-API-Key: gcdr_alarm_integration_key_2026"

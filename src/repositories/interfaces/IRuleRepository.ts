@@ -11,6 +11,7 @@ export interface ListRulesParams {
   customerId?: string;
   enabled?: boolean;
   status?: string;
+  search?: string;
 }
 
 export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, UpdateRuleDTO> {

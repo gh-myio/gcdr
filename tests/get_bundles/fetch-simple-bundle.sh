@@ -3,17 +3,14 @@
 
 # Configuration - Change API_URL for different environments
 # Local: http://localhost:3015
-# Production: https://gcdr-server.apps.myio-bas.com
+# Production: https://gcdr-api.a.myio-bas.com
 #API_URL="http://localhost:3015"
 API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="84e0370e-636a-4741-9874-504b5e0b3577"
-# Fixed test API key (seeded in database)
 #API_KEY="gcdr_cust_test_bundle_key_myio2026"
 API_KEY="gcdr_alarm_integration_key_2026"
-# X-Tenant-Id is optional - tenant is auto-discovered from API key
-# X-Central-Id is optional - filters devices by central ID
+# X-Central-Id filters devices by central (gateway)
 CENTRAL_ID="e982edf9-edb1-4aa6-8a14-4782465ae5a3"
-  
 OUTPUT_FILE="$(dirname "$0")/simple_bundle_output.json"
 
 echo "Fetching simplified bundle..."

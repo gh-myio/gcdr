@@ -1743,6 +1743,32 @@ Use este checklist para acompanhar seu progresso:
 
 ## Changelog
 
+### 2026-02-26
+
+**Device: campos `code` e `label`**
+- Colunas `code` (varchar 50) e `label` (varchar 100) adicionadas à tabela `devices`
+- Migration: `drizzle/migrations/0009_devices_code_label.sql`
+- Ambos os campos opcionais; úteis para identificação alternativa do dispositivo
+- OpenAPI atualizado: campos adicionados ao schema `Device`
+
+**Device ↔ Rules: novos endpoints cruzados**
+- `GET /devices/:id/rules` — lista todas as rules aplicáveis a um device (todos os scopes: GLOBAL, CUSTOMER, ASSET, DEVICE)
+- `GET /rules/:id/devices` — lista todos os devices associados a uma rule (via `scope_entity_id` ou `scope_entity_ids`)
+- Ambos retornam `{ items: [...], count: N }`
+- OpenAPI atualizado com ambos os endpoints
+
+**Rules: filtro `search` em `GET /rules`**
+- Query param `?search=` adicionado ao `GET /rules` — filtra por nome (ILIKE, case-insensitive)
+- Declarado em `ListRulesParams` e documentado no OpenAPI
+
+**Auth: API Key em `GET /customers/:customerId/rules`**
+- Endpoint agora aceita autenticação por API Key (além de JWT)
+- Permite que integrações M2M (ex: Node-RED) leiam regras diretamente
+
+**Script operacional: fix UUID malformado (Moxuara)**
+- `scripts/db/ops/fix-moxuara-malformed-uuid.sql` — diagnóstico e correção de `scope_entity_id` com `"` trailing
+- Causa raiz: double-serialization ao salvar rules via API (bug já corrigido no código)
+
 ### 2026-02-23
 
 **Alarm Bundle: endpoint de invalidação de cache**

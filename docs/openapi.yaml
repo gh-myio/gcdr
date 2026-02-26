@@ -1258,6 +1258,29 @@ components:
         createdAt:
           type: string
           format: date-time
+        displayName:
+          type: string
+          description: Human-friendly display name
+        code:
+          type: string
+          maxLength: 50
+          description: Optional short code for the device
+        label:
+          type: string
+          maxLength: 100
+          description: Optional label / tag for the device
+        externalId:
+          type: string
+          description: ThingsBoard UUID or other external system identifier
+        centralId:
+          type: string
+          format: uuid
+          description: UUID of the associated central (gateway) — used for Modbus devices
+        slaveId:
+          type: integer
+          minimum: 1
+          maximum: 247
+          description: Modbus slave ID — combined with centralId for exact device lookup
         updatedAt:
           type: string
           format: date-time
@@ -5775,6 +5798,38 @@ paths:
                       data:
                         $ref: '#/components/schemas/Device'
 
+  /devices/{id}/rules:
+    get:
+      tags: [Devices]
+      summary: List rules applicable to a device
+      description: |
+        Returns all rules that apply to the device considering all scope levels:
+        GLOBAL, CUSTOMER, ASSET and DEVICE (via `scope_entity_id` or `scope_entity_ids`).
+      operationId: listDeviceRules
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Applicable rules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Rule'
+                          count:
+                            type: integer
+        '404':
+          description: Device not found
+
   # Rules
   /rules:
     post:
@@ -5832,6 +5887,11 @@ paths:
           schema:
             type: string
             enum: [ACTIVE, INACTIVE, SUSPENDED]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Filter rules by name (case-insensitive partial match)
       responses:
         '200':
           description: List of rules
@@ -5941,6 +6001,38 @@ paths:
                   - properties:
                       data:
                         $ref: '#/components/schemas/Rule'
+
+  /rules/{id}/devices:
+    get:
+      tags: [Rules]
+      summary: List devices associated to a rule
+      description: |
+        Returns all devices referenced by the rule's scope (`scope_entity_id` and/or `scope_entity_ids`).
+        Only applies to rules with `scope.type = DEVICE`.
+      operationId: listRuleDevices
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Associated devices
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Device'
+                          count:
+                            type: integer
+        '404':
+          description: Rule not found
 
   /rules/evaluate:
     post:
