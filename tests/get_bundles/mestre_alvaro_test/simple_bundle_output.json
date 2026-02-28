@@ -1,0 +1,189 @@
+{
+  "success": true,
+  "data": {
+    "versionId": "v1-736a607cdec9",
+    "deviceIndex": {
+      "a83ebc33-25ac-4792-99ca-08a2cc86aff1": {
+        "deviceName": "Elevador 1 L2.",
+        "slaveId": 182,
+        "offset": { "temp": 0, "hum": 0, "pot": 1, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "cb29bc74-6531-460c-abca-98c678112388": {
+        "deviceName": "Elevador 2 L2",
+        "slaveId": 183,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "e9dce3c5-efa0-4df3-8352-8d09e60a1ea7": {
+        "deviceName": "Elevador 3 L2",
+        "slaveId": 184,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "f3d80c84-c2b0-4325-b73a-d48d2f8f8c0f": {
+        "deviceName": "Elevador 4 L2",
+        "slaveId": 185,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "7e3aaf6a-31e7-4c45-a70d-f978bcfe0a46": {
+        "deviceName": "Elevador 5 L2",
+        "slaveId": 186,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "463a38ed-e5b3-4aac-a4d0-f86a35cfbb77": {
+        "deviceName": "Elevador 6 L2",
+        "slaveId": 187,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      },
+      "9264f262-6b5c-4f7e-ac12-5760fc225e33": {
+        "deviceName": "Elevador 7 L2",
+        "slaveId": 188,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "bbbb0001-0001-0001-0001-000000000028",
+          "bbbb0001-0001-0001-0001-000000000027"
+        ]
+      }
+    },
+    "rules": {
+      "bbbb0001-0001-0001-0001-000000000024": {
+        "id": "bbbb0001-0001-0001-0001-000000000024",
+        "name": "Elevador energizado e não usado (domingo)",
+        "metric": "energy",
+        "operator": "LT",
+        "value": 205,
+        "duration": 1200000,
+        "hysteresis": 0,
+        "aggregation": "MAX",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "bbbb0001-0001-0001-0001-000000000023": {
+        "id": "bbbb0001-0001-0001-0001-000000000023",
+        "name": "Elevador energizado e não usado (seg-sáb)",
+        "metric": "energy",
+        "operator": "LT",
+        "value": 205,
+        "duration": 1200000,
+        "hysteresis": 0,
+        "aggregation": "MAX",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "4ec73b8e-06d8-494b-a580-f38ef97a5438": {
+        "id": "4ec73b8e-06d8-494b-a580-f38ef97a5438",
+        "name": "Potência da Escada Rolante energizada e não usada (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 200,
+        "valueHigh": null,
+        "duration": 900000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "bbbb0001-0001-0001-0001-000000000028": {
+        "id": "bbbb0001-0001-0001-0001-000000000028",
+        "name": "Potência do Elevador energizado e não usado (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 200,
+        "duration": 900000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "bbbb0001-0001-0001-0001-000000000027": {
+        "id": "bbbb0001-0001-0001-0001-000000000027",
+        "name": "Potência do Elevador energizado e não usado (seg-sáb).",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 200,
+        "valueHigh": null,
+        "duration": 900000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      }
+    }
+  },
+  "meta": {
+    "requestId": "a7b9b210-863c-4970-8c78-d17f326f5fea",
+    "timestamp": "2026-02-28T12:37:11.929Z"
+  }
+}

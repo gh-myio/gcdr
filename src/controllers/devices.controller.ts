@@ -312,18 +312,26 @@ export const listByAssetHandler = async (req: Request, res: Response, next: Next
   try {
     const { tenantId, requestId } = req.context;
     const { assetId } = req.params;
-    const { type, status, connectivityStatus, limit, cursor } = req.query;
+    const { type, status, connectivityStatus, limit, cursor, page, pageSize } = req.query;
 
     if (!assetId) {
       throw new ValidationError('Asset ID is required');
     }
 
+    const resolvedLimit = pageSize
+      ? parseInt(pageSize as string, 10)
+      : limit ? parseInt(limit as string, 10) : 20;
+
+    const resolvedCursor = page
+      ? String((parseInt(page as string, 10) - 1) * resolvedLimit)
+      : cursor as string | undefined;
+
     const params: ListDevicesParams = {
       type: type as string | undefined,
       status: status as string | undefined,
       connectivityStatus: connectivityStatus as string | undefined,
-      limit: limit ? parseInt(limit as string, 10) : undefined,
-      cursor: cursor as string | undefined,
+      limit: resolvedLimit,
+      cursor: resolvedCursor,
     };
 
     const result = await deviceService.listByAsset(tenantId, assetId, params);
@@ -341,19 +349,27 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
-    const { type, status, connectivityStatus, limit, cursor } = req.query;
+    const { type, status, connectivityStatus, limit, cursor, page, pageSize } = req.query;
 
     if (!customerId) {
       throw new ValidationError('Customer ID is required');
     }
+
+    const resolvedLimit = pageSize
+      ? parseInt(pageSize as string, 10)
+      : limit ? parseInt(limit as string, 10) : 20;
+
+    const resolvedCursor = page
+      ? String((parseInt(page as string, 10) - 1) * resolvedLimit)
+      : cursor as string | undefined;
 
     const params: ListDevicesParams = {
       customerId,
       type: type as string | undefined,
       status: status as string | undefined,
       connectivityStatus: connectivityStatus as string | undefined,
-      limit: limit ? parseInt(limit as string, 10) : undefined,
-      cursor: cursor as string | undefined,
+      limit: resolvedLimit,
+      cursor: resolvedCursor,
     };
 
     const result = await deviceService.list(tenantId, params);
