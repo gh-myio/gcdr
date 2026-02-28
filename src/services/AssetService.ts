@@ -41,11 +41,15 @@ export class AssetService {
       }
     }
 
-    // Check for duplicate code
+    // Upsert by code: if asset with same code already exists, update it
     if (data.code) {
       const existing = await this.repository.getByCode(tenantId, data.customerId, data.code);
       if (existing) {
-        throw new ConflictError(`Asset with code ${data.code} already exists for this customer`);
+        const updated = await this.repository.update(tenantId, existing.id, data, userId);
+        alarmBundleService.invalidateCache(tenantId, data.customerId, {
+          reason: 'asset_updated', entityType: 'asset', entityId: updated.id, userId,
+        });
+        return updated;
       }
     }
 
