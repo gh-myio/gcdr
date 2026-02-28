@@ -334,11 +334,13 @@ export class AlarmBundleService {
         const override = rule?.scopeEntityOverrides?.[device.id];
 
         if (override && rulesCatalog[ruleId]) {
-          const variantKey = `${ruleId}_${device.id}`;
+          const deviceKey = device.slaveId?.toString() ?? device.id;
+          const variantKey = `${ruleId}_${deviceKey}`;
           if (!variantRules[variantKey]) {
             variantRules[variantKey] = {
               ...rulesCatalog[ruleId],
               id: variantKey,
+              parentRuleId: ruleId,
               ...(override.value !== undefined && { value: override.value }),
               ...(override.valueHigh !== undefined && { valueHigh: override.valueHigh }),
             };
@@ -356,7 +358,8 @@ export class AlarmBundleService {
         ruleIds: resolvedRuleIds,
       };
 
-      deviceIndex[device.id] = mapping;
+      const deviceKey = device.slaveId?.toString() ?? device.id;
+      deviceIndex[deviceKey] = mapping;
     }
 
     // Merge variant rules (overridden) into the catalog

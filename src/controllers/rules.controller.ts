@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { ruleService } from '../services/RuleService';
 import { alarmBundleService } from '../services/AlarmBundleService';
 import { DeviceRepository } from '../repositories/DeviceRepository';
+import { CentralRepository } from '../repositories/CentralRepository';
 import {
   CreateRuleSchema,
   UpdateRuleSchema,
@@ -419,6 +420,34 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
 
     if (!customerId) {
       throw new ValidationError('Customer ID is required');
+    }
+
+    // Validate X-Central-Id if provided
+    if (centralId) {
+      const centralRepo = new CentralRepository();
+      const central = await centralRepo.getById(tenantId, centralId);
+
+      if (!central) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'CENTRAL_NOT_FOUND',
+            message: `Central '${centralId}' not found`,
+          },
+          meta: { requestId },
+        });
+      }
+
+      if (central.customerId !== customerId) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'CENTRAL_CUSTOMER_MISMATCH',
+            message: `Central '${centralId}' does not belong to customer '${customerId}'`,
+          },
+          meta: { requestId },
+        });
+      }
     }
 
     const bundleParams = {

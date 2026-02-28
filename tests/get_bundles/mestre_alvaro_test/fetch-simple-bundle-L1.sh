@@ -1,31 +1,23 @@
 #!/bin/bash
-# Fetch simplified alarm bundle for Mestre Álvaro and save to JSON file
-# Customer: Shopping Mestre Álvaro (e04046d4-...)
-# Central:  sem filtro — retorna todos os devices do customer
-# Para filtrar por central use: fetch-simple-bundle-L1/L2/L3L4.sh
+# Fetch simplified alarm bundle — Mestre Álvaro / Central L1
+# Customer:  e04046d4-baa4-44e9-a378-4dfebe4140f1 (Shopping Mestre Álvaro)
+# Central:   45250d44-bad0-4071-aaa0-8091cfb12691 (MAGATEWAY-L1)
 
-# Configuration - Change API_URL for different environments
-# Local: http://localhost:3015
-# Production: https://gcdr-api.a.myio-bas.com
 #API_URL="http://localhost:3015"
 API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="e04046d4-baa4-44e9-a378-4dfebe4140f1"
 API_KEY="gcdr_alarm_integration_key_2026"
-# X-Central-Id — deixar vazio para ver todos os devices
-CENTRAL_ID=""
-OUTPUT_FILE="$(dirname "$0")/simple_bundle_output.json"
+CENTRAL_ID="45250d44-bad0-4071-aaa0-8091cfb12691"
+OUTPUT_FILE="$(dirname "$0")/simple_bundle_L1.json"
 
-echo "Fetching simplified bundle — Mestre Álvaro..."
+echo "Fetching simplified bundle — Mestre Álvaro L1 (MAGATEWAY-L1)..."
 echo "Customer: $CUSTOMER_ID"
 echo "Central:  $CENTRAL_ID"
 echo ""
 
-CENTRAL_HEADER=""
-[ -n "$CENTRAL_ID" ] && CENTRAL_HEADER="-H \"X-Central-Id: ${CENTRAL_ID}\""
-
 curl -s "${API_URL}/api/v1/customers/${CUSTOMER_ID}/alarm-rules/bundle/simple" \
   -H "X-API-Key: ${API_KEY}" \
-  ${CENTRAL_ID:+-H "X-Central-Id: ${CENTRAL_ID}"} \
+  -H "X-Central-Id: ${CENTRAL_ID}" \
   -H "Accept: application/json" \
   -o "$OUTPUT_FILE"
 

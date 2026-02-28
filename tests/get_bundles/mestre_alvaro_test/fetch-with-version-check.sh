@@ -7,9 +7,13 @@
 # Configuration
 #API_URL="http://localhost:3015"
 API_URL="https://gcdr-api.a.myio-bas.com"
-CUSTOMER_ID="84e0370e-636a-4741-9874-504b5e0b3577"
+CUSTOMER_ID="e04046d4-baa4-44e9-a378-4dfebe4140f1"
 API_KEY="gcdr_alarm_integration_key_2026"
-CENTRAL_ID="e982edf9-edb1-4aa6-8a14-4782465ae5a3"
+# Escolha a central: L1, L2 ou L3L4
+# L1:   45250d44-bad0-4071-aaa0-8091cfb12691  (MAGATEWAY-L1)
+# L2:   d3202744-05dd-46d1-af33-495e9a2ecd52  (MAGATEWAY-L2)
+# L3L4: fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e  (MAGATEWAY-L3L4)
+CENTRAL_ID="45250d44-bad0-4071-aaa0-8091cfb12691"
 
 # Colors
 GREEN='\033[0;32m'
