@@ -7,9 +7,11 @@ import { ApiKeyScope } from '../domain/entities/CustomerApiKey';
 // DISABLE_AUTH=true bypasses all auth checks (development/testing only — never use in production)
 const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
 
+const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 function bypassAuth(req: Request, next: NextFunction): void {
   req.context.tenantId = req.context.tenantId || process.env.DEFAULT_TENANT_ID || '11111111-1111-1111-1111-111111111111';
-  req.user = { sub: 'dev', email: 'dev@local', tenant_id: req.context.tenantId, type: 'SERVICE_ACCOUNT', roles: ['*'] };
+  req.context.userId = DEV_USER_ID;
+  req.user = { sub: DEV_USER_ID, email: 'dev@local', tenant_id: req.context.tenantId, type: 'SERVICE_ACCOUNT', roles: ['*'] };
   next();
 }
 
