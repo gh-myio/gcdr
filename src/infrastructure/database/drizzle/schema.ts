@@ -253,7 +253,7 @@ export const assets = pgTable('assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull(),
   customerId: uuid('customer_id').notNull().references(() => customers.id),
-  parentAssetId: uuid('parent_asset_id'),
+  parentAssetId: uuid('parent_asset_id').nullable(),
   path: text('path').notNull(),
   depth: integer('depth').notNull(),
 

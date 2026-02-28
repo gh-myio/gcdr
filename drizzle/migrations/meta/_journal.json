@@ -57,6 +57,34 @@
       "when": 1771736893012,
       "tag": "0007_graceful_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772000000000,
+      "tag": "0008_device_name_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772100000000,
+      "tag": "0009_devices_code_label",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772200000000,
+      "tag": "0010_rules_scope_entity_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772300000000,
+      "tag": "0011_asset_type_site",
+      "breakpoints": true
     }
   ]
 }
