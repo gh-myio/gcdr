@@ -126,16 +126,15 @@ const RuleValueOverrideSchema = z.object({
 // Rule Scope Schema
 const RuleScopeSchema = z.object({
   type: ScopTypeSchema,
-  entityId: z.string().optional(),
+  entityId: z.string().uuid().optional(),
+  entityIds: z.array(z.string().uuid()).optional(),
   inherited: z.boolean().optional(),
 }).refine(
   (data) => {
-    if (data.type !== 'GLOBAL' && !data.entityId) {
-      return false;
-    }
-    return true;
+    if (data.type === 'GLOBAL') return true;
+    return !!(data.entityId || (data.entityIds && data.entityIds.length > 0));
   },
-  { message: 'entityId is required for non-GLOBAL scope types' }
+  { message: 'entityId or entityIds is required for non-GLOBAL scope types' }
 );
 
 // Create Rule DTO

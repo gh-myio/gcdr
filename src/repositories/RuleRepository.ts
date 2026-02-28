@@ -27,6 +27,7 @@ export class RuleRepository implements IRuleRepository {
       priority: data.priority || 'MEDIUM',
       scopeType: data.scope.type,
       scopeEntityId: data.scope.entityId || null,
+      scopeEntityIds: data.scope.entityIds || [],
       scopeInherited: data.scope.inherited ?? false,
       scopeEntityOverrides: data.scopeEntityOverrides || null,
       alarmConfig: data.alarmConfig || null,
@@ -81,6 +82,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.scope !== undefined) {
       updateData.scopeType = data.scope.type;
       updateData.scopeEntityId = data.scope.entityId || null;
+      updateData.scopeEntityIds = data.scope.entityIds || [];
       updateData.scopeInherited = data.scope.inherited ?? false;
     }
 
