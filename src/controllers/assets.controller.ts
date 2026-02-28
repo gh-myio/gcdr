@@ -106,7 +106,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /assets/:id
  * Update asset
  */
-router.put('/:id',
+const updateAssetHandler = [
   logEvent({
     eventType: EventType.ASSET_UPDATED,
     description: (req) => `Asset ${req.params.id} updated`,
@@ -130,7 +130,10 @@ router.put('/:id',
       next(err);
     }
   }
-);
+];
+
+router.put('/:id', ...updateAssetHandler);
+router.patch('/:id', ...updateAssetHandler);
 
 /**
  * DELETE /assets/:id

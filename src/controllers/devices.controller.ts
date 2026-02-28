@@ -189,7 +189,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * PUT /devices/:id
  * Update device
  */
-router.put('/:id',
+const updateDeviceHandler = [
   logEvent({
     eventType: EventType.DEVICE_UPDATED,
     description: (req) => `Device ${req.params.id} updated`,
@@ -213,7 +213,10 @@ router.put('/:id',
       next(err);
     }
   }
-);
+];
+
+router.put('/:id', ...updateDeviceHandler);
+router.patch('/:id', ...updateDeviceHandler);
 
 /**
  * DELETE /devices/:id
