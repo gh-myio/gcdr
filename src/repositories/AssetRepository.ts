@@ -39,11 +39,14 @@ export class AssetRepository implements IAssetRepository {
     // Generate code if not provided
     const code = data.code || this.generateCode(data.name);
 
+    // Sanitize parentAssetId — sync services may send "" instead of null
+    const parentAssetId = data.parentAssetId ? data.parentAssetId : null;
+
     const [result] = await db.insert(assets).values({
       id,
       tenantId,
       customerId: data.customerId,
-      parentAssetId: data.parentAssetId || null,
+      parentAssetId,
       path,
       depth,
       name: data.name,
@@ -60,6 +63,19 @@ export class AssetRepository implements IAssetRepository {
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),
       createdBy,
+    }).onConflictDoUpdate({
+      target: [assets.tenantId, assets.customerId, assets.code],
+      set: {
+        name: data.name,
+        displayName: data.displayName || data.name,
+        type: data.type,
+        description: data.description,
+        parentAssetId,
+        metadata: data.metadata || {},
+        tags: data.tags || [],
+        updatedAt: new Date(timestamp),
+        version: sql`${assets.version} + 1`,
+      },
     }).returning();
 
     return this.mapToEntity(result);
