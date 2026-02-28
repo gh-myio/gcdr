@@ -552,6 +552,7 @@ export const rules = pgTable('rules', {
   scopeType: scopeTypeEnum('scope_type').notNull().default('GLOBAL'),
   scopeEntityId: uuid('scope_entity_id'),
   scopeEntityIds: uuid('scope_entity_ids').array(),
+  scopeEntityOverrides: jsonb('scope_entity_overrides'),
   scopeInherited: boolean('scope_inherited').notNull().default(false),
 
   // Type-specific configuration (JSONB)

@@ -28,6 +28,7 @@ export class RuleRepository implements IRuleRepository {
       scopeType: data.scope.type,
       scopeEntityId: data.scope.entityId || null,
       scopeInherited: data.scope.inherited ?? false,
+      scopeEntityOverrides: data.scopeEntityOverrides || null,
       alarmConfig: data.alarmConfig || null,
       slaConfig: data.slaConfig || null,
       escalationConfig: data.escalationConfig || null,
@@ -82,6 +83,9 @@ export class RuleRepository implements IRuleRepository {
       updateData.scopeEntityId = data.scope.entityId || null;
       updateData.scopeInherited = data.scope.inherited ?? false;
     }
+
+    // Handle scope entity overrides
+    if (data.scopeEntityOverrides !== undefined) updateData.scopeEntityOverrides = data.scopeEntityOverrides ?? null;
 
     // Handle config updates
     if (data.alarmConfig !== undefined) updateData.alarmConfig = data.alarmConfig;
@@ -340,6 +344,7 @@ export class RuleRepository implements IRuleRepository {
       type: row.type,
       priority: row.priority,
       scope,
+      scopeEntityOverrides: row.scopeEntityOverrides as Rule['scopeEntityOverrides'] ?? undefined,
       alarmConfig: row.alarmConfig as Rule['alarmConfig'],
       slaConfig: row.slaConfig as Rule['slaConfig'],
       escalationConfig: row.escalationConfig as Rule['escalationConfig'],

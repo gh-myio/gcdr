@@ -152,6 +152,12 @@ export interface NotificationChannel {
   enabled: boolean;
 }
 
+// Per-device value override for rules with scope_entity_ids
+export interface RuleValueOverride {
+  value?: number;
+  valueHigh?: number;
+}
+
 // Rule Scope - determines where the rule applies
 export interface RuleScope {
   type: 'GLOBAL' | 'CUSTOMER' | 'ASSET' | 'DEVICE';
@@ -177,6 +183,9 @@ export interface Rule extends BaseEntity {
 
   // Notification settings
   notificationChannels?: NotificationChannel[];
+
+  // Per-device value overrides (RFC-0018) — keyed by device UUID
+  scopeEntityOverrides?: Record<string, RuleValueOverride>;
 
   // Tags for organization
   tags: string[];

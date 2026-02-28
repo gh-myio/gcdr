@@ -117,6 +117,12 @@ const NotificationChannelSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
+// Per-device value override schema (RFC-0018)
+const RuleValueOverrideSchema = z.object({
+  value: z.number().optional(),
+  valueHigh: z.number().optional(),
+});
+
 // Rule Scope Schema
 const RuleScopeSchema = z.object({
   type: ScopTypeSchema,
@@ -145,6 +151,7 @@ export const CreateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
+  scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
 }).refine(
@@ -179,6 +186,7 @@ export const UpdateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
+  scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
 });

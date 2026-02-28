@@ -312,6 +312,7 @@ export class AlarmBundleService {
 
     // Build device index (minimal fields: name, centralId, slaveId, offset, ruleIds)
     const deviceIndex: Record<string, SimpleDeviceMapping> = {};
+    const variantRules: Record<string, SimpleBundleAlarmRule> = {};
 
     for (const device of devices) {
       // Get applicable rules with channel info for discrete metrics
@@ -325,15 +326,41 @@ export class AlarmBundleService {
       // Only include devices that have at least one applicable rule
       if (applicableRuleIds.length === 0) continue;
 
+      // RFC-0018: resolve per-device value overrides
+      const resolvedRuleIds: RuleIdEntry[] = [];
+      for (const entry of applicableRuleIds) {
+        const ruleId = typeof entry === 'string' ? entry : entry.id;
+        const rule = rules.find(r => r.id === ruleId);
+        const override = rule?.scopeEntityOverrides?.[device.id];
+
+        if (override && rulesCatalog[ruleId]) {
+          const variantKey = `${ruleId}_${device.id}`;
+          if (!variantRules[variantKey]) {
+            variantRules[variantKey] = {
+              ...rulesCatalog[ruleId],
+              id: variantKey,
+              ...(override.value !== undefined && { value: override.value }),
+              ...(override.valueHigh !== undefined && { valueHigh: override.valueHigh }),
+            };
+          }
+          resolvedRuleIds.push(typeof entry === 'string' ? variantKey : { id: variantKey, channel: entry.channel });
+        } else {
+          resolvedRuleIds.push(entry);
+        }
+      }
+
       const mapping: SimpleDeviceMapping = {
         deviceName: device.name,
         slaveId: device.slaveId,
         offset,
-        ruleIds: applicableRuleIds,
+        ruleIds: resolvedRuleIds,
       };
 
       deviceIndex[device.id] = mapping;
     }
+
+    // Merge variant rules (overridden) into the catalog
+    Object.assign(rulesCatalog, variantRules);
 
     // Calculate version hash from content
     const bundleContent = { deviceIndex, rules: rulesCatalog };
