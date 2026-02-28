@@ -7,7 +7,8 @@ import {
   UpdateRuleSchema,
   ToggleRuleSchema,
   EvaluateRuleSchema,
-  ListRulesParamsSchema
+  ListRulesParamsSchema,
+  SetDeviceOverrideSchema,
 } from '../dto/request/RuleDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
@@ -179,6 +180,60 @@ router.put('/:id',
 
       const data = UpdateRuleSchema.parse(req.body);
       const rule = await ruleService.update(tenantId, id, data, userId);
+      sendSuccess(res, rule, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * PUT /rules/:id/overrides/:deviceId
+ * Set (or replace) the value override for a specific device in a rule.
+ * Other devices' overrides are preserved.
+ * Body: { value?: number, valueHigh?: number }
+ */
+router.put('/:id/overrides/:deviceId',
+  logEvent({
+    eventType: EventType.RULE_UPDATED,
+    description: (req) => `Rule ${req.params.id} override set for device ${req.params.deviceId}`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ deviceId: req.params.deviceId, override: req.body }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id, deviceId } = req.params;
+
+      const override = SetDeviceOverrideSchema.parse(req.body);
+      const rule = await ruleService.setDeviceOverride(tenantId, id, deviceId, override, userId);
+      sendSuccess(res, rule, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * DELETE /rules/:id/overrides/:deviceId
+ * Remove the value override for a specific device.
+ * Other devices' overrides are preserved.
+ */
+router.delete('/:id/overrides/:deviceId',
+  logEvent({
+    eventType: EventType.RULE_UPDATED,
+    description: (req) => `Rule ${req.params.id} override removed for device ${req.params.deviceId}`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ deviceId: req.params.deviceId }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id, deviceId } = req.params;
+
+      const rule = await ruleService.removeDeviceOverride(tenantId, id, deviceId, userId);
       sendSuccess(res, rule, 200, requestId);
     } catch (err) {
       next(err);

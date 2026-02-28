@@ -1,6 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
-import { Rule, RuleType, RuleScope } from '../domain/entities/Rule';
+import { Rule, RuleType, RuleScope, RuleValueOverride } from '../domain/entities/Rule';
 import { CreateRuleDTO, UpdateRuleDTO } from '../dto/request/RuleDTO';
 import { PaginatedResult } from '../shared/types';
 import { IRuleRepository, ListRulesParams } from './interfaces/IRuleRepository';
@@ -324,6 +324,44 @@ export class RuleRepository implements IRuleRepository {
         lastTriggeredAt: new Date(),
       })
       .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)));
+  }
+
+  async setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride): Promise<Rule> {
+    const existing = await this.getById(tenantId, ruleId);
+    if (!existing) {
+      throw new AppError('RULE_NOT_FOUND', 'Rule not found', 404);
+    }
+
+    const [result] = await db
+      .update(rules)
+      .set({
+        scopeEntityOverrides: sql`COALESCE(${rules.scopeEntityOverrides}, '{}'::jsonb) || ${JSON.stringify({ [deviceId]: override })}::jsonb`,
+        updatedAt: new Date(),
+        version: existing.version + 1,
+      })
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)))
+      .returning();
+
+    return this.mapToEntity(result);
+  }
+
+  async removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string): Promise<Rule> {
+    const existing = await this.getById(tenantId, ruleId);
+    if (!existing) {
+      throw new AppError('RULE_NOT_FOUND', 'Rule not found', 404);
+    }
+
+    const [result] = await db
+      .update(rules)
+      .set({
+        scopeEntityOverrides: sql`${rules.scopeEntityOverrides} - ${deviceId}`,
+        updatedAt: new Date(),
+        version: existing.version + 1,
+      })
+      .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)))
+      .returning();
+
+    return this.mapToEntity(result);
   }
 
   private mapToEntity(row: typeof rules.$inferSelect): Rule {

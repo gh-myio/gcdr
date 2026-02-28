@@ -1,4 +1,4 @@
-import { Rule, RuleType, RulePriority } from '../../domain/entities/Rule';
+import { Rule, RuleType, RulePriority, RuleValueOverride } from '../../domain/entities/Rule';
 import { CreateRuleDTO, UpdateRuleDTO } from '../../dto/request/RuleDTO';
 import { PaginatedResult } from '../../shared/types';
 import { IRepository } from './IRepository';
@@ -24,4 +24,6 @@ export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, Update
   getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]>;
   incrementTriggerCount(tenantId: string, ruleId: string): Promise<void>;
   updateLastTriggered(tenantId: string, ruleId: string): Promise<void>;
+  setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride): Promise<Rule>;
+  removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string): Promise<Rule>;
 }

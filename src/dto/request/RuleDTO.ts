@@ -222,3 +222,13 @@ export const ToggleRuleSchema = z.object({
 });
 
 export type ToggleRuleDTO = z.infer<typeof ToggleRuleSchema>;
+
+// Set Device Override DTO
+export const SetDeviceOverrideSchema = z.object({
+  value: z.number().optional(),
+  valueHigh: z.number().optional(),
+}).refine(data => data.value !== undefined || data.valueHigh !== undefined, {
+  message: 'At least one of value or valueHigh must be provided',
+});
+
+export type SetDeviceOverrideDTO = z.infer<typeof SetDeviceOverrideSchema>;

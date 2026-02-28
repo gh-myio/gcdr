@@ -1,4 +1,4 @@
-import { Rule, RuleType } from '../domain/entities/Rule';
+import { Rule, RuleType, RuleValueOverride } from '../domain/entities/Rule';
 import { CreateRuleDTO, UpdateRuleDTO, ListRulesParams } from '../dto/request/RuleDTO';
 import { RuleRepository } from '../repositories/RuleRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
@@ -109,6 +109,22 @@ export class RuleService {
 
   async getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]> {
     return this.repository.getApplicableForDevice(tenantId, deviceId, customerId, assetId);
+  }
+
+  async setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride, userId: string): Promise<Rule> {
+    const rule = await this.repository.setDeviceOverride(tenantId, ruleId, deviceId, override);
+    alarmBundleService.invalidateCache(tenantId, rule.customerId, {
+      reason: 'rule_override_set', entityType: 'rule', entityId: ruleId, userId,
+    });
+    return rule;
+  }
+
+  async removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string, userId: string): Promise<Rule> {
+    const rule = await this.repository.removeDeviceOverride(tenantId, ruleId, deviceId);
+    alarmBundleService.invalidateCache(tenantId, rule.customerId, {
+      reason: 'rule_override_removed', entityType: 'rule', entityId: ruleId, userId,
+    });
+    return rule;
   }
 
   async toggle(tenantId: string, id: string, enabled: boolean, userId: string, reason?: string): Promise<Rule> {
