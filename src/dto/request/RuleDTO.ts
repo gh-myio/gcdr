@@ -129,13 +129,7 @@ const RuleScopeSchema = z.object({
   entityId: z.string().uuid().optional(),
   entityIds: z.array(z.string().uuid()).optional(),
   inherited: z.boolean().optional(),
-}).refine(
-  (data) => {
-    if (data.type === 'GLOBAL') return true;
-    return !!(data.entityId || (data.entityIds && data.entityIds.length > 0));
-  },
-  { message: 'entityId or entityIds is required for non-GLOBAL scope types' }
-);
+});
 
 // Create Rule DTO
 export const CreateRuleSchema = z.object({

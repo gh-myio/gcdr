@@ -247,20 +247,8 @@ export class RuleService {
 
   // Private helper methods
 
-  private async validateScope(tenantId: string, scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
-    if (scope.type === 'GLOBAL') {
-      return; // No validation needed for global scope
-    }
-
-    // Accept entityId directly or derive from first element of entityIds
-    const resolvedEntityId = scope.entityId ?? scope.entityIds?.[0];
-    if (!resolvedEntityId) {
-      throw new ValidationError('entityId is required for non-GLOBAL scope');
-    }
-
-    // Validate the entity exists based on scope type
-    // This is simplified - full implementation would check the appropriate repository
-    // For now, we just validate that an entityId is provided
+  private async validateScope(_tenantId: string, _scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
+    // entityId and entityIds are optional — no validation required
   }
 
   /**
