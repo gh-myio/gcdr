@@ -80,7 +80,7 @@ export function requireRoles(...roles: string[]) {
  *
  * @param requiredScope - Optional scope required for API Key authentication
  */
-export function hybridAuthMiddleware(requiredScope?: ApiKeyScope) {
+export function hybridAuthMiddleware(requiredScope?: ApiKeyScope | ApiKeyScope[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const authHeader = req.headers['authorization'];
     const apiKey = req.headers['x-api-key'] as string | undefined;
@@ -155,7 +155,7 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope) {
  * GET/HEAD/OPTIONS → readScope
  * POST/PUT/PATCH/DELETE → writeScope
  */
-export function hybridAuthByMethod(readScope: ApiKeyScope, writeScope: ApiKeyScope) {
+export function hybridAuthByMethod(readScope: ApiKeyScope | ApiKeyScope[], writeScope: ApiKeyScope | ApiKeyScope[]) {
   const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
   return (req: Request, res: Response, next: NextFunction) => {
     const scope = READ_METHODS.has(req.method) ? readScope : writeScope;

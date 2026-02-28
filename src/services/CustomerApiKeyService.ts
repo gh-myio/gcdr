@@ -92,7 +92,7 @@ export class CustomerApiKeyService {
   async validateApiKey(
     plaintextKey: string,
     clientIp: string,
-    requiredScope?: ApiKeyScope
+    requiredScope?: ApiKeyScope | ApiKeyScope[]
   ): Promise<ApiKeyContext> {
     // Check key format
     if (!plaintextKey.startsWith(KEY_PREFIX)) {
@@ -120,9 +120,13 @@ export class CustomerApiKeyService {
       }
     }
 
-    // Check scope
-    if (requiredScope && !hasScope(apiKey.scopes, requiredScope)) {
-      throw new UnauthorizedError(`API key does not have required scope: ${requiredScope}`);
+    // Check scope (single or array — any match passes)
+    if (requiredScope) {
+      const scopes = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
+      const hasAny = scopes.some(s => hasScope(apiKey.scopes, s));
+      if (!hasAny) {
+        throw new UnauthorizedError(`API key does not have required scope: ${scopes.join(' or ')}`);
+      }
     }
 
     // Update usage statistics (fire and forget - don't block the request)
@@ -145,7 +149,7 @@ export class CustomerApiKeyService {
     tenantId: string,
     plaintextKey: string,
     clientIp: string,
-    requiredScope?: ApiKeyScope
+    requiredScope?: ApiKeyScope | ApiKeyScope[]
   ): Promise<ApiKeyContext> {
     // Check key format
     if (!plaintextKey.startsWith(KEY_PREFIX)) {
@@ -173,9 +177,13 @@ export class CustomerApiKeyService {
       }
     }
 
-    // Check scope
-    if (requiredScope && !hasScope(apiKey.scopes, requiredScope)) {
-      throw new UnauthorizedError(`API key does not have required scope: ${requiredScope}`);
+    // Check scope (single or array — any match passes)
+    if (requiredScope) {
+      const scopes = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
+      const hasAny = scopes.some(s => hasScope(apiKey.scopes, s));
+      if (!hasAny) {
+        throw new UnauthorizedError(`API key does not have required scope: ${scopes.join(' or ')}`);
+      }
     }
 
     // Update usage statistics (fire and forget - don't block the request)

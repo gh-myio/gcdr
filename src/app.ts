@@ -206,8 +206,8 @@ apiV1Router.use('/roles', authMiddleware, rolesController);
 // Authorization
 apiV1Router.use('/authorization', authMiddleware, authorizationController);
 
-// Rules (hybridAuth: read=bundles:read, write=rules:write)
-apiV1Router.use('/rules', hybridAuthByMethod('bundles:read', 'rules:write'), rulesController);
+// Rules (hybridAuth: read=bundles:read, write=bundles:read OR rules:write)
+apiV1Router.use('/rules', hybridAuthByMethod('bundles:read', ['bundles:read', 'rules:write']), rulesController);
 
 // Integrations
 apiV1Router.use('/integrations', authMiddleware, integrationsController);
