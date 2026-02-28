@@ -1,1 +1,579 @@
-{"success":true,"data":{"versionId":"v1-c8c8d7b3194d","deviceIndex":{"b7e919bb-a3a0-4c47-ad65-3e74c2d1823a":{"deviceName":"3F ESRL. PF-Escada 03","slaveId":92,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a","cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a"]},"7088ed6c-b17f-4a69-a094-b0ac44e14298":{"deviceName":"3F ESRL. PF-Escada 08","slaveId":130,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298","cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298"]},"7793062b-494c-4537-aabd-f1ac68e0796d":{"deviceName":"3F ESRL. PF-Escada 09","slaveId":131,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d","cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d"]},"15708d7a-bcc9-48b6-83fb-c55119faac87":{"deviceName":"3F SCMAL2ACEL1","slaveId":83,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87","cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87"]},"1135216b-222c-45cd-a3f8-513b1fc4b908":{"deviceName":"3F SCMAL2ACEL3","slaveId":87,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908","cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908"]},"816fe09a-bde1-404d-8bde-18cb4988d553":{"deviceName":"3F SCMAL2ACEL4","slaveId":88,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553","cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553"]},"e8d438a1-7550-4e76-89aa-576d6fa922ae":{"deviceName":"3F SCMAL2ACEL5","slaveId":89,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae","cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae"]},"817085a9-ba9c-479d-86f2-c3a6e5c2a757":{"deviceName":"3F SCMAL2ACEL6","slaveId":84,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757","cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757"]},"862777fa-fdfc-4e7b-aac6-85ff8a846c46":{"deviceName":"3F SCMAL2ACEL7","slaveId":86,"offset":{"temp":0,"hum":0,"pot":0,"water_level":0},"ruleIds":["cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46","cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46"]}},"rules":{"cccc0001-0001-0001-0001-000000000004":{"id":"cccc0001-0001-0001-0001-000000000004","name":"Potência da Escada Rolante parada em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":1330,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000003":{"id":"cccc0001-0001-0001-0001-000000000003","name":"Potência da Escada Rolante parada em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":1330,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002":{"id":"cccc0001-0001-0001-0001-000000000002","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":206,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001":{"id":"cccc0001-0001-0001-0001-000000000001","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":206,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a":{"id":"cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a","name":"Potência da Escada Rolante parada em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":3260,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a":{"id":"cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a","name":"Potência da Escada Rolante parada em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":3260,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298":{"id":"cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298","name":"Potência da Escada Rolante parada em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":1740,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298":{"id":"cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298","name":"Potência da Escada Rolante parada em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":1740,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d":{"id":"cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d","name":"Potência da Escada Rolante parada em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":1330,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d":{"id":"cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d","name":"Potência da Escada Rolante parada em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":1330,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87":{"id":"cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":512,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87":{"id":"cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":512,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908":{"id":"cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":288,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908":{"id":"cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":288,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553":{"id":"cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":242,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553":{"id":"cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":242,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae":{"id":"cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":228,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae":{"id":"cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":228,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757":{"id":"cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":220,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757":{"id":"cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":220,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1},"cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46":{"id":"cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46","name":"Potência do Elevador parado em horário de operação (domingo)","metric":"instantaneous_power","operator":"LT","value":206,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"12:00","endAt":"22:00","daysOfWeek":{"0":true,"1":false,"2":false,"3":false,"4":false,"5":false,"6":false},"keyMulti":1},"cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46":{"id":"cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46","name":"Potência do Elevador parado em horário de operação (seg-sáb)","metric":"instantaneous_power","operator":"LT","value":206,"duration":300000,"hysteresis":0,"aggregation":"AVG","startAt":"10:00","endAt":"22:00","daysOfWeek":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true},"keyMulti":1}}},"meta":{"requestId":"e5c362e4-0a7d-420d-95ce-4bc62eec6ad3","timestamp":"2026-02-28T13:18:45.286Z"}}
+{
+  "success": true,
+  "data": {
+    "versionId": "v1-c8c8d7b3194d",
+    "deviceIndex": {
+      "b7e919bb-a3a0-4c47-ad65-3e74c2d1823a": {
+        "deviceName": "3F ESRL. PF-Escada 03",
+        "slaveId": 92,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a",
+          "cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a"
+        ]
+      },
+      "7088ed6c-b17f-4a69-a094-b0ac44e14298": {
+        "deviceName": "3F ESRL. PF-Escada 08",
+        "slaveId": 130,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298",
+          "cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298"
+        ]
+      },
+      "7793062b-494c-4537-aabd-f1ac68e0796d": {
+        "deviceName": "3F ESRL. PF-Escada 09",
+        "slaveId": 131,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d",
+          "cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d"
+        ]
+      },
+      "15708d7a-bcc9-48b6-83fb-c55119faac87": {
+        "deviceName": "3F SCMAL2ACEL1",
+        "slaveId": 83,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87",
+          "cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87"
+        ]
+      },
+      "1135216b-222c-45cd-a3f8-513b1fc4b908": {
+        "deviceName": "3F SCMAL2ACEL3",
+        "slaveId": 87,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908",
+          "cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908"
+        ]
+      },
+      "816fe09a-bde1-404d-8bde-18cb4988d553": {
+        "deviceName": "3F SCMAL2ACEL4",
+        "slaveId": 88,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553",
+          "cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553"
+        ]
+      },
+      "e8d438a1-7550-4e76-89aa-576d6fa922ae": {
+        "deviceName": "3F SCMAL2ACEL5",
+        "slaveId": 89,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae",
+          "cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae"
+        ]
+      },
+      "817085a9-ba9c-479d-86f2-c3a6e5c2a757": {
+        "deviceName": "3F SCMAL2ACEL6",
+        "slaveId": 84,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757",
+          "cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757"
+        ]
+      },
+      "862777fa-fdfc-4e7b-aac6-85ff8a846c46": {
+        "deviceName": "3F SCMAL2ACEL7",
+        "slaveId": 86,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46",
+          "cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46"
+        ]
+      }
+    },
+    "rules": {
+      "cccc0001-0001-0001-0001-000000000004": {
+        "id": "cccc0001-0001-0001-0001-000000000004",
+        "name": "Potência da Escada Rolante parada em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1330,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000003": {
+        "id": "cccc0001-0001-0001-0001-000000000003",
+        "name": "Potência da Escada Rolante parada em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1330,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002": {
+        "id": "cccc0001-0001-0001-0001-000000000002",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 206,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001": {
+        "id": "cccc0001-0001-0001-0001-000000000001",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 206,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a": {
+        "id": "cccc0001-0001-0001-0001-000000000004_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a",
+        "name": "Potência da Escada Rolante parada em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 3260,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a": {
+        "id": "cccc0001-0001-0001-0001-000000000003_b7e919bb-a3a0-4c47-ad65-3e74c2d1823a",
+        "name": "Potência da Escada Rolante parada em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 3260,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298": {
+        "id": "cccc0001-0001-0001-0001-000000000004_7088ed6c-b17f-4a69-a094-b0ac44e14298",
+        "name": "Potência da Escada Rolante parada em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1740,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298": {
+        "id": "cccc0001-0001-0001-0001-000000000003_7088ed6c-b17f-4a69-a094-b0ac44e14298",
+        "name": "Potência da Escada Rolante parada em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1740,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d": {
+        "id": "cccc0001-0001-0001-0001-000000000004_7793062b-494c-4537-aabd-f1ac68e0796d",
+        "name": "Potência da Escada Rolante parada em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1330,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d": {
+        "id": "cccc0001-0001-0001-0001-000000000003_7793062b-494c-4537-aabd-f1ac68e0796d",
+        "name": "Potência da Escada Rolante parada em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 1330,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87": {
+        "id": "cccc0001-0001-0001-0001-000000000002_15708d7a-bcc9-48b6-83fb-c55119faac87",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 512,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87": {
+        "id": "cccc0001-0001-0001-0001-000000000001_15708d7a-bcc9-48b6-83fb-c55119faac87",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 512,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908": {
+        "id": "cccc0001-0001-0001-0001-000000000002_1135216b-222c-45cd-a3f8-513b1fc4b908",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 288,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908": {
+        "id": "cccc0001-0001-0001-0001-000000000001_1135216b-222c-45cd-a3f8-513b1fc4b908",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 288,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553": {
+        "id": "cccc0001-0001-0001-0001-000000000002_816fe09a-bde1-404d-8bde-18cb4988d553",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 242,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553": {
+        "id": "cccc0001-0001-0001-0001-000000000001_816fe09a-bde1-404d-8bde-18cb4988d553",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 242,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae": {
+        "id": "cccc0001-0001-0001-0001-000000000002_e8d438a1-7550-4e76-89aa-576d6fa922ae",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 228,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae": {
+        "id": "cccc0001-0001-0001-0001-000000000001_e8d438a1-7550-4e76-89aa-576d6fa922ae",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 228,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757": {
+        "id": "cccc0001-0001-0001-0001-000000000002_817085a9-ba9c-479d-86f2-c3a6e5c2a757",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 220,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757": {
+        "id": "cccc0001-0001-0001-0001-000000000001_817085a9-ba9c-479d-86f2-c3a6e5c2a757",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 220,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46": {
+        "id": "cccc0001-0001-0001-0001-000000000002_862777fa-fdfc-4e7b-aac6-85ff8a846c46",
+        "name": "Potência do Elevador parado em horário de operação (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 206,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46": {
+        "id": "cccc0001-0001-0001-0001-000000000001_862777fa-fdfc-4e7b-aac6-85ff8a846c46",
+        "name": "Potência do Elevador parado em horário de operação (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 206,
+        "duration": 300000,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      }
+    }
+  },
+  "meta": {
+    "requestId": "e5c362e4-0a7d-420d-95ce-4bc62eec6ad3",
+    "timestamp": "2026-02-28T13:18:45.286Z"
+  }
+}
