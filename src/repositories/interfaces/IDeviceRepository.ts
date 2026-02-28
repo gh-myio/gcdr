@@ -8,6 +8,7 @@ export interface IDeviceRepository {
   getById(tenantId: string, id: string): Promise<Device | null>;
   getBySerialNumber(tenantId: string, serialNumber: string): Promise<Device | null>;
   getByExternalId(tenantId: string, externalId: string): Promise<Device | null>;
+  findByIdentifier(tenantId: string, identifier: string): Promise<Device | null>;
   update(tenantId: string, id: string, data: UpdateDeviceDTO, updatedBy: string): Promise<Device>;
   delete(tenantId: string, id: string): Promise<void>;
 

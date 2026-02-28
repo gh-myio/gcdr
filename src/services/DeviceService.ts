@@ -52,6 +52,18 @@ export class DeviceService {
       throw new NotFoundError(`Asset ${data.assetId} not found`);
     }
 
+    // Upsert by identifier: if device with same identifier already exists, update it
+    if (data.identifier) {
+      const existingByIdentifier = await this.repository.findByIdentifier(tenantId, data.identifier);
+      if (existingByIdentifier) {
+        const updated = await this.repository.update(tenantId, existingByIdentifier.id, data, userId);
+        alarmBundleService.invalidateCache(tenantId, asset.customerId, {
+          reason: 'device_updated', entityType: 'device', entityId: updated.id, userId,
+        });
+        return updated;
+      }
+    }
+
     // Check for duplicate serial number (if provided)
     if (data.serialNumber) {
       const existingSerial = await this.repository.getBySerialNumber(tenantId, data.serialNumber);
