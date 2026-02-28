@@ -7,6 +7,7 @@ export const ApiKeyScopeSchema = z.enum([
   'bundles:read',
   'devices:read',
   'rules:read',
+  'rules:write',
   'assets:read',
   'groups:read',
   '*:read',

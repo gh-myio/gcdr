@@ -10,6 +10,7 @@ export type ApiKeyScope =
   | 'devices:read'      // Read devices
   | 'devices:write'     // Write devices (RFC-0016)
   | 'rules:read'        // Read rules
+  | 'rules:write'       // Create/update/delete rules
   | 'assets:read'       // Read assets
   | 'assets:write'      // Write assets (RFC-0016)
   | 'groups:read'       // Read groups
