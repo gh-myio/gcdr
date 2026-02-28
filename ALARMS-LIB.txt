@@ -1,0 +1,31 @@
+ALARMS
+
+
+LIB
+
+Resultado do Checklist                                                                                                                                                        
+                                                                                                                                                                                
+  ┌────────────────────────┬────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 
+  │          Item          │ Status │                                                                Detalhe                                                                │
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ RFCs recentes          │ ✅     │ RFC-0183 criada (AlarmServiceOrchestrator-AlarmBadge.md). RFC-0180/181/182 já existiam e estão corretas.                              │   
+  │ atualizadas            │        │                                                                                                                                       │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ ONBOARDING.md          │ ✅     │ ONBOARDING-ECOSYSTEM-GCDR-ALARMS.md atualizado — nova Seção 7 "Camada de Dashboard" cobre AlarmServiceOrchestrator, AlarmBadge,       │   
+  │                        │        │ AlarmsTab, AllReportModal filter, globals e RFCs 0180-0183. Checklist com Fase 7.                                                     │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ Swagger                │ N/A    │ Biblioteca JS — não há OpenAPI/Swagger neste repositório.                                                                             │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ Entidades/migrations   │ N/A    │ Sem banco de dados neste repo.                                                                                                        │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ Commit + push          │ ✅     │ a3ba698 docs(rfc-0183) → pushed para fix/rfc-0152-real-data. As mudanças de código da sessão (MAIN_VIEW, TELEMETRY, AllReportModal,   │   
+  │                        │        │ showcase) já estavam em a1c4bb7 commitado pelo Rodrigo.                                                                               │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ Build OK               │ ✅     │ npm run build → exit 0. Apenas warnings pré-existentes em ChartModal.js (duplicate member) e .js legados com module.exports. Nada     │   
+  │                        │        │ novo.                                                                                                                                 │   
+  ├────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤   
+  │ Rodando local          │ —      │ Ignorado conforme solicitado.                                                                                                         │   
+  └────────────────────────┴────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘   
+
+  Pendente (fora do escopo desta sessão): há 4 arquivos uncommitted de trabalho paralelo do usuário (upsell modal, NODE-RED, novos GCDR-Upsell-Setup/ e Pre-Setup-Constructor/) 
+  — não foram commitados pois parecem trabalho em andamento.

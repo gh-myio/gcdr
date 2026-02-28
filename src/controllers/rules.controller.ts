@@ -137,6 +137,8 @@ router.get('/:id/devices', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * GET /rules/:id
  * Get rule by ID
@@ -148,6 +150,10 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!id) {
       throw new ValidationError('Rule ID is required');
+    }
+
+    if (!UUID_REGEX.test(id)) {
+      throw new ValidationError(`Invalid rule ID format: "${id}"`);
     }
 
     const rule = await ruleService.getById(tenantId, id);
@@ -176,6 +182,10 @@ router.put('/:id',
 
       if (!id) {
         throw new ValidationError('Rule ID is required');
+      }
+
+      if (!UUID_REGEX.test(id)) {
+        throw new ValidationError(`Invalid rule ID format: "${id}"`);
       }
 
       const data = UpdateRuleSchema.parse(req.body);
@@ -258,6 +268,10 @@ router.delete('/:id',
 
       if (!id) {
         throw new ValidationError('Rule ID is required');
+      }
+
+      if (!UUID_REGEX.test(id)) {
+        throw new ValidationError(`Invalid rule ID format: "${id}"`);
       }
 
       await ruleService.delete(tenantId, id, userId);
