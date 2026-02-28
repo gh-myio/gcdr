@@ -4,10 +4,20 @@ import { decodeJWT, JWTUser } from './context';
 import { customerApiKeyService } from '../services/CustomerApiKeyService';
 import { ApiKeyScope } from '../domain/entities/CustomerApiKey';
 
+// DISABLE_AUTH=true bypasses all auth checks (development/testing only — never use in production)
+const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
+
+function bypassAuth(req: Request, next: NextFunction): void {
+  req.context.tenantId = req.context.tenantId || process.env.DEFAULT_TENANT_ID || '11111111-1111-1111-1111-111111111111';
+  req.user = { sub: 'dev', email: 'dev@local', tenant_id: req.context.tenantId, type: 'SERVICE_ACCOUNT', roles: ['*'] };
+  next();
+}
+
 /**
  * Authentication middleware - requires valid JWT token
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (AUTH_DISABLED) return bypassAuth(req, next);
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -82,6 +92,7 @@ export function requireRoles(...roles: string[]) {
  */
 export function hybridAuthMiddleware(requiredScope?: ApiKeyScope | ApiKeyScope[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (AUTH_DISABLED) return bypassAuth(req, next);
     const authHeader = req.headers['authorization'];
     const apiKey = req.headers['x-api-key'] as string | undefined;
 
