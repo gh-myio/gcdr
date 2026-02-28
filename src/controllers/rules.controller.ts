@@ -165,6 +165,40 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * PATCH /rules/:id
+ * Partial update rule (alias for PUT — accepts partial body)
+ */
+router.patch('/:id',
+  logEvent({
+    eventType: EventType.RULE_UPDATED,
+    description: (req) => `Rule ${req.params.id} partially updated`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req, res) => res.locals.responseBody?.data?.customerId,
+    getMetadata: (req) => ({ updatedFields: Object.keys(req.body) }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Rule ID is required');
+      }
+
+      if (!UUID_REGEX.test(id)) {
+        throw new ValidationError(`Invalid rule ID format: "${id}"`);
+      }
+
+      const data = UpdateRuleSchema.parse(req.body);
+      const rule = await ruleService.update(tenantId, id, data, userId);
+      sendSuccess(res, rule, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * PUT /rules/:id
  * Update rule
  */
