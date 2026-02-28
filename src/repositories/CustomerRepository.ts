@@ -116,6 +116,7 @@ export class CustomerRepository implements ICustomerRepository {
     if (data.settings !== undefined) updateData.settings = { ...existing.settings, ...data.settings };
     if (data.theme !== undefined) updateData.theme = data.theme;
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
+    if (data.config !== undefined) updateData.config = data.config ?? null;
     if (data.status !== undefined) updateData.status = data.status;
 
     const [result] = await db

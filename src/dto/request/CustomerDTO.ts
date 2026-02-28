@@ -83,6 +83,11 @@ export const UpdateCustomerSchema = z.object({
   externalId: z.string().max(255).optional().nullable(),
   metadata: z.record(z.unknown()).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE'] as const).optional(),
+  config: z.object({
+    bundle: z.object({
+      checkVersion: z.boolean().optional(),
+    }).optional(),
+  }).optional().nullable(),
 });
 
 export type UpdateCustomerDTO = z.infer<typeof UpdateCustomerSchema>;
