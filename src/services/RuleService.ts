@@ -247,12 +247,14 @@ export class RuleService {
 
   // Private helper methods
 
-  private async validateScope(tenantId: string, scope: { type: string; entityId?: string }): Promise<void> {
+  private async validateScope(tenantId: string, scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
     if (scope.type === 'GLOBAL') {
       return; // No validation needed for global scope
     }
 
-    if (!scope.entityId) {
+    // Accept entityId directly or derive from first element of entityIds
+    const resolvedEntityId = scope.entityId ?? scope.entityIds?.[0];
+    if (!resolvedEntityId) {
       throw new ValidationError('entityId is required for non-GLOBAL scope');
     }
 
