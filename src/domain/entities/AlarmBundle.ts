@@ -166,6 +166,7 @@ export interface SimpleBundleMeta {
   ttlSeconds: number;
   rulesCount: number;
   devicesCount: number;
+  skipVersionCheck: boolean;  // RFC-0019: true when customer.config.bundle.checkVersion === false
 }
 
 /**

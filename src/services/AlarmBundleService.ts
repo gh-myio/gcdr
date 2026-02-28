@@ -377,6 +377,7 @@ export class AlarmBundleService {
       ttlSeconds: DEFAULT_TTL_SECONDS,
       rulesCount: Object.keys(rulesCatalog).length,
       devicesCount: devices.length,
+      skipVersionCheck: customer.config?.bundle?.checkVersion === false,
     };
 
     return {

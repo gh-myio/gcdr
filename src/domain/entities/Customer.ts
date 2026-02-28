@@ -46,10 +46,19 @@ export interface Customer extends BaseEntity {
   settings: CustomerSettings;
   theme?: CustomerTheme;
   metadata: Record<string, unknown>;
+  config?: CustomerConfig;
 
   // Status
   status: EntityStatus;
   deletedAt?: string;
+}
+
+export interface CustomerBundleConfig {
+  checkVersion?: boolean;  // default true — false = always return full bundle
+}
+
+export interface CustomerConfig {
+  bundle?: CustomerBundleConfig;
 }
 
 export function createDefaultCustomerSettings(): CustomerSettings {

@@ -174,6 +174,7 @@ export const customers = pgTable('customers', {
   settings: jsonb('settings').notNull().default({}),
   theme: jsonb('theme'),
   metadata: jsonb('metadata').notNull().default({}),
+  config: jsonb('config'),
 
   // Status
   status: entityStatusEnum('status').notNull().default('ACTIVE'),

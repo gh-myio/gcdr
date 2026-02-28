@@ -439,26 +439,29 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     const etag = `"${bundle.meta.version}"`;
     const currentVersionId = bundle.meta.version;
 
-    // Return 200 Not Modified if X-Version-Id matches current version
-    if (clientVersionId && clientVersionId === currentVersionId) {
-      res.set({
-        'ETag': etag,
-        'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
-        'X-Bundle-Version': currentVersionId,
-      });
-      res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
-      return;
-    }
+    // RFC-0019: skip version checks if customer.config.bundle.checkVersion === false
+    if (!bundle.meta.skipVersionCheck) {
+      // Return 200 Not Modified if X-Version-Id matches current version
+      if (clientVersionId && clientVersionId === currentVersionId) {
+        res.set({
+          'ETag': etag,
+          'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+          'X-Bundle-Version': currentVersionId,
+        });
+        res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
+        return;
+      }
 
-    // Return 200 Not Modified if ETag matches (standard HTTP caching)
-    if (ifNoneMatch && ifNoneMatch === etag) {
-      res.set({
-        'ETag': etag,
-        'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
-        'X-Bundle-Version': currentVersionId,
-      });
-      res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
-      return;
+      // Return 200 Not Modified if ETag matches (standard HTTP caching)
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        res.set({
+          'ETag': etag,
+          'Cache-Control': `private, max-age=${bundle.meta.ttlSeconds}`,
+          'X-Bundle-Version': currentVersionId,
+        });
+        res.status(200).json({ versionId: currentVersionId, message: 'Not Modified' });
+        return;
+      }
     }
 
     // Set caching headers (metadata goes here instead of body)

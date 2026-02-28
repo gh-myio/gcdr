@@ -450,6 +450,7 @@ export class CustomerRepository implements ICustomerRepository {
       settings: row.settings as Customer['settings'],
       theme: row.theme as Customer['theme'],
       metadata: row.metadata as Record<string, unknown>,
+      config: (row.config as Customer['config']) ?? undefined,
       status: row.status,
       deletedAt: row.deletedAt?.toISOString(),
       createdAt: row.createdAt.toISOString(),
