@@ -1442,3 +1442,66 @@ slaveId
 curl https://gcdr-api.a.myio-bas.com/api/v1/customers/84e0370e-636a-4741-9874-504b5e0b3577/rules -H "X-API-Key: gcdr_alarm_integration_key_2026"
 
 curl https://gcdr-api.a.myio-bas.com/api/v1/customers/84e0370e-636a-4741-9874-504b5e0b3577/rules -H "X-API-Key: gcdr_alarm_integration_key_2026"
+
+
+
+O fluxo completo hoje, do início ao fim:                                                                                                                                                                                 
+                                                                                                                                                                                                                           
+  ---                                                                                                                                                                                                                      
+  ┌─────────────────────────────────────────────────────────────────┐                                                                                                                                                        │  orchestrator.verify (worker)  — a cada VERIFY_POLL_INTERVAL_MS │                                                                                                                                                      
+  └──────────────────────────────┬──────────────────────────────────┘                                                                                                                                                      
+                                 │
+                      1. Busca todos os customers
+                         GET /api/v1/customers no GCDR
+                         (fallback: env GCDR_CUSTOMER_ID)
+                                 │
+                      2. Para cada customer (sequencial):
+                                 │
+                      ┌──────────▼──────────────────┐
+                      │  VerifyService.run()         │
+                      │  (verify.service.ts)         │
+                      └──────────┬──────────────────┘
+                                 │
+                      3. Busca bundle de regras no GCDR
+                         (com X-Version-Id → pula se não mudou)
+                                 │
+                      4. Para cada device × rule:
+                         a. Enriquece device via GCDR
+                            (tbDeviceId, deviceName, etc.)
+                         b. Busca telemetria no ThingsBoard
+                            para a janela de tempo da regra
+                         c. Avalia cada bucket de telemetria
+                            (measuredValue OP threshold ?)
+                                 │
+                      5. Se bucket TRIGGERED:
+                         emite AlarmCandidateRaised
+                         fingerprint = ruleId  ← RFC-0015
+                                 │
+                      ┌──────────▼──────────────────────────────┐
+                      │  Redis queue: alarm-events               │
+                      └──────────┬──────────────────────────────┘
+                                 │
+                      ┌──────────▼──────────────────────────────┐
+                      │  orchestrator (worker principal)         │
+                      │  DecisionEngine.handleCandidateRaised()  │
+                      └──────────┬──────────────────────────────┘
+                                 │
+                      6. dedup.guard → verifica dedup_entries
+                         dedup_key = tenantId:centralId:deviceId:alarmType:ruleId
+                         ├─ entrada OPEN existe? → SUPPRESS (descarta)
+                         └─ não existe / CLOSED? → cria alarm OPEN
+                                 │
+                      7. Alarm salvo no Postgres
+                         dedup_entry criada (TTL 90 dias)
+
+  ---
+  O que NÃO acontece no verify-path:
+  - Não há auto-fechamento — o verify emite só AlarmCandidateRaised, nunca AlarmCandidateResolved. Se a condição parar de disparar, o alarme fica OPEN até ser fechado manualmente ou via ingest-candidate (que tem o fluxo
+   triggered=false).
+
+  Otimização de bundle:
+  - O worker mantém um versionRefs em memória por customer. Se o GCDR responde que o bundle não mudou (mesmo versionId), o poll do customer é pulado completamente — sem telemetria, sem avaliação.
+
+  Antes vs. depois do RFC-0015:
+  - Antes: cada bucket triggerizado criava um alarm novo (fingerprint = timestamp)
+  - Agora: o segundo bucket em diante é suprimido pelo dedup (fingerprint = ruleId)
