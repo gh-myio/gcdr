@@ -94,6 +94,12 @@ export function decodeJWT(token: string): JWTUser | null {
       return null;
     }
 
+    // Reject tokens where tenant_id is not a valid UUID (e.g. 'tenant-default')
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!decoded.tenant_id || !UUID_REGEX.test(decoded.tenant_id)) {
+      return null;
+    }
+
     return {
       sub: decoded.sub,
       tenant_id: decoded.tenant_id,
