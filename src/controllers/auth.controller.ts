@@ -16,6 +16,7 @@ import { ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT } from '../middleware/context';
 import { registrationService } from '../services/RegistrationService';
 import { EventType } from '../shared/types';
+import { customerApiKeyService } from '../services/CustomerApiKeyService';
 
 const router = Router();
 
@@ -284,6 +285,46 @@ router.post('/reset-password', async (req: Request, res: Response, next: NextFun
     const response = await registrationService.resetPassword(tenantId, email, code, newPassword);
 
     sendSuccess(res, response, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/validate-key
+ * Validate a Customer API Key and return its context (no JWT required).
+ *
+ * Designed for M2M systems (e.g. Alarm Orchestrator) that need to verify
+ * a key is valid before using it in subsequent requests.
+ *
+ * Request headers:
+ *   X-API-Key: gcdr_xxx...   (required)
+ *
+ * Response 200:
+ *   { keyId, tenantId, customerId, name, scopes, valid: true }
+ *
+ * Response 401:
+ *   { success: false, error: { code: 'UNAUTHORIZED', message: '...' } }
+ */
+router.post('/validate-key', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { requestId, ip } = req.context;
+    const apiKey = req.headers['x-api-key'] as string | undefined;
+
+    if (!apiKey) {
+      throw new UnauthorizedError('X-API-Key header is required');
+    }
+
+    const context = await customerApiKeyService.validateApiKey(apiKey, ip);
+
+    sendSuccess(res, {
+      valid: true,
+      keyId: context.keyId,
+      tenantId: context.tenantId,
+      customerId: context.customerId,
+      name: context.name,
+      scopes: context.scopes,
+    }, 200, requestId);
   } catch (err) {
     next(err);
   }
