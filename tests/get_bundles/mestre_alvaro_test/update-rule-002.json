@@ -1,0 +1,28 @@
+{
+  "name": "Elevador parado (domingo)",
+  "type": "ALARM_THRESHOLD",
+  "priority": "MEDIUM",
+  "scope": {
+    "type": "DEVICE",
+    "entityId": "15708d7a-bcc9-48b6-83fb-c55119faac87",
+    "entityIds": [
+      "15708d7a-bcc9-48b6-83fb-c55119faac87",
+      "1135216b-222c-45cd-a3f8-513b1fc4b908",
+      "816fe09a-bde1-404d-8bde-18cb4988d553",
+      "e8d438a1-7550-4e76-89aa-576d6fa922ae",
+      "817085a9-ba9c-479d-86f2-c3a6e5c2a757",
+      "862777fa-fdfc-4e7b-aac6-85ff8a846c46"
+    ]
+  },
+  "alarmConfig": {
+    "metric": "instantaneous_power",
+    "operator": "LT",
+    "value": 400,
+    "duration": 900000,
+    "hysteresis": 0,
+    "aggregation": "AVG",
+    "startAt": "12:00",
+    "endAt": "22:00",
+    "daysOfWeek": [0]
+  }
+}

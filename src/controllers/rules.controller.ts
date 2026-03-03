@@ -493,21 +493,6 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
       includeDisabled: includeDisabled === 'true',
     };
 
-    // Quick version check (cache-only, no DB queries)
-    if (clientVersionId) {
-      const cachedVersion = alarmBundleService.getVersion(bundleParams, 'simple');
-      if (cachedVersion && cachedVersion === clientVersionId) {
-        const etag = `"${cachedVersion}"`;
-        res.set({
-          'ETag': etag,
-          'Cache-Control': 'private, max-age=300',
-          'X-Bundle-Version': cachedVersion,
-        });
-        res.status(200).json({ versionId: cachedVersion, message: 'Not Modified' });
-        return;
-      }
-    }
-
     // Check for conditional request (If-None-Match header - standard HTTP)
     const ifNoneMatch = req.headers['if-none-match'];
 

@@ -16,7 +16,10 @@ export function errorHandler(
   // Only log full stack trace for unexpected errors (5xx / non-operational)
   // Operational errors (4xx) are expected and get a brief log line
   if (err instanceof AppError && err.isOperational) {
-    console.warn(`[${err.statusCode}] ${err.code}: ${err.message}`);
+    const requestId = req.context?.requestId || '-';
+    const userId    = req.context?.userId    || '-';
+    const ip        = req.context?.ip        || req.ip || '-';
+    console.warn(`[${err.statusCode}] ${err.code}: ${err.message} | ${req.method} ${req.path} | ip=${ip} | userId=${userId} | requestId=${requestId}`);
   } else {
     console.error('Error:', err);
   }

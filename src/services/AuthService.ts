@@ -368,7 +368,7 @@ export class AuthService {
     // Check if token is in our store (not revoked)
     const storedToken = this.refreshTokens.get(payload.jti);
     if (!storedToken || storedToken.userId !== payload.sub) {
-      throw new UnauthorizedError('Refresh token revogado');
+      throw new UnauthorizedError(`Refresh token revogado (jti=${payload.jti}, sub=${payload.sub})`);
     }
 
     // Get user to ensure they still exist and are active

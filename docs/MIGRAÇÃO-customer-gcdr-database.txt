@@ -1,0 +1,132 @@
+migration customer attr gcrd
+
+SELECT 'customers (filhos)'   AS tabela, COUNT(*) FROM customers           WHERE parent_customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'users',                           COUNT(*) FROM users               WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'assets',                          COUNT(*) FROM assets              WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'devices',                         COUNT(*) FROM devices             WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'rules',                           COUNT(*) FROM rules               WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'centrals',                        COUNT(*) FROM centrals            WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'groups',                          COUNT(*) FROM groups              WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'look_and_feels (temas)',          COUNT(*) FROM look_and_feels      WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'customer_api_keys',              COUNT(*) FROM customer_api_keys    WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'maintenance_groups',             COUNT(*) FROM maintenance_groups   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'alarm_bundle_versions',          COUNT(*) FROM alarm_bundle_versions WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+  UNION ALL
+  SELECT 'audit_logs',                     COUNT(*) FROM audit_logs           WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9'
+
+  ORDER BY tabela;
+  
+  
+----
+
+
+-- ============================================================                                                                                                                    
+  -- MIGRAÇÃO: 4eb817a0-... → a4c64215-...
+  -- ============================================================                                                                                                                      -- OLD: 4eb817a0-52fe-4011-980a-199854dddeb9  (Montserrat - remover)
+  -- NEW: a4c64215-f7eb-4102-80b5-e10b98e2f94e  (Mont Serrat - manter)                                                                                                               
+  -- ============================================================
+
+  BEGIN;
+
+  -- 1. Filhos de customers (sub-customers)
+  UPDATE customers
+     SET parent_customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE parent_customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 2. Users
+  UPDATE users
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 3. Assets
+  UPDATE assets
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 4. Devices
+  UPDATE devices
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 5. Rules
+  UPDATE rules
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 6. Centrals
+  UPDATE centrals
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 7. Groups
+  UPDATE groups
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 8. Look and feels (temas)
+  UPDATE look_and_feels
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 9. API Keys
+  UPDATE customer_api_keys
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 10. Maintenance groups
+  UPDATE maintenance_groups
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 11. Alarm bundle versions (histórico — manter para auditoria)
+  UPDATE alarm_bundle_versions
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 12. Audit logs (histórico — manter para auditoria)
+  UPDATE audit_logs
+     SET customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   WHERE customer_id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- 13. Deletar o customer antigo
+  DELETE FROM customers
+   WHERE id = '4eb817a0-52fe-4011-980a-199854dddeb9';
+
+  -- Verificar resultado
+  SELECT 'customers (filhos)'  AS tabela, COUNT(*) FROM customers           WHERE parent_customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'users',                          COUNT(*) FROM users               WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'assets',                         COUNT(*) FROM assets              WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'devices',                        COUNT(*) FROM devices             WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'rules',                          COUNT(*) FROM rules               WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'centrals',                       COUNT(*) FROM centrals            WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+  UNION ALL
+  SELECT 'customer_api_keys',             COUNT(*) FROM customer_api_keys    WHERE customer_id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e';
+
+  COMMIT;
+
+  Atenção antes de rodar: assets tem unique index em (tenant_id, customer_id, code). Se ambos os customers tiverem assets com o mesmo code, o UPDATE vai dar conflict. Rode isso     
+  antes para checar:
+  SELECT a.code, COUNT(*)
+    FROM assets a
+   WHERE a.customer_id IN (
+     '4eb817a0-52fe-4011-980a-199854dddeb9',
+     'a4c64215-f7eb-4102-80b5-e10b98e2f94e'
+   )
+   GROUP BY a.code
+  HAVING COUNT(*) > 1;
+  Se retornar zero linhas, pode rodar o migration tranquilo.
