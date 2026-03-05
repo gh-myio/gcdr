@@ -1,4 +1,4 @@
-import { eq, and, like, isNull, sql, inArray } from 'drizzle-orm';
+import { eq, and, like, isNull, sql, inArray, notInArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Customer, createDefaultCustomerSettings } from '../domain/entities/Customer';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../dto/request/CustomerDTO';
@@ -269,11 +269,31 @@ export class CustomerRepository implements ICustomerRepository {
       summary.devices = deletedDevices.length;
 
       // Delete assets (FK → customers.id)
+      // When keepCentrals=true, exclude assets still referenced by centrals (FK constraint)
+      const centralAssetIds = options.keepCentrals
+        ? (await trx
+            .select({ assetId: schema.centrals.assetId })
+            .from(schema.centrals)
+            .where(and(
+              eq(schema.centrals.tenantId, tenantId),
+              inArray(schema.centrals.customerId, allCustomerIds),
+            ))
+          ).map((r) => r.assetId)
+        : [];
+
+      const assetWhere = centralAssetIds.length > 0
+        ? and(
+            eq(schema.assets.tenantId, tenantId),
+            inArray(schema.assets.customerId, allCustomerIds),
+            notInArray(schema.assets.id, centralAssetIds),
+          )
+        : and(
+            eq(schema.assets.tenantId, tenantId),
+            inArray(schema.assets.customerId, allCustomerIds),
+          );
+
       const deletedAssets = await trx.delete(schema.assets)
-        .where(and(
-          eq(schema.assets.tenantId, tenantId),
-          inArray(schema.assets.customerId, allCustomerIds),
-        ))
+        .where(assetWhere)
         .returning({ id: schema.assets.id });
       summary.assets = deletedAssets.length;
 
