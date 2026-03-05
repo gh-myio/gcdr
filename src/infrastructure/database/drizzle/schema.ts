@@ -1257,3 +1257,30 @@ export const alarmBundleVersions = pgTable('alarm_bundle_versions', {
   versionIdx: index('abv_version_idx').on(table.version),
   createdAtIdx: index('abv_created_at_idx').on(table.createdAt),
 }));
+
+// =============================================================================
+// RFC-0021: HTML Templates Engine
+// =============================================================================
+
+export const templates = pgTable('templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 255 }).notNull(),
+  tenantId: uuid('tenant_id').notNull(),
+
+  name: varchar('name', { length: 500 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(),     // EMAIL_ALARM | EMAIL_REPORT | EMAIL_WELCOME
+  status: varchar('status', { length: 50 }).notNull().default('DRAFT'),
+
+  // TEXT — not varchar/jsonb — supports 20–50 KB HTML templates
+  htmlContent: text('html_content').notNull(),
+
+  description: varchar('description', { length: 1000 }),
+  version: integer('version').notNull().default(1),
+
+  createdBy: uuid('created_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  slugTenantUnique: uniqueIndex('tmpl_slug_tenant_unique').on(table.slug, table.tenantId),
+  tenantTypeStatusIdx: index('tmpl_tenant_type_status_idx').on(table.tenantId, table.type, table.status),
+}));

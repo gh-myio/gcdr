@@ -32,3 +32,6 @@ export { default as accessBundleController } from './access-bundle.controller';
 
 // RFC-0020: Public Single Apps
 export { default as publicSingleAppsController } from './public-single-apps.controller';
+
+// RFC-0021: HTML Templates Engine
+export { default as templatesController } from './templates.controller';
