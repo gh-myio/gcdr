@@ -22,15 +22,15 @@ DECLARE
     v_admin_id  UUID := 'bbbb1111-1111-1111-1111-111111111111';
 
     -- App IDs
-    v_app_migration   UUID := 'psa00001-0000-0000-0000-000000000001';
-    v_app_onboarding  UUID := 'psa00001-0000-0000-0000-000000000002';
-    v_app_nda         UUID := 'psa00001-0000-0000-0000-000000000003';
+    v_app_migration   UUID := 'a5a00001-0000-0000-0000-000000000001';
+    v_app_onboarding  UUID := 'a5a00001-0000-0000-0000-000000000002';
+    v_app_nda         UUID := 'a5a00001-0000-0000-0000-000000000003';
 
     -- Response group IDs
-    v_group_helexia   UUID := 'psag0001-0000-0000-0000-000000000001';
-    v_group_xyz       UUID := 'psag0001-0000-0000-0000-000000000002';
-    v_group_abc       UUID := 'psag0001-0000-0000-0000-000000000003';
-    v_group_mont      UUID := 'psag0001-0000-0000-0000-000000000004';
+    v_group_helexia   UUID := 'a5a90001-0000-0000-0000-000000000001';
+    v_group_xyz       UUID := 'a5a90001-0000-0000-0000-000000000002';
+    v_group_abc       UUID := 'a5a90001-0000-0000-0000-000000000003';
+    v_group_mont      UUID := 'a5a90001-0000-0000-0000-000000000004';
 
 BEGIN
 
@@ -120,7 +120,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0001-0001-0001-000000000001',
+    'a5b00001-0001-0001-0001-000000000001',
     v_app_migration,
     v_group_helexia,
     1,
@@ -185,7 +185,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0001-0001-0001-000000000002',
+    'a5b00001-0001-0001-0001-000000000002',
     v_app_migration,
     v_group_helexia,
     2,
@@ -263,7 +263,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0002-0002-0002-000000000001',
+    'a5b00001-0002-0002-0002-000000000001',
     v_app_migration,
     v_group_xyz,
     1,
@@ -329,7 +329,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0003-0003-0003-000000000001',
+    'a5b00001-0003-0003-0003-000000000001',
     v_app_migration,
     v_group_abc,
     1,
@@ -375,7 +375,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0003-0003-0003-000000000002',
+    'a5b00001-0003-0003-0003-000000000002',
     v_app_migration,
     v_group_abc,
     2,
@@ -425,7 +425,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0001-0003-0003-0003-000000000003',
+    'a5b00001-0003-0003-0003-000000000003',
     v_app_migration,
     v_group_abc,
     3,
@@ -485,7 +485,7 @@ INSERT INTO public_single_app_responses
      form_data, submitted_by, changes_from_previous, change_notes,
      status, metadata, created_at, updated_at, created_by)
 VALUES (
-    'psar0002-0004-0004-0004-000000000001',
+    'a5b00002-0004-0004-0004-000000000001',
     v_app_onboarding,
     v_group_mont,
     1,
