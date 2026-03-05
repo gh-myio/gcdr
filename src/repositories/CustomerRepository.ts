@@ -308,11 +308,13 @@ export class CustomerRepository implements ICustomerRepository {
         summary.users = deletedUsers.length;
       }
 
-      // Delete customers — skipped when keepCentrals=true because:
-      // centrals → assets → customers (FK chain prevents customer deletion)
-      // In that case this becomes a "data reset": devices/rules/users wiped,
-      // but the customer + their assets + centrals are preserved.
-      if (!options.keepCentrals) {
+      // Delete customers — skipped when any "keep" option is active:
+      //   keepCentrals: centrals → assets → customers (unbreakable FK chain)
+      //   keepApiKeys:  customer_api_keys.customer_id → customers (FK)
+      // When skipped this becomes a "data reset": devices/rules/users/groups wiped
+      // but the customer record itself is preserved.
+      const keepCustomer = options.keepCentrals || options.keepApiKeys;
+      if (!keepCustomer) {
         await trx.delete(customers)
           .where(and(
             eq(customers.tenantId, tenantId),
@@ -322,7 +324,7 @@ export class CustomerRepository implements ICustomerRepository {
     });
 
     return {
-      deletedCustomers: options.keepCentrals ? 0 : allCustomerIds.length,
+      deletedCustomers: (options.keepCentrals || options.keepApiKeys) ? 0 : allCustomerIds.length,
       summary,
     };
   }
