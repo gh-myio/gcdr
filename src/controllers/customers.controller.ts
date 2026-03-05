@@ -266,6 +266,26 @@ router.get('/:id/descendants', async (req: Request, res: Response, next: NextFun
 });
 
 /**
+ * GET /customers/:id/ancestors
+ * Get all ancestors of a customer (path from root to parent)
+ */
+router.get('/:id/ancestors', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    const ancestors = await customerService.getAncestors(tenantId, id);
+    sendSuccess(res, { items: ancestors, count: ancestors.length }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /customers/:id/tree
  * Get customer tree structure
  */
