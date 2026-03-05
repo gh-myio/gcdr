@@ -569,6 +569,240 @@ ORDER BY ak.created_at DESC;`,
 });
 
 // =============================================================================
+// Seed Export — Reverse Engineering
+// =============================================================================
+
+/** Escape a value for use in a SQL literal */
+function sqlLit(val: unknown): string {
+  if (val === null || val === undefined) return 'NULL';
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+  if (typeof val === 'number') return String(val);
+  if (val instanceof Date) return `'${val.toISOString()}'::timestamptz`;
+  if (typeof val === 'object') {
+    return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+  }
+  return `'${String(val).replace(/'/g, "''")}'`;
+}
+
+/** Build a single INSERT ... ON CONFLICT (id) DO NOTHING statement */
+function buildInsert(table: string, row: Record<string, unknown>, conflictCol = 'id'): string {
+  const cols = Object.keys(row);
+  const vals = cols.map(c => sqlLit(row[c]));
+  return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (${conflictCol}) DO NOTHING;`;
+}
+
+/** Generate a SQL seed script for a specific customer (and optional descendants) */
+async function generateSeedExport(
+  customerId: string,
+  options: { includeDescendants?: boolean; includeTables?: string[] },
+): Promise<string> {
+  const lines: string[] = [];
+  const defaultTables = ['customers', 'assets', 'devices', 'centrals', 'rules', 'customer_api_keys', 'groups', 'look_and_feels', 'alarm_bundle_versions'];
+  const tables = options.includeTables ?? defaultTables;
+
+  lines.push(`-- =============================================================================`);
+  lines.push(`-- GCDR Seed Export`);
+  lines.push(`-- Generated: ${new Date().toISOString()}`);
+  lines.push(`-- Customer: ${customerId}`);
+  lines.push(`-- Includes descendants: ${options.includeDescendants ? 'yes' : 'no'}`);
+  lines.push(`-- Tables: ${tables.join(', ')}`);
+  lines.push(`-- =============================================================================`);
+  lines.push('');
+  lines.push('DO $$');
+  lines.push('BEGIN');
+  lines.push('');
+
+  // ── 1. Collect customer IDs ───────────────────────────────────────────────
+  let customerIds: string[] = [customerId];
+
+  if (options.includeDescendants) {
+    const descRows = await db.execute(sql`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM customers WHERE id = ${customerId}
+        UNION ALL
+        SELECT c.id FROM customers c
+        JOIN descendants d ON c.parent_customer_id = d.id
+      )
+      SELECT id FROM descendants
+    `);
+    customerIds = (Array.isArray(descRows) ? descRows : []).map((r: any) => r.id as string);
+  }
+
+  const idList = customerIds.map(id => `'${id}'`).join(', ');
+
+  // ── 2. CUSTOMERS ─────────────────────────────────────────────────────────
+  if (tables.includes('customers')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM customers WHERE id IN (${idList}) ORDER BY depth, name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- customers (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('customers', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 3. ASSETS ─────────────────────────────────────────────────────────────
+  if (tables.includes('assets')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM assets WHERE customer_id IN (${idList}) ORDER BY depth, name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- assets (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('assets', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 4. DEVICES ────────────────────────────────────────────────────────────
+  if (tables.includes('devices')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM devices WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- devices (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('devices', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 5. CENTRALS ───────────────────────────────────────────────────────────
+  if (tables.includes('centrals')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM centrals WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- centrals (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('centrals', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 6. RULES ──────────────────────────────────────────────────────────────
+  if (tables.includes('rules')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM rules WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- rules (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('rules', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 7. CUSTOMER API KEYS ──────────────────────────────────────────────────
+  if (tables.includes('customer_api_keys')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM customer_api_keys WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- customer_api_keys (${rows.length}) -----`);
+      lines.push(`  -- NOTE: key_hash values are hashed — keys are NOT recoverable from this export`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('customer_api_keys', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 8. GROUPS ─────────────────────────────────────────────────────────────
+  if (tables.includes('groups')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM groups WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- groups (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('groups', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 9. LOOK AND FEELS (themes) ────────────────────────────────────────────
+  if (tables.includes('look_and_feels')) {
+    const rows = await db.execute(sql.raw(`SELECT * FROM look_and_feels WHERE customer_id IN (${idList}) ORDER BY name`));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- look_and_feels (${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('look_and_feels', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── 10. ALARM BUNDLE VERSIONS (last 10 per customer) ─────────────────────
+  if (tables.includes('alarm_bundle_versions')) {
+    const rows = await db.execute(sql.raw(
+      `SELECT * FROM alarm_bundle_versions WHERE customer_id IN (${idList})
+       ORDER BY created_at DESC LIMIT 50`
+    ));
+    if (Array.isArray(rows) && rows.length > 0) {
+      lines.push(`  -- ----- alarm_bundle_versions (last ${rows.length}) -----`);
+      for (const row of rows as Record<string, unknown>[]) {
+        lines.push(`  ${buildInsert('alarm_bundle_versions', row)}`);
+      }
+      lines.push('');
+    }
+  }
+
+  lines.push('END $$;');
+  lines.push('');
+  lines.push(`-- Export complete: ${new Date().toISOString()}`);
+  return lines.join('\n');
+}
+
+// GET /api/seed-export/customers — list customers for the dropdown
+router.get('/api/seed-export/customers', async (req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT id, name, type, depth, status,
+             REPEAT('  ', depth) || name AS hierarchy
+      FROM customers
+      ORDER BY depth, name
+      LIMIT 500
+    `);
+    res.json({ customers: Array.isArray(rows) ? rows : [] });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/seed-export — generate and download seed SQL for a customer
+router.post('/api/seed-export', async (req: Request, res: Response) => {
+  const { customerId, includeDescendants, tables } = req.body;
+
+  if (!customerId || typeof customerId !== 'string') {
+    return res.status(400).json({ error: 'customerId is required' });
+  }
+
+  // Validate UUID
+  if (!/^[0-9a-f-]{36}$/i.test(customerId)) {
+    return res.status(400).json({ error: 'customerId must be a valid UUID' });
+  }
+
+  try {
+    const sqlContent = await generateSeedExport(customerId, {
+      includeDescendants: Boolean(includeDescendants),
+      includeTables: Array.isArray(tables) && tables.length > 0 ? tables : undefined,
+    });
+
+    // Get customer name for filename
+    const nameRows = await db.execute(sql`SELECT name FROM customers WHERE id = ${customerId}`);
+    const customerName = Array.isArray(nameRows) && nameRows[0]
+      ? String((nameRows[0] as any).name).toLowerCase().replace(/[^a-z0-9]/g, '-')
+      : customerId.substring(0, 8);
+
+    const filename = `seed-export-${customerName}-${new Date().toISOString().slice(0, 10)}.sql`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(sqlContent);
+
+    addLog('success', `Seed export generated: ${filename} (${(sqlContent.length / 1024).toFixed(1)} KB)`);
+  } catch (error: any) {
+    addLog('error', `Seed export failed: ${extractPgError(error)}`);
+    res.status(500).json({ error: extractPgError(error) });
+  }
+});
+
+// =============================================================================
 // HTML UI
 // =============================================================================
 
@@ -1244,6 +1478,7 @@ function getHtmlPage(): string {
     <button class="tab" onclick="showTab('scripts')">Scripts</button>
     <button class="tab" onclick="showTab('logs')">Logs</button>
     <button class="tab" onclick="showTab('query')">Query Console</button>
+    <button class="tab" onclick="showTab('seed-export')">&#128229; Seed Export</button>
   </div>
 
   <div class="container">
@@ -1409,6 +1644,89 @@ function getHtmlPage(): string {
       </div>
     </div>
   </div>
+
+    <!-- Seed Export Panel -->
+    <div id="seed-export-panel" class="panel">
+      <div class="card">
+        <div class="card-title">&#128229; Seed Export — Reverse Engineering</div>
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
+          Gera um arquivo <code>.sql</code> com todos os dados do customer selecionado,
+          pronto para reimportar em outro ambiente.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 16px; max-width: 700px;">
+
+          <!-- Customer selector -->
+          <div>
+            <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary);">
+              Selecionar customer (dropdown)
+            </label>
+            <select id="seed-customer-select"
+              style="width: 100%; padding: 9px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;">
+              <option value="">-- carregando... --</option>
+            </select>
+          </div>
+
+          <!-- Manual UUID input -->
+          <div>
+            <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary);">
+              Customer ID (UUID) — pode colar manualmente
+            </label>
+            <input id="seed-customer-id" type="text"
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              style="width: 100%; padding: 9px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: monospace; font-size: 0.9rem; box-sizing: border-box;" />
+          </div>
+
+          <!-- Options -->
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+              <input type="checkbox" id="seed-include-descendants" checked />
+              Incluir descendentes (sub-customers)
+            </label>
+          </div>
+
+          <!-- Tables to include -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+              Tabelas a exportar:
+            </label>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              ${['customers','assets','devices','centrals','rules','customer_api_keys','groups','look_and_feels','alarm_bundle_versions'].map(t =>
+                `<label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;background:var(--bg-tertiary);padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);">
+                  <input type="checkbox" class="seed-table-check" value="${t}" checked /> ${t}
+                </label>`
+              ).join('')}
+            </div>
+          </div>
+
+          <!-- Action row -->
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <button id="btn-seed-export" class="btn btn-success" onclick="generateSeedExport()">
+              &#128229; Generate &amp; Download .sql
+            </button>
+            <button class="btn btn-secondary" onclick="loadSeedExportCustomers()">
+              &#8635; Reload customers
+            </button>
+          </div>
+
+          <!-- Status -->
+          <div id="seed-export-status" style="font-size: 0.9rem; min-height: 24px;"></div>
+        </div>
+      </div>
+
+      <!-- Info card -->
+      <div class="card" style="margin-top: 16px;">
+        <div class="card-title">Sobre o export</div>
+        <ul style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 20px;">
+          <li>Todas as INSERTs usam <code>ON CONFLICT (id) DO NOTHING</code> — safe para reimportar</li>
+          <li>Valores JSONB são serialized corretamente com cast <code>::jsonb</code></li>
+          <li>Timestamps com cast <code>::timestamptz</code></li>
+          <li>API Keys: o <code>key_hash</code> é exportado mas a chave original NÃO é recuperável</li>
+          <li>Usuários, audit_logs e role_assignments NÃO são incluídos (dependências complexas)</li>
+          <li>O arquivo pode ser importado com: <code>psql $DATABASE_URL -f seed-export-*.sql</code></li>
+        </ul>
+      </div>
+    </div>
 
   <!-- JSON Modal -->
   <div id="json-modal" class="modal-overlay" onclick="closeModal(event)">
@@ -1642,6 +1960,7 @@ function getHtmlPage(): string {
         renderHistory();
         if (editor) editor.refresh();
       }
+      if (tabId === 'seed-export') loadSeedExportCustomers();
     }
 
     // ==========================================================================
@@ -2085,6 +2404,78 @@ function getHtmlPage(): string {
       loadScripts();
       loadExamples();
       renderHistory();
+    }
+
+    // ==========================================================================
+    // Seed Export
+    // ==========================================================================
+    let seedCustomers = [];
+
+    async function loadSeedExportCustomers() {
+      const sel = document.getElementById('seed-customer-select');
+      const inp = document.getElementById('seed-customer-id');
+      sel.innerHTML = '<option value="">Loading...</option>';
+      try {
+        const res = await fetch(\`\${API_BASE}/seed-export/customers\`);
+        const data = await res.json();
+        seedCustomers = data.customers || [];
+        sel.innerHTML = '<option value="">-- select a customer --</option>' +
+          seedCustomers.map(c => \`<option value="\${c.id}">\${c.hierarchy || c.name} (\${c.type}) \${c.status !== 'ACTIVE' ? '['+c.status+']' : ''}</option>\`).join('');
+        sel.onchange = () => { if (sel.value) inp.value = sel.value; };
+      } catch (err) {
+        sel.innerHTML = '<option value="">Failed to load</option>';
+      }
+    }
+
+    async function generateSeedExport() {
+      const customerId = document.getElementById('seed-customer-id').value.trim();
+      if (!customerId) { alert('Enter or select a Customer ID'); return; }
+
+      const includeDescendants = document.getElementById('seed-include-descendants').checked;
+      const tables = Array.from(document.querySelectorAll('.seed-table-check:checked')).map(el => el.value);
+
+      const btn = document.getElementById('btn-seed-export');
+      const status = document.getElementById('seed-export-status');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Generating...';
+      status.innerHTML = '<span style="color:var(--info);">Querying database...</span>';
+
+      try {
+        const res = await fetch(\`\${API_BASE}/seed-export\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId, includeDescendants, tables }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          status.innerHTML = \`<span style="color:var(--error);">Error: \${err.error}</span>\`;
+          return;
+        }
+
+        // Trigger download
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="([^"]+)"/);
+        const filename = match ? match[1] : \`seed-export-\${customerId.slice(0,8)}.sql\`;
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        const sizeKb = (blob.size / 1024).toFixed(1);
+        status.innerHTML = \`<span style="color:var(--success);">&#10003; Downloaded: <strong>\${filename}</strong> (\${sizeKb} KB)</span>\`;
+      } catch (err) {
+        status.innerHTML = \`<span style="color:var(--error);">Error: \${err.message}</span>\`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '&#128229; Generate &amp; Download .sql';
+      }
     }
 
     // ==========================================================================
