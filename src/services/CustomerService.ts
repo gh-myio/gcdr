@@ -263,10 +263,10 @@ export class CustomerService {
     });
   }
 
-  async forceDelete(tenantId: string, id: string, userId: string): Promise<ForceDeleteResult> {
+  async forceDelete(tenantId: string, id: string, userId: string, options: import('../repositories/interfaces/ICustomerRepository').ForceDeleteOptions = {}): Promise<ForceDeleteResult> {
     await this.getById(tenantId, id); // validates existence
 
-    const result = await this.repository.forceDelete(tenantId, id);
+    const result = await this.repository.forceDelete(tenantId, id, options);
 
     alarmBundleService.invalidateCache(tenantId, id, {
       reason: 'customer_force_deleted', entityType: 'customer', entityId: id, userId,

@@ -150,7 +150,7 @@ export class CustomerRepository implements ICustomerRepository {
     // Drizzle doesn't return affected rows directly, so we trust it worked
   }
 
-  async forceDelete(tenantId: string, customerId: string): Promise<ForceDeleteResult> {
+  async forceDelete(tenantId: string, customerId: string, options: import('./interfaces/ICustomerRepository').ForceDeleteOptions = {}): Promise<ForceDeleteResult> {
     const customer = await this.getById(tenantId, customerId);
     if (!customer) {
       throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
@@ -201,14 +201,16 @@ export class CustomerRepository implements ICustomerRepository {
         .returning({ id: schema.alarmBundleVersions.id });
       summary.alarmBundleVersions = deletedABV.length;
 
-      // Delete customerApiKeys (FK → customers.id)
-      const deletedKeys = await trx.delete(schema.customerApiKeys)
-        .where(and(
-          eq(schema.customerApiKeys.tenantId, tenantId),
-          inArray(schema.customerApiKeys.customerId, allCustomerIds),
-        ))
-        .returning({ id: schema.customerApiKeys.id });
-      summary.customerApiKeys = deletedKeys.length;
+      // Delete customerApiKeys (FK → customers.id) — skipped if keepApiKeys=true
+      if (!options.keepApiKeys) {
+        const deletedKeys = await trx.delete(schema.customerApiKeys)
+          .where(and(
+            eq(schema.customerApiKeys.tenantId, tenantId),
+            inArray(schema.customerApiKeys.customerId, allCustomerIds),
+          ))
+          .returning({ id: schema.customerApiKeys.id });
+        summary.customerApiKeys = deletedKeys.length;
+      }
 
       // Delete rules (FK → customers.id)
       const deletedRules = await trx.delete(schema.rules)
@@ -246,14 +248,16 @@ export class CustomerRepository implements ICustomerRepository {
         .returning({ id: schema.maintenanceGroups.id });
       summary.maintenanceGroups = deletedMG.length;
 
-      // Delete centrals BEFORE assets (FK → customers.id AND assets.id)
-      const deletedCentrals = await trx.delete(schema.centrals)
-        .where(and(
-          eq(schema.centrals.tenantId, tenantId),
-          inArray(schema.centrals.customerId, allCustomerIds),
-        ))
-        .returning({ id: schema.centrals.id });
-      summary.centrals = deletedCentrals.length;
+      // Delete centrals BEFORE assets (FK → customers.id AND assets.id) — skipped if keepCentrals=true
+      if (!options.keepCentrals) {
+        const deletedCentrals = await trx.delete(schema.centrals)
+          .where(and(
+            eq(schema.centrals.tenantId, tenantId),
+            inArray(schema.centrals.customerId, allCustomerIds),
+          ))
+          .returning({ id: schema.centrals.id });
+        summary.centrals = deletedCentrals.length;
+      }
 
       // Delete devices BEFORE assets (FK → customers.id AND assets.id)
       const deletedDevices = await trx.delete(schema.devices)

@@ -206,7 +206,12 @@ router.delete('/:id/force',
       const previous = await customerService.getById(tenantId, id);
       res.locals.previousData = previous;
 
-      const result = await customerService.forceDelete(tenantId, id, userId);
+      const options = {
+        keepApiKeys: req.query.keepApiKeys === 'true',
+        keepCentrals: req.query.keepCentrals === 'true',
+      };
+
+      const result = await customerService.forceDelete(tenantId, id, userId, options);
       res.locals.data = result;
       sendSuccess(res, result, 200, requestId);
     } catch (err) {
