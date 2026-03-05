@@ -9,8 +9,8 @@
 API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="77777777-7777-7777-7777-777777777777"
 API_KEY="gcdr_dimension_bundle_key_2026"
-# Defina o CENTRAL_ID da central Dimension a testar (ou deixe vazio para todos)
-CENTRAL_ID=""
+# Central Dimension: 9308af89-94b2-45e6-9e47-ae78f881afd2 (DIMENSION-GATEWAY)
+CENTRAL_ID="9308af89-94b2-45e6-9e47-ae78f881afd2"
 
 # Colors
 GREEN='\033[0;32m'

@@ -1186,6 +1186,50 @@ export const userBundleCache = pgTable('user_bundle_cache', {
 // ALARM BUNDLE VERSIONS
 // =============================================================================
 
+// =============================================================================
+// PUBLIC SINGLE APPS (RFC-0020)
+// =============================================================================
+
+export const publicSingleApps = pgTable('public_single_apps', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 100 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  fieldsSchema: jsonb('fields_schema').notNull().default({}),
+  status: varchar('status', { length: 20 }).notNull().default('ACTIVE'),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  version: integer('version').notNull().default(1),
+}, (table) => ({
+  slugUnique: uniqueIndex('public_single_apps_slug_unique').on(table.slug),
+  statusIdx: index('public_single_apps_status_idx').on(table.status),
+}));
+
+export const publicSingleAppResponses = pgTable('public_single_app_responses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  appId: uuid('app_id').notNull().references(() => publicSingleApps.id),
+  responseGroupId: uuid('response_group_id').notNull(),
+  responseVersion: integer('response_version').notNull().default(1),
+  isLatest: boolean('is_latest').notNull().default(true),
+  formData: jsonb('form_data').notNull().default({}),
+  submittedBy: jsonb('submitted_by').notNull().default({}),
+  changesFromPrevious: jsonb('changes_from_previous'),
+  changeNotes: text('change_notes'),
+  status: varchar('status', { length: 20 }).notNull().default('DRAFT'),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  groupVersionUnique: uniqueIndex('psar_group_version_unique').on(table.responseGroupId, table.responseVersion),
+  appIdIdx: index('psar_app_id_idx').on(table.appId),
+  groupIdx: index('psar_group_idx').on(table.responseGroupId),
+  statusIdx: index('psar_status_idx').on(table.status),
+  createdAtIdx: index('psar_created_at_idx').on(table.createdAt),
+}));
+
 export const alarmBundleVersions = pgTable('alarm_bundle_versions', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull(),

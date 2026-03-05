@@ -75,7 +75,7 @@ A especificação completa da API está disponível em:
 - **Swagger UI (online)**: [`/docs`](http://localhost:3015/docs)
 - **OpenAPI JSON**: [`/docs/openapi.json`](http://localhost:3015/docs/openapi.json)
 - **Arquivo local**: [`docs/openapi.yaml`](./openapi.yaml) (5,850+ linhas)
-- **140+ endpoints** documentados com schemas de request/response
+- **155+ endpoints** documentados com schemas de request/response
 
 Você também pode importar o `openapi.yaml` em ferramentas como:
 - [Postman](https://www.postman.com/)
@@ -104,6 +104,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Themes** | 10 | Look and Feel (cores, logos, CSS customizado) |
 | **Users** | 18 | Usuários, gerenciamento, MFA |
 | **Groups** | 12 | Grupos de usuários, dispositivos e assets com hierarquia |
+| **Public Single Apps** | 12 | Apps públicos de formulário com respostas versionadas (RFC-0020) |
 
 ### Exemplos de Requisições
 
@@ -260,6 +261,110 @@ curl -X POST http://localhost:3015/customers/{customerId}/api-keys \
 curl "http://localhost:3015/audit-logs?userId={userId}&action=UPDATE" \
   -H "x-tenant-id: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Authorization: Bearer <token>"
+```
+
+#### Criar Public App (RFC-0020)
+```bash
+curl -X POST http://localhost:3015/api/v1/public-apps \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "slug": "myio-migration-requirements",
+    "name": "MYIO Migration Requirements Form",
+    "description": "Formulário de levantamento de requisitos para migração MYIO",
+    "fieldsSchema": { "version": "v6" },
+    "status": "ACTIVE"
+  }'
+```
+
+#### Submeter Resposta para Public App
+```bash
+# Cria um novo grupo de respostas (responseGroupId gerado automaticamente)
+curl -X POST http://localhost:3015/api/v1/public-apps/myio-migration-requirements/responses \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "formData": {
+      "companyName": "Helexia Brasil",
+      "numberOfSites": 12,
+      "currentSystem": "SCADA v2"
+    },
+    "submittedBy": {
+      "firstName": "Ana",
+      "lastName": "Lima",
+      "email": "ana.lima@helexia.com",
+      "company": "Helexia Brasil"
+    }
+  }'
+```
+
+Resposta:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "appId": "app-uuid",
+    "responseGroupId": "group-uuid",
+    "responseVersion": 1,
+    "isLatest": true,
+    "formData": { "companyName": "Helexia Brasil", "numberOfSites": 12 },
+    "submittedBy": { "firstName": "Ana", "lastName": "Lima", "email": "ana.lima@helexia.com", "company": "Helexia Brasil" },
+    "status": "SUBMITTED",
+    "changesFromPrevious": null,
+    "createdAt": "2026-03-04T10:00:00.000Z"
+  }
+}
+```
+
+#### Revisar Resposta (nova versão)
+```bash
+# Cria versão 2 da resposta, rastreando o diff em relação à v1
+curl -X POST http://localhost:3015/api/v1/public-apps/myio-migration-requirements/responses/{groupId}/revise \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "formData": {
+      "companyName": "Helexia Brasil",
+      "numberOfSites": 15,
+      "currentSystem": "SCADA v3"
+    },
+    "submittedBy": {
+      "firstName": "Ana",
+      "lastName": "Lima",
+      "email": "ana.lima@helexia.com",
+      "company": "Helexia Brasil"
+    },
+    "changeNotes": "Atualizado número de sites e versão do sistema"
+  }'
+```
+
+`changesFromPrevious` no retorno mostrará o diff em dot-notation:
+```json
+{
+  "numberOfSites": { "from": 12, "to": 15 },
+  "currentSystem": { "from": "SCADA v2", "to": "SCADA v3" }
+}
+```
+
+#### Histórico de Revisões
+```bash
+curl http://localhost:3015/api/v1/public-apps/myio-migration-requirements/responses/{groupId}/history \
+  -H "x-tenant-id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Atualizar Status de Resposta
+```bash
+# Statuses disponíveis: SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, ARCHIVED
+curl -X PATCH http://localhost:3015/api/v1/public-apps/myio-migration-requirements/responses/{groupId}/status \
+  -H "Content-Type: application/json" \
+  -H "x-tenant-id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token>" \
+  -d '{ "status": "APPROVED" }'
 ```
 
 ### Padrão de Resposta
@@ -1678,6 +1783,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
 - [RFC-0015: Alarm Bundle Version History](./RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
 - [RFC-0016: ThingsBoard Entity Mapping](./RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
+- [RFC-0020: Public Single Apps](./RFC-0020-Public-Single-Apps.md) - Apps públicos de formulário com respostas versionadas
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 - [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 
@@ -1786,6 +1892,25 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - Constraint `devices_tenant_customer_name_unique` adicionada: `UNIQUE(tenant_id, customer_id, name)`
 - Impede criação/rename de device com nome duplicado dentro do mesmo customer
 - Migration: `0008_device_name_unique.sql`
+
+### 2026-03-04
+
+**RFC-0020: Public Single Apps**
+- Novo módulo para hospedar apps públicos de formulário (ex: MYIO Migration Requirements Form)
+- 2 tabelas: `public_single_apps` (definição do app) + `public_single_app_responses` (respostas versionadas)
+- `response_group_id` agrupa todas as revisões de uma resposta; `response_version` incrementa por revisão
+- `is_latest = true` com índice único parcial garante integridade no banco
+- `changes_from_previous` armazena diff em dot-notation via utilitário `flatDiff()`
+- 12 endpoints: 5 de gestão de apps + 7 de respostas (submit, revise, history, status, etc.)
+- Auth: `authMiddleware` em todas as rotas (gestão e leitura de respostas protegidas)
+- Migration: `scripts/db/migrations/public-single-apps.sql`
+- RFC: `docs/RFC-0020-Public-Single-Apps.md`
+
+**Force Delete Customer**
+- `DELETE /customers/:id/force` — deleta customer + toda a árvore de descendentes + dados associados em uma transação
+- Remove em ordem: roleAssignments → alarmBundleVersions → customerApiKeys → rules → groups → lookAndFeels → maintenanceGroups → centrals → devices → assets → users → customers
+- Retorna sumário com contagem de registros deletados por entidade
+- Evento de auditoria: `CUSTOMER_FORCE_DELETED`
 
 ### 2026-02-22
 

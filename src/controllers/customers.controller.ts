@@ -181,6 +181,41 @@ router.delete('/:id',
 );
 
 /**
+ * DELETE /customers/:id/force
+ * Force delete customer (and all descendants) with all associated data:
+ * assets, devices, rules, centrals, groups, API keys, users, etc.
+ */
+router.delete('/:id/force',
+  logEvent({
+    eventType: EventType.CUSTOMER_FORCE_DELETED,
+    description: (req) => `Customer ${req.params.id} force deleted with all associated data`,
+    getEntityId: (req) => req.params.id,
+    getCustomerId: (req) => req.params.id,
+    getPreviousValue: (_req, res) => res.locals.previousData,
+    getMetadata: (_req, res) => res.locals.data,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Customer ID is required');
+      }
+
+      const previous = await customerService.getById(tenantId, id);
+      res.locals.previousData = previous;
+
+      const result = await customerService.forceDelete(tenantId, id, userId);
+      res.locals.data = result;
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /customers/:id/children
  * Get direct children of a customer
  */

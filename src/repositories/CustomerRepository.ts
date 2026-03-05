@@ -1,9 +1,9 @@
-import { eq, and, like, isNull, sql } from 'drizzle-orm';
+import { eq, and, like, isNull, sql, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Customer, createDefaultCustomerSettings } from '../domain/entities/Customer';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../dto/request/CustomerDTO';
 import { PaginatedResult } from '../shared/types';
-import { ICustomerRepository, CustomerTreeNode } from './interfaces/ICustomerRepository';
+import { ICustomerRepository, CustomerTreeNode, ForceDeleteResult } from './interfaces/ICustomerRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
 import { AppError } from '../shared/errors/AppError';
@@ -148,6 +148,152 @@ export class CustomerRepository implements ICustomerRepository {
       .where(and(eq(customers.tenantId, tenantId), eq(customers.id, id)));
 
     // Drizzle doesn't return affected rows directly, so we trust it worked
+  }
+
+  async forceDelete(tenantId: string, customerId: string): Promise<ForceDeleteResult> {
+    const customer = await this.getById(tenantId, customerId);
+    if (!customer) {
+      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+    }
+
+    const descendants = await this.getDescendants(tenantId, customerId);
+    const allCustomerIds = [customerId, ...descendants.map((d) => d.id)];
+
+    const summary: ForceDeleteResult['summary'] = {
+      users: 0,
+      assets: 0,
+      devices: 0,
+      rules: 0,
+      centrals: 0,
+      groups: 0,
+      lookAndFeels: 0,
+      customerApiKeys: 0,
+      maintenanceGroups: 0,
+      alarmBundleVersions: 0,
+    };
+
+    await db.transaction(async (trx) => {
+      // Collect user IDs for these customers (needed before user deletion)
+      const affectedUsers = await trx
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(and(
+          eq(schema.users.tenantId, tenantId),
+          inArray(schema.users.customerId, allCustomerIds),
+        ));
+      const userIds = affectedUsers.map((u) => u.id);
+
+      // Delete roleAssignments for these users (FK → users.id, no cascade)
+      if (userIds.length > 0) {
+        await trx.delete(schema.roleAssignments)
+          .where(and(
+            eq(schema.roleAssignments.tenantId, tenantId),
+            inArray(schema.roleAssignments.userId, userIds),
+          ));
+      }
+
+      // Delete alarmBundleVersions (no FK constraint on customer_id)
+      const deletedABV = await trx.delete(schema.alarmBundleVersions)
+        .where(and(
+          eq(schema.alarmBundleVersions.tenantId, tenantId),
+          inArray(schema.alarmBundleVersions.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.alarmBundleVersions.id });
+      summary.alarmBundleVersions = deletedABV.length;
+
+      // Delete customerApiKeys (FK → customers.id)
+      const deletedKeys = await trx.delete(schema.customerApiKeys)
+        .where(and(
+          eq(schema.customerApiKeys.tenantId, tenantId),
+          inArray(schema.customerApiKeys.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.customerApiKeys.id });
+      summary.customerApiKeys = deletedKeys.length;
+
+      // Delete rules (FK → customers.id)
+      const deletedRules = await trx.delete(schema.rules)
+        .where(and(
+          eq(schema.rules.tenantId, tenantId),
+          inArray(schema.rules.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.rules.id });
+      summary.rules = deletedRules.length;
+
+      // Delete groups (FK → customers.id)
+      const deletedGroups = await trx.delete(schema.groups)
+        .where(and(
+          eq(schema.groups.tenantId, tenantId),
+          inArray(schema.groups.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.groups.id });
+      summary.groups = deletedGroups.length;
+
+      // Delete lookAndFeels (FK → customers.id)
+      const deletedLAF = await trx.delete(schema.lookAndFeels)
+        .where(and(
+          eq(schema.lookAndFeels.tenantId, tenantId),
+          inArray(schema.lookAndFeels.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.lookAndFeels.id });
+      summary.lookAndFeels = deletedLAF.length;
+
+      // Delete maintenanceGroups (FK → customers.id, cascade → userMaintenanceGroups)
+      const deletedMG = await trx.delete(schema.maintenanceGroups)
+        .where(and(
+          eq(schema.maintenanceGroups.tenantId, tenantId),
+          inArray(schema.maintenanceGroups.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.maintenanceGroups.id });
+      summary.maintenanceGroups = deletedMG.length;
+
+      // Delete centrals BEFORE assets (FK → customers.id AND assets.id)
+      const deletedCentrals = await trx.delete(schema.centrals)
+        .where(and(
+          eq(schema.centrals.tenantId, tenantId),
+          inArray(schema.centrals.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.centrals.id });
+      summary.centrals = deletedCentrals.length;
+
+      // Delete devices BEFORE assets (FK → customers.id AND assets.id)
+      const deletedDevices = await trx.delete(schema.devices)
+        .where(and(
+          eq(schema.devices.tenantId, tenantId),
+          inArray(schema.devices.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.devices.id });
+      summary.devices = deletedDevices.length;
+
+      // Delete assets (FK → customers.id)
+      const deletedAssets = await trx.delete(schema.assets)
+        .where(and(
+          eq(schema.assets.tenantId, tenantId),
+          inArray(schema.assets.customerId, allCustomerIds),
+        ))
+        .returning({ id: schema.assets.id });
+      summary.assets = deletedAssets.length;
+
+      // Delete users (FK → customers.id is optional; roleAssignments already deleted above)
+      if (userIds.length > 0) {
+        const deletedUsers = await trx.delete(schema.users)
+          .where(and(
+            eq(schema.users.tenantId, tenantId),
+            inArray(schema.users.id, userIds),
+          ))
+          .returning({ id: schema.users.id });
+        summary.users = deletedUsers.length;
+      }
+
+      // Delete all customers in the subtree (self + descendants)
+      // parentCustomerId has no FK constraint, so any order works
+      await trx.delete(customers)
+        .where(and(
+          eq(customers.tenantId, tenantId),
+          inArray(customers.id, allCustomerIds),
+        ));
+    });
+
+    return { deletedCustomers: allCustomerIds.length, summary };
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Customer>> {

@@ -50,6 +50,8 @@ import {
   // RFC-0013: User Access Profile Bundle
   maintenanceGroupsController,
   accessBundleController,
+  // RFC-0020: Public Single Apps
+  publicSingleAppsController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -230,6 +232,9 @@ apiV1Router.use('/simulator', authMiddleware, simulatorController);
 // RFC-0013: User Access Profile Bundle
 apiV1Router.use('/maintenance-groups', authMiddleware, maintenanceGroupsController);
 apiV1Router.use('/access-bundle', authMiddleware, accessBundleController);
+
+// RFC-0020: Public Single Apps (mixed auth — managed within controller)
+apiV1Router.use('/public-apps', authMiddleware, publicSingleAppsController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);

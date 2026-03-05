@@ -10,7 +10,7 @@ import {
   GetDescendantsParams,
 } from '../dto/request/CustomerDTO';
 import { CustomerRepository } from '../repositories/CustomerRepository';
-import { CustomerTreeNode, ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { CustomerTreeNode, ForceDeleteResult, ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
@@ -261,6 +261,18 @@ export class CustomerService {
     alarmBundleService.invalidateCache(tenantId, id, {
       reason: 'customer_deleted', entityType: 'customer', entityId: id, userId,
     });
+  }
+
+  async forceDelete(tenantId: string, id: string, userId: string): Promise<ForceDeleteResult> {
+    await this.getById(tenantId, id); // validates existence
+
+    const result = await this.repository.forceDelete(tenantId, id);
+
+    alarmBundleService.invalidateCache(tenantId, id, {
+      reason: 'customer_force_deleted', entityType: 'customer', entityId: id, userId,
+    });
+
+    return result;
   }
 
   async list(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>> {

@@ -74,3 +74,9 @@ export type NewAuditLog = typeof schema.auditLogs.$inferInsert;
 
 export type AlarmBundleVersion = typeof schema.alarmBundleVersions.$inferSelect;
 export type NewAlarmBundleVersion = typeof schema.alarmBundleVersions.$inferInsert;
+
+export type PublicSingleApp = typeof schema.publicSingleApps.$inferSelect;
+export type NewPublicSingleApp = typeof schema.publicSingleApps.$inferInsert;
+
+export type PublicSingleAppResponse = typeof schema.publicSingleAppResponses.$inferSelect;
+export type NewPublicSingleAppResponse = typeof schema.publicSingleAppResponses.$inferInsert;

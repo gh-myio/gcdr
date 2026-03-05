@@ -29,3 +29,6 @@ export { default as themesController, listByCustomerHandler as themesListByCusto
 // RFC-0013: User Access Profile Bundle
 export { default as maintenanceGroupsController } from './maintenance-groups.controller';
 export { default as accessBundleController } from './access-bundle.controller';
+
+// RFC-0020: Public Single Apps
+export { default as publicSingleAppsController } from './public-single-apps.controller';

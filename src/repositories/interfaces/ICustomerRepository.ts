@@ -7,6 +7,22 @@ export interface CustomerTreeNode extends Customer {
   children: CustomerTreeNode[];
 }
 
+export interface ForceDeleteResult {
+  deletedCustomers: number;
+  summary: {
+    users: number;
+    assets: number;
+    devices: number;
+    rules: number;
+    centrals: number;
+    groups: number;
+    lookAndFeels: number;
+    customerApiKeys: number;
+    maintenanceGroups: number;
+    alarmBundleVersions: number;
+  };
+}
+
 export interface ICustomerRepository extends IRepository<Customer, CreateCustomerDTO, UpdateCustomerDTO> {
   getByCode(tenantId: string, code: string): Promise<Customer | null>;
   getByExternalId(tenantId: string, externalId: string): Promise<Customer | null>;
@@ -17,4 +33,5 @@ export interface ICustomerRepository extends IRepository<Customer, CreateCustome
   move(tenantId: string, customerId: string, newParentId: string | null, updatedBy: string): Promise<Customer>;
   listWithFilters(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>>;
   updatePath(tenantId: string, customerId: string, newPath: string, newDepth: number): Promise<void>;
+  forceDelete(tenantId: string, customerId: string): Promise<ForceDeleteResult>;
 }
