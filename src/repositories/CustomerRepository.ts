@@ -308,16 +308,23 @@ export class CustomerRepository implements ICustomerRepository {
         summary.users = deletedUsers.length;
       }
 
-      // Delete all customers in the subtree (self + descendants)
-      // parentCustomerId has no FK constraint, so any order works
-      await trx.delete(customers)
-        .where(and(
-          eq(customers.tenantId, tenantId),
-          inArray(customers.id, allCustomerIds),
-        ));
+      // Delete customers — skipped when keepCentrals=true because:
+      // centrals → assets → customers (FK chain prevents customer deletion)
+      // In that case this becomes a "data reset": devices/rules/users wiped,
+      // but the customer + their assets + centrals are preserved.
+      if (!options.keepCentrals) {
+        await trx.delete(customers)
+          .where(and(
+            eq(customers.tenantId, tenantId),
+            inArray(customers.id, allCustomerIds),
+          ));
+      }
     });
 
-    return { deletedCustomers: allCustomerIds.length, summary };
+    return {
+      deletedCustomers: options.keepCentrals ? 0 : allCustomerIds.length,
+      summary,
+    };
   }
 
   async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<Customer>> {
