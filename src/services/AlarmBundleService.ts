@@ -215,166 +215,42 @@ export class AlarmBundleService {
   }
 
   /**
-   * Verify the alarm bundle configuration for a customer.
-   * Returns a health report with issues that may affect bundle correctness.
-   *
-   * Severities:
-   *   ERROR   — rule/device is invalid and will be silently ignored in the bundle
-   *   WARNING — configuration gap that may cause missed alarms or routing failures
-   *   INFO    — informational, no immediate impact
+   * Generate a verify bundle — same as simplified bundle but enriched with:
+   *   - meta.gatewayToken: customer's gateway authentication token
+   *   - rules[id].notifications: per-category recipients + emailRelay config
    */
-  async verifyBundle(tenantId: string, customerId: string): Promise<{
-    status: 'OK' | 'WARNING' | 'ERROR';
-    summary: {
-      rulesTotal: number;
-      rulesActive: number;
-      rulesDisabled: number;
-      devicesTotal: number;
-      devicesInBundle: number;
-      devicesWithoutRules: number;
-      issuesTotal: number;
-    };
-    issues: Array<{
-      severity: 'ERROR' | 'WARNING' | 'INFO';
-      type: string;
-      message: string;
-      ruleId?: string;
-      ruleName?: string;
-      deviceId?: string;
-      deviceName?: string;
-    }>;
+  async verifyBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle & {
+    meta: { gatewayToken?: string };
+    rules: Record<string, SimpleBundleAlarmRule & { notifications?: import('../domain/entities/Rule').RuleNotifications }>;
   }> {
+    const { tenantId, customerId } = params;
+
+    // Generate the base simplified bundle (uses cache)
+    const base = await this.generateSimplifiedBundle(params);
+
+    // Fetch customer for gatewayToken
     const customer = await this.customerRepository.getById(tenantId, customerId);
-    if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
 
-    const devices = await this.getDevicesByCustomer(tenantId, customerId);
+    // Fetch full rules to get notifications field
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
-    const alarmRules = allRules.filter(isAlarmRule);
+    const notificationsMap = new Map(allRules.map(r => [r.id, r.notifications]));
 
-    const issues: Array<{
-      severity: 'ERROR' | 'WARNING' | 'INFO';
-      type: string;
-      message: string;
-      ruleId?: string;
-      ruleName?: string;
-      deviceId?: string;
-      deviceName?: string;
-    }> = [];
-
-    // Track which devices appear in the bundle
-    const devicesInBundle = new Set<string>();
-
-    // 1. Check each enabled alarm rule has at least one matching device
-    const enabledRules = alarmRules.filter(r => r.enabled);
-    for (const rule of enabledRules) {
-      const matching = devices.filter(d => this.getApplicableRulesWithChannel(d, [rule]).length > 0);
-      if (matching.length === 0) {
-        issues.push({
-          severity: 'ERROR',
-          type: 'RULE_NO_DEVICES',
-          message: `Rule "${rule.name}" is enabled but matches no devices — it will be absent from the bundle.`,
-          ruleId: rule.id,
-          ruleName: rule.name,
-        });
-      } else {
-        matching.forEach(d => devicesInBundle.add(d.id));
-      }
+    // Enrich each rule entry with its notifications
+    const enrichedRules: Record<string, SimpleBundleAlarmRule & { notifications?: import('../domain/entities/Rule').RuleNotifications }> = {};
+    for (const [ruleId, rule] of Object.entries(base.rules)) {
+      enrichedRules[ruleId] = {
+        ...rule,
+        ...(notificationsMap.get(ruleId) ? { notifications: notificationsMap.get(ruleId) } : {}),
+      };
     }
-
-    // 2. Check disabled rules
-    const disabledRules = alarmRules.filter(r => !r.enabled);
-    for (const rule of disabledRules) {
-      issues.push({
-        severity: 'INFO',
-        type: 'RULE_DISABLED',
-        message: `Rule "${rule.name}" is disabled and will not be included in the bundle.`,
-        ruleId: rule.id,
-        ruleName: rule.name,
-      });
-    }
-
-    // 3. Check devices without slaveId (Modbus devices only)
-    for (const device of devices) {
-      if (device.slaveId == null) {
-        issues.push({
-          severity: 'WARNING',
-          type: 'DEVICE_NO_SLAVE_ID',
-          message: `Device "${device.displayName ?? device.name}" has no slaveId — Node-RED cannot route Modbus commands to it.`,
-          deviceId: device.id,
-          deviceName: device.displayName ?? device.name,
-        });
-      }
-    }
-
-    // 4. Check devices without centralId
-    for (const device of devices) {
-      if (!device.centralId) {
-        issues.push({
-          severity: 'WARNING',
-          type: 'DEVICE_NO_CENTRAL',
-          message: `Device "${device.displayName ?? device.name}" has no centralId — it cannot appear in a central-filtered bundle.`,
-          deviceId: device.id,
-          deviceName: device.displayName ?? device.name,
-        });
-      }
-    }
-
-    // 5. Devices with no applicable rules (INFO only)
-    for (const device of devices) {
-      if (!devicesInBundle.has(device.id)) {
-        issues.push({
-          severity: 'INFO',
-          type: 'DEVICE_NO_RULES',
-          message: `Device "${device.displayName ?? device.name}" has no applicable alarm rules and will be absent from the bundle.`,
-          deviceId: device.id,
-          deviceName: device.displayName ?? device.name,
-        });
-      }
-    }
-
-    // 6. Customer gatewayToken missing
-    if (!customer.config?.gatewayToken) {
-      issues.push({
-        severity: 'WARNING',
-        type: 'CUSTOMER_NO_GATEWAY_TOKEN',
-        message: 'Customer has no gatewayToken configured — gateways and centrals cannot authenticate against the platform.',
-      });
-    }
-
-    // 7. Enabled notification categories without emailRelay config
-    const categoryKeys: Array<'alarmNotify' | 'alarmReport' | 'alarmInsight'> = ['alarmNotify', 'alarmReport', 'alarmInsight'];
-    for (const rule of enabledRules) {
-      if (!rule.notifications) continue;
-      for (const key of categoryKeys) {
-        const channel = rule.notifications[key];
-        if (channel?.enabled && (channel.recipients?.length ?? 0) > 0 && !channel.emailRelay) {
-          issues.push({
-            severity: 'WARNING',
-            type: 'RULE_NOTIFICATION_NO_EMAIL_RELAY',
-            message: `Rule "${rule.name}" has recipients configured for "${key}" but no emailRelay (SMTP) config — emails will not be sent.`,
-            ruleId: rule.id,
-            ruleName: rule.name,
-          });
-        }
-      }
-    }
-
-    const hasError = issues.some(i => i.severity === 'ERROR');
-    const hasWarning = issues.some(i => i.severity === 'WARNING');
-    const status = hasError ? 'ERROR' : hasWarning ? 'WARNING' : 'OK';
 
     return {
-      status,
-      summary: {
-        rulesTotal: alarmRules.length,
-        rulesActive: enabledRules.length,
-        rulesDisabled: disabledRules.length,
-        devicesTotal: devices.length,
-        devicesInBundle: devicesInBundle.size,
-        devicesWithoutRules: devices.length - devicesInBundle.size,
-        issuesTotal: issues.length,
+      ...base,
+      meta: {
+        ...base.meta,
+        gatewayToken: customer?.config?.gatewayToken,
       },
-      issues,
+      rules: enrichedRules,
     };
   }
 

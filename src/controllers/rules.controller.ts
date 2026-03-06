@@ -587,20 +587,36 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
 
 /**
  * GET /customers/:customerId/alarm-rules/bundle/verify
- * Health-check the alarm bundle configuration for a customer.
- * Returns issues (ERROR / WARNING / INFO) without generating a bundle.
+ * Same as /bundle/simple but enriched with:
+ *   - meta.gatewayToken  — customer gateway auth token
+ *   - rules[id].notifications — per-category recipients + emailRelay config
  */
 export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
+    const { domain, deviceType, includeDisabled } = req.query;
+    const centralId = req.headers['x-central-id'] as string | undefined;
 
     if (!customerId) {
       throw new ValidationError('Customer ID is required');
     }
 
-    const report = await alarmBundleService.verifyBundle(tenantId, customerId);
-    sendSuccess(res, report, 200, requestId);
+    const bundle = await alarmBundleService.verifyBundle({
+      tenantId,
+      customerId,
+      centralId,
+      domain: domain as string | undefined,
+      deviceType: deviceType as string | undefined,
+      includeDisabled: includeDisabled === 'true',
+    });
+
+    sendSuccess(res, {
+      versionId: bundle.meta.version,
+      gatewayToken: bundle.meta.gatewayToken,
+      deviceIndex: bundle.deviceIndex,
+      rules: bundle.rules,
+    }, 200, requestId);
   } catch (err) {
     next(err);
   }
