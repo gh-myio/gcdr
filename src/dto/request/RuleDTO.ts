@@ -126,9 +126,18 @@ const NotificationRecipientSchema = z.object({
   groupId: z.string().uuid().optional(),
 });
 
+const NotificationEmailRelaySchema = z.object({
+  host: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean(),
+  user: z.string().optional(),
+  from: z.string().min(1),
+});
+
 const RuleNotificationChannelSchema = z.object({
   enabled: z.boolean().default(false),
   recipients: z.array(NotificationRecipientSchema).default([]),
+  emailRelay: NotificationEmailRelaySchema.optional(),
 });
 
 const RuleNotificationsSchema = z.object({

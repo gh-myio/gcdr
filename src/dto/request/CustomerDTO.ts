@@ -87,6 +87,7 @@ export const UpdateCustomerSchema = z.object({
     bundle: z.object({
       checkVersion: z.boolean().optional(),
     }).optional(),
+    gatewayToken: z.string().min(1).max(512).optional(),
   }).optional().nullable(),
 });
 

@@ -58,6 +58,42 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /rules/notification-categories
+ * List the 3 notification recipient categories available on every rule.
+ * Each category maps to a templateType for email rendering.
+ */
+router.get('/notification-categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { requestId } = req.context;
+    sendSuccess(res, [
+      {
+        id: 'alarmNotify',
+        label: 'Notificação de Alarme',
+        description: 'Destinatários que recebem o email imediato quando um alarme é disparado pela rule.',
+        icon: 'bell-alert',
+        templateType: 'EMAIL_ALARM',
+      },
+      {
+        id: 'alarmReport',
+        label: 'Relatório de Alarme',
+        description: 'Destinatários que recebem o relatório periódico consolidado dos alarmes da rule.',
+        icon: 'chart-bar',
+        templateType: 'EMAIL_REPORT',
+      },
+      {
+        id: 'alarmInsight',
+        label: 'Insight de Alarme',
+        description: 'Destinatários que recebem análises e insights analíticos gerados a partir dos dados da rule.',
+        icon: 'light-bulb',
+        templateType: 'INSIGHT',
+      },
+    ], 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /rules/statistics
  * Get rules statistics
  */
@@ -544,6 +580,27 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     };
 
     sendSuccess(res, simplifiedPayload, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /customers/:customerId/alarm-rules/bundle/verify
+ * Health-check the alarm bundle configuration for a customer.
+ * Returns issues (ERROR / WARNING / INFO) without generating a bundle.
+ */
+export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    const report = await alarmBundleService.verifyBundle(tenantId, customerId);
+    sendSuccess(res, report, 200, requestId);
   } catch (err) {
     next(err);
   }

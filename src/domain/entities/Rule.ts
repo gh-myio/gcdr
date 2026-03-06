@@ -165,10 +165,20 @@ export interface NotificationRecipient {
   groupId?: string;  // UUID of the group (GROUP_MEMBER only)
 }
 
+// SMTP relay config for outbound notification emails (per notification category)
+export interface NotificationEmailRelay {
+  host: string;      // SMTP host (e.g. smtp.sendgrid.net)
+  port: number;      // SMTP port (465 or 587)
+  secure: boolean;   // true = TLS/SSL, false = STARTTLS
+  user?: string;     // SMTP authentication user
+  from: string;      // From address (e.g. "Alertas MYIO <noreply@empresa.com.br>")
+}
+
 // Recipients for a single notification category
 export interface RuleNotificationChannel {
   enabled: boolean;
   recipients: NotificationRecipient[];
+  emailRelay?: NotificationEmailRelay;  // SMTP settings for this category
 }
 
 // Per-category notification settings for a rule

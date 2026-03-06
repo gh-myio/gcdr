@@ -35,6 +35,7 @@ import {
   getSimplifiedAlarmBundleHandler,
   getAlarmBundleVersionsHandler,
   invalidateAlarmBundleCacheHandler,
+  getAlarmBundleVerifyHandler,
   integrationsController,
   customerApiKeysController,
   auditLogsController,
@@ -144,6 +145,9 @@ apiV1Router.use('/auth', authController);
 
 // Customer-specific nested routes MUST come before the general /customers router
 // to ensure proper route matching (more specific routes first)
+
+// Bundle Verify — health check for bundle config (no cache, no bundle generated)
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/verify', authMiddleware, getAlarmBundleVerifyHandler);
 
 // Bundle Cache Invalidation (must come before /bundle routes)
 apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware('bundles:read'), invalidateAlarmBundleCacheHandler);
