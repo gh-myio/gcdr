@@ -233,8 +233,39 @@ const PRIORITY_DEFINITIONS: PriorityDefinition[] = [
 ];
 
 /**
+ * Rule notification categories — the 3 independent recipient lists per rule
+ */
+interface NotificationCategoryDefinition {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+}
+
+const NOTIFICATION_CATEGORY_DEFINITIONS: NotificationCategoryDefinition[] = [
+  {
+    id: 'alarmNotify',
+    label: 'Notificação de Alarme',
+    description: 'Destinatários que recebem o email imediato quando um alarme é disparado pela rule.',
+    icon: 'bell-alert',
+  },
+  {
+    id: 'alarmReport',
+    label: 'Relatório de Alarme',
+    description: 'Destinatários que recebem o relatório periódico consolidado dos alarmes da rule.',
+    icon: 'chart-bar',
+  },
+  {
+    id: 'alarmInsight',
+    label: 'Insight de Alarme',
+    description: 'Destinatários que recebem análises e insights analíticos gerados a partir dos dados da rule.',
+    icon: 'light-bulb',
+  },
+];
+
+/**
  * GET /domains
- * Get all domain definitions (metrics, operators, aggregations, priorities)
+ * Get all domain definitions (metrics, operators, aggregations, priorities, notificationCategories)
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -245,6 +276,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     let operators = OPERATOR_DEFINITIONS;
     let aggregations = AGGREGATION_DEFINITIONS;
     let priorities = PRIORITY_DEFINITIONS;
+    let notificationCategories = NOTIFICATION_CATEGORY_DEFINITIONS;
 
     if (search) {
       const s = (search as string).toLowerCase();
@@ -252,6 +284,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       operators = operators.filter(o => o.name.toLowerCase().includes(s));
       aggregations = aggregations.filter(a => a.name.toLowerCase().includes(s));
       priorities = priorities.filter(p => p.name.toLowerCase().includes(s));
+      notificationCategories = notificationCategories.filter(c => c.label.toLowerCase().includes(s));
     }
 
     sendSuccess(res, {
@@ -259,6 +292,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       operators,
       aggregations,
       priorities,
+      notificationCategories,
     }, 200, requestId);
   } catch (err) {
     next(err);
@@ -381,6 +415,19 @@ router.get('/priorities', async (req: Request, res: Response, next: NextFunction
     }
 
     sendSuccess(res, priorities, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /domains/notification-categories
+ * Get rule notification category definitions (alarmNotify, alarmReport, alarmInsight)
+ */
+router.get('/notification-categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { requestId } = req.context;
+    sendSuccess(res, NOTIFICATION_CATEGORY_DEFINITIONS, 200, requestId);
   } catch (err) {
     next(err);
   }
