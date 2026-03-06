@@ -105,7 +105,8 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Users** | 18 | Usuários, gerenciamento, MFA |
 | **Groups** | 12 | Grupos de usuários, dispositivos e assets com hierarquia |
 | **Public Single Apps** | 12 | Apps públicos de formulário com respostas versionadas (RFC-0020) |
-| **Templates** | 7 | Motor de templates HTML para email (EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME) com preview e catálogo de tags (RFC-0021) |
+| **Templates** | 8 | Motor de templates HTML para email (6 tipos: EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT) com preview e catálogo de tags (RFC-0021) |
+| **Template Types** | 3 | Catálogo de tipos de template: listar, detalhar e editar label/descrição/ícone (`GET /template-types`, `PATCH /template-types/:type`) |
 
 ### Exemplos de Requisições
 
@@ -1785,7 +1786,9 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0015: Alarm Bundle Version History](./RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
 - [RFC-0016: ThingsBoard Entity Mapping](./RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
 - [RFC-0020: Public Single Apps](./RFC-0020-Public-Single-Apps.md) - Apps públicos de formulário com respostas versionadas
-- [RFC-0021: HTML Templates Engine](./BACKEND-RFC-0021-HTML-Templates.md) - Motor de templates HTML para email com preview e catálogo de tags
+- [RFC-0021: HTML Templates Engine](./BACKEND-RFC-0021-HTML-Templates.md) - Motor de templates HTML para email com preview e catálogo de tags (6 tipos)
+- [Frontend: Temas e Template Types](./FRONTEND-Themes-TemplateTypes.md) - Guia frontend para temas por tipo de email e endpoints `/template-types`
+- [Frontend: Usuários, Grupos e Roles](./FRONTEND-Users-Groups-Roles.md) - Guia frontend para modelo de usuário, RBAC e grupos
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 - [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 
@@ -1895,14 +1898,46 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - Impede criação/rename de device com nome duplicado dentro do mesmo customer
 - Migration: `0008_device_name_unique.sql`
 
+### 2026-03-06
+
+**RFC-0021: Template Types + Temas por tipo**
+
+*Template Types — catálogo de tipos de e-mail:*
+- Nova tabela `template_types` (PK = `type` string) com `label`, `description`, `icon`, `sort_order`, `active`
+- 6 tipos canônicos: `EMAIL_ALARM`, `EMAIL_REPORT`, `EMAIL_WELCOME`, `RELEASE_NOTE`, `NOTIFICATION`, `INSIGHT`
+- 3 novos endpoints: `GET /template-types`, `GET /template-types/:type`, `PATCH /template-types/:type`
+- Labels e descrições editáveis pelo admin MYIO sem deploy; ícones seguem convenção Heroicons
+- Migration: `scripts/db/migrations/add-template-type-to-look-and-feels.sql`
+
+*Temas por tipo de template (`look_and_feels`):*
+- Nova coluna `template_type` (FK → `template_types.type`) em `look_and_feels`
+- `NULL` = tema global (app UI + fallback de email); valor = tema exclusivo para aquele tipo de email
+- Índice único `UNIQUE (customer_id, template_type) WHERE template_type IS NOT NULL` — um tema por tipo por customer
+- `409 Conflict` ao tentar criar segundo tema com o mesmo `(customer_id, template_type)`
+- `renderForEmailSender` percorre fallback: customer+tipo → customer+global → MYIO+tipo → MYIO+global
+
+*Templates expandidos:*
+- `TemplateType` agora inclui `NOTIFICATION` e `INSIGHT` (antes apenas 3 tipos)
+- Tag catalog atualizado com tags para os 2 novos tipos
+- Seed `20-templates.sql` contém 6 templates HTML completos (plain SQL, sem PL/pgSQL)
+- Seed `21-template-types.sql` removido — dados já inseridos pela migration
+
+*Seeds:*
+- `scripts/db/seeds/19-themes.sql` — inclui 3 temas type-specific para Mestre Álvaro (EMAIL_ALARM, NOTIFICATION, INSIGHT)
+- `scripts/db/seeds/20-templates.sql` — reescrito em plain SQL (removido wrapper DO $$ ... END $$)
+
+*Frontend Guides adicionados:*
+- `docs/FRONTEND-Themes-TemplateTypes.md` — temas por tipo, endpoints template-types, fallback chain, sugestão UX
+- `docs/FRONTEND-Users-Groups-Roles.md` — modelo de usuário, RBAC (roles/policies/assignments/scope), grupos
+
 ### 2026-03-05
 
 **RFC-0021: HTML Templates Engine**
 - Novo módulo para gerenciar templates HTML para envio de emails (alarme, relatório, boas-vindas)
 - Tabela `templates` com `slug`, `type`, `status`, `html_content`, `version` e `tenant_id`
-- 7 endpoints: `POST /`, `GET /`, `GET /tags/:type`, `GET /:slug`, `PUT /:slug`, `DELETE /:slug`, `POST /:slug/preview`
+- 8 endpoints: `POST /`, `GET /`, `GET /tag-catalog`, `GET /:slug`, `PUT /:slug`, `DELETE /:slug`, `POST /:slug/preview`, `GET /active/:type`
 - Motor de renderização com suporte a `{{variable}}` e `{{#each list}}...{{/each}}` (aninhamento suportado)
-- Catálogo de tags por tipo: `EMAIL_ALARM`, `EMAIL_REPORT`, `EMAIL_WELCOME`
+- Catálogo de tags por tipo: `EMAIL_ALARM`, `EMAIL_REPORT`, `EMAIL_WELCOME`, `RELEASE_NOTE`, `NOTIFICATION`, `INSIGHT`
 - Soft delete via status `ARCHIVED` (sem exclusão física)
 - Migration: `scripts/db/migrations/html-templates.sql`
 - RFC: `docs/BACKEND-RFC-0021-HTML-Templates.md`
