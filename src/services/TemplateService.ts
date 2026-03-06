@@ -2,7 +2,13 @@ import { Template, TemplateSummary, TemplateType } from '../domain/entities/Temp
 import { CreateTemplateDTO, UpdateTemplateDTO, ListTemplatesQuery } from '../dto/request/TemplateDTO';
 import { TemplateRepository } from '../repositories/TemplateRepository';
 import { ITemplateRepository } from '../repositories/interfaces/ITemplateRepository';
-import { ConflictError, NotFoundError } from '../shared/errors/AppError';
+import { lookAndFeelRepository } from '../repositories/LookAndFeelRepository';
+import { LookAndFeel } from '../domain/entities/LookAndFeel';
+import { ConflictError, NotFoundError, AppError } from '../shared/errors/AppError';
+
+// Tenant/customer da plataforma MYIO — usado como fallback de tema
+const MYIO_TENANT_ID  = '11111111-1111-1111-1111-111111111111';
+const MYIO_CUSTOMER_ID = '22222222-2222-2222-2222-222222222222';
 
 // =============================================================================
 // Template Tag Catalog — per type
@@ -76,6 +82,31 @@ const TAG_CATALOG: Record<string, TagDefinition[]> = {
     { tag: '{{highlight.label}}',        label: 'Label do destaque',               description: 'Dentro de {{#each highlights}}',                             example: 'CHILLER 1' },
     { tag: '{{highlight.value}}',        label: 'Valor do destaque',               description: 'Dentro de {{#each highlights}}',                             example: '12.429 MWh' },
     { tag: '{{highlight.description}}',  label: 'Descrição do destaque',           description: 'Dentro de {{#each highlights}}',                             example: '25.4% do total' },
+    { tag: '{{/each}}',                  label: 'Loop — fecha bloco',              description: 'Fecha qualquer {{#each}}',                                   example: '' },
+  ],
+  NOTIFICATION: [
+    { tag: '{{notification.title}}',     label: 'Título da notificação',           description: 'Título principal da notificação',                            example: 'Alarme crítico detectado' },
+    { tag: '{{notification.body}}',      label: 'Corpo da notificação',            description: 'Texto completo da mensagem',                                 example: 'O dispositivo Fancoil 01 excedeu o limite configurado.' },
+    { tag: '{{notification.level}}',     label: 'Nível de severidade',             description: 'INFO | WARNING | ERROR | SUCCESS',                           example: 'WARNING' },
+    { tag: '{{notification.actionLabel}}', label: 'Label do botão de ação',        description: 'Texto do CTA da notificação',                                example: 'Ver detalhes' },
+    { tag: '{{notification.actionUrl}}', label: 'URL da ação',                     description: 'Link para onde o botão de ação aponta',                      example: 'https://app.myio.com.br/alarms/123' },
+    { tag: '{{user.name}}',              label: 'Nome do usuário',                 description: 'Nome do destinatário da notificação',                        example: 'João Silva' },
+    { tag: '{{customer.name}}',          label: 'Nome do cliente',                 description: 'Nome do customer associado',                                 example: 'Dimension Engenharia' },
+    { tag: '{{platform.name}}',          label: 'Nome da plataforma',              description: 'Nome da plataforma MYIO',                                    example: 'MYIO' },
+  ],
+  INSIGHT: [
+    { tag: '{{insight.title}}',          label: 'Título do insight',               description: 'Título principal do relatório de insights',                  example: 'Resumo de Consumo — Março 2026' },
+    { tag: '{{insight.period}}',         label: 'Período de análise',              description: 'Intervalo de tempo analisado',                               example: '01/03/2026 a 31/03/2026' },
+    { tag: '{{insight.summary}}',        label: 'Resumo executivo',                description: 'Parágrafo com a visão geral dos insights',                   example: 'O consumo total aumentou 12% em relação ao mês anterior.' },
+    { tag: '{{customer.name}}',          label: 'Nome do cliente',                 description: 'Nome do customer associado ao insight',                      example: 'Dimension Engenharia' },
+    { tag: '{{#each metrics}}',          label: 'Loop — métricas',                 description: 'Repete o bloco para cada métrica do insight',                example: '' },
+    { tag: '{{metric.label}}',           label: 'Label da métrica',                description: 'Dentro de {{#each metrics}}',                                example: 'Consumo Total' },
+    { tag: '{{metric.value}}',           label: 'Valor da métrica',                description: 'Dentro de {{#each metrics}}',                                example: '12.450' },
+    { tag: '{{metric.unit}}',            label: 'Unidade da métrica',              description: 'Dentro de {{#each metrics}}',                                example: 'kWh' },
+    { tag: '{{metric.trend}}',           label: 'Tendência da métrica',            description: 'Dentro de {{#each metrics}} — UP | DOWN | STABLE',           example: 'UP' },
+    { tag: '{{#each recommendations}}',  label: 'Loop — recomendações',            description: 'Repete o bloco para cada recomendação',                      example: '' },
+    { tag: '{{recommendation.title}}',   label: 'Título da recomendação',          description: 'Dentro de {{#each recommendations}}',                        example: 'Reduzir consumo em horário de ponta' },
+    { tag: '{{recommendation.text}}',    label: 'Texto da recomendação',           description: 'Dentro de {{#each recommendations}}',                        example: 'Considere desligar equipamentos entre 18h e 21h.' },
     { tag: '{{/each}}',                  label: 'Loop — fecha bloco',              description: 'Fecha qualquer {{#each}}',                                   example: '' },
   ],
 };
@@ -192,6 +223,68 @@ export function renderTemplate(htmlContent: string, data: Record<string, unknown
 }
 
 // =============================================================================
+// Theme Merge — inject customer colors/logo as CSS variables into HTML
+// =============================================================================
+
+function camelToKebab(str: string): string {
+  return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
+}
+
+function buildThemeCssVars(theme: LookAndFeel): string {
+  const lines: string[] = [];
+
+  // Colors — iterate known ColorPalette fields
+  const c = theme.colors;
+  const colorEntries: Array<[string, string | undefined]> = [
+    ['primary',          c.primary],
+    ['primary-light',    c.primaryLight],
+    ['primary-dark',     c.primaryDark],
+    ['secondary',        c.secondary],
+    ['secondary-light',  c.secondaryLight],
+    ['secondary-dark',   c.secondaryDark],
+    ['accent',           c.accent],
+    ['background',       c.background],
+    ['surface',          c.surface],
+    ['surface-variant',  (c as unknown as Record<string, string>)['surfaceVariant']],
+    ['error',            c.error],
+    ['warning',          c.warning],
+    ['success',          c.success],
+    ['info',             c.info],
+    ['text-primary',     c.textPrimary],
+    ['text-secondary',   c.textSecondary],
+    ['text-disabled',    c.textDisabled],
+    ['divider',          c.divider],
+  ];
+  for (const [key, value] of colorEntries) {
+    if (value) lines.push(`  --color-${key}: ${value};`);
+  }
+
+  // Typography
+  if (theme.typography.fontFamily)          lines.push(`  --font-family: ${theme.typography.fontFamily};`);
+  if (theme.typography.fontFamilySecondary) lines.push(`  --font-family-secondary: ${theme.typography.fontFamilySecondary};`);
+
+  // Logo
+  if (theme.logo.primaryUrl) lines.push(`  --logo-url: url('${theme.logo.primaryUrl}');`);
+  if (theme.logo.iconUrl)    lines.push(`  --logo-icon-url: url('${theme.logo.iconUrl}');`);
+
+  // Brand
+  if (theme.brandName) lines.push(`  --brand-name: "${theme.brandName}";`);
+
+  return `:root {\n${lines.join('\n')}\n}`;
+}
+
+function injectThemeIntoHtml(html: string, theme: LookAndFeel): string {
+  const cssVars = buildThemeCssVars(theme);
+  const styleBlock = `<style data-gcdr-theme="${theme.id}">\n${cssVars}\n</style>`;
+
+  // Inject before </head> if present, otherwise prepend
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${styleBlock}\n</head>`);
+  }
+  return styleBlock + '\n' + html;
+}
+
+// =============================================================================
 // TemplateService
 // =============================================================================
 
@@ -243,6 +336,81 @@ export class TemplateService {
 
   async getActiveByType(tenantId: string, type: TemplateType): Promise<Template | null> {
     return this.repository.getActiveByType(tenantId, type);
+  }
+
+  /**
+   * Render endpoint for EMAIL_SENDER.
+   * Finds the template (by version or latest ACTIVE), merges customer theme as CSS vars,
+   * and returns the HTML ready for tag substitution by the caller.
+   *
+   * Fallback chain:
+   *   template: tenant → MYIO default tenant → 404
+   *   theme:    customer default → MYIO platform customer → no theme (plain HTML)
+   */
+  async renderForEmailSender(
+    tenantId: string,
+    type: TemplateType,
+    customerId: string,
+    version?: number,
+  ): Promise<{
+    html: string;
+    template: { id: string; slug: string; type: string; version: number; status: string };
+    themeSource: 'customer' | 'default' | 'none';
+  }> {
+    // 1. Find template
+    let template: Template | null = null;
+
+    if (version !== undefined) {
+      template = await this.repository.getByTypeAndVersion(tenantId, type, version);
+      if (!template) {
+        throw new AppError(
+          'TEMPLATE_VERSION_NOT_FOUND',
+          `Template version ${version} not found for type ${type}`,
+          404,
+        );
+      }
+    } else {
+      // Try tenant first, then MYIO default tenant as fallback
+      template = await this.repository.getActiveByType(tenantId, type);
+      if (!template && tenantId !== MYIO_TENANT_ID) {
+        template = await this.repository.getActiveByType(MYIO_TENANT_ID, type);
+      }
+      if (!template) {
+        throw new AppError(
+          'TEMPLATE_NOT_FOUND',
+          `No ACTIVE template found for type ${type}. Create and activate a template for this type.`,
+          404,
+        );
+      }
+    }
+
+    // 2. Find theme
+    let theme: LookAndFeel | null = null;
+    let themeSource: 'customer' | 'default' | 'none' = 'none';
+
+    theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, customerId);
+    if (theme) {
+      themeSource = 'customer';
+    } else {
+      // Fallback: MYIO platform default theme
+      theme = await lookAndFeelRepository.getDefaultByCustomer(MYIO_TENANT_ID, MYIO_CUSTOMER_ID);
+      if (theme) themeSource = 'default';
+    }
+
+    // 3. Merge theme into HTML
+    const html = theme ? injectThemeIntoHtml(template.htmlContent, theme) : template.htmlContent;
+
+    return {
+      html,
+      template: {
+        id: template.id,
+        slug: template.slug,
+        type: template.type,
+        version: template.version,
+        status: template.status,
+      },
+      themeSource,
+    };
   }
 }
 

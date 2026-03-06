@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const TEMPLATE_TYPES = ['EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME', 'RELEASE_NOTE'] as const;
+const TEMPLATE_TYPES = ['EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME', 'RELEASE_NOTE', 'NOTIFICATION', 'INSIGHT'] as const;
 const TEMPLATE_STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'] as const;
 
 export const CreateTemplateSchema = z.object({
@@ -39,3 +39,11 @@ export const ListTemplatesQuerySchema = z.object({
 });
 
 export type ListTemplatesQuery = z.infer<typeof ListTemplatesQuerySchema>;
+
+export const RenderTemplateQuerySchema = z.object({
+  type: z.enum(TEMPLATE_TYPES),
+  customerId: z.string().uuid('customerId must be a valid UUID'),
+  version: z.coerce.number().int().positive().optional(),
+});
+
+export type RenderTemplateQuery = z.infer<typeof RenderTemplateQuerySchema>;

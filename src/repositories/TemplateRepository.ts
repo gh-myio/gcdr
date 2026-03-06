@@ -104,6 +104,21 @@ export class TemplateRepository implements ITemplateRepository {
       .limit(1);
     return row ? mapRow(row) : null;
   }
+
+  async getByTypeAndVersion(tenantId: string, type: TemplateType, version: number): Promise<Template | null> {
+    const [row] = await db
+      .select()
+      .from(schema.templates)
+      .where(
+        and(
+          eq(schema.templates.tenantId, tenantId),
+          eq(schema.templates.type, type),
+          eq(schema.templates.version, version),
+        ),
+      )
+      .limit(1);
+    return row ? mapRow(row) : null;
+  }
 }
 
 export const templateRepository = new TemplateRepository();

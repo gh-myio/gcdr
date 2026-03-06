@@ -13,4 +13,5 @@ export interface ITemplateRepository {
   update(tenantId: string, slug: string, data: UpdateTemplateDTO): Promise<Template>;
   archive(tenantId: string, slug: string): Promise<void>;
   getActiveByType(tenantId: string, type: TemplateType): Promise<Template | null>;
+  getByTypeAndVersion(tenantId: string, type: TemplateType, version: number): Promise<Template | null>;
 }

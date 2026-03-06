@@ -1,4 +1,4 @@
-export type TemplateType = 'EMAIL_ALARM' | 'EMAIL_REPORT' | 'EMAIL_WELCOME' | 'RELEASE_NOTE';
+export type TemplateType = 'EMAIL_ALARM' | 'EMAIL_REPORT' | 'EMAIL_WELCOME' | 'RELEASE_NOTE' | 'NOTIFICATION' | 'INSIGHT';
 export type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export interface Template {

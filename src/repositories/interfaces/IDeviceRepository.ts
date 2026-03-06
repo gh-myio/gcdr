@@ -17,6 +17,9 @@ export interface IDeviceRepository {
   listByAsset(tenantId: string, assetId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>>;
   listByCustomer(tenantId: string, customerId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>>;
 
+  // Lookup
+  findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null>;
+
   // Connectivity
   updateConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<Device>;
 

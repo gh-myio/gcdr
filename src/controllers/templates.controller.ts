@@ -5,6 +5,7 @@ import {
   UpdateTemplateSchema,
   PreviewTemplateSchema,
   ListTemplatesQuerySchema,
+  RenderTemplateQuerySchema,
 } from '../dto/request/TemplateDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
@@ -55,22 +56,52 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
- * GET /templates/tags/:type
+ * GET /templates/tag-catalog?type=EMAIL_ALARM
  * Tag catalog for a given template type — used by the frontend editor
  * Must be declared BEFORE /:slug to avoid route collision
  */
-router.get('/tags/:type', (req: Request, res: Response, next: NextFunction) => {
+router.get('/tag-catalog', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
-    const { type } = req.params;
+    const { type } = req.query as { type?: string };
 
-    const validTypes: TemplateType[] = ['EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME'];
-    if (!validTypes.includes(type as TemplateType)) {
-      throw new ValidationError(`Invalid template type "${type}". Valid: ${validTypes.join(', ')}`);
+    const validTypes: TemplateType[] = [
+      'EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME', 'RELEASE_NOTE', 'NOTIFICATION', 'INSIGHT',
+    ];
+    if (!type || !validTypes.includes(type as TemplateType)) {
+      throw new ValidationError(
+        `Query param "type" is required. Valid values: ${validTypes.join(', ')}`,
+      );
     }
 
     const tags = templateService.getTagCatalog(type as TemplateType);
     sendSuccess(res, tags, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /templates/render?type=EMAIL_ALARM&customerId=uuid[&version=3]
+ * Returns template HTML merged with customer theme — used by EMAIL_SENDER (M2M)
+ * Must be declared BEFORE /:slug to avoid route collision
+ */
+router.get('/render', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const query = RenderTemplateQuerySchema.parse(req.query);
+
+    const result = await templateService.renderForEmailSender(
+      tenantId,
+      query.type,
+      query.customerId,
+      query.version,
+    );
+
+    res.setHeader('X-Template-Version', String(result.template.version));
+    res.setHeader('X-Theme-Source', result.themeSource);
+
+    sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
   }

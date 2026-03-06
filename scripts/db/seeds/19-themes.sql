@@ -536,8 +536,463 @@ BEGIN
         RAISE NOTICE 'Skipped theme: ACME Tech SP — customer % not found', v_branch1_id;
     END IF;
 
+    -- =========================================================================
+    -- 5. Mestre Álvaro — gestão de edifícios (azul corporativo + dourado)
+    -- =========================================================================
+    IF EXISTS (SELECT 1 FROM customers WHERE id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1') THEN
+        INSERT INTO look_and_feels (
+            id, tenant_id, customer_id, name, description,
+            is_default, mode,
+            colors, dark_mode_colors,
+            typography, logo, brand_name, tagline,
+            layout, components,
+            inherit_from_parent, metadata, version
+        ) VALUES (
+            'b1e70001-0001-0001-0001-000000000005',
+            v_tenant_id,
+            'e04046d4-baa4-44e9-a378-4dfebe4140f1',
+            'Mestre Álvaro',
+            'Tema corporativo Mestre Álvaro — azul profissional com acento dourado',
+            true,
+            'light',
+            '{
+                "primary":         "#1A3A5C",
+                "primaryLight":    "#245180",
+                "primaryDark":     "#102438",
+                "secondary":       "#C9A84C",
+                "secondaryLight":  "#DFC077",
+                "secondaryDark":   "#A07830",
+                "accent":          "#E8B84B",
+                "background":      "#F5F6F8",
+                "surface":         "#FFFFFF",
+                "surfaceVariant":  "#EEF1F6",
+                "error":           "#C62828",
+                "warning":         "#E65100",
+                "success":         "#2E7D32",
+                "info":            "#0277BD",
+                "textPrimary":     "#1A1F36",
+                "textSecondary":   "#4A5568",
+                "textDisabled":    "#A0AEC0",
+                "divider":         "#DDE2EC",
+                "border":          "#C8D0DE"
+            }',
+            '{
+                "primary":         "#5B8DB8",
+                "primaryLight":    "#7AAACF",
+                "primaryDark":     "#3D6F99",
+                "secondary":       "#DFC077",
+                "accent":          "#F0CC6A",
+                "background":      "#0F1520",
+                "surface":         "#182030",
+                "surfaceVariant":  "#1F2D42",
+                "error":           "#EF5350",
+                "warning":         "#FFB74D",
+                "success":         "#66BB6A",
+                "info":            "#42A5F5",
+                "textPrimary":     "#EDF2F7",
+                "textSecondary":   "#94A3B8",
+                "textDisabled":    "#4A5568",
+                "divider":         "#2D3748"
+            }',
+            '{
+                "fontFamily":          "Inter, system-ui, sans-serif",
+                "fontFamilySecondary": "Georgia, serif",
+                "fontSize": {
+                    "xs":   "0.75rem",
+                    "sm":   "0.875rem",
+                    "base": "1rem",
+                    "lg":   "1.125rem",
+                    "xl":   "1.25rem",
+                    "2xl":  "1.5rem",
+                    "3xl":  "1.875rem"
+                },
+                "fontWeight": {
+                    "light":    300,
+                    "normal":   400,
+                    "medium":   500,
+                    "semibold": 600,
+                    "bold":     700
+                },
+                "lineHeight": {
+                    "tight":   1.25,
+                    "normal":  1.5,
+                    "relaxed": 1.75
+                }
+            }',
+            '{
+                "primaryUrl":  "https://mestrealvaro.com.br/assets/logo.svg",
+                "iconUrl":     "https://mestrealvaro.com.br/assets/icon.svg",
+                "faviconUrl":  "https://mestrealvaro.com.br/favicon.ico",
+                "width":  180,
+                "height":  44
+            }',
+            'Mestre Álvaro',
+            'Gestão Predial Inteligente',
+            '{
+                "sidebarPosition":  "left",
+                "sidebarCollapsed": false,
+                "sidebarWidth":     256,
+                "headerHeight":     64,
+                "footerHeight":     44,
+                "maxContentWidth":  1440,
+                "borderRadius": {
+                    "none": "0",
+                    "sm":   "0.25rem",
+                    "md":   "0.5rem",
+                    "lg":   "0.75rem",
+                    "xl":   "1rem",
+                    "full": "9999px"
+                }
+            }',
+            '{
+                "buttons": {
+                    "borderRadius":  "0.5rem",
+                    "textTransform": "none",
+                    "fontWeight":    600,
+                    "shadow":        "0 1px 3px rgba(26,58,92,0.3)"
+                },
+                "cards": {
+                    "borderRadius":  "0.75rem",
+                    "shadow":        "0 2px 8px rgba(0,0,0,0.08)",
+                    "borderWidth":   "1px",
+                    "borderColor":   "#DDE2EC",
+                    "accentBorder":  "3px solid #C9A84C"
+                },
+                "inputs": {
+                    "borderRadius":   "0.5rem",
+                    "borderWidth":    "1px",
+                    "focusRingWidth": "2px",
+                    "focusRingColor": "#1A3A5C"
+                },
+                "tables": {
+                    "headerBackground": "#EEF1F6",
+                    "stripedRows":      true,
+                    "hoverEffect":      true,
+                    "borderStyle":      "horizontal"
+                },
+                "charts": {
+                    "palette": ["#1A3A5C","#C9A84C","#245180","#2E7D32","#C62828","#7B5EA7"]
+                },
+                "badges": {
+                    "borderRadius": "9999px",
+                    "fontWeight":   600,
+                    "fontSize":     "0.75rem"
+                }
+            }',
+            false,
+            '{"industry": "building-management", "segment": "facilities"}',
+            1
+        ) ON CONFLICT (id) DO NOTHING;
+        RAISE NOTICE 'Inserted theme: Mestre Álvaro';
+    ELSE
+        RAISE NOTICE 'Skipped theme: Mestre Álvaro — customer e04046d4-... not found';
+    END IF;
+
+    -- =========================================================================
+    -- 6. Mont Serrat — hospitalidade / condomínio (verde sereno + terracota)
+    -- =========================================================================
+    IF EXISTS (SELECT 1 FROM customers WHERE id = 'a4c64215-f7eb-4102-80b5-e10b98e2f94e') THEN
+        INSERT INTO look_and_feels (
+            id, tenant_id, customer_id, name, description,
+            is_default, mode,
+            colors, dark_mode_colors,
+            typography, logo, brand_name, tagline,
+            layout, components,
+            inherit_from_parent, metadata, version
+        ) VALUES (
+            'b1e70001-0001-0001-0001-000000000006',
+            v_tenant_id,
+            'a4c64215-f7eb-4102-80b5-e10b98e2f94e',
+            'Mont Serrat',
+            'Tema Mont Serrat — verde sereno com terracota, identidade de hospitalidade',
+            true,
+            'light',
+            '{
+                "primary":         "#2D6A4F",
+                "primaryLight":    "#3D8A66",
+                "primaryDark":     "#1B4D37",
+                "secondary":       "#BC6C25",
+                "secondaryLight":  "#D4845C",
+                "secondaryDark":   "#8B4A13",
+                "accent":          "#E9C46A",
+                "background":      "#F8F5F0",
+                "surface":         "#FFFFFF",
+                "surfaceVariant":  "#EDF5EF",
+                "error":           "#C62828",
+                "warning":         "#D4580C",
+                "success":         "#1B5E20",
+                "info":            "#01579B",
+                "textPrimary":     "#1C2B22",
+                "textSecondary":   "#4A6358",
+                "textDisabled":    "#9DB5A7",
+                "divider":         "#DDE8E2",
+                "border":          "#C8D8CC"
+            }',
+            '{
+                "primary":         "#52B788",
+                "primaryLight":    "#74C69D",
+                "primaryDark":     "#40916C",
+                "secondary":       "#E07A5F",
+                "accent":          "#F2CC60",
+                "background":      "#0F1A13",
+                "surface":         "#162019",
+                "surfaceVariant":  "#1E2E23",
+                "error":           "#EF5350",
+                "warning":         "#FF8A65",
+                "success":         "#66BB6A",
+                "info":            "#42A5F5",
+                "textPrimary":     "#E8F5E9",
+                "textSecondary":   "#95B8A3",
+                "textDisabled":    "#4A6358",
+                "divider":         "#2D3D32"
+            }',
+            '{
+                "fontFamily":          "Merriweather, Georgia, serif",
+                "fontFamilySecondary": "Inter, sans-serif",
+                "fontSize": {
+                    "xs":   "0.75rem",
+                    "sm":   "0.875rem",
+                    "base": "1rem",
+                    "lg":   "1.125rem",
+                    "xl":   "1.25rem",
+                    "2xl":  "1.5rem",
+                    "3xl":  "1.875rem"
+                },
+                "fontWeight": {
+                    "light":    300,
+                    "normal":   400,
+                    "medium":   500,
+                    "semibold": 600,
+                    "bold":     700
+                },
+                "lineHeight": {
+                    "tight":   1.3,
+                    "normal":  1.6,
+                    "relaxed": 1.8
+                }
+            }',
+            '{
+                "primaryUrl":  "https://montserrat.com.br/assets/logo.svg",
+                "iconUrl":     "https://montserrat.com.br/assets/icon.svg",
+                "faviconUrl":  "https://montserrat.com.br/favicon.ico",
+                "width":  170,
+                "height":  48
+            }',
+            'Mont Serrat',
+            'Bem-viver com Inteligência',
+            '{
+                "sidebarPosition":  "left",
+                "sidebarCollapsed": false,
+                "sidebarWidth":     260,
+                "headerHeight":     68,
+                "footerHeight":     44,
+                "maxContentWidth":  1380,
+                "borderRadius": {
+                    "none": "0",
+                    "sm":   "0.375rem",
+                    "md":   "0.625rem",
+                    "lg":   "1rem",
+                    "xl":   "1.5rem",
+                    "full": "9999px"
+                }
+            }',
+            '{
+                "buttons": {
+                    "borderRadius":  "0.625rem",
+                    "textTransform": "none",
+                    "fontWeight":    600,
+                    "shadow":        "0 2px 6px rgba(45,106,79,0.25)"
+                },
+                "cards": {
+                    "borderRadius":  "1rem",
+                    "shadow":        "0 4px 12px rgba(0,0,0,0.07)",
+                    "borderWidth":   "1px",
+                    "borderColor":   "#DDE8E2",
+                    "accentBorder":  "3px solid #2D6A4F"
+                },
+                "inputs": {
+                    "borderRadius":   "0.625rem",
+                    "borderWidth":    "1px",
+                    "focusRingWidth": "2px",
+                    "focusRingColor": "#2D6A4F"
+                },
+                "tables": {
+                    "headerBackground": "#EDF5EF",
+                    "stripedRows":      true,
+                    "hoverEffect":      true,
+                    "borderStyle":      "horizontal"
+                },
+                "charts": {
+                    "palette": ["#2D6A4F","#BC6C25","#E9C46A","#52B788","#C62828","#6A4F7B"]
+                },
+                "badges": {
+                    "borderRadius": "9999px",
+                    "fontWeight":   600,
+                    "fontSize":     "0.75rem"
+                }
+            }',
+            false,
+            '{"industry": "hospitality", "segment": "condominium"}',
+            1
+        ) ON CONFLICT (id) DO NOTHING;
+        RAISE NOTICE 'Inserted theme: Mont Serrat';
+    ELSE
+        RAISE NOTICE 'Skipped theme: Mont Serrat — customer a4c64215-... not found';
+    END IF;
+
+    -- =========================================================================
+    -- 7. Moxuara — industrial/portuário (cinza aço + laranja de segurança)
+    -- =========================================================================
+    IF EXISTS (SELECT 1 FROM customers WHERE id = '84e0370e-636a-4741-9874-504b5e0b3577') THEN
+        INSERT INTO look_and_feels (
+            id, tenant_id, customer_id, name, description,
+            is_default, mode,
+            colors, dark_mode_colors,
+            typography, logo, brand_name, tagline,
+            layout, components,
+            inherit_from_parent, metadata, version
+        ) VALUES (
+            'b1e70001-0001-0001-0001-000000000007',
+            v_tenant_id,
+            '84e0370e-636a-4741-9874-504b5e0b3577',
+            'Moxuara',
+            'Tema Moxuara — cinza industrial com laranja de segurança, robustez operacional',
+            true,
+            'light',
+            '{
+                "primary":         "#374151",
+                "primaryLight":    "#4B5563",
+                "primaryDark":     "#1F2937",
+                "secondary":       "#EA580C",
+                "secondaryLight":  "#F97316",
+                "secondaryDark":   "#C2410C",
+                "accent":          "#F59E0B",
+                "background":      "#F3F4F6",
+                "surface":         "#FFFFFF",
+                "surfaceVariant":  "#E5E7EB",
+                "error":           "#DC2626",
+                "warning":         "#D97706",
+                "success":         "#16A34A",
+                "info":            "#0284C7",
+                "textPrimary":     "#111827",
+                "textSecondary":   "#374151",
+                "textDisabled":    "#9CA3AF",
+                "divider":         "#D1D5DB",
+                "border":          "#9CA3AF"
+            }',
+            '{
+                "primary":         "#9CA3AF",
+                "primaryLight":    "#D1D5DB",
+                "primaryDark":     "#6B7280",
+                "secondary":       "#F97316",
+                "accent":          "#FBBF24",
+                "background":      "#111827",
+                "surface":         "#1F2937",
+                "surfaceVariant":  "#374151",
+                "error":           "#EF4444",
+                "warning":         "#F59E0B",
+                "success":         "#22C55E",
+                "info":            "#38BDF8",
+                "textPrimary":     "#F9FAFB",
+                "textSecondary":   "#D1D5DB",
+                "textDisabled":    "#6B7280",
+                "divider":         "#374151"
+            }',
+            '{
+                "fontFamily":          "Roboto, system-ui, sans-serif",
+                "fontFamilySecondary": "Roboto Mono, monospace",
+                "fontSize": {
+                    "xs":   "0.75rem",
+                    "sm":   "0.875rem",
+                    "base": "1rem",
+                    "lg":   "1.125rem",
+                    "xl":   "1.25rem",
+                    "2xl":  "1.5rem",
+                    "3xl":  "1.875rem"
+                },
+                "fontWeight": {
+                    "normal":   400,
+                    "medium":   500,
+                    "semibold": 600,
+                    "bold":     700
+                },
+                "lineHeight": {
+                    "tight":   1.25,
+                    "normal":  1.5,
+                    "relaxed": 1.65
+                }
+            }',
+            '{
+                "primaryUrl":  "https://moxuara.com.br/assets/logo.svg",
+                "iconUrl":     "https://moxuara.com.br/assets/icon.svg",
+                "faviconUrl":  "https://moxuara.com.br/favicon.ico",
+                "width":  160,
+                "height":  40
+            }',
+            'Moxuara',
+            'Monitoramento Industrial de Alta Confiabilidade',
+            '{
+                "sidebarPosition":  "left",
+                "sidebarCollapsed": true,
+                "sidebarWidth":     260,
+                "headerHeight":     56,
+                "footerHeight":     40,
+                "maxContentWidth":  1600,
+                "borderRadius": {
+                    "none": "0",
+                    "sm":   "0.125rem",
+                    "md":   "0.25rem",
+                    "lg":   "0.5rem",
+                    "xl":   "0.75rem",
+                    "full": "9999px"
+                }
+            }',
+            '{
+                "buttons": {
+                    "borderRadius":  "0.25rem",
+                    "textTransform": "uppercase",
+                    "fontWeight":    700,
+                    "letterSpacing": "0.05em"
+                },
+                "cards": {
+                    "borderRadius":  "0.25rem",
+                    "shadow":        "none",
+                    "borderWidth":   "1px",
+                    "borderColor":   "#D1D5DB",
+                    "accentBorder":  "3px solid #EA580C"
+                },
+                "inputs": {
+                    "borderRadius":   "0.25rem",
+                    "borderWidth":    "2px",
+                    "focusRingWidth": "0",
+                    "focusRingColor": "#EA580C"
+                },
+                "tables": {
+                    "headerBackground": "#E5E7EB",
+                    "stripedRows":      true,
+                    "hoverEffect":      false,
+                    "borderStyle":      "all",
+                    "compact":          true
+                },
+                "charts": {
+                    "palette": ["#374151","#EA580C","#F59E0B","#16A34A","#DC2626","#7C3AED"]
+                },
+                "badges": {
+                    "borderRadius": "0.25rem",
+                    "fontWeight":   700,
+                    "fontSize":     "0.72rem"
+                }
+            }',
+            false,
+            '{"industry": "industrial", "segment": "port-logistics", "customerId": "84e0370e-636a-4741-9874-504b5e0b3577"}',
+            1
+        ) ON CONFLICT (id) DO NOTHING;
+        RAISE NOTICE 'Inserted theme: Moxuara';
+    ELSE
+        RAISE NOTICE 'Skipped theme: Moxuara — customer 84e0370e-... not found';
+    END IF;
+
     RAISE NOTICE 'Done: themes seed completed';
-END $$;
 
 -- Verificar todos os temas
 SELECT
