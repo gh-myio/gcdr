@@ -1,6 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
-import { Rule, RuleType, RuleScope, RuleValueOverride } from '../domain/entities/Rule';
+import { Rule, RuleType, RuleScope, RuleValueOverride, RuleNotifications } from '../domain/entities/Rule';
 import { CreateRuleDTO, UpdateRuleDTO } from '../dto/request/RuleDTO';
 import { PaginatedResult } from '../shared/types';
 import { IRuleRepository, ListRulesParams } from './interfaces/IRuleRepository';
@@ -35,6 +35,7 @@ export class RuleRepository implements IRuleRepository {
       escalationConfig: data.escalationConfig || null,
       maintenanceConfig: data.maintenanceConfig || null,
       notificationChannels: data.notificationChannels || [],
+      notifications: data.notifications || null,
       tags: data.tags || [],
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
@@ -77,6 +78,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
+    if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
 
     // Handle scope updates
     if (data.scope !== undefined) {
@@ -390,6 +392,7 @@ export class RuleRepository implements IRuleRepository {
       escalationConfig: row.escalationConfig as Rule['escalationConfig'],
       maintenanceConfig: row.maintenanceConfig as Rule['maintenanceConfig'],
       notificationChannels: row.notificationChannels as Rule['notificationChannels'],
+      notifications: row.notifications as RuleNotifications ?? undefined,
       tags: row.tags as string[],
       status: row.status,
       enabled: row.enabled,

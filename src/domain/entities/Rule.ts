@@ -145,11 +145,38 @@ export interface MaintenanceWindowConfig {
   affectedRules?: string[]; // Rule IDs to suppress, empty means all
 }
 
-// Notification Channel Configuration
+// Notification Channel Configuration (delivery mechanism — webhook, SMS config, etc.)
 export interface NotificationChannel {
   type: 'EMAIL' | 'SMS' | 'WEBHOOK' | 'SLACK' | 'TEAMS' | 'PAGERDUTY' | 'CUSTOM';
   config: Record<string, string>;
   enabled: boolean;
+}
+
+// Individual recipient of a rule notification
+// sourceType:
+//   USER         — user selected directly from the customer's user list
+//   GROUP_MEMBER — user added via a notification group; groupId indicates origin
+//   MANUAL       — email typed manually (no userId/groupId)
+export interface NotificationRecipient {
+  name: string;
+  email: string;
+  sourceType: 'USER' | 'GROUP_MEMBER' | 'MANUAL';
+  userId?: string;   // UUID of the user record (USER or GROUP_MEMBER)
+  groupId?: string;  // UUID of the group (GROUP_MEMBER only)
+}
+
+// Recipients for a single notification category
+export interface RuleNotificationChannel {
+  enabled: boolean;
+  recipients: NotificationRecipient[];
+}
+
+// Per-category notification settings for a rule
+// Each category is independent — different recipient lists per purpose
+export interface RuleNotifications {
+  alarmNotify?: RuleNotificationChannel;   // Alarm fired notification
+  alarmReport?: RuleNotificationChannel;   // Alarm report digest
+  alarmInsight?: RuleNotificationChannel;  // Alarm insight / analytics
 }
 
 // Per-device value override for rules with scope_entity_ids
@@ -181,8 +208,11 @@ export interface Rule extends BaseEntity {
   escalationConfig?: EscalationConfig;
   maintenanceConfig?: MaintenanceWindowConfig;
 
-  // Notification settings
+  // Notification settings — delivery channels (webhook/SMS config)
   notificationChannels?: NotificationChannel[];
+
+  // Notification recipients — who receives which notification category
+  notifications?: RuleNotifications;
 
   // Per-device value overrides (RFC-0018) — keyed by device UUID
   scopeEntityOverrides?: Record<string, RuleValueOverride>;

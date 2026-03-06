@@ -564,6 +564,7 @@ export const rules = pgTable('rules', {
 
   // Notification settings
   notificationChannels: jsonb('notification_channels').notNull().default([]),
+  notifications: jsonb('notifications'),
 
   // Tags
   tags: jsonb('tags').notNull().default([]),

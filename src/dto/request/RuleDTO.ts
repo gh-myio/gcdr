@@ -110,11 +110,31 @@ const MaintenanceWindowConfigSchema = z.object({
   affectedRules: z.array(z.string()).optional(),
 });
 
-// Notification Channel Schema
+// Notification Channel Schema (delivery mechanism)
 const NotificationChannelSchema = z.object({
   type: NotificationTypeSchema,
   config: z.record(z.string()),
   enabled: z.boolean().default(true),
+});
+
+// Notification recipient schemas
+const NotificationRecipientSchema = z.object({
+  name: z.string().min(1).max(255),
+  email: z.string().email(),
+  sourceType: z.enum(['USER', 'GROUP_MEMBER', 'MANUAL']),
+  userId: z.string().uuid().optional(),
+  groupId: z.string().uuid().optional(),
+});
+
+const RuleNotificationChannelSchema = z.object({
+  enabled: z.boolean().default(false),
+  recipients: z.array(NotificationRecipientSchema).default([]),
+});
+
+const RuleNotificationsSchema = z.object({
+  alarmNotify: RuleNotificationChannelSchema.optional(),
+  alarmReport: RuleNotificationChannelSchema.optional(),
+  alarmInsight: RuleNotificationChannelSchema.optional(),
 });
 
 // Per-device value override schema (RFC-0018)
@@ -144,6 +164,7 @@ export const CreateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
+  notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
@@ -179,6 +200,7 @@ export const UpdateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
+  notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
