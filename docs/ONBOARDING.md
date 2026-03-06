@@ -87,7 +87,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 |--------|-----------|-----------|
 | **Health** | 1 | Health check da API |
 | **Authentication** | 6 | Login, logout, refresh token, MFA, password reset |
-| **Customers** | 9 | Hierarquia de clientes (ROOT → RESELLER → ENTERPRISE → BUSINESS → INDIVIDUAL) |
+| **Customers** | 10 | Hierarquia de clientes (ROOT → RESELLER → ENTERPRISE → BUSINESS → INDIVIDUAL) |
 | **Partners** | 15 | Parceiros, API Keys, OAuth Clients, Webhooks |
 | **Authorization** | 18 | RBAC completo (Roles, Policies, Assignments) |
 | **Assets** | 11 | Ativos com hierarquia (SITE → BUILDING → FLOOR → AREA → EQUIPMENT) |
@@ -105,6 +105,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Users** | 18 | Usuários, gerenciamento, MFA |
 | **Groups** | 12 | Grupos de usuários, dispositivos e assets com hierarquia |
 | **Public Single Apps** | 12 | Apps públicos de formulário com respostas versionadas (RFC-0020) |
+| **Templates** | 7 | Motor de templates HTML para email (EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME) com preview e catálogo de tags (RFC-0021) |
 
 ### Exemplos de Requisições
 
@@ -1784,6 +1785,7 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [RFC-0015: Alarm Bundle Version History](./RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
 - [RFC-0016: ThingsBoard Entity Mapping](./RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
 - [RFC-0020: Public Single Apps](./RFC-0020-Public-Single-Apps.md) - Apps públicos de formulário com respostas versionadas
+- [RFC-0021: HTML Templates Engine](./BACKEND-RFC-0021-HTML-Templates.md) - Motor de templates HTML para email com preview e catálogo de tags
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 - [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 
@@ -1892,6 +1894,21 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - Constraint `devices_tenant_customer_name_unique` adicionada: `UNIQUE(tenant_id, customer_id, name)`
 - Impede criação/rename de device com nome duplicado dentro do mesmo customer
 - Migration: `0008_device_name_unique.sql`
+
+### 2026-03-05
+
+**RFC-0021: HTML Templates Engine**
+- Novo módulo para gerenciar templates HTML para envio de emails (alarme, relatório, boas-vindas)
+- Tabela `templates` com `slug`, `type`, `status`, `html_content`, `version` e `tenant_id`
+- 7 endpoints: `POST /`, `GET /`, `GET /tags/:type`, `GET /:slug`, `PUT /:slug`, `DELETE /:slug`, `POST /:slug/preview`
+- Motor de renderização com suporte a `{{variable}}` e `{{#each list}}...{{/each}}` (aninhamento suportado)
+- Catálogo de tags por tipo: `EMAIL_ALARM`, `EMAIL_REPORT`, `EMAIL_WELCOME`
+- Soft delete via status `ARCHIVED` (sem exclusão física)
+- Migration: `scripts/db/migrations/html-templates.sql`
+- RFC: `docs/BACKEND-RFC-0021-HTML-Templates.md`
+
+**GET /customers/:id/ancestors**
+- Endpoint para retornar a cadeia de ancestrais de um customer (do root até o pai imediato)
 
 ### 2026-03-04
 

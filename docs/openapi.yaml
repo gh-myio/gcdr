@@ -57,6 +57,8 @@ tags:
     description: User self-registration and email verification (RFC-0011)
   - name: Admin Users
     description: Admin user management - approval, rejection, unlock (RFC-0011)
+  - name: Templates
+    description: HTML template engine for email notifications with preview and tag catalog (RFC-0021)
 
 security:
   - bearerAuth: []
@@ -3453,6 +3455,144 @@ components:
           type: string
           format: date-time
 
+    # Templates (RFC-0021)
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          example: alarm-notification-v1
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+        htmlContent:
+          type: string
+          description: Full HTML content with {{variable}} and {{#each list}} tags
+        description:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TemplateSummary:
+      type: object
+      description: Template without htmlContent
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+        description:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTemplate:
+      type: object
+      required: [slug, name, type, htmlContent]
+      properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          example: alarm-notification-v1
+        name:
+          type: string
+          example: Alarm Notification Email
+        type:
+          type: string
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+          default: DRAFT
+        htmlContent:
+          type: string
+        description:
+          type: string
+
+    UpdateTemplate:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+        htmlContent:
+          type: string
+        description:
+          type: string
+
+    TemplateTag:
+      type: object
+      properties:
+        tag:
+          type: string
+          example: '{{customerName}}'
+        description:
+          type: string
+          example: Name of the customer
+
+    TemplateLoopTag:
+      type: object
+      properties:
+        tag:
+          type: string
+          example: '{{#each rules}}'
+        closeTag:
+          type: string
+          example: '{{/each}}'
+        description:
+          type: string
+        itemTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateTag'
+
 paths:
   # Health
   /health:
@@ -4345,6 +4485,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+
+  /customers/{id}/ancestors:
+    get:
+      tags: [Customers]
+      summary: Get all ancestors of customer (root to parent path)
+      operationId: getCustomerAncestors
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: List of ancestor customers ordered from root to immediate parent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Customer'
+                          count:
+                            type: integer
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /customers/{id}/tree:
     get:
@@ -7996,6 +8169,245 @@ paths:
                         $ref: '#/components/schemas/Group'
         '404':
           description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Templates (RFC-0021)
+  /templates:
+    post:
+      tags: [Templates]
+      summary: Create a new HTML template
+      operationId: createTemplate
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplate'
+      responses:
+        '201':
+          description: Template created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Template'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slug already exists for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Templates]
+      summary: List templates (without htmlContent)
+      operationId: listTemplates
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: type
+          in: query
+          description: Filter by template type
+          schema:
+            type: string
+            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [DRAFT, ACTIVE, ARCHIVED]
+      responses:
+        '200':
+          description: List of templates (summary, no htmlContent)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TemplateSummary'
+
+  /templates/tags/{type}:
+    get:
+      tags: [Templates]
+      summary: Get tag catalog for a template type
+      operationId: getTemplateTags
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: type
+          in: path
+          required: true
+          description: Template type
+          schema:
+            type: string
+            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+      responses:
+        '200':
+          description: Tag catalog with available variables and loops
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          variables:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/TemplateTag'
+                          loops:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/TemplateLoopTag'
+
+  /templates/{slug}:
+    get:
+      tags: [Templates]
+      summary: Get template by slug (includes htmlContent)
+      operationId: getTemplate
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full template including htmlContent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Template'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Templates]
+      summary: Update template (increments version)
+      operationId: updateTemplate
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplate'
+      responses:
+        '200':
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Template'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Templates]
+      summary: Archive template (soft delete, sets status to ARCHIVED)
+      operationId: archiveTemplate
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Template archived
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/{slug}/preview:
+    post:
+      tags: [Templates]
+      summary: Preview rendered HTML with provided data
+      operationId: previewTemplate
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  description: Data object used to render the template variables and loops
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Rendered HTML string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          slug:
+                            type: string
+                          type:
+                            type: string
+                          renderedHtml:
+                            type: string
+        '404':
+          description: Template not found
           content:
             application/json:
               schema:

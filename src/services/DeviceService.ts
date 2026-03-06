@@ -80,6 +80,16 @@ export class DeviceService {
       }
     }
 
+    // Check for duplicate (central_id, slave_id) — constraint devices_tenant_central_slave_unique
+    if (data.centralId && data.slaveId !== undefined) {
+      const existingByCentralSlave = await this.repository.findBySlaveId(tenantId, data.centralId, data.slaveId);
+      if (existingByCentralSlave) {
+        throw new ConflictError(
+          `Device with central ${data.centralId} and slave ID ${data.slaveId} already exists (id: ${existingByCentralSlave.id})`
+        );
+      }
+    }
+
     const device = await this.repository.create(tenantId, data, asset.customerId, userId);
 
     alarmBundleService.invalidateCache(tenantId, asset.customerId, {
