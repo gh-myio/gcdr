@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const TEMPLATE_TYPES = ['EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME'] as const;
+const TEMPLATE_TYPES = ['EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME', 'RELEASE_NOTE'] as const;
 const TEMPLATE_STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'] as const;
 
 export const CreateTemplateSchema = z.object({
