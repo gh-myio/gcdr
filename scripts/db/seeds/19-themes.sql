@@ -12,6 +12,13 @@
 --
 -- NOTE: Cada INSERT usa SELECT ... WHERE EXISTS para ser condicional e
 -- compatível com seed runners que dividem SQL em semicolons.
+--
+-- PADRÃO DE template_type:
+--   template_type = NULL   → tema global (app UI + fallback de e-mail)
+--   template_type = 'EMAIL_ALARM'  → tema específico para e-mails de alarme
+--   template_type = 'NOTIFICATION' → tema específico para notificações
+--   template_type = 'INSIGHT'      → tema específico para insights
+--   (apenas um tema por customer por template_type — UNIQUE INDEX no banco)
 -- =============================================================================
 
 -- =========================================================================
@@ -955,15 +962,281 @@ SELECT
 WHERE EXISTS (SELECT 1 FROM customers WHERE id = '84e0370e-636a-4741-9874-504b5e0b3577')
 ON CONFLICT (id) DO NOTHING;
 
+-- =============================================================================
+-- TEMAS TIPO-ESPECÍFICOS (template_type NOT NULL)
+-- =============================================================================
+-- Exemplos de temas vinculados a um tipo de template para Mestre Álvaro.
+-- O EMAIL_SENDER usa estes temas ao renderizar e-mails do tipo correspondente;
+-- para tipos sem tema específico, cai no tema global (template_type IS NULL).
+--
+-- IDs: b1e70001-0001-0001-0001-0000000000XX (XX = 10+)
+-- =============================================================================
+
+-- =========================================================================
+-- 8. Mestre Álvaro — EMAIL_ALARM
+--    Vermelho de urgência + cinza escuro. Usado em e-mails de alarme.
+-- =========================================================================
+INSERT INTO look_and_feels (
+    id, tenant_id, customer_id, name, description,
+    is_default, mode, template_type,
+    colors,
+    typography, logo, brand_name, tagline,
+    layout, components,
+    inherit_from_parent, metadata, version
+)
+SELECT
+    'b1e70001-0001-0001-0001-000000000010',
+    '11111111-1111-1111-1111-111111111111',
+    'e04046d4-baa4-44e9-a378-4dfebe4140f1',
+    'Mestre Álvaro — Alarme',
+    'Tema de urgência para e-mails de alarme — vermelho primário com cinza técnico',
+    false,
+    'light',
+    'EMAIL_ALARM',
+    '{
+        "primary":         "#C62828",
+        "primaryLight":    "#EF5350",
+        "primaryDark":     "#8E0000",
+        "secondary":       "#37474F",
+        "secondaryLight":  "#546E7A",
+        "secondaryDark":   "#263238",
+        "accent":          "#FF8F00",
+        "background":      "#FFF8F8",
+        "surface":         "#FFFFFF",
+        "surfaceVariant":  "#FFEBEE",
+        "error":           "#B71C1C",
+        "warning":         "#E65100",
+        "success":         "#2E7D32",
+        "info":            "#0277BD",
+        "textPrimary":     "#1A1F36",
+        "textSecondary":   "#4A5568",
+        "textDisabled":    "#A0AEC0",
+        "divider":         "#FFCDD2",
+        "border":          "#EF9A9A"
+    }',
+    '{
+        "fontFamily":          "Inter, system-ui, sans-serif",
+        "fontFamilySecondary": "Georgia, serif",
+        "fontSize": {
+            "xs":   "0.75rem",
+            "sm":   "0.875rem",
+            "base": "1rem",
+            "lg":   "1.125rem",
+            "xl":   "1.25rem",
+            "2xl":  "1.5rem",
+            "3xl":  "1.875rem"
+        },
+        "fontWeight": {
+            "light":    300,
+            "normal":   400,
+            "medium":   500,
+            "semibold": 600,
+            "bold":     700
+        },
+        "lineHeight": { "tight": 1.25, "normal": 1.5, "relaxed": 1.75 }
+    }',
+    '{
+        "primaryUrl":  "https://mestrealvaro.com.br/assets/logo.svg",
+        "iconUrl":     "https://mestrealvaro.com.br/assets/icon.svg",
+        "faviconUrl":  "https://mestrealvaro.com.br/favicon.ico",
+        "width": 180, "height": 44
+    }',
+    'Mestre Álvaro',
+    'Alerta de Monitoramento',
+    '{"sidebarPosition": "left", "sidebarCollapsed": false, "sidebarWidth": 256, "headerHeight": 64, "maxContentWidth": 1440}',
+    '{
+        "buttons": { "borderRadius": "0.5rem", "textTransform": "none", "fontWeight": 700, "shadow": "0 1px 3px rgba(198,40,40,0.3)" },
+        "cards":   { "borderRadius": "0.75rem", "shadow": "0 2px 8px rgba(0,0,0,0.08)", "borderWidth": "1px", "borderColor": "#FFCDD2", "accentBorder": "3px solid #C62828" },
+        "inputs":  { "borderRadius": "0.5rem", "borderWidth": "1px", "focusRingWidth": "2px", "focusRingColor": "#C62828" },
+        "tables":  { "headerBackground": "#FFEBEE", "stripedRows": true, "hoverEffect": true, "borderStyle": "horizontal" },
+        "charts":  { "palette": ["#C62828","#37474F","#FF8F00","#2E7D32","#1A3A5C","#7B5EA7"] }
+    }',
+    false,
+    '{"industry": "building-management", "segment": "facilities", "templateType": "EMAIL_ALARM"}',
+    1
+WHERE EXISTS (SELECT 1 FROM customers WHERE id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+ON CONFLICT (id) DO NOTHING;
+
+-- =========================================================================
+-- 9. Mestre Álvaro — NOTIFICATION
+--    Laranja de atenção + azul corporativo. Usado em e-mails de notificação.
+-- =========================================================================
+INSERT INTO look_and_feels (
+    id, tenant_id, customer_id, name, description,
+    is_default, mode, template_type,
+    colors,
+    typography, logo, brand_name, tagline,
+    layout, components,
+    inherit_from_parent, metadata, version
+)
+SELECT
+    'b1e70001-0001-0001-0001-000000000011',
+    '11111111-1111-1111-1111-111111111111',
+    'e04046d4-baa4-44e9-a378-4dfebe4140f1',
+    'Mestre Álvaro — Notificação',
+    'Tema de atenção para e-mails de notificação — laranja primário com azul corporativo',
+    false,
+    'light',
+    'NOTIFICATION',
+    '{
+        "primary":         "#E65100",
+        "primaryLight":    "#FF6D00",
+        "primaryDark":     "#BF360C",
+        "secondary":       "#1A3A5C",
+        "secondaryLight":  "#245180",
+        "secondaryDark":   "#102438",
+        "accent":          "#C9A84C",
+        "background":      "#FFFAF5",
+        "surface":         "#FFFFFF",
+        "surfaceVariant":  "#FFF3E0",
+        "error":           "#C62828",
+        "warning":         "#E65100",
+        "success":         "#2E7D32",
+        "info":            "#0277BD",
+        "textPrimary":     "#1A1F36",
+        "textSecondary":   "#4A5568",
+        "textDisabled":    "#A0AEC0",
+        "divider":         "#FFE0B2",
+        "border":          "#FFCC80"
+    }',
+    '{
+        "fontFamily":          "Inter, system-ui, sans-serif",
+        "fontFamilySecondary": "Georgia, serif",
+        "fontSize": {
+            "xs":   "0.75rem",
+            "sm":   "0.875rem",
+            "base": "1rem",
+            "lg":   "1.125rem",
+            "xl":   "1.25rem",
+            "2xl":  "1.5rem",
+            "3xl":  "1.875rem"
+        },
+        "fontWeight": {
+            "light":    300,
+            "normal":   400,
+            "medium":   500,
+            "semibold": 600,
+            "bold":     700
+        },
+        "lineHeight": { "tight": 1.25, "normal": 1.5, "relaxed": 1.75 }
+    }',
+    '{
+        "primaryUrl":  "https://mestrealvaro.com.br/assets/logo.svg",
+        "iconUrl":     "https://mestrealvaro.com.br/assets/icon.svg",
+        "faviconUrl":  "https://mestrealvaro.com.br/favicon.ico",
+        "width": 180, "height": 44
+    }',
+    'Mestre Álvaro',
+    'Notificação do Sistema',
+    '{"sidebarPosition": "left", "sidebarCollapsed": false, "sidebarWidth": 256, "headerHeight": 64, "maxContentWidth": 1440}',
+    '{
+        "buttons": { "borderRadius": "0.5rem", "textTransform": "none", "fontWeight": 600, "shadow": "0 1px 3px rgba(230,81,0,0.3)" },
+        "cards":   { "borderRadius": "0.75rem", "shadow": "0 2px 8px rgba(0,0,0,0.08)", "borderWidth": "1px", "borderColor": "#FFE0B2", "accentBorder": "3px solid #E65100" },
+        "inputs":  { "borderRadius": "0.5rem", "borderWidth": "1px", "focusRingWidth": "2px", "focusRingColor": "#E65100" },
+        "tables":  { "headerBackground": "#FFF3E0", "stripedRows": true, "hoverEffect": true, "borderStyle": "horizontal" },
+        "charts":  { "palette": ["#E65100","#1A3A5C","#C9A84C","#2E7D32","#C62828","#7B5EA7"] }
+    }',
+    false,
+    '{"industry": "building-management", "segment": "facilities", "templateType": "NOTIFICATION"}',
+    1
+WHERE EXISTS (SELECT 1 FROM customers WHERE id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+ON CONFLICT (id) DO NOTHING;
+
+-- =========================================================================
+-- 10. Mestre Álvaro — INSIGHT
+--     Verde analítico + azul corporativo. Usado em e-mails de insight.
+-- =========================================================================
+INSERT INTO look_and_feels (
+    id, tenant_id, customer_id, name, description,
+    is_default, mode, template_type,
+    colors,
+    typography, logo, brand_name, tagline,
+    layout, components,
+    inherit_from_parent, metadata, version
+)
+SELECT
+    'b1e70001-0001-0001-0001-000000000012',
+    '11111111-1111-1111-1111-111111111111',
+    'e04046d4-baa4-44e9-a378-4dfebe4140f1',
+    'Mestre Álvaro — Insight',
+    'Tema analítico para e-mails de insight — verde sustentável com azul corporativo',
+    false,
+    'light',
+    'INSIGHT',
+    '{
+        "primary":         "#2E7D32",
+        "primaryLight":    "#43A047",
+        "primaryDark":     "#1B5E20",
+        "secondary":       "#1A3A5C",
+        "secondaryLight":  "#245180",
+        "secondaryDark":   "#102438",
+        "accent":          "#C9A84C",
+        "background":      "#F5FBF5",
+        "surface":         "#FFFFFF",
+        "surfaceVariant":  "#E8F5E9",
+        "error":           "#C62828",
+        "warning":         "#E65100",
+        "success":         "#2E7D32",
+        "info":            "#0277BD",
+        "textPrimary":     "#1A1F36",
+        "textSecondary":   "#4A5568",
+        "textDisabled":    "#A0AEC0",
+        "divider":         "#C8E6C9",
+        "border":          "#A5D6A7"
+    }',
+    '{
+        "fontFamily":          "Inter, system-ui, sans-serif",
+        "fontFamilySecondary": "Georgia, serif",
+        "fontSize": {
+            "xs":   "0.75rem",
+            "sm":   "0.875rem",
+            "base": "1rem",
+            "lg":   "1.125rem",
+            "xl":   "1.25rem",
+            "2xl":  "1.5rem",
+            "3xl":  "1.875rem"
+        },
+        "fontWeight": {
+            "light":    300,
+            "normal":   400,
+            "medium":   500,
+            "semibold": 600,
+            "bold":     700
+        },
+        "lineHeight": { "tight": 1.25, "normal": 1.5, "relaxed": 1.75 }
+    }',
+    '{
+        "primaryUrl":  "https://mestrealvaro.com.br/assets/logo.svg",
+        "iconUrl":     "https://mestrealvaro.com.br/assets/icon.svg",
+        "faviconUrl":  "https://mestrealvaro.com.br/favicon.ico",
+        "width": 180, "height": 44
+    }',
+    'Mestre Álvaro',
+    'Inteligência de Consumo',
+    '{"sidebarPosition": "left", "sidebarCollapsed": false, "sidebarWidth": 256, "headerHeight": 64, "maxContentWidth": 1440}',
+    '{
+        "buttons": { "borderRadius": "0.5rem", "textTransform": "none", "fontWeight": 600, "shadow": "0 1px 3px rgba(46,125,50,0.3)" },
+        "cards":   { "borderRadius": "0.75rem", "shadow": "0 2px 8px rgba(0,0,0,0.08)", "borderWidth": "1px", "borderColor": "#C8E6C9", "accentBorder": "3px solid #2E7D32" },
+        "inputs":  { "borderRadius": "0.5rem", "borderWidth": "1px", "focusRingWidth": "2px", "focusRingColor": "#2E7D32" },
+        "tables":  { "headerBackground": "#E8F5E9", "stripedRows": true, "hoverEffect": true, "borderStyle": "horizontal" },
+        "charts":  { "palette": ["#2E7D32","#1A3A5C","#C9A84C","#E65100","#C62828","#7B5EA7"] }
+    }',
+    false,
+    '{"industry": "building-management", "segment": "facilities", "templateType": "INSIGHT"}',
+    1
+WHERE EXISTS (SELECT 1 FROM customers WHERE id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+ON CONFLICT (id) DO NOTHING;
+
 -- Verificar todos os temas
 SELECT
-    lf.name           AS theme,
-    c.name            AS customer,
+    lf.name              AS theme,
+    c.name               AS customer,
+    lf.template_type,
     lf.mode,
     lf.is_default,
     lf.inherit_from_parent,
-    parent.name       AS parent_theme
+    parent.name          AS parent_theme
 FROM look_and_feels lf
 LEFT JOIN customers      c      ON c.id = lf.customer_id
 LEFT JOIN look_and_feels parent ON parent.id = lf.parent_theme_id
-ORDER BY c.name, lf.is_default DESC;
+ORDER BY c.name, lf.is_default DESC, lf.template_type NULLS FIRST;
