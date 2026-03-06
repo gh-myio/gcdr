@@ -11,25 +11,21 @@
 --
 -- Payload contract: docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md
 -- Tag catalog:      GET /templates/tag-catalog?type=<TYPE>
+-- Tenant:           11111111-1111-1111-1111-111111111111
 -- =============================================================================
 
-DO $$
-DECLARE
-    v_tenant_id UUID := '11111111-1111-1111-1111-111111111111';
-BEGIN
-
-    -- =========================================================================
-    -- 1. EMAIL_ALARM — Notificação de Alarme (ACTIVE)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000001',
-        'alarm-notification-v1',
-        v_tenant_id,
-        'Notificação de Alarme',
-        'EMAIL_ALARM',
-        'ACTIVE',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 1. EMAIL_ALARM — Notificação de Alarme (ACTIVE)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000001',
+    'alarm-notification-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Notificação de Alarme',
+    'EMAIL_ALARM',
+    'ACTIVE',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -130,23 +126,23 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Template padrão para notificações de alarme disparadas pelo motor de rules',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
+    'Template padrão para notificações de alarme disparadas pelo motor de rules',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
-    -- =========================================================================
-    -- 2. EMAIL_REPORT — Relatório Periódico (DRAFT)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000002',
-        'periodic-report-v1',
-        v_tenant_id,
-        'Relatório Periódico',
-        'EMAIL_REPORT',
-        'DRAFT',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 2. EMAIL_REPORT — Relatório Periódico (DRAFT)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000002',
+    'periodic-report-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Relatório Periódico',
+    'EMAIL_REPORT',
+    'DRAFT',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -220,23 +216,23 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Template para relatórios periódicos (mensal, semanal). Status DRAFT — personalizar antes de ativar.',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
+    'Template para relatórios periódicos (mensal, semanal). Status DRAFT — personalizar antes de ativar.',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
-    -- =========================================================================
-    -- 3. EMAIL_WELCOME — Boas-vindas (ACTIVE)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000003',
-        'welcome-email-v1',
-        v_tenant_id,
-        'Boas-vindas ao MYIO',
-        'EMAIL_WELCOME',
-        'ACTIVE',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 3. EMAIL_WELCOME — Boas-vindas (ACTIVE)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000003',
+    'welcome-email-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Boas-vindas ao MYIO',
+    'EMAIL_WELCOME',
+    'ACTIVE',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -321,23 +317,23 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Email de boas-vindas enviado ao criar um novo usuário. Link de ativação para definir senha.',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
+    'Email de boas-vindas enviado ao criar um novo usuário. Link de ativação para definir senha.',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
-    -- =========================================================================
-    -- 4. RELEASE_NOTE — Comunicado de Nova Feature (DRAFT)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000004',
-        'release-note-v1',
-        v_tenant_id,
-        'Release Note — Nova Feature',
-        'RELEASE_NOTE',
-        'DRAFT',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 4. RELEASE_NOTE — Comunicado de Nova Feature (DRAFT)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000004',
+    'release-note-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Release Note — Nova Feature',
+    'RELEASE_NOTE',
+    'DRAFT',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -437,23 +433,23 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Release note de nova feature. Status DRAFT — revisar textos antes de ativar.',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
+    'Release note de nova feature. Status DRAFT — revisar textos antes de ativar.',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
-    -- =========================================================================
-    -- 5. NOTIFICATION — Notificação Avulsa de Sistema (DRAFT)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000005',
-        'system-notification-v1',
-        v_tenant_id,
-        'Notificação de Sistema',
-        'NOTIFICATION',
-        'DRAFT',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 5. NOTIFICATION — Notificação Avulsa de Sistema (DRAFT)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000005',
+    'system-notification-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Notificação de Sistema',
+    'NOTIFICATION',
+    'DRAFT',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -507,23 +503,23 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Notificação avulsa de sistema (INFO, WARNING, ERROR, SUCCESS). Status DRAFT — ativar após validação.',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
+    'Notificação avulsa de sistema (INFO, WARNING, ERROR, SUCCESS). Status DRAFT — ativar após validação.',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
-    -- =========================================================================
-    -- 6. INSIGHT — Resumo de Insights e Métricas (DRAFT)
-    -- =========================================================================
-    INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
-    VALUES (
-        'a1b2c3d4-0001-0001-0001-000000000006',
-        'insights-summary-v1',
-        v_tenant_id,
-        'Resumo de Insights',
-        'INSIGHT',
-        'DRAFT',
-        $HTML$<!DOCTYPE html>
+-- =========================================================================
+-- 6. INSIGHT — Resumo de Insights e Métricas (DRAFT)
+-- =========================================================================
+INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+VALUES (
+    'a1b2c3d4-0001-0001-0001-000000000006',
+    'insights-summary-v1',
+    '11111111-1111-1111-1111-111111111111',
+    'Resumo de Insights',
+    'INSIGHT',
+    'DRAFT',
+    $HTML$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -599,13 +595,10 @@ BEGIN
 </div>
 </body>
 </html>$HTML$,
-        'Resumo de insights e métricas do período. Status DRAFT — ativar após validação com o time de produto.',
-        1,
-        NULL
-    ) ON CONFLICT (id) DO NOTHING;
-
-    RAISE NOTICE 'Inserted 6 templates: EMAIL_ALARM (active), EMAIL_REPORT (draft), EMAIL_WELCOME (active), RELEASE_NOTE (draft), NOTIFICATION (draft), INSIGHT (draft)';
-END $$;
+    'Resumo de insights e métricas do período. Status DRAFT — ativar após validação com o time de produto.',
+    1,
+    NULL
+) ON CONFLICT (id) DO NOTHING;
 
 -- Verify
 SELECT id, slug, type, status, version, LENGTH(html_content) AS html_bytes FROM templates ORDER BY type;
