@@ -160,3 +160,6 @@ docs/*.png
 
 # Windows artifacts
 nul
+
+# Email sender rendered output
+scripts/api/examples/email-sender/output/*.html

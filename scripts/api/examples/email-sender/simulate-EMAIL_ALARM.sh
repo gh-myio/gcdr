@@ -12,6 +12,9 @@ API_KEY="${GCDR_API_KEY:-gcdr_alarm_integration_key_2026}"
 TENANT_ID="${GCDR_TENANT_ID:-11111111-1111-1111-1111-111111111111}"
 CUSTOMER_ID="e04046d4-baa4-44e9-a378-4dfebe4140f1"
 TYPE="EMAIL_ALARM"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="${SCRIPT_DIR}/output"
+mkdir -p "$OUTPUT_DIR"
 
 echo "========================================"
 echo " EMAIL_SENDER — Simulação: ALARM_OPENED"
@@ -113,6 +116,6 @@ echo " Próximo passo: SMTP.send(to, html)"
 echo "========================================"
 
 # Salvar HTML para inspeção
-OUTPUT_FILE="/tmp/alarm-email-mestrealvaro.html"
+OUTPUT_FILE="${OUTPUT_DIR}/alarm-email-mestrealvaro.html"
 echo "$HTML" > "$OUTPUT_FILE"
 echo " HTML salvo em: $OUTPUT_FILE"
