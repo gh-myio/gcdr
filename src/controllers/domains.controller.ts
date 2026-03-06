@@ -233,13 +233,15 @@ const PRIORITY_DEFINITIONS: PriorityDefinition[] = [
 ];
 
 /**
- * Rule notification categories — the 3 independent recipient lists per rule
+ * Rule notification categories — the 3 independent recipient lists per rule.
+ * templateType links each category to the TemplateType used to render the email.
  */
 interface NotificationCategoryDefinition {
   id: string;
   label: string;
   description: string;
   icon: string;
+  templateType: string; // Matches template_types.type — used to resolve the email template
 }
 
 const NOTIFICATION_CATEGORY_DEFINITIONS: NotificationCategoryDefinition[] = [
@@ -248,18 +250,21 @@ const NOTIFICATION_CATEGORY_DEFINITIONS: NotificationCategoryDefinition[] = [
     label: 'Notificação de Alarme',
     description: 'Destinatários que recebem o email imediato quando um alarme é disparado pela rule.',
     icon: 'bell-alert',
+    templateType: 'EMAIL_ALARM',
   },
   {
     id: 'alarmReport',
     label: 'Relatório de Alarme',
     description: 'Destinatários que recebem o relatório periódico consolidado dos alarmes da rule.',
     icon: 'chart-bar',
+    templateType: 'EMAIL_REPORT',
   },
   {
     id: 'alarmInsight',
     label: 'Insight de Alarme',
     description: 'Destinatários que recebem análises e insights analíticos gerados a partir dos dados da rule.',
     icon: 'light-bulb',
+    templateType: 'INSIGHT',
   },
 ];
 
