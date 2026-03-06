@@ -16,6 +16,9 @@ export interface ILookAndFeelRepository {
   getDefaultByCustomer(tenantId: string, customerId: string): Promise<LookAndFeel | null>;
   setDefault(tenantId: string, customerId: string, themeId: string): Promise<LookAndFeel>;
 
+  // By template type
+  getByCustomerAndType(tenantId: string, customerId: string, templateType: string): Promise<LookAndFeel | null>;
+
   // Inheritance
   getByParentTheme(tenantId: string, parentThemeId: string): Promise<LookAndFeel[]>;
 }

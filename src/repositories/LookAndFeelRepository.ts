@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   LookAndFeel,
@@ -40,6 +40,7 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
       layout: data.layout || createDefaultLayoutConfig(),
       components: data.components || createDefaultComponentStyles(),
       customCss: data.customCss || null,
+      templateType: data.templateType || null,
       inheritFromParent: data.inheritFromParent ?? true,
       parentThemeId: data.parentThemeId || null,
       metadata: data.metadata || {},
@@ -87,6 +88,7 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
     if (data.brandName !== undefined) updateData.brandName = data.brandName;
     if (data.tagline !== undefined) updateData.tagline = data.tagline;
     if (data.customCss !== undefined) updateData.customCss = data.customCss;
+    if (data.templateType !== undefined) updateData.templateType = data.templateType;
     if (data.inheritFromParent !== undefined) updateData.inheritFromParent = data.inheritFromParent;
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
 
@@ -230,6 +232,20 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
     return this.mapToEntity(result);
   }
 
+  async getByCustomerAndType(tenantId: string, customerId: string, templateType: string): Promise<LookAndFeel | null> {
+    const [result] = await db
+      .select()
+      .from(lookAndFeels)
+      .where(and(
+        eq(lookAndFeels.tenantId, tenantId),
+        eq(lookAndFeels.customerId, customerId),
+        eq(lookAndFeels.templateType, templateType)
+      ))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
   async getByParentTheme(tenantId: string, parentThemeId: string): Promise<LookAndFeel[]> {
     const results = await db
       .select()
@@ -280,6 +296,7 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
       layout: row.layout as LookAndFeel['layout'],
       components: row.components as LookAndFeel['components'],
       customCss: row.customCss as LookAndFeel['customCss'],
+      templateType: row.templateType || undefined,
       inheritFromParent: row.inheritFromParent,
       parentThemeId: row.parentThemeId || undefined,
       metadata: row.metadata as Record<string, unknown>,

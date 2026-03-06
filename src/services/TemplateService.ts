@@ -384,16 +384,23 @@ export class TemplateService {
       }
     }
 
-    // 2. Find theme
+    // 2. Find theme — fallback chain:
+    //    a) customer + type-specific  →  b) customer + global (is_default)
+    //    c) MYIO customer + type-specific  →  d) MYIO customer + global
     let theme: LookAndFeel | null = null;
     let themeSource: 'customer' | 'default' | 'none' = 'none';
 
-    theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, customerId);
+    theme = await lookAndFeelRepository.getByCustomerAndType(tenantId, customerId, type);
+    if (!theme) {
+      theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, customerId);
+    }
     if (theme) {
       themeSource = 'customer';
     } else {
-      // Fallback: MYIO platform default theme
-      theme = await lookAndFeelRepository.getDefaultByCustomer(MYIO_TENANT_ID, MYIO_CUSTOMER_ID);
+      theme = await lookAndFeelRepository.getByCustomerAndType(MYIO_TENANT_ID, MYIO_CUSTOMER_ID, type);
+      if (!theme) {
+        theme = await lookAndFeelRepository.getDefaultByCustomer(MYIO_TENANT_ID, MYIO_CUSTOMER_ID);
+      }
       if (theme) themeSource = 'default';
     }
 

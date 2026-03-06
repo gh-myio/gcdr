@@ -54,6 +54,7 @@ import {
   publicSingleAppsController,
   // RFC-0021: HTML Templates Engine
   templatesController,
+  templateTypesController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -240,6 +241,7 @@ apiV1Router.use('/public-apps', authMiddleware, publicSingleAppsController);
 
 // RFC-0021: HTML Templates Engine
 apiV1Router.use('/templates', authMiddleware, templatesController);
+apiV1Router.use('/template-types', authMiddleware, templateTypesController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);

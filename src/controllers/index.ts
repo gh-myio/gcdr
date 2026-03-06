@@ -35,3 +35,4 @@ export { default as publicSingleAppsController } from './public-single-apps.cont
 
 // RFC-0021: HTML Templates Engine
 export { default as templatesController } from './templates.controller';
+export { default as templateTypesController } from './template-types.controller';

@@ -143,6 +143,9 @@ export interface LookAndFeel extends BaseEntity {
   // Custom CSS
   customCss?: CustomCSS;
 
+  // Template type binding (null = global/app UI theme)
+  templateType?: string;
+
   // Inheritance
   inheritFromParent: boolean;
   parentThemeId?: string;

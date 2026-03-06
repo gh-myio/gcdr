@@ -135,6 +135,7 @@ export const CreateLookAndFeelSchema = z.object({
   layout: LayoutConfigSchema.optional(),
   components: ComponentStylesSchema.optional(),
   customCss: CustomCSSSchema.optional(),
+  templateType: z.string().min(1).max(50).optional(),
   inheritFromParent: z.boolean().default(false),
   parentThemeId: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).default({}),
@@ -157,6 +158,7 @@ export const UpdateLookAndFeelSchema = z.object({
   layout: LayoutConfigSchema.partial().optional(),
   components: ComponentStylesSchema.partial().optional(),
   customCss: CustomCSSSchema.optional().nullable(),
+  templateType: z.string().min(1).max(50).optional().nullable(),
   inheritFromParent: z.boolean().optional(),
   metadata: z.record(z.unknown()).optional(),
 });

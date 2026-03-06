@@ -712,6 +712,21 @@ export const groups = pgTable('groups', {
 }));
 
 // =============================================================================
+// TEMPLATE TYPES
+// =============================================================================
+
+export const templateTypes = pgTable('template_types', {
+  type:        varchar('type', { length: 50 }).primaryKey(),
+  label:       varchar('label', { length: 100 }).notNull(),
+  description: text('description'),
+  icon:        varchar('icon', { length: 50 }),
+  sortOrder:   integer('sort_order').notNull().default(0),
+  active:      boolean('active').notNull().default(true),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// =============================================================================
 // LOOK AND FEEL
 // =============================================================================
 
@@ -743,6 +758,9 @@ export const lookAndFeels = pgTable('look_and_feels', {
   components: jsonb('components').notNull().default({}),
   customCss: jsonb('custom_css'),
 
+  // Template type binding (null = global/app UI theme)
+  templateType: varchar('template_type', { length: 50 }),
+
   // Inheritance
   inheritFromParent: boolean('inherit_from_parent').notNull().default(true),
   parentThemeId: uuid('parent_theme_id'),
@@ -759,6 +777,7 @@ export const lookAndFeels = pgTable('look_and_feels', {
 }, (table) => ({
   tenantCustomerIdx: index('look_and_feels_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantDefaultIdx: index('look_and_feels_tenant_default_idx').on(table.tenantId, table.isDefault),
+  tenantTypeIdx: index('look_and_feels_tenant_type_idx').on(table.tenantId, table.templateType),
 }));
 
 // =============================================================================
