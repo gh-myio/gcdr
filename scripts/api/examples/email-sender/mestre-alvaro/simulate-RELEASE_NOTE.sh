@@ -73,7 +73,7 @@ PAYLOAD='{
 }'
 
 PREVIEW_RESPONSE=$(curl -s -X POST \
-  "${BASE_URL}/api/v1/templates/${SLUG}/preview" \
+  "${BASE_URL}/api/v1/templates/${SLUG}/preview?customerId=${CUSTOMER_ID}" \
   -H "X-API-Key: ${API_KEY}" \
   -H "X-Tenant-Id: ${TENANT_ID}" \
   -H "Content-Type: application/json" \

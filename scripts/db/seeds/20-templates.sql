@@ -34,31 +34,31 @@ VALUES (
 <style>
   body { margin:0; padding:0; background:#f0f2f5; font-family: Inter, Arial, sans-serif; }
   .wrapper { max-width:620px; margin:32px auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.1); }
-  .header { background:#0D47A1; padding:24px 32px; }
+  .header { background:var(--color-primary,#0D47A1); padding:24px 32px; }
   .header h1 { margin:0; color:#fff; font-size:1.25rem; font-weight:600; letter-spacing:-0.3px; }
-  .header .subtitle { color:#90CAF9; font-size:0.85rem; margin-top:4px; }
-  .badge-alarm { display:inline-block; background:#FF6F00; color:#fff; border-radius:4px; padding:2px 10px; font-size:0.75rem; font-weight:700; text-transform:uppercase; margin-top:6px; }
-  .summary { background:#FFF8E1; border-left:4px solid #FF6F00; padding:16px 24px; margin:0; }
+  .header .subtitle { color:rgba(255,255,255,0.75); font-size:0.85rem; margin-top:4px; }
+  .badge-alarm { display:inline-block; background:var(--color-warning,#FF6F00); color:#fff; border-radius:4px; padding:2px 10px; font-size:0.75rem; font-weight:700; text-transform:uppercase; margin-top:6px; }
+  .summary { background:#FFF8E1; border-left:4px solid var(--color-warning,#FF6F00); padding:16px 24px; margin:0; }
   .summary p { margin:4px 0; color:#5D4037; font-size:0.9rem; }
-  .summary strong { color:#BF360C; }
+  .summary strong { color:var(--color-error,#BF360C); }
   .content { padding:24px 32px; }
   .rule-block { border:1px solid #E3E8F0; border-radius:6px; margin-bottom:20px; overflow:hidden; }
-  .rule-header { background:#E8F0FE; padding:12px 16px; }
-  .rule-header h3 { margin:0; color:#0D47A1; font-size:0.95rem; font-weight:600; }
+  .rule-header { background:var(--color-surface-variant,#E8F0FE); padding:12px 16px; }
+  .rule-header h3 { margin:0; color:var(--color-primary,#0D47A1); font-size:0.95rem; font-weight:600; }
   .rule-meta { color:#546E7A; font-size:0.82rem; margin-top:4px; }
   .rule-body { padding:12px 16px; }
-  .rule-condition { display:inline-block; background:#FFF3E0; color:#E65100; border-radius:4px; padding:3px 10px; font-size:0.82rem; font-family:monospace; margin-bottom:10px; }
+  .rule-condition { display:inline-block; background:#FFF3E0; color:var(--color-warning,#E65100); border-radius:4px; padding:3px 10px; font-size:0.82rem; font-family:monospace; margin-bottom:10px; }
   .emails-row { font-size:0.82rem; color:#546E7A; margin-bottom:10px; }
   table { width:100%; border-collapse:collapse; font-size:0.83rem; }
-  thead th { background:#37474F; color:#fff; padding:8px 10px; text-align:left; font-weight:500; }
+  thead th { background:var(--color-secondary,#37474F); color:#fff; padding:8px 10px; text-align:left; font-weight:500; }
   tbody td { padding:7px 10px; border-bottom:1px solid #ECEFF1; color:#37474F; }
   tbody tr:last-child td { border-bottom:none; }
   tbody tr:hover td { background:#F5F7FA; }
-  .status-online { color:#2E7D32; font-weight:600; }
-  .status-offline { color:#C62828; font-weight:600; }
+  .status-online { color:var(--color-success,#2E7D32); font-weight:600; }
+  .status-offline { color:var(--color-error,#C62828); font-weight:600; }
   .footer { background:#F5F7FA; border-top:1px solid #E3E8F0; padding:16px 32px; text-align:center; }
   .footer p { margin:0; color:#90A4AE; font-size:0.78rem; }
-  .footer a { color:#0D47A1; text-decoration:none; }
+  .footer a { color:var(--color-primary,#0D47A1); text-decoration:none; }
 </style>
 </head>
 <body>
@@ -129,7 +129,7 @@ VALUES (
     'Template padrão para notificações de alarme disparadas pelo motor de rules',
     1,
     NULL
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET html_content = EXCLUDED.html_content, updated_at = now();
 
 -- =========================================================================
 -- 2. EMAIL_REPORT — Relatório Periódico (DRAFT)

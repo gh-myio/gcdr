@@ -29,6 +29,7 @@ export type UpdateTemplateDTO = z.infer<typeof UpdateTemplateSchema>;
 
 export const PreviewTemplateSchema = z.object({
   data: z.record(z.unknown()),
+  customerId: z.string().uuid().optional(),
 });
 
 export type PreviewTemplateDTO = z.infer<typeof PreviewTemplateSchema>;

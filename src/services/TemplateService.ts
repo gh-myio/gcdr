@@ -325,9 +325,19 @@ export class TemplateService {
     await this.repository.archive(tenantId, slug);
   }
 
-  async preview(tenantId: string, slug: string, data: Record<string, unknown>): Promise<string> {
+  async preview(tenantId: string, slug: string, data: Record<string, unknown>, customerId?: string): Promise<string> {
     const template = await this.getBySlug(tenantId, slug);
-    return renderTemplate(template.htmlContent, data);
+
+    let html = template.htmlContent;
+
+    if (customerId) {
+      const theme =
+        await lookAndFeelRepository.getByCustomerAndType(tenantId, customerId, template.type as TemplateType) ??
+        await lookAndFeelRepository.getDefaultByCustomer(tenantId, customerId);
+      if (theme) html = injectThemeIntoHtml(html, theme);
+    }
+
+    return renderTemplate(html, data);
   }
 
   getTagCatalog(type: TemplateType): TagDefinition[] {

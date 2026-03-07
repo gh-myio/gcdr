@@ -187,8 +187,9 @@ router.post('/:slug/preview', async (req: Request, res: Response, next: NextFunc
   try {
     const { tenantId, requestId } = req.context;
     const { slug } = req.params;
-    const { data } = PreviewTemplateSchema.parse(req.body);
-    const html = await templateService.preview(tenantId, slug, data as Record<string, unknown>);
+    const { data, customerId: bodyCustomerId } = PreviewTemplateSchema.parse(req.body);
+    const customerId = bodyCustomerId ?? (req.query.customerId as string | undefined);
+    const html = await templateService.preview(tenantId, slug, data as Record<string, unknown>, customerId);
     sendSuccess(res, { html }, 200, requestId);
   } catch (err) {
     next(err);
