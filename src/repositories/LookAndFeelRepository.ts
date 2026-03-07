@@ -1,4 +1,4 @@
-import { eq, and, sql, isNull } from 'drizzle-orm';
+import { eq, and, sql, isNull, isNotNull } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   LookAndFeel,
@@ -151,11 +151,21 @@ export class LookAndFeelRepository implements ILookAndFeelRepository {
       .where(and(eq(lookAndFeels.tenantId, tenantId), eq(lookAndFeels.id, id)));
   }
 
-  async list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<LookAndFeel>> {
+  async list(tenantId: string, params?: { limit?: number; cursor?: string; customerId?: string; templateType?: string }): Promise<PaginatedResult<LookAndFeel>> {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
 
     const conditions = [eq(lookAndFeels.tenantId, tenantId)];
+
+    if (params?.customerId) {
+      conditions.push(eq(lookAndFeels.customerId, params.customerId));
+    }
+
+    if (params?.templateType === 'null') {
+      conditions.push(isNull(lookAndFeels.templateType));
+    } else if (params?.templateType) {
+      conditions.push(eq(lookAndFeels.templateType, params.templateType));
+    }
 
     const [results, total] = await Promise.all([
       db.select()

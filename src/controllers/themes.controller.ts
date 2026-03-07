@@ -35,16 +35,26 @@ router.post('/',
 
 /**
  * GET /themes
- * List all themes
+ * List all themes with optional filters and hybrid pagination (page or cursor)
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { limit, cursor } = req.query;
+    const { limit, cursor, page, pageSize, customerId, templateType } = req.query;
+
+    const resolvedLimit = pageSize
+      ? parseInt(pageSize as string, 10)
+      : limit ? parseInt(limit as string, 10) : 20;
+
+    const resolvedCursor = page
+      ? String((parseInt(page as string, 10) - 1) * resolvedLimit)
+      : cursor as string | undefined;
 
     const result = await lookAndFeelRepository.list(tenantId, {
-      limit: limit ? parseInt(limit as string, 10) : undefined,
-      cursor: cursor as string | undefined,
+      limit: resolvedLimit,
+      cursor: resolvedCursor,
+      customerId: customerId as string | undefined,
+      templateType: templateType as string | undefined,
     });
     sendSuccess(res, result, 200, requestId);
   } catch (err) {

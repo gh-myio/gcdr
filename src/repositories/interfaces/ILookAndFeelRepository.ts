@@ -9,7 +9,7 @@ export interface ILookAndFeelRepository {
   delete(tenantId: string, id: string): Promise<void>;
 
   // List
-  list(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<LookAndFeel>>;
+  list(tenantId: string, params?: { limit?: number; cursor?: string; customerId?: string; templateType?: string }): Promise<PaginatedResult<LookAndFeel>>;
   listByCustomer(tenantId: string, customerId: string): Promise<LookAndFeel[]>;
 
   // Default theme
