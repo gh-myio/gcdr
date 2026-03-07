@@ -48,3 +48,12 @@ export const RenderTemplateQuerySchema = z.object({
 });
 
 export type RenderTemplateQuery = z.infer<typeof RenderTemplateQuerySchema>;
+
+export const RenderTemplateBodySchema = z.object({
+  type: z.enum(TEMPLATE_TYPES),
+  customerId: z.string().uuid('customerId must be a valid UUID'),
+  version: z.number().int().positive().optional(),
+  data: z.record(z.unknown()),
+});
+
+export type RenderTemplateBody = z.infer<typeof RenderTemplateBodySchema>;

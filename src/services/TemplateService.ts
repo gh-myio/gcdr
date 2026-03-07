@@ -429,6 +429,26 @@ export class TemplateService {
       themeSource,
     };
   }
+
+  /**
+   * Full render: theme injection + Handlebars data rendering in one shot.
+   * Used by POST /templates/render — the EMAIL_SENDER single-call endpoint.
+   */
+  async renderFull(
+    tenantId: string,
+    type: TemplateType,
+    customerId: string,
+    data: Record<string, unknown>,
+    version?: number,
+  ): Promise<{
+    html: string;
+    template: { id: string; slug: string; type: string; version: number };
+    themeSource: 'customer' | 'default' | 'none';
+  }> {
+    const result = await this.renderForEmailSender(tenantId, type, customerId, version);
+    const html = renderTemplate(result.html, data);
+    return { html, template: result.template, themeSource: result.themeSource };
+  }
 }
 
 export const templateService = new TemplateService();

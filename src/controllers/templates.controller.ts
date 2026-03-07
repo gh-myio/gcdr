@@ -6,6 +6,7 @@ import {
   PreviewTemplateSchema,
   ListTemplatesQuerySchema,
   RenderTemplateQuerySchema,
+  RenderTemplateBodySchema,
 } from '../dto/request/TemplateDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
@@ -76,6 +77,34 @@ router.get('/tag-catalog', (req: Request, res: Response, next: NextFunction) => 
 
     const tags = templateService.getTagCatalog(type as TemplateType);
     sendSuccess(res, tags, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /templates/render
+ * Full render: theme injection + Handlebars data in one call.
+ * Used by EMAIL_SENDER to get final HTML ready for SMTP.
+ * Body: { type, customerId, data, version? }
+ */
+router.post('/render', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const body = RenderTemplateBodySchema.parse(req.body);
+
+    const result = await templateService.renderFull(
+      tenantId,
+      body.type,
+      body.customerId,
+      body.data as Record<string, unknown>,
+      body.version,
+    );
+
+    res.setHeader('X-Template-Version', String(result.template.version));
+    res.setHeader('X-Theme-Source', result.themeSource);
+
+    sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
   }
