@@ -4,7 +4,7 @@
   "description": "GCDR - Global Central Data Registry API",
   "main": "dist/app.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/docs && cp docs/openapi.yaml dist/docs/openapi.yaml",
     "start": "node dist/app.js",
     "dev": "tsx watch src/app.ts",
     "offline": "serverless offline start",
