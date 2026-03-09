@@ -52,7 +52,13 @@ export const UpdateAssetSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   displayName: z.string().max(255).optional(),
   code: z.string().max(50).optional(),
-  type: z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']).optional(),
+  type: z.preprocess(
+    (v) => {
+      const valid = ['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER'];
+      return valid.includes(v as string) ? v : undefined;
+    },
+    z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']).optional(),
+  ),
   description: z.string().max(1000).optional(),
   location: AssetLocationSchema,
   specs: AssetSpecsSchema,
