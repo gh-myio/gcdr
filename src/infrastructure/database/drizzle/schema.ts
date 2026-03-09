@@ -551,8 +551,7 @@ export const rules = pgTable('rules', {
 
   // Scope - using enum for better querying
   scopeType: scopeTypeEnum('scope_type').notNull().default('GLOBAL'),
-  scopeEntityId: uuid('scope_entity_id'),
-  scopeEntityIds: uuid('scope_entity_ids').array(),
+  scopeEntityIds: uuid('scope_entity_ids').array().notNull().default([]),
   scopeEntityOverrides: jsonb('scope_entity_overrides'),
   scopeInherited: boolean('scope_inherited').notNull().default(false),
 
@@ -611,7 +610,7 @@ export const rules = pgTable('rules', {
   // Scope entity validation
   validScopeEntity: check(
     'valid_scope_entity',
-    sql`${table.scopeType} = 'GLOBAL' OR ${table.scopeEntityId} IS NOT NULL`
+    sql`${table.scopeType} = 'GLOBAL' OR cardinality(${table.scopeEntityIds}) > 0`
   ),
 }));
 

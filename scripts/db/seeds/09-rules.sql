@@ -14,7 +14,7 @@ DECLARE
     v_dimension_id UUID := '77777777-7777-7777-7777-777777777777';
 BEGIN
     -- ALARM_THRESHOLD rule: High Temperature
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000001',
         v_tenant_id,
@@ -24,7 +24,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'ASSET',
-        v_room1_id,
+        ARRAY[v_room1_id],
         false,
         '{"metric": "temperature", "operator": "GT", "value": 28, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}, {"type": "SLACK", "config": {"channel": "#alerts"}, "enabled": true}]',
@@ -35,7 +35,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Low Temperature
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000002',
         v_tenant_id,
@@ -45,7 +45,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'ASSET',
-        v_room1_id,
+        ARRAY[v_room1_id],
         false,
         '{"metric": "temperature", "operator": "LTE", "value": 18, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}]',
@@ -56,7 +56,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: High Humidity
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000003',
         v_tenant_id,
@@ -66,7 +66,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        v_temp_device_id,
+        ARRAY[v_temp_device_id],
         false,
         '{"metric": "humidity", "operator": "GT", "value": 60, "unit": "%", "hysteresis": 5, "hysteresisType": "PERCENTAGE"}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}]',
@@ -77,7 +77,7 @@ BEGIN
     );
 
     -- SLA rule: Temperature SLA
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, sla_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, sla_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000004',
         v_tenant_id,
@@ -87,7 +87,7 @@ BEGIN
         'SLA',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature_compliance", "target": 99.5, "unit": "%", "period": "MONTHLY", "calculationMethod": "AVAILABILITY", "excludeMaintenanceWindows": true, "breachNotification": true, "warningThreshold": 95}',
         '[{"type": "EMAIL", "config": {"to": ["sla@acmetech.com", "management@acmetech.com"]}, "enabled": true}]',
@@ -98,7 +98,7 @@ BEGIN
     );
 
     -- SLA rule: Uptime SLA
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, sla_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, sla_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000005',
         v_tenant_id,
@@ -108,7 +108,7 @@ BEGIN
         'SLA',
         'CRITICAL',
         'GLOBAL',
-        NULL,
+        ARRAY[]::uuid[],
         false,
         '{"metric": "uptime", "target": 99.9, "unit": "%", "period": "MONTHLY", "calculationMethod": "AVAILABILITY", "excludeMaintenanceWindows": true, "breachNotification": true, "warningThreshold": 99}',
         '[{"type": "EMAIL", "config": {"to": ["sla@acmetech.com"]}, "enabled": true}, {"type": "PAGERDUTY", "config": {"serviceKey": "pd-key-123"}, "enabled": true}]',
@@ -119,7 +119,7 @@ BEGIN
     );
 
     -- ESCALATION rule
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, escalation_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, escalation_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000006',
         v_tenant_id,
@@ -129,7 +129,7 @@ BEGIN
         'ESCALATION',
         'CRITICAL',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"levels": [{"level": 1, "delayMinutes": 0, "notifyChannels": ["email"], "notifyUsers": ["bbbb2222-2222-2222-2222-222222222222"], "repeatInterval": 15, "maxRepeats": 3}, {"level": 2, "delayMinutes": 30, "notifyChannels": ["email", "sms"], "notifyUsers": ["bbbb1111-1111-1111-1111-111111111111"], "repeatInterval": 30, "maxRepeats": 2}, {"level": 3, "delayMinutes": 60, "notifyChannels": ["email", "sms", "phone"], "notifyGroups": ["management"], "autoAcknowledge": false}], "autoResolveAfterMinutes": 240, "businessHoursOnly": false}',
         '[]',
@@ -140,7 +140,7 @@ BEGIN
     );
 
     -- MAINTENANCE_WINDOW rule: Weekly Maintenance
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, maintenance_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, maintenance_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000007',
         v_tenant_id,
@@ -150,7 +150,7 @@ BEGIN
         'MAINTENANCE_WINDOW',
         'LOW',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"startTime": "02:00", "endTime": "06:00", "duration": 240, "recurrence": "WEEKLY", "recurrenceDays": [0], "timezone": "America/Sao_Paulo", "suppressAlarms": true, "suppressNotifications": false}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}]',
@@ -161,7 +161,7 @@ BEGIN
     );
 
     -- MAINTENANCE_WINDOW rule: One-time Maintenance
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, maintenance_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, maintenance_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000008',
         v_tenant_id,
@@ -171,7 +171,7 @@ BEGIN
         'MAINTENANCE_WINDOW',
         'MEDIUM',
         'ASSET',
-        v_room1_id,
+        ARRAY[v_room1_id],
         false,
         '{"startTime": "2025-02-01T02:00:00Z", "endTime": "2025-02-01T06:00:00Z", "recurrence": "ONCE", "timezone": "America/Sao_Paulo", "suppressAlarms": true, "suppressNotifications": true, "affectedRules": ["aaaa0001-0001-0001-0001-000000000001", "aaaa0001-0001-0001-0001-000000000002"]}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com", "tech@acmetech.com"]}, "enabled": true}]',
@@ -182,7 +182,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: High Energy Consumption (Business Hours)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000010',
         v_tenant_id,
@@ -192,7 +192,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "energy_consumption", "operator": "GT", "value": 950, "unit": "kWh", "duration": 300, "aggregation": "AVG", "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
         '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "ops@acmetech.com"]}, "enabled": true}]',
@@ -203,7 +203,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Maximum Temperature 26°C
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000011',
         v_tenant_id,
@@ -213,7 +213,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature", "operator": "GT", "value": 26, "unit": "°C", "duration": 600, "aggregation": "AVG", "aggregationWindow": 300}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
@@ -224,7 +224,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Low Water Tank Level
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000012',
         v_tenant_id,
@@ -234,7 +234,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "water_level", "operator": "LT", "value": 15, "unit": "%", "duration": 60, "hysteresis": 5, "hysteresisType": "ABSOLUTE"}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -245,7 +245,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Night Water Usage (Leak Detection)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000013',
         v_tenant_id,
@@ -255,7 +255,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "water_flow", "operator": "GT", "value": 10, "unit": "L", "duration": 300, "aggregation": "SUM", "aggregationWindow": 300, "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6]}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "security@acmetech.com"]}, "enabled": true}]',
@@ -266,7 +266,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: High Instantaneous Power
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000014',
         v_tenant_id,
@@ -276,7 +276,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com"]}, "enabled": true}]',
@@ -287,7 +287,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Power Surge Detection
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000015',
         v_tenant_id,
@@ -297,7 +297,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "GTE", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST"}',
         '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -308,7 +308,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Low Power (Equipment Off Detection)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000016',
         v_tenant_id,
@@ -318,7 +318,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "LTE", "value": 50, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
@@ -329,7 +329,7 @@ BEGIN
     );
 
     -- Disabled rule
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000009',
         v_tenant_id,
@@ -339,7 +339,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'DEVICE',
-        '11110001-0001-0001-0001-000000000003', -- Power Meter
+        ARRAY['11110001-0001-0001-0001-000000000003'::uuid], -- Power Meter
         false,
         '{"metric": "power", "operator": "GT", "value": 80, "unit": "kW"}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com"]}, "enabled": true}]',
@@ -355,7 +355,7 @@ BEGIN
 
     -- ALARM_THRESHOLD rule: Temperature Comfort Zone (BETWEEN)
     -- Alerts when temperature is WITHIN the comfort zone (18-26°C) - for monitoring
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000020',
         v_tenant_id,
@@ -365,7 +365,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature", "operator": "BETWEEN", "value": 18, "valueHigh": 26, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.example.com/comfort-status"}, "enabled": true}]',
@@ -377,7 +377,7 @@ BEGIN
 
     -- ALARM_THRESHOLD rule: Temperature Outside Safe Range (OUTSIDE)
     -- Alerts when temperature is OUTSIDE the safe range (15-30°C)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000021',
         v_tenant_id,
@@ -387,7 +387,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 30, "unit": "°C", "duration": 120, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE"}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -399,7 +399,7 @@ BEGIN
 
     -- ALARM_THRESHOLD rule: Power Normal Operating Range (BETWEEN)
     -- Monitors when power is within normal operating range (100-400W)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000022',
         v_tenant_id,
@@ -409,7 +409,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.example.com/power-status"}, "enabled": true}]',
@@ -421,7 +421,7 @@ BEGIN
 
     -- ALARM_THRESHOLD rule: Power Anomaly Detection (OUTSIDE)
     -- Alerts when power is OUTSIDE normal range (below 50W or above 600W)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000023',
         v_tenant_id,
@@ -431,7 +431,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE"}',
         '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "facilities@acmetech.com"]}, "enabled": true}]',
@@ -443,7 +443,7 @@ BEGIN
 
     -- ALARM_THRESHOLD rule: Server Room Temperature Critical Range (OUTSIDE)
     -- For server room: alerts when temperature is outside 18-28°C
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000024',
         v_tenant_id,
@@ -453,7 +453,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'ASSET',
-        v_room1_id,
+        ARRAY[v_room1_id],
         false,
         '{"metric": "temperature", "operator": "OUTSIDE", "value": 18, "valueHigh": 28, "unit": "°C", "duration": 60, "aggregation": "AVG", "aggregationWindow": 30, "hysteresis": 1, "hysteresisType": "ABSOLUTE"}',
         '[{"type": "EMAIL", "config": {"to": ["ops@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}, {"type": "PAGERDUTY", "config": {"serviceKey": "pd-key-123"}, "enabled": true}]',
@@ -464,7 +464,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Minimum Temperature (LT)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000025',
         v_tenant_id,
@@ -474,7 +474,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature", "operator": "LT", "value": 15, "unit": "°C", "duration": 300, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
@@ -485,7 +485,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Maximum Temperature (GT)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000026',
         v_tenant_id,
@@ -495,7 +495,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "temperature", "operator": "GT", "value": 32, "unit": "°C", "duration": 120, "aggregation": "AVG", "aggregationWindow": 60}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}]',
@@ -506,7 +506,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Minimum Power (Equipment Off)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000027',
         v_tenant_id,
@@ -516,7 +516,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "20:00", "daysOfWeek": [1, 2, 3, 4, 5]}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@acmetech.com"]}, "enabled": true}]',
@@ -527,7 +527,7 @@ BEGIN
     );
 
     -- ALARM_THRESHOLD rule: Maximum Power (Overload)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'aaaa0001-0001-0001-0001-000000000028',
         v_tenant_id,
@@ -537,7 +537,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'CUSTOMER',
-        v_company1_id,
+        ARRAY[v_company1_id],
         true,
         '{"metric": "instantaneous_power", "operator": "GT", "value": 750, "unit": "W", "duration": 1, "aggregation": "LAST"}',
         '[{"type": "EMAIL", "config": {"to": ["energy@acmetech.com", "emergency@acmetech.com"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -552,7 +552,7 @@ BEGIN
     -- ==========================================================================
 
     -- Temperature rules for Laboratório device
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000001',
         v_tenant_id,
@@ -562,7 +562,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
+        ARRAY['22220001-0001-0001-0001-000000000004'::uuid], -- Laboratório temp sensor
         false,
         '{"metric": "temperature", "operator": "GT", "value": 28, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
@@ -573,7 +573,7 @@ BEGIN
     );
 
     -- Temperature Low for Laboratório
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000002',
         v_tenant_id,
@@ -583,7 +583,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000004', -- Laboratório temp sensor
+        ARRAY['22220001-0001-0001-0001-000000000004'::uuid], -- Laboratório temp sensor
         false,
         '{"metric": "temperature", "operator": "LT", "value": 18, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
@@ -594,7 +594,7 @@ BEGIN
     );
 
     -- Temperature Range for Temp. Sala (OUTSIDE - alert when outside comfort zone)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000003',
         v_tenant_id,
@@ -604,7 +604,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000006', -- Temp. Sala sensor
+        ARRAY['22220001-0001-0001-0001-000000000006'::uuid], -- Temp. Sala sensor
         false,
         '{"metric": "temperature", "operator": "OUTSIDE", "value": 20, "valueHigh": 26, "unit": "°C", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 1, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
@@ -615,7 +615,7 @@ BEGIN
     );
 
     -- Temperature Range for Customer (BETWEEN - monitoring comfort)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000004',
         v_tenant_id,
@@ -625,7 +625,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'CUSTOMER',
-        v_dimension_id,
+        ARRAY[v_dimension_id],
         true,
         '{"metric": "temperature", "operator": "BETWEEN", "value": 22, "valueHigh": 24, "unit": "°C", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/comfort-status"}, "enabled": true}]',
@@ -636,7 +636,7 @@ BEGIN
     );
 
     -- Energy/Power rules for 3F Geral meter
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000005',
         v_tenant_id,
@@ -646,7 +646,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral meter
         false,
         '{"metric": "instantaneous_power", "operator": "GT", "value": 500, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br"]}, "enabled": true}]',
@@ -657,7 +657,7 @@ BEGIN
     );
 
     -- Power Low (equipment off detection)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000006',
         v_tenant_id,
@@ -667,7 +667,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral meter
         false,
         '{"metric": "instantaneous_power", "operator": "LT", "value": 30, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "startAt": "08:00", "endAt": "18:00", "daysOfWeek": [1, 2, 3, 4, 5], "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
@@ -678,7 +678,7 @@ BEGIN
     );
 
     -- Power Normal Range (BETWEEN)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000007',
         v_tenant_id,
@@ -688,7 +688,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral meter
         false,
         '{"metric": "instantaneous_power", "operator": "BETWEEN", "value": 100, "valueHigh": 400, "unit": "W", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/power-status"}, "enabled": true}]',
@@ -699,7 +699,7 @@ BEGIN
     );
 
     -- Power Anomaly (OUTSIDE)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000008',
         v_tenant_id,
@@ -709,7 +709,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral meter
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral meter
         false,
         '{"metric": "instantaneous_power", "operator": "OUTSIDE", "value": 50, "valueHigh": 600, "unit": "W", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 10, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energy@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
@@ -720,7 +720,7 @@ BEGIN
     );
 
     -- Energy Lab lamp rules
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000009',
         v_tenant_id,
@@ -730,7 +730,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000001', -- Energy Laboratório meter
+        ARRAY['22220001-0001-0001-0001-000000000001'::uuid], -- Energy Laboratório meter
         false,
         '{"metric": "instantaneous_power", "operator": "GT", "value": 200, "unit": "W", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
@@ -741,7 +741,7 @@ BEGIN
     );
 
     -- Lamp control rule (Laboratory lamp - ch1) - should be OFF after hours
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000010',
         v_tenant_id,
@@ -751,7 +751,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000003', -- Sensores Lampada (OUTLET)
+        ARRAY['22220001-0001-0001-0001-000000000003'::uuid], -- Sensores Lampada (OUTLET)
         false,
         '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
@@ -762,7 +762,7 @@ BEGIN
     );
 
     -- Lamp control rule (Entrance lamp - ch0) - should be OFF after hours
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000021',
         v_tenant_id,
@@ -772,7 +772,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000003', -- Sensores Lampada (OUTLET)
+        ARRAY['22220001-0001-0001-0001-000000000003'::uuid], -- Sensores Lampada (OUTLET)
         false,
         '{"metric": "lamp", "operator": "EQ", "value": 0, "duration": 0, "aggregation": "LAST", "startAt": "22:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 0, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
@@ -783,7 +783,7 @@ BEGIN
     );
 
     -- Meeting Room door sensor rule (ch1 of Device 4/slaveId=3)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000022',
         v_tenant_id,
@@ -793,7 +793,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000004', -- Sala Reunião (OUTLET)
+        ARRAY['22220001-0001-0001-0001-000000000004'::uuid], -- Sala Reunião (OUTLET)
         false,
         '{"metric": "door_sensor", "operator": "EQ", "value": 1, "duration": 0, "aggregation": "LAST", "startAt": "20:00", "endAt": "06:00", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "channelId": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["security@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -804,7 +804,7 @@ BEGIN
     );
 
     -- Customer-wide temperature critical (inherited)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000011',
         v_tenant_id,
@@ -814,7 +814,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'CUSTOMER',
-        v_dimension_id,
+        ARRAY[v_dimension_id],
         true,
         '{"metric": "temperature", "operator": "OUTSIDE", "value": 15, "valueHigh": 32, "unit": "°C", "duration": 2, "aggregation": "LAST", "hysteresis": 1, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -825,7 +825,7 @@ BEGIN
     );
 
     -- Customer-wide power surge detection
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000012',
         v_tenant_id,
@@ -835,7 +835,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'CUSTOMER',
-        v_dimension_id,
+        ARRAY[v_dimension_id],
         true,
         '{"metric": "instantaneous_power", "operator": "GT", "value": 800, "unit": "W", "duration": 0, "aggregation": "LAST", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -850,7 +850,7 @@ BEGIN
     -- ==========================================================================
 
     -- Humidity High for dedicated humidity sensor
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000013',
         v_tenant_id,
@@ -860,7 +860,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
+        ARRAY['22220001-0001-0001-0001-000000000007'::uuid], -- Umidade Entrada
         false,
         '{"metric": "humidity", "operator": "GT", "value": 70, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
@@ -871,7 +871,7 @@ BEGIN
     );
 
     -- Humidity Low
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000014',
         v_tenant_id,
@@ -881,7 +881,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000007', -- Umidade Entrada
+        ARRAY['22220001-0001-0001-0001-000000000007'::uuid], -- Umidade Entrada
         false,
         '{"metric": "humidity", "operator": "LT", "value": 30, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
@@ -892,7 +892,7 @@ BEGIN
     );
 
     -- Humidity Outside Comfort Range (OUTSIDE)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000015',
         v_tenant_id,
@@ -902,7 +902,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'CUSTOMER',
-        v_dimension_id,
+        ARRAY[v_dimension_id],
         true,
         '{"metric": "humidity", "operator": "OUTSIDE", "value": 40, "valueHigh": 60, "unit": "%", "duration": 10, "aggregation": "AVG", "aggregationWindow": 120, "hysteresis": 3, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}]',
@@ -913,7 +913,7 @@ BEGIN
     );
 
     -- Lab Multi-sensor Humidity High
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000016',
         v_tenant_id,
@@ -923,7 +923,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000008', -- Temp+Umidade Lab
+        ARRAY['22220001-0001-0001-0001-000000000008'::uuid], -- Temp+Umidade Lab
         false,
         '{"metric": "humidity", "operator": "GT", "value": 65, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["lab@dimension.com.br"]}, "enabled": true}]',
@@ -938,7 +938,7 @@ BEGIN
     -- ==========================================================================
 
     -- Water Level Low
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000017',
         v_tenant_id,
@@ -948,7 +948,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        ARRAY['22220001-0001-0001-0001-000000000009'::uuid], -- Nível Caixa Água
         false,
         '{"metric": "water_level_continuous", "operator": "LT", "value": 20, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 3, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -959,7 +959,7 @@ BEGIN
     );
 
     -- Water Level Critical Low
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000018',
         v_tenant_id,
@@ -969,7 +969,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'CRITICAL',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        ARRAY['22220001-0001-0001-0001-000000000009'::uuid], -- Nível Caixa Água
         false,
         '{"metric": "water_level_continuous", "operator": "LT", "value": 10, "unit": "%", "duration": 0, "aggregation": "LAST", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["emergency@dimension.com.br"]}, "enabled": true}, {"type": "SMS", "config": {"to": ["+5511999999999"]}, "enabled": true}]',
@@ -980,7 +980,7 @@ BEGIN
     );
 
     -- Water Level Normal Range (BETWEEN)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000019',
         v_tenant_id,
@@ -990,7 +990,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'LOW',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        ARRAY['22220001-0001-0001-0001-000000000009'::uuid], -- Nível Caixa Água
         false,
         '{"metric": "water_level_continuous", "operator": "BETWEEN", "value": 40, "valueHigh": 80, "unit": "%", "duration": 5, "aggregation": "AVG", "aggregationWindow": 60, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 120, "maxTransitions": 5}, "digest": {"enabled": true, "windowSeconds": 900, "threshold": 10}}',
         '[{"type": "WEBHOOK", "config": {"url": "https://api.dimension.com.br/water-status"}, "enabled": true}]',
@@ -1001,7 +1001,7 @@ BEGIN
     );
 
     -- Water Level Outside Safe Range (OUTSIDE)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000020',
         v_tenant_id,
@@ -1011,7 +1011,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000009', -- Nível Caixa Água
+        ARRAY['22220001-0001-0001-0001-000000000009'::uuid], -- Nível Caixa Água
         false,
         '{"metric": "water_level_continuous", "operator": "OUTSIDE", "value": 15, "valueHigh": 95, "unit": "%", "duration": 3, "aggregation": "AVG", "aggregationWindow": 60, "hysteresis": 2, "hysteresisType": "ABSOLUTE", "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["facilities@dimension.com.br", "emergency@dimension.com.br"]}, "enabled": true}]',
@@ -1026,7 +1026,7 @@ BEGIN
     -- ==========================================================================
 
     -- Elevator energized and not used (Monday to Saturday)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000023',
         v_tenant_id,
@@ -1036,7 +1036,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral
         false,
         '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 960000, "aggregation": "MAX", "startAt": "10:00", "endAt": "22:00", "daysOfWeek": [1, 2, 3, 4, 5, 6], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
@@ -1047,7 +1047,7 @@ BEGIN
     );
 
     -- Elevator energized and not used (Sunday)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000024',
         v_tenant_id,
@@ -1057,7 +1057,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'MEDIUM',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral
         false,
         '{"metric": "energy", "operator": "LT", "value": 210, "unit": "W", "duration": 901000, "aggregation": "MAX", "startAt": "12:00", "endAt": "22:00", "daysOfWeek": [0], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 120, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
@@ -1068,7 +1068,7 @@ BEGIN
     );
 
     -- Daily energy limit (10 kWh max per day)
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000025',
         v_tenant_id,
@@ -1078,7 +1078,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral
         false,
         '{"metric": "energy", "operator": "GT", "value": 10000, "unit": "Wh", "duration": 0, "aggregation": "SUM", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 0.25, "dedup": {"enabled": true, "ttlSeconds": 300}, "cooldown": {"enabled": true, "seconds": 60, "perChannel": false}, "hysteresisGuard": {"enabled": true, "windowSeconds": 120, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',
@@ -1094,7 +1094,7 @@ BEGIN
     -- for the full duration window (requires UNCHANGED support in alarms-backend)
     -- ==========================================================================
     -- Duration: 12h 21min = 44460000 ms
-    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_id, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
+    INSERT INTO rules (id, tenant_id, customer_id, name, description, type, priority, scope_type, scope_entity_ids, scope_inherited, alarm_config, notification_channels, tags, status, enabled, version)
     VALUES (
         'bbbb0001-0001-0001-0001-000000000026',
         v_tenant_id,
@@ -1104,7 +1104,7 @@ BEGIN
         'ALARM_THRESHOLD',
         'HIGH',
         'DEVICE',
-        '22220001-0001-0001-0001-000000000005', -- 3F Geral (template device)
+        ARRAY['22220001-0001-0001-0001-000000000005'::uuid], -- 3F Geral (template device)
         false,
         '{"metric": "power", "operator": "UNCHANGED", "value": 0, "duration": 44460000, "aggregation": "LAST", "startAt": "00:00", "endAt": "23:59", "daysOfWeek": [0, 1, 2, 3, 4, 5, 6], "keyMulti": 1, "dedup": {"enabled": true, "ttlSeconds": 600}, "cooldown": {"enabled": true, "seconds": 300, "perChannel": false}, "hysteresisGuard": {"enabled": false, "windowSeconds": 180, "maxTransitions": 3}, "digest": {"enabled": false, "windowSeconds": 600, "threshold": 5}}',
         '[{"type": "EMAIL", "config": {"to": ["energia@dimension.com.br"]}, "enabled": true}]',

@@ -26,8 +26,7 @@ export class RuleRepository implements IRuleRepository {
       type: data.type,
       priority: data.priority || 'MEDIUM',
       scopeType: data.scope.type,
-      scopeEntityId: data.scope.entityId ?? data.scope.entityIds?.[0] ?? null,
-      scopeEntityIds: data.scope.entityIds || [],
+      scopeEntityIds: data.scope.entityIds ?? (data.scope.entityId ? [data.scope.entityId] : []),
       scopeInherited: data.scope.inherited ?? false,
       scopeEntityOverrides: data.scopeEntityOverrides || null,
       alarmConfig: data.alarmConfig || null,
@@ -83,8 +82,7 @@ export class RuleRepository implements IRuleRepository {
     // Handle scope updates
     if (data.scope !== undefined) {
       updateData.scopeType = data.scope.type;
-      updateData.scopeEntityId = data.scope.entityId ?? data.scope.entityIds?.[0] ?? null;
-      updateData.scopeEntityIds = data.scope.entityIds || [];
+      updateData.scopeEntityIds = data.scope.entityIds ?? (data.scope.entityId ? [data.scope.entityId] : []);
       updateData.scopeInherited = data.scope.inherited ?? false;
     }
 
@@ -272,7 +270,7 @@ export class RuleRepository implements IRuleRepository {
     assetId?: string
   ): Promise<Rule[]> {
     const assetCondition = assetId
-      ? sql`(${rules.scopeType} = 'ASSET' AND ${rules.scopeEntityId} = ${assetId})`
+      ? sql`(${rules.scopeType} = 'ASSET' AND ${rules.scopeEntityIds} @> ARRAY[${assetId}::uuid])`
       : sql`FALSE`;
 
     const results = await db
@@ -284,12 +282,9 @@ export class RuleRepository implements IRuleRepository {
         eq(rules.enabled, true),
         sql`(
           ${rules.scopeType} = 'GLOBAL'
-          OR (${rules.scopeType} = 'CUSTOMER' AND ${rules.scopeEntityId} = ${customerId})
+          OR (${rules.scopeType} = 'CUSTOMER' AND ${rules.scopeEntityIds} @> ARRAY[${customerId}::uuid])
           OR ${assetCondition}
-          OR (${rules.scopeType} = 'DEVICE' AND (
-            ${rules.scopeEntityId} = ${deviceId}
-            OR ${rules.scopeEntityIds} @> ARRAY[${deviceId}::uuid]
-          ))
+          OR (${rules.scopeType} = 'DEVICE' AND ${rules.scopeEntityIds} @> ARRAY[${deviceId}::uuid])
         )`
       ))
       .orderBy(rules.priority);
@@ -304,7 +299,7 @@ export class RuleRepository implements IRuleRepository {
       .where(and(
         eq(rules.tenantId, tenantId),
         eq(rules.scopeType, scopeType as 'GLOBAL' | 'CUSTOMER' | 'ASSET' | 'DEVICE'),
-        sql`(${rules.scopeEntityId} = ${entityId} OR ${rules.scopeEntityIds} @> ARRAY[${entityId}::uuid])`
+        sql`${rules.scopeEntityIds} @> ARRAY[${entityId}::uuid]`
       ))
       .orderBy(rules.priority);
 
@@ -370,10 +365,11 @@ export class RuleRepository implements IRuleRepository {
 
   private mapToEntity(row: typeof rules.$inferSelect): Rule {
     // Reconstruct the scope object from flat fields
+    const entityIds = (row.scopeEntityIds?.length ?? 0) > 0 ? row.scopeEntityIds as string[] : undefined;
     const scope: RuleScope = {
       type: row.scopeType,
-      entityId: row.scopeEntityId || undefined,
-      entityIds: (row.scopeEntityIds?.length ?? 0) > 0 ? row.scopeEntityIds as string[] : undefined,
+      entityId: entityIds?.[0],
+      entityIds,
       inherited: row.scopeInherited,
     };
 

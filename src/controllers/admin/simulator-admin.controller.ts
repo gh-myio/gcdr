@@ -452,7 +452,7 @@ router.post('/api/demo/setup', async (req: Request, res: Response) => {
         type: rule.type,
         priority: rule.priority,
         scopeType: 'CUSTOMER',
-        scopeEntityId: DEMO_CUSTOMER_ID,
+        scopeEntityIds: [DEMO_CUSTOMER_ID],
         alarmConfig: rule.alarmConfig,
         enabled: true,
         status: 'ACTIVE',
