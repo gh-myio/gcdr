@@ -14,8 +14,6 @@
 --   psql $DATABASE_URL -f scripts/db/migrations/remove-scope-entity-id.sql
 -- =============================================================================
 
-BEGIN;
-
 DO $$
 DECLARE
   col_exists   BOOLEAN;
@@ -87,4 +85,3 @@ FROM rules
 GROUP BY scope_type
 ORDER BY scope_type;
 
-COMMIT;
