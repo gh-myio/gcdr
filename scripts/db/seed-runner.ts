@@ -81,7 +81,8 @@ function getSeedFiles(): string[] {
 
 // Execute SQL file using psql via Docker
 async function executeSqlFile(filename: string, verbose: boolean = false): Promise<{ success: boolean; output: string; duration: number }> {
-  const filepath = path.join(SEEDS_DIR, filename);
+  // Support absolute paths or paths outside SEEDS_DIR
+  const filepath = path.isAbsolute(filename) ? filename : path.join(SEEDS_DIR, filename);
   const startTime = Date.now();
 
   try {
@@ -238,16 +239,28 @@ function listScripts(): void {
   logInfo(`Total: ${files.length} scripts`);
 }
 
-// Run a specific seed file
+// Run a specific seed file (or any SQL file by path)
 async function runSingle(filename: string, options: { verbose?: boolean } = {}): Promise<void> {
   logHeader(`Running: ${filename}`);
 
-  const files = getSeedFiles();
-  if (!files.includes(filename)) {
-    logError(`File not found: ${filename}`);
-    logInfo('Use "list" command to see available scripts');
+  // Resolve path: absolute, relative to cwd, or relative to seeds dir
+  let filepath: string;
+  if (path.isAbsolute(filename)) {
+    filepath = filename;
+  } else if (fs.existsSync(path.join(process.cwd(), filename))) {
+    filepath = path.join(process.cwd(), filename);
+  } else {
+    filepath = path.join(SEEDS_DIR, filename);
+  }
+
+  if (!fs.existsSync(filepath)) {
+    logError(`File not found: ${filepath}`);
+    logInfo('Use "list" command to see available seed scripts');
     return;
   }
+
+  // Re-point filename to resolved path for executeSqlFile
+  filename = filepath;
 
   process.stdout.write(`Executing ${filename}... `);
   const result = await executeSqlFile(filename, true);
@@ -364,14 +377,17 @@ async function main(): Promise<void> {
       listScripts();
       break;
     case 'run':
+    case 'exec': {
       const filename = args[1];
       if (!filename) {
-        logError('Please specify a file name');
+        logError('Please specify a file name or path');
         logInfo('Usage: seed-runner run <filename>');
+        logInfo('Usage: seed-runner exec scripts/db/migrations/remove-scope-entity-id.sql');
         process.exit(1);
       }
       await runSingle(filename, options);
       break;
+    }
     case 'interactive':
     case 'menu':
     case '-i':

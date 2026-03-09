@@ -34,7 +34,8 @@
     "db:seed:clear": "tsx scripts/db/seed-runner.ts clear",
     "db:seed:verify": "tsx scripts/db/seed-runner.ts verify",
     "db:seed:list": "tsx scripts/db/seed-runner.ts list",
-    "db:seed:menu": "tsx scripts/db/seed-runner.ts interactive"
+    "db:seed:menu": "tsx scripts/db/seed-runner.ts interactive",
+    "db:ops": "tsx scripts/db/seed-runner.ts exec"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.400.0",
