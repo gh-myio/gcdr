@@ -35,7 +35,7 @@ export class RuleRepository implements IRuleRepository {
       maintenanceConfig: data.maintenanceConfig || null,
       notificationChannels: data.notificationChannels || [],
       notifications: data.notifications || null,
-      scopeProfiles: data.scopeProfiles ?? null,
+      scopeProfiles: data.scopeProfiles ?? data.scope.scopeProfiles ?? null,
       tags: data.tags || [],
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
@@ -79,7 +79,8 @@ export class RuleRepository implements IRuleRepository {
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
     if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
-    if (data.scopeProfiles !== undefined) updateData.scopeProfiles = data.scopeProfiles ?? null;
+    const scopeProfiles = data.scopeProfiles !== undefined ? data.scopeProfiles : data.scope?.scopeProfiles;
+    if (scopeProfiles !== undefined) updateData.scopeProfiles = scopeProfiles ?? null;
 
     // Handle scope updates
     if (data.scope !== undefined) {

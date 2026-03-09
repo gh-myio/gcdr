@@ -158,6 +158,8 @@ const RuleScopeSchema = z.object({
   entityId: z.string().uuid().optional(),
   entityIds: z.array(z.string().uuid()).optional(),
   inherited: z.boolean().optional(),
+  // scopeProfiles may be sent nested inside scope by some clients
+  scopeProfiles: z.array(z.string().min(1)).optional().nullable(),
 });
 
 // Create Rule DTO
