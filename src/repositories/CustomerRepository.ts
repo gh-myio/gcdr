@@ -212,14 +212,16 @@ export class CustomerRepository implements ICustomerRepository {
         summary.customerApiKeys = deletedKeys.length;
       }
 
-      // Delete rules (FK → customers.id)
-      const deletedRules = await trx.delete(schema.rules)
-        .where(and(
-          eq(schema.rules.tenantId, tenantId),
-          inArray(schema.rules.customerId, allCustomerIds),
-        ))
-        .returning({ id: schema.rules.id });
-      summary.rules = deletedRules.length;
+      // Delete rules (FK → customers.id) — skipped if keepRules=true
+      if (!options.keepRules) {
+        const deletedRules = await trx.delete(schema.rules)
+          .where(and(
+            eq(schema.rules.tenantId, tenantId),
+            inArray(schema.rules.customerId, allCustomerIds),
+          ))
+          .returning({ id: schema.rules.id });
+        summary.rules = deletedRules.length;
+      }
 
       // Delete groups (FK → customers.id)
       const deletedGroups = await trx.delete(schema.groups)
@@ -313,7 +315,7 @@ export class CustomerRepository implements ICustomerRepository {
       //   keepApiKeys:  customer_api_keys.customer_id → customers (FK)
       // When skipped this becomes a "data reset": devices/rules/users/groups wiped
       // but the customer record itself is preserved.
-      const keepCustomer = options.keepCentrals || options.keepApiKeys;
+      const keepCustomer = options.keepCentrals || options.keepApiKeys || options.keepRules;
       if (!keepCustomer) {
         await trx.delete(customers)
           .where(and(
@@ -324,7 +326,7 @@ export class CustomerRepository implements ICustomerRepository {
     });
 
     return {
-      deletedCustomers: (options.keepCentrals || options.keepApiKeys) ? 0 : allCustomerIds.length,
+      deletedCustomers: (options.keepCentrals || options.keepApiKeys || options.keepRules) ? 0 : allCustomerIds.length,
       summary,
     };
   }

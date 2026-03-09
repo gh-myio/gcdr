@@ -209,6 +209,7 @@ router.delete('/:id/force',
       const options = {
         keepApiKeys: req.query.keepApiKeys === 'true',
         keepCentrals: req.query.keepCentrals === 'true',
+        keepRules: req.query.keepRules === 'true',
       };
 
       const result = await customerService.forceDelete(tenantId, id, userId, options);

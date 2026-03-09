@@ -10,6 +10,7 @@ export interface CustomerTreeNode extends Customer {
 export interface ForceDeleteOptions {
   keepApiKeys?: boolean;
   keepCentrals?: boolean;
+  keepRules?: boolean;
 }
 
 export interface ForceDeleteResult {
