@@ -289,7 +289,13 @@ export class CustomerRepository implements ICustomerRepository {
             eq(schema.devices.tenantId, tenantId),
             inArray(schema.devices.assetId, allAssetIds),
           ))
-          .returning({ id: schema.devices.id });
+          .returning({ id: schema.devices.id, customerId: schema.devices.customerId, assetId: schema.devices.assetId });
+        if (strayDevices.length > 0) {
+          console.warn(
+            `[forceDelete] DATA_INCONSISTENCY: ${strayDevices.length} device(s) had assetId pointing to customer ${customerId} but a different customerId. Deleted:`,
+            strayDevices.map((d) => ({ deviceId: d.id, deviceCustomerId: d.customerId, assetId: d.assetId })),
+          );
+        }
         summary.devices += strayDevices.length;
       }
 
