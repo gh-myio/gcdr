@@ -227,6 +227,9 @@ export interface Rule extends BaseEntity {
   // Per-device value overrides (RFC-0018) — keyed by device UUID
   scopeEntityOverrides?: Record<string, RuleValueOverride>;
 
+  // Device profile filter — when set, rule only applies to devices matching one of these profiles
+  scopeProfiles?: string[];
+
   // Tags for organization
   tags: string[];
 

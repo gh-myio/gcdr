@@ -565,6 +565,10 @@ export const rules = pgTable('rules', {
   notificationChannels: jsonb('notification_channels').notNull().default([]),
   notifications: jsonb('notifications'),
 
+  // Device profile filter (e.g. ['ELEVADOR', 'ESCADA_ROLANTE'])
+  // When null/empty the rule applies to all profiles
+  scopeProfiles: text('scope_profiles').array(),
+
   // Tags
   tags: jsonb('tags').notNull().default([]),
 
