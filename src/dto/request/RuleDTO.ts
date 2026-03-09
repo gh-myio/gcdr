@@ -177,7 +177,6 @@ export const CreateRuleSchema = z.object({
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
-  scopeProfiles: z.array(z.string().min(1)).optional(),
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
 }).refine(
@@ -214,7 +213,6 @@ export const UpdateRuleSchema = z.object({
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
-  scopeProfiles: z.array(z.string().min(1)).optional().nullable(),
   tags: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
 });
