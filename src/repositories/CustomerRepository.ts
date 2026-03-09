@@ -261,7 +261,19 @@ export class CustomerRepository implements ICustomerRepository {
         summary.centrals = deletedCentrals.length;
       }
 
+      // Collect all asset IDs for these customers (needed before device deletion to catch
+      // devices that may reference these assets but have an inconsistent customerId)
+      const customerAssets = await trx
+        .select({ id: schema.assets.id })
+        .from(schema.assets)
+        .where(and(
+          eq(schema.assets.tenantId, tenantId),
+          inArray(schema.assets.customerId, allCustomerIds),
+        ));
+      const allAssetIds = customerAssets.map((a) => a.id);
+
       // Delete devices BEFORE assets (FK → customers.id AND assets.id)
+      // First pass: by customerId (normal case)
       const deletedDevices = await trx.delete(schema.devices)
         .where(and(
           eq(schema.devices.tenantId, tenantId),
@@ -269,6 +281,17 @@ export class CustomerRepository implements ICustomerRepository {
         ))
         .returning({ id: schema.devices.id });
       summary.devices = deletedDevices.length;
+
+      // Second pass: catch any stray devices referencing customer assets with a different customerId
+      if (allAssetIds.length > 0) {
+        const strayDevices = await trx.delete(schema.devices)
+          .where(and(
+            eq(schema.devices.tenantId, tenantId),
+            inArray(schema.devices.assetId, allAssetIds),
+          ))
+          .returning({ id: schema.devices.id });
+        summary.devices += strayDevices.length;
+      }
 
       // Delete assets (FK → customers.id)
       // When keepCentrals=true, exclude assets still referenced by centrals (FK constraint)
