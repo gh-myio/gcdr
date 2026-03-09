@@ -401,6 +401,27 @@ export class RuleRepository implements IRuleRepository {
       version: row.version,
     };
   }
+
+  async clearDevicesFromCustomerRules(tenantId: string, customerId: string, updatedBy: string): Promise<{ affected: number }> {
+    const result = await db
+      .update(rules)
+      .set({
+        scopeType: 'GLOBAL',
+        scopeEntityIds: [],
+        enabled: false,
+        updatedAt: new Date(),
+        updatedBy,
+        version: sql`${rules.version} + 1`,
+      })
+      .where(and(
+        eq(rules.tenantId, tenantId),
+        eq(rules.customerId, customerId),
+        eq(rules.scopeType, 'DEVICE'),
+      ))
+      .returning({ id: rules.id });
+
+    return { affected: result.length };
+  }
 }
 
 // Export singleton instance

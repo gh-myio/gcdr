@@ -107,6 +107,23 @@ export class RuleService {
     return this.repository.getByCustomerId(tenantId, customerId);
   }
 
+  async clearDevicesFromCustomerRules(tenantId: string, customerId: string, userId: string): Promise<{ affected: number }> {
+    const customer = await this.customerRepository.getById(tenantId, customerId);
+    if (!customer) {
+      throw new NotFoundError(`Customer ${customerId} not found`);
+    }
+
+    const result = await this.repository.clearDevicesFromCustomerRules(tenantId, customerId, userId);
+
+    if (result.affected > 0) {
+      alarmBundleService.invalidateCache(tenantId, customerId, {
+        reason: 'rules_devices_cleared', entityType: 'customer', entityId: customerId, userId,
+      });
+    }
+
+    return result;
+  }
+
   async getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]> {
     return this.repository.getApplicableForDevice(tenantId, deviceId, customerId, assetId);
   }

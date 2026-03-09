@@ -26,4 +26,5 @@ export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, Update
   updateLastTriggered(tenantId: string, ruleId: string): Promise<void>;
   setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride): Promise<Rule>;
   removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string): Promise<Rule>;
+  clearDevicesFromCustomerRules(tenantId: string, customerId: string, updatedBy: string): Promise<{ affected: number }>;
 }

@@ -410,6 +410,24 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
 };
 
 /**
+ * DELETE /customers/:customerId/rules/devices
+ * Remove all device associations from every DEVICE-scoped rule of a customer.
+ * Affected rules: scope_type → GLOBAL, scope_entity_ids → [], enabled → false.
+ * (mounted in app.ts)
+ */
+export const clearCustomerRuleDevicesHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { customerId } = req.params;
+
+    const result = await ruleService.clearDevicesFromCustomerRules(tenantId, customerId, userId);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * GET /customers/:customerId/alarm-rules/bundle
  * Get alarm bundle for customer (mounted in app.ts)
  */

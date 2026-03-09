@@ -31,6 +31,7 @@ import {
   authorizationController,
   rulesController,
   rulesListByCustomerHandler,
+  clearCustomerRuleDevicesHandler,
   getAlarmBundleHandler,
   getSimplifiedAlarmBundleHandler,
   getAlarmBundleVersionsHandler,
@@ -173,6 +174,7 @@ apiV1Router.get('/customers/:customerId/devices', authMiddleware, devicesListByC
 
 // Customer Rules (nested route)
 apiV1Router.get('/customers/:customerId/rules', hybridAuthMiddleware('customers:read'), rulesListByCustomerHandler);
+apiV1Router.delete('/customers/:customerId/rules/devices', authMiddleware, clearCustomerRuleDevicesHandler);
 
 // Customer Centrals (nested route)
 apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
