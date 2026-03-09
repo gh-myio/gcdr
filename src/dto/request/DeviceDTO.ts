@@ -99,7 +99,7 @@ export const CreateDeviceSchema = z.object({
   firmwareVersion: z.string().max(50).optional(),
 
   // RFC-0008: New fields
-  slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
+  slaveId: z.number().int().min(1).max(999).optional(),  // Slave ID (Modbus RTU max 247, other protocols up to 999)
   centralId: z.string().uuid().optional(),               // Central reference
   identifier: z.string().max(255).optional(),            // Human-readable identifier
   deviceProfile: z.string().max(100).optional(),         // Device profile
@@ -133,7 +133,7 @@ export const UpdateDeviceSchema = z.object({
   firmwareVersion: z.string().max(50).optional(),
 
   // RFC-0008: New fields
-  slaveId: z.number().int().min(1).max(247).optional(),  // Modbus slave ID
+  slaveId: z.number().int().min(1).max(999).optional(),  // Slave ID (Modbus RTU max 247, other protocols up to 999)
   centralId: z.string().uuid().optional(),               // Central reference
   identifier: z.string().max(255).optional(),            // Human-readable identifier
   deviceProfile: z.string().max(100).optional(),         // Device profile
