@@ -108,6 +108,18 @@ elif [[ $DR_EXIT -ne 0 ]]; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Step 4 — generate-registry.sh
+# ---------------------------------------------------------------------------
+echo -e "${BOLD}──────────────────────────────────────────────${NC}"
+echo -e "${BOLD}Step 4 — Generating device registry${NC}"
+echo -e "${BOLD}──────────────────────────────────────────────${NC}"
+set +e
+"$SCRIPT_DIR/generate-registry.sh"
+GR_EXIT=$?
+set -e
+[[ $GR_EXIT -ne 0 ]] && echo -e "${YELLOW}[WARN]${NC} generate-registry.sh failed (non-fatal)"
+
 echo ""
 echo -e "${BOLD}=== run-all complete ===${NC}"
 echo -e "  Next: review action plans, then run:"
