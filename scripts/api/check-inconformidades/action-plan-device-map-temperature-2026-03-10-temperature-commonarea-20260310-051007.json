@@ -1,0 +1,968 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:26:51Z",
+    "sourceReport": "inconformidades-report-device-map-temperature-2026-03-10-temperature-commonarea-20260310-051007.json",
+    "summary": {
+      "create": 0,
+      "update": 15,
+      "update_identifier": 0,
+      "skip": 0
+    }
+  },
+  "actions": {
+    "create": [],
+    "update": [
+      {
+        "action": "UPDATE",
+        "tbId": "d2059510-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp16",
+        "gcdrDeviceId": "0a123ea6-f24c-4778-80ce-4b9f214eab7d",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_d2059510'"
+        ],
+        "tb": {
+          "label": "Temperatura 16 (L3 Outback - Claraboia)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "149",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "0a123ea6-f24c-4778-80ce-4b9f214eab7d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "0a123ea6-f24c-4778-80ce-4b9f214eab7d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp16",
+          "displayName": "Temperatura 16 (L3 Outback - Claraboia)",
+          "label": "Temperatura 16 (L3 Outback - Claraboia)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-0a123ea6",
+          "externalId": "d2059510-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-0a123ea6"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d2059510-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp16"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:52.477Z",
+          "updatedAt": "2026-03-09T20:55:52.477Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 149,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_d2059510",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "b2f6bafe-8ca9-4bd3-a90f-605f24908323",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "ce62f2e0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp12",
+        "gcdrDeviceId": "6dc992a6-a2c9-418e-a213-d1a28694fe1b",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_ce62f2e0'"
+        ],
+        "tb": {
+          "label": "Temperatura 12 (L3 PE)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "145",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "6dc992a6-a2c9-418e-a213-d1a28694fe1b",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "6dc992a6-a2c9-418e-a213-d1a28694fe1b",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp12",
+          "displayName": "Temperatura 12 (L3 PE)",
+          "label": "Temperatura 12 (L3 PE)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-6dc992a6",
+          "externalId": "ce62f2e0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-6dc992a6"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "ce62f2e0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp12"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:47.928Z",
+          "updatedAt": "2026-03-09T20:55:47.928Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 145,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_ce62f2e0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "d64e656e-f6c6-46c1-a46d-3ae4174fd2d8",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c9ca09d0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp7",
+        "gcdrDeviceId": "23b79660-83b8-4726-b0fd-3190cf0cbd25",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_c9ca09d0'"
+        ],
+        "tb": {
+          "label": "Temperatura 7 (L3 - Leitura)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "140",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "23b79660-83b8-4726-b0fd-3190cf0cbd25",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "23b79660-83b8-4726-b0fd-3190cf0cbd25",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp7",
+          "displayName": "Temperatura 7 (L3 - Leitura)",
+          "label": "Temperatura 7 (L3 - Leitura)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-23b79660",
+          "externalId": "c9ca09d0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-23b79660"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c9ca09d0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp7"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:42.226Z",
+          "updatedAt": "2026-03-09T20:55:42.226Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 140,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_c9ca09d0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "73eedefd-cf93-4cf0-b5a2-9ee96599a9a9",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d032d0e0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp14",
+        "gcdrDeviceId": "3c76bcfc-b3f7-465b-8878-b81ceb258669",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_d032d0e0'"
+        ],
+        "tb": {
+          "label": "Temperatura 14 (L3 Cacau Show)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "147",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "3c76bcfc-b3f7-465b-8878-b81ceb258669",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "3c76bcfc-b3f7-465b-8878-b81ceb258669",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp14",
+          "displayName": "Temperatura 14 (L3 Cacau Show)",
+          "label": "Temperatura 14 (L3 Cacau Show)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-3c76bcfc",
+          "externalId": "d032d0e0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-3c76bcfc"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d032d0e0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp14"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:50.129Z",
+          "updatedAt": "2026-03-09T20:55:50.129Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 147,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_d032d0e0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "17a76db7-48f0-407e-b5f6-9c9c72f1f472",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c8e0e250-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp6",
+        "gcdrDeviceId": "9eb75b77-c9b8-4ff6-9acb-952f43321e4c",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_c8e0e250'"
+        ],
+        "tb": {
+          "label": "Temperatura 6 (Passarela)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "139",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "9eb75b77-c9b8-4ff6-9acb-952f43321e4c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "9eb75b77-c9b8-4ff6-9acb-952f43321e4c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp6",
+          "displayName": "Temperatura 6 (Passarela)",
+          "label": "Temperatura 6 (Passarela)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-9eb75b77",
+          "externalId": "c8e0e250-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-9eb75b77"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c8e0e250-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp6"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:41.126Z",
+          "updatedAt": "2026-03-09T20:55:41.126Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 139,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_c8e0e250",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "d660b9e3-e9e3-450c-ad50-57e35fd35786",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d11a98d0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp15",
+        "gcdrDeviceId": "eec21d97-5405-49b9-9f49-901a080ffceb",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_d11a98d0'"
+        ],
+        "tb": {
+          "label": "Temperatura 15 (L1 - MC donalds)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "148",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "eec21d97-5405-49b9-9f49-901a080ffceb",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "eec21d97-5405-49b9-9f49-901a080ffceb",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp15",
+          "displayName": "Temperatura 15 (L1 - MC donalds)",
+          "label": "Temperatura 15 (L1 - MC donalds)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-eec21d97",
+          "externalId": "d11a98d0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-eec21d97"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d11a98d0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp15"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:51.372Z",
+          "updatedAt": "2026-03-09T20:55:51.372Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 148,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_d11a98d0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "6582a8ff-0717-4fa2-8e7a-9d9c50b27eae",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cd7b03e0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp11",
+        "gcdrDeviceId": "14032039-b15b-46fa-a5f0-23d1adb7798c",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_cd7b03e0'"
+        ],
+        "tb": {
+          "label": "Temperatura 11 (frente à Move On 208I)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "144",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "14032039-b15b-46fa-a5f0-23d1adb7798c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "14032039-b15b-46fa-a5f0-23d1adb7798c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp11",
+          "displayName": "Temperatura 11 (frente à Move On 208I)",
+          "label": "Temperatura 11 (frente à Move On 208I)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-14032039",
+          "externalId": "cd7b03e0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-14032039"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cd7b03e0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp11"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:46.791Z",
+          "updatedAt": "2026-03-09T20:55:46.791Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 144,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_cd7b03e0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "2c4c9026-fda3-4712-af90-ea8f2d60c103",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c5166cd0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp2",
+        "gcdrDeviceId": "8af11614-3875-426b-9742-38028022d3f9",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_c5166cd0'"
+        ],
+        "tb": {
+          "label": "Temperatura L2 (frente à Pernambucanas 203K)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "135",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "8af11614-3875-426b-9742-38028022d3f9",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "8af11614-3875-426b-9742-38028022d3f9",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp2",
+          "displayName": "Temperatura L2 (frente à Pernambucanas 203K)",
+          "label": "Temperatura L2 (frente à Pernambucanas 203K)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-8af11614",
+          "externalId": "c5166cd0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-8af11614"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c5166cd0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp2"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:36.526Z",
+          "updatedAt": "2026-03-09T20:55:36.526Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 135,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_c5166cd0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "e0b32416-56d1-4f26-ba43-7338c0c958f9",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c7ea9b70-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp5",
+        "gcdrDeviceId": "a754bcc3-b7ea-4050-b8a7-122ac88d2d18",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_c7ea9b70'"
+        ],
+        "tb": {
+          "label": "Temperatura 5 (frente ao artesanato da terra 213A)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "138",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "a754bcc3-b7ea-4050-b8a7-122ac88d2d18",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "a754bcc3-b7ea-4050-b8a7-122ac88d2d18",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp5",
+          "displayName": "Temperatura 5 (frente ao artesanato da terra 213A)",
+          "label": "Temperatura 5 (frente ao artesanato da terra 213A)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-a754bcc3",
+          "externalId": "c7ea9b70-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-a754bcc3"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c7ea9b70-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp5"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:40.022Z",
+          "updatedAt": "2026-03-09T20:55:40.022Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 138,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_c7ea9b70",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "06ea7d27-fd5d-416e-8848-5c01ed40105b",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c4281530-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp1",
+        "gcdrDeviceId": "854c9036-bdb3-4a5d-9b2c-98382326a897",
+        "divergences": [
+          "label: TB='Temperatura 1 (frente ao Paraíso Bijoux 201D/E)' GCDR='TEMPERATURA 5 L3 (301E)'",
+          "slaveId: TB='134' GCDR='149'",
+          "centralId: TB='d3202744-05dd-46d1-af33-495e9a2ecd52' GCDR='186bbdcb-95bc-4290-bf33-1ce89e48ffb4'",
+          "externalId: TB_id='c4281530-9c85-11f0-afe1-175479a33d89' GCDR='88970b80-bfed-11f0-84a2-1f4ed3957b2a'"
+        ],
+        "tb": {
+          "label": "Temperatura 1 (frente ao Paraíso Bijoux 201D/E)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "134",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "854c9036-bdb3-4a5d-9b2c-98382326a897",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "854c9036-bdb3-4a5d-9b2c-98382326a897",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMS_L3_FRENTE_301EL3",
+          "displayName": "TEMPERATURA 5 L3 (301E)",
+          "label": "TEMPERATURA 5 L3 (301E)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-854c9036",
+          "externalId": "88970b80-bfed-11f0-84a2-1f4ed3957b2a",
+          "specs": {
+            "serialNumber": "AUTO-854c9036"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "88970b80-bfed-11f0-84a2-1f4ed3957b2a",
+            "syncedAt": "2026-03-09T23:10:56.959Z",
+            "tbProfile": "TERMOSTATO",
+            "tbDeviceName": "TEMP. SCMS_L3_FRENTE_301EL3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:35.431Z",
+          "updatedAt": "2026-03-09T23:13:12.245Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "updatedBy": "00000000-0000-0000-0000-000000000001",
+          "version": 3,
+          "slaveId": 149,
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "identifier": "temperatura",
+          "deviceProfile": "TERMOSTATO",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "fcc16d0f-e27e-4d48-aec2-c1f35191ac9f",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cf44c760-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp13",
+        "gcdrDeviceId": "a40c6490-6004-4b07-8d5e-14727fff4f96",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_cf44c760'"
+        ],
+        "tb": {
+          "label": "Temperatura 13 (frente a Le Biscuit)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "146",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "a40c6490-6004-4b07-8d5e-14727fff4f96",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "a40c6490-6004-4b07-8d5e-14727fff4f96",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp13",
+          "displayName": "Temperatura 13 (frente a Le Biscuit)",
+          "label": "Temperatura 13 (frente a Le Biscuit)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-a40c6490",
+          "externalId": "cf44c760-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-a40c6490"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cf44c760-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp13"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:49.016Z",
+          "updatedAt": "2026-03-09T20:55:49.016Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 146,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_cf44c760",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "f539a566-d3f7-45b5-9b28-ee8adbe520ec",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c6049d60-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp3",
+        "gcdrDeviceId": "4eca6f8f-bc48-4679-b58c-e3ce7832a9cf",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_c6049d60'"
+        ],
+        "tb": {
+          "label": "Temperatura 3 (L1 Barbarela)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "136",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "4eca6f8f-bc48-4679-b58c-e3ce7832a9cf",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "4eca6f8f-bc48-4679-b58c-e3ce7832a9cf",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp3",
+          "displayName": "Temperatura 3 (L1 Barbarela)",
+          "label": "Temperatura 3 (L1 Barbarela)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-4eca6f8f",
+          "externalId": "c6049d60-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-4eca6f8f"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c6049d60-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:37.627Z",
+          "updatedAt": "2026-03-09T20:55:37.627Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 136,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_c6049d60",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "1a6132c7-ed03-4c97-a542-a89b6ed93af7",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cba384c0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp9",
+        "gcdrDeviceId": "4f9221fd-b1ff-40e9-b6b8-36f4ab3a2033",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_cba384c0'"
+        ],
+        "tb": {
+          "label": "Temperatura 9 (L1 - PA Griletto)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "142",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "4f9221fd-b1ff-40e9-b6b8-36f4ab3a2033",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "4f9221fd-b1ff-40e9-b6b8-36f4ab3a2033",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp9",
+          "displayName": "Temperatura 9 (L1 - PA Griletto)",
+          "label": "Temperatura 9 (L1 - PA Griletto)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-4f9221fd",
+          "externalId": "cba384c0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-4f9221fd"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cba384c0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp9"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:44.445Z",
+          "updatedAt": "2026-03-09T20:55:44.445Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 142,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_cba384c0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "6fddd13f-61ef-46ad-bc9f-ff7fe0e40550",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cc9314e0-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp10",
+        "gcdrDeviceId": "0a4472ef-a5e4-4123-89ee-1f1337ca269c",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_cc9314e0'"
+        ],
+        "tb": {
+          "label": "Temperatura 10 (L1 - Correios)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "143",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "0a4472ef-a5e4-4123-89ee-1f1337ca269c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "0a4472ef-a5e4-4123-89ee-1f1337ca269c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp10",
+          "displayName": "Temperatura 10 (L1 - Correios)",
+          "label": "Temperatura 10 (L1 - Correios)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-0a4472ef",
+          "externalId": "cc9314e0-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-0a4472ef"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cc9314e0-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp10"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:45.673Z",
+          "updatedAt": "2026-03-09T20:55:45.673Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 143,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_cc9314e0",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "decadc03-8ba5-46b2-bd8f-9f2ba29b470b",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cab9e810-9c85-11f0-afe1-175479a33d89",
+        "deviceName": "TEMP. SCMAL2ACAC-Temp8",
+        "gcdrDeviceId": "823df041-ca86-4377-9151-a4e4e82622c3",
+        "divergences": [
+          "deviceProfile: TB='TERMOSTATO' GCDR=''",
+          "identifier: TB='Temperatura' GCDR='temperatura_cab9e810'"
+        ],
+        "tb": {
+          "label": "Temperatura 8 (EXTERNA G7)",
+          "identifier": "Temperatura",
+          "deviceType": "TERMOSTATO",
+          "deviceProfile": "TERMOSTATO",
+          "slaveId": "141",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "gcdrDeviceId": "823df041-ca86-4377-9151-a4e4e82622c3",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "823df041-ca86-4377-9151-a4e4e82622c3",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "7b1ba3f0-6d4b-4d54-8ff3-94ba972d6e9c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "TEMP. SCMAL2ACAC-Temp8",
+          "displayName": "Temperatura 8 (EXTERNA G7)",
+          "label": "Temperatura 8 (EXTERNA G7)",
+          "type": "SENSOR",
+          "serialNumber": "AUTO-823df041",
+          "externalId": "cab9e810-9c85-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-823df041"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cab9e810-9c85-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "TEMP. SCMAL2ACAC-Temp8"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:43.337Z",
+          "updatedAt": "2026-03-09T20:55:43.337Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 141,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "temperatura_cab9e810",
+          "deviceType": "TERMOSTATO",
+          "ingestionId": "ae5c3efd-edc4-4736-bb5d-fdafda228be7",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      }
+    ],
+    "update_identifier": [],
+    "skip": []
+  }
+}

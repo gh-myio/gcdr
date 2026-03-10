@@ -1,0 +1,4 @@
+API_URL=https://gcdr-api.a.myio-bas.com
+API_KEY=gcdr_cust_mestre_alvaro_tb_2026
+CUSTOMER_ID=e04046d4-baa4-44e9-a378-4dfebe4140f1
+CENTRAL_ID=d3202744-05dd-46d1-af33-495e9a2ecd52

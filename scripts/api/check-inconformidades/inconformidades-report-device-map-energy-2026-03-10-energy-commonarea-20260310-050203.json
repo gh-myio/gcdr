@@ -1,0 +1,4148 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:03:54Z",
+    "apiUrl": "https://gcdr-api.a.myio-bas.com",
+    "authMode": "apikey",
+    "totals": {
+      "tbDevices": 69,
+      "gcdrDevicesLoaded": 414,
+      "conformant": 3,
+      "divergent": 63,
+      "missing": 2
+    }
+  },
+  "results": [
+    {
+      "tbId": "35f4a6c0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACCAGC",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Chiller 1",
+        "identifier": "CAG",
+        "deviceType": "CHILLER",
+        "deviceProfile": "CHILLER",
+        "slaveId": "120",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "ec5d001d-194e-4bcb-bf4c-9a5426734892",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "ec5d001d-194e-4bcb-bf4c-9a5426734892",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACCAGC",
+        "displayName": "Chiller 1",
+        "label": "Chiller 1",
+        "type": "METER",
+        "serialNumber": "AUTO-ec5d001d",
+        "externalId": "35f4a6c0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-ec5d001d"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "35f4a6c0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "CHILLER",
+          "tbDeviceName": "3F SCMAL2ACCAGC"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:21.725Z",
+        "updatedAt": "2026-03-09T20:55:21.725Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 120,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_35f4a6c0",
+        "deviceProfile": "CHILLER",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "ce6a7e51-e642-4562-8d3d-8f492929d4df",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_35f4a6c0'"
+      ]
+    },
+    {
+      "tbId": "160b9170-9e29-11f0-afe1-175479a33d89",
+      "deviceName": "3F Trafo CAG 2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Trafo CAG 2",
+        "identifier": "CAG",
+        "deviceType": "CHILLER",
+        "deviceProfile": "CHILLER",
+        "slaveId": "186",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "fb18d4d2-f90f-4721-af6c-92d0776fef90",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "fb18d4d2-f90f-4721-af6c-92d0776fef90",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F Trafo CAG 2",
+        "displayName": "Trafo CAG 2",
+        "label": "Trafo CAG 2",
+        "type": "METER",
+        "serialNumber": "AUTO-fb18d4d2",
+        "externalId": "160b9170-9e29-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-fb18d4d2"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "160b9170-9e29-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "CHILLER",
+          "tbDeviceName": "3F Trafo CAG 2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:34.332Z",
+        "updatedAt": "2026-03-09T20:55:34.332Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 186,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_160b9170",
+        "deviceProfile": "CHILLER",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "32188855-540b-457f-9c0f-840b4274901d",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_160b9170'"
+      ]
+    },
+    {
+      "tbId": "152242e0-9e29-11f0-afe1-175479a33d89",
+      "deviceName": "3F Trafo CAG 1",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Trafo CAG 1",
+        "identifier": "CAG",
+        "deviceType": "CHILLER",
+        "deviceProfile": "CHILLER",
+        "slaveId": "185",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "51b09210-d0c4-4616-9a40-14cd988cfda0",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "51b09210-d0c4-4616-9a40-14cd988cfda0",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F Trafo CAG 1",
+        "displayName": "Trafo CAG 1",
+        "label": "Trafo CAG 1",
+        "type": "METER",
+        "serialNumber": "AUTO-51b09210",
+        "externalId": "152242e0-9e29-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-51b09210"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "152242e0-9e29-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "CHILLER",
+          "tbDeviceName": "3F Trafo CAG 1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:33.060Z",
+        "updatedAt": "2026-03-09T20:55:33.060Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 185,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_152242e0",
+        "deviceProfile": "CHILLER",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "126a09d9-8a3e-44c9-a762-59c8b2545307",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_152242e0'"
+      ]
+    },
+    {
+      "tbId": "35479de0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACCAGC2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Chiller 2",
+        "identifier": "CAG",
+        "deviceType": "CHILLER",
+        "deviceProfile": "CHILLER",
+        "slaveId": "119",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "a3327860-01a1-4b53-aa19-d7e52f5474b4",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "a3327860-01a1-4b53-aa19-d7e52f5474b4",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMSROOFTOP 03",
+        "displayName": "ROOFTOP 3",
+        "label": "ROOFTOP 3",
+        "type": "METER",
+        "serialNumber": "AUTO-a3327860",
+        "externalId": "38db0910-b026-11f0-9722-210aa9448abc",
+        "specs": {
+          "serialNumber": "AUTO-a3327860"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "38db0910-b026-11f0-9722-210aa9448abc",
+          "syncedAt": "2026-03-09T23:08:34.462Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F SCMSROOFTOP 03"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:20.598Z",
+        "updatedAt": "2026-03-10T00:00:33.265Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "updatedBy": "00000000-0000-0000-0000-000000000001",
+        "version": 5,
+        "slaveId": 160,
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "identifier": "cag",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "5a71329e-10a0-4ebd-9a6a-4f7fe0deb666",
+        "ingestionGatewayId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4"
+      },
+      "divergences": [
+        "label: TB='Chiller 2' GCDR='ROOFTOP 3'",
+        "deviceProfile: TB='CHILLER' GCDR='FANCOIL'",
+        "slaveId: TB='119' GCDR='160'",
+        "centralId: TB='d3202744-05dd-46d1-af33-495e9a2ecd52' GCDR='186bbdcb-95bc-4290-bf33-1ce89e48ffb4'",
+        "externalId: TB_id='35479de0-9181-11f0-a06d-e9509531b1d5' GCDR='38db0910-b026-11f0-9722-210aa9448abc'"
+      ]
+    },
+    {
+      "tbId": "3980dac0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-S 02",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Secundária 2",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "125",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "6dc9bd07-bbde-4b30-9282-ffc6a19c7a5a",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "6dc9bd07-bbde-4b30-9282-ffc6a19c7a5a",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-S 02",
+        "displayName": "Bomba Secundária 2",
+        "label": "Bomba Secundária 2",
+        "type": "OTHER",
+        "serialNumber": "AUTO-6dc9bd07",
+        "externalId": "3980dac0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-6dc9bd07"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3980dac0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-S 02"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:27.390Z",
+        "updatedAt": "2026-03-09T20:55:27.390Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 125,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3980dac0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "14a988c4-e75a-46a0-aae2-bd2f477369c4",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3980dac0'"
+      ]
+    },
+    {
+      "tbId": "3757b930-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-P 02",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Primária",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "122",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "3c3d21da-0302-4cc0-963b-54f6c83ea517",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "3c3d21da-0302-4cc0-963b-54f6c83ea517",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-P 02",
+        "displayName": "Bomba Primária",
+        "label": "Bomba Primária",
+        "type": "OTHER",
+        "serialNumber": "AUTO-3c3d21da",
+        "externalId": "3757b930-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-3c3d21da"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3757b930-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-P 02"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:24.077Z",
+        "updatedAt": "2026-03-09T20:55:24.077Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 122,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3757b930",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "e7cd51af-6a2f-4030-8869-5ca5d8924043",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3757b930'"
+      ]
+    },
+    {
+      "tbId": "3a342530-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-S R",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Secundária 3",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "126",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "881f8e4d-8869-449a-b281-a42188e0a202",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "881f8e4d-8869-449a-b281-a42188e0a202",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-S R",
+        "displayName": "Bomba Secundária 3",
+        "label": "Bomba Secundária 3",
+        "type": "OTHER",
+        "serialNumber": "AUTO-881f8e4d",
+        "externalId": "3a342530-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-881f8e4d"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3a342530-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-S R"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:28.623Z",
+        "updatedAt": "2026-03-09T20:55:28.623Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 126,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3a342530",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "4fd2defc-3287-4feb-8627-d0b4c81fbf68",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3a342530'"
+      ]
+    },
+    {
+      "tbId": "ab821c40-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ELEV. SCMAL2ACEL2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 2",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "85",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "2b526f1f-cab8-445b-a27a-15f8054e8424",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "2b526f1f-cab8-445b-a27a-15f8054e8424",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ELEV. SCMAL2ACEL2",
+        "displayName": "Elevador 2",
+        "label": "Elevador 2",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-2b526f1f",
+        "externalId": "ab821c40-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-2b526f1f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "ab821c40-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F ELEV. SCMAL2ACEL2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:56.607Z",
+        "updatedAt": "2026-03-09T20:54:56.607Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 85,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_ab821c40",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "ELEVADOR",
+        "ingestionId": "85eada1c-5285-4821-848a-db364540f7d1",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_ab821c40'"
+      ]
+    },
+    {
+      "tbId": "36ab73a0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-P 01",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Primaria 1",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "121",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "18758b9f-2842-41b1-beef-19bdb39ba882",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "18758b9f-2842-41b1-beef-19bdb39ba882",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-P 01",
+        "displayName": "Bomba Primaria 1",
+        "label": "Bomba Primaria 1",
+        "type": "OTHER",
+        "serialNumber": "AUTO-18758b9f",
+        "externalId": "36ab73a0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-18758b9f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "36ab73a0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-P 01"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:22.967Z",
+        "updatedAt": "2026-03-09T20:55:22.967Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 121,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_36ab73a0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "68269ec2-1726-4979-8387-9b9b5f149bb5",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_36ab73a0'"
+      ]
+    },
+    {
+      "tbId": "b44240d0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH4",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba hidrúlica 4",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "101",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "384e543d-714c-4184-860d-964550adaf23",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "384e543d-714c-4184-860d-964550adaf23",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH4",
+        "displayName": "Bomba hidrúlica 4",
+        "label": "Bomba hidrúlica 4",
+        "type": "METER",
+        "serialNumber": "AUTO-384e543d",
+        "externalId": "b44240d0-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-384e543d"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b44240d0-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH4"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:05.861Z",
+        "updatedAt": "2026-03-09T20:55:05.861Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 101,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas_b44240d0",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "22cf1f77-0c15-4460-9bcd-379a69339754",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='BOMBASHIDRAULICAS' GCDR='bombashidraulicas_b44240d0'"
+      ]
+    },
+    {
+      "tbId": "aa7f5240-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL1",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 1",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "83",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "6857b8cb-34aa-4e2e-9113-8598c2601f31",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "6857b8cb-34aa-4e2e-9113-8598c2601f31",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACEL1",
+        "displayName": "Elevador 1",
+        "label": "Elevador 1",
+        "type": "METER",
+        "serialNumber": "AUTO-6857b8cb",
+        "externalId": "aa7f5240-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-6857b8cb"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "aa7f5240-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F SCMAL2ACEL1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:54.398Z",
+        "updatedAt": "2026-03-09T20:54:54.398Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 83,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_aa7f5240",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "9851120c-661a-4eb4-b698-3418e2c8ddb7",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_aa7f5240'"
+      ]
+    },
+    {
+      "tbId": "d6166260-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil4",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 4",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "153",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "c2b69932-ac5c-499c-a275-84d9dbc03f86",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "c2b69932-ac5c-499c-a275-84d9dbc03f86",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil4",
+        "displayName": "Fancoil 4",
+        "label": "Fancoil 4",
+        "type": "METER",
+        "serialNumber": "AUTO-c2b69932",
+        "externalId": "d6166260-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-c2b69932"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d6166260-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil4"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:58.179Z",
+        "updatedAt": "2026-03-09T20:55:58.179Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 153,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d6166260",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "2ab7d213-6394-47af-adad-19702b355eb5",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d6166260'"
+      ]
+    },
+    {
+      "tbId": "26156370-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 05",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 5",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "94",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "cc4a6665-4630-4c7d-a309-3f9a4a78f351",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "cc4a6665-4630-4c7d-a309-3f9a4a78f351",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 05",
+        "displayName": "ER 5",
+        "label": "ER 5",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-cc4a6665",
+        "externalId": "26156370-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-cc4a6665"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "26156370-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 05"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:36.008Z",
+        "updatedAt": "2026-03-09T20:54:36.008Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 94,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_26156370",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "f8e0f1ee-9eb2-466f-8e27-0a7b98104ea8",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_26156370'"
+      ]
+    },
+    {
+      "tbId": "e4c00be0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil20",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 20",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "169",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "6da89ccc-baf5-4b96-b130-2b3af35b7bde",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "6da89ccc-baf5-4b96-b130-2b3af35b7bde",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil20",
+        "displayName": "Fancoil 20",
+        "label": "Fancoil 20",
+        "type": "METER",
+        "serialNumber": "AUTO-6da89ccc",
+        "externalId": "e4c00be0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-6da89ccc"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e4c00be0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil20"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:18.922Z",
+        "updatedAt": "2026-03-09T20:56:18.922Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 169,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e4c00be0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "d16ff485-4ab4-4e85-b948-2a287864c124",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e4c00be0'"
+      ]
+    },
+    {
+      "tbId": "282ef4a0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 08",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 8",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "130",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "5114b625-8eea-45c2-97fd-7e600b1f5743",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "5114b625-8eea-45c2-97fd-7e600b1f5743",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 08",
+        "displayName": "ER 8",
+        "label": "ER 8",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-5114b625",
+        "externalId": "282ef4a0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-5114b625"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "282ef4a0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 08"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:39.500Z",
+        "updatedAt": "2026-03-09T20:54:39.500Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 130,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_282ef4a0",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "2cf65615-5aec-4a3d-88f9-b41367cf899a",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_282ef4a0'"
+      ]
+    },
+    {
+      "tbId": "24b58550-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 03",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 3",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "92",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "74d770e2-f77a-48e8-b506-8597bd66eff5",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "74d770e2-f77a-48e8-b506-8597bd66eff5",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 03",
+        "displayName": "ER 3",
+        "label": "ER 3",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-74d770e2",
+        "externalId": "24b58550-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-74d770e2"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "24b58550-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 03"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:33.808Z",
+        "updatedAt": "2026-03-09T20:54:33.808Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 92,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_24b58550",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "735b4611-d9da-4272-b7c2-414f05c639ec",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_24b58550'"
+      ]
+    },
+    {
+      "tbId": "26d38350-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 06",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 6",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "95",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "04c2210a-4984-4537-a2b1-2ea692fdf0b5",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "04c2210a-4984-4537-a2b1-2ea692fdf0b5",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 06",
+        "displayName": "ER 6",
+        "label": "ER 6",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-04c2210a",
+        "externalId": "26d38350-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-04c2210a"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "26d38350-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 06"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:37.263Z",
+        "updatedAt": "2026-03-09T20:54:37.263Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 95,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_26d38350",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "e46a838d-12d4-4122-8aee-bb61e75aa512",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_26d38350'"
+      ]
+    },
+    {
+      "tbId": "de606c90-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil13",
+      "status": "CONFORMANT",
+      "tb": {
+        "label": "Fancoil 13",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "162",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "1cb87e52-9807-4dd2-9f75-ba70bb658233",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "1cb87e52-9807-4dd2-9f75-ba70bb658233",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil13",
+        "displayName": "Fancoil 13",
+        "label": "Fancoil 13",
+        "type": "METER",
+        "serialNumber": "AUTO-1cb87e52",
+        "externalId": "de606c90-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-1cb87e52"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "de606c90-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil13"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:53.596Z",
+        "updatedAt": "2026-03-09T20:55:53.596Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 162,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "9a3d7b48-6e4c-4c73-8001-8bcd2578a871",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": []
+    },
+    {
+      "tbId": "d8d0ee80-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil7",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 7",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "156",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "3a29d53b-342b-43bf-9da9-93bbd4cf3d2d",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "3a29d53b-342b-43bf-9da9-93bbd4cf3d2d",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil7",
+        "displayName": "Fancoil 7",
+        "label": "Fancoil 7",
+        "type": "METER",
+        "serialNumber": "AUTO-3a29d53b",
+        "externalId": "d8d0ee80-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-3a29d53b"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d8d0ee80-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil7"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:01.533Z",
+        "updatedAt": "2026-03-09T20:56:01.533Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 156,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d8d0ee80",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "f8cf8e15-998d-4996-843c-9692d1cde6a6",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d8d0ee80'"
+      ]
+    },
+    {
+      "tbId": "2a4b9310-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 11",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 11",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "133",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "20697e95-e9e8-4bd5-b351-4d441799cc6f",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "20697e95-e9e8-4bd5-b351-4d441799cc6f",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 11",
+        "displayName": "ER 11",
+        "label": "ER 11",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-20697e95",
+        "externalId": "2a4b9310-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-20697e95"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "2a4b9310-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 11"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:43.033Z",
+        "updatedAt": "2026-03-09T20:54:43.033Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 133,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_2a4b9310",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "4f4c0c57-17c8-4e7f-96f6-0d23f966e525",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_2a4b9310'"
+      ]
+    },
+    {
+      "tbId": "e2e9ec50-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil18",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 18",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "167",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "ad23d402-a68a-40b3-880c-c4dcba9d9d77",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "ad23d402-a68a-40b3-880c-c4dcba9d9d77",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil18",
+        "displayName": "Fancoil 18",
+        "label": "Fancoil 18",
+        "type": "METER",
+        "serialNumber": "AUTO-ad23d402",
+        "externalId": "e2e9ec50-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-ad23d402"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e2e9ec50-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil18"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:13.189Z",
+        "updatedAt": "2026-03-09T20:56:13.189Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 167,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e2e9ec50",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "b2fb1501-444f-4d16-998c-b868073b2173",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e2e9ec50'"
+      ]
+    },
+    {
+      "tbId": "24076b00-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 02",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 2",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "187",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "bbc33685-062e-4e65-84f6-9398ec4db54a",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "bbc33685-062e-4e65-84f6-9398ec4db54a",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 02",
+        "displayName": "ER 2",
+        "label": "ER 2",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-bbc33685",
+        "externalId": "24076b00-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-bbc33685"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "24076b00-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 02"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:32.707Z",
+        "updatedAt": "2026-03-09T20:54:32.707Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 187,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_24076b00",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "7d8ca6df-cbc1-4858-9c8c-2fbe0cb2d9c8",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_24076b00'"
+      ]
+    },
+    {
+      "tbId": "e5b76430-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil21",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 21",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "170",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "b068d87f-e35d-4d16-8563-9128a38b4e1b",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "b068d87f-e35d-4d16-8563-9128a38b4e1b",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil21",
+        "displayName": "Fancoil 21",
+        "label": "Fancoil 21",
+        "type": "METER",
+        "serialNumber": "AUTO-b068d87f",
+        "externalId": "e5b76430-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-b068d87f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e5b76430-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil21"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:20.141Z",
+        "updatedAt": "2026-03-09T20:56:20.141Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 170,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e5b76430",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "007a6751-feb8-4e0e-a39a-987fb68ac224",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e5b76430'"
+      ]
+    },
+    {
+      "tbId": "e8728c90-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil24",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 24",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "173",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "517f8fd6-1ff2-4c38-b6c5-646681f74dee",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "517f8fd6-1ff2-4c38-b6c5-646681f74dee",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil24",
+        "displayName": "Fancoil 24",
+        "label": "Fancoil 24",
+        "type": "METER",
+        "serialNumber": "AUTO-517f8fd6",
+        "externalId": "e8728c90-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-517f8fd6"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e8728c90-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil24"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:17.832Z",
+        "updatedAt": "2026-03-09T20:56:17.832Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 173,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e8728c90",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "8d8a7366-6444-4350-80ec-5f3fd404434b",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e8728c90'"
+      ]
+    },
+    {
+      "tbId": "dd6850f0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil12",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 12",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "161",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "d2dc6f71-57ea-40fb-9c66-bbec5128ee37",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "d2dc6f71-57ea-40fb-9c66-bbec5128ee37",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil12",
+        "displayName": "Fancoil 12",
+        "label": "Fancoil 12",
+        "type": "METER",
+        "serialNumber": "AUTO-d2dc6f71",
+        "externalId": "dd6850f0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-d2dc6f71"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "dd6850f0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil12"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:07.466Z",
+        "updatedAt": "2026-03-09T20:56:07.466Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 161,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_dd6850f0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "98cd97c9-daa0-431f-8a36-41aac2485e31",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_dd6850f0'"
+      ]
+    },
+    {
+      "tbId": "a1c20390-9e59-11f0-afe1-175479a33d89",
+      "deviceName": "3F ESRL. PF-Escada 12",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 12",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "188",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "ac075312-cb12-44e8-bc8c-3acd3f795fa2",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "ac075312-cb12-44e8-bc8c-3acd3f795fa2",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 12",
+        "displayName": "ER 12",
+        "label": "ER 12",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-ac075312",
+        "externalId": "a1c20390-9e59-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-ac075312"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "a1c20390-9e59-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 12"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:28.029Z",
+        "updatedAt": "2026-03-09T20:54:28.029Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 188,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_a1c20390",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "8df8a621-cf6f-4044-9a6b-1fd067564a38",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_a1c20390'"
+      ]
+    },
+    {
+      "tbId": "25639fa0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 04",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 4",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "93",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "adb564f2-692f-4cb6-8c41-2cdab247b4eb",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "adb564f2-692f-4cb6-8c41-2cdab247b4eb",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 04",
+        "displayName": "ER 4",
+        "label": "ER 4",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-adb564f2",
+        "externalId": "25639fa0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-adb564f2"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "25639fa0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 04"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:34.900Z",
+        "updatedAt": "2026-03-09T20:54:34.900Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 93,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_25639fa0",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "e5ba6efc-0d1f-4c1b-869c-bcba28cf41d5",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_25639fa0'"
+      ]
+    },
+    {
+      "tbId": "39e70e00-9e63-11f0-afe1-175479a33d89",
+      "deviceName": "3F ESRL. PF-Escada 15",
+      "status": "NOT_LINKED",
+      "tb": {
+        "label": "ER 15",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "191",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "254c1e85-1d43-40fa-a67b-b3ab1e833a32",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {},
+      "divergences": []
+    },
+    {
+      "tbId": "d46b6a60-9e5a-11f0-afe1-175479a33d89",
+      "deviceName": "3F ESRL. PF-Escada 14",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 14",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "190",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "73b34695-ae84-4a88-bb58-12a9c89f1900",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "73b34695-ae84-4a88-bb58-12a9c89f1900",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 14",
+        "displayName": "ER 14",
+        "label": "ER 14",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-73b34695",
+        "externalId": "d46b6a60-9e5a-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-73b34695"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d46b6a60-9e5a-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 14"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:26.929Z",
+        "updatedAt": "2026-03-09T20:54:26.929Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 190,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_d46b6a60",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "c6fc05a1-2da7-4e7a-98a5-e8f8ddb4ab4c",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_d46b6a60'"
+      ]
+    },
+    {
+      "tbId": "d7ef4110-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil6",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 6",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "155",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "205d5732-4853-4b05-84dc-c14234d33774",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "205d5732-4853-4b05-84dc-c14234d33774",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil6",
+        "displayName": "Fancoil 6",
+        "label": "Fancoil 6",
+        "type": "METER",
+        "serialNumber": "AUTO-205d5732",
+        "externalId": "d7ef4110-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-205d5732"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d7ef4110-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil6"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:00.394Z",
+        "updatedAt": "2026-03-09T20:56:00.394Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 155,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d7ef4110",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "7d1b3334-52b0-460a-8c6f-71d389a9ab5b",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d7ef4110'"
+      ]
+    },
+    {
+      "tbId": "299fe9c0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 10",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 10",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "132",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "c2a45202-aacc-4701-bda3-8ac9d1d61ef5",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "c2a45202-aacc-4701-bda3-8ac9d1d61ef5",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 10",
+        "displayName": "ER 10",
+        "label": "ER 10",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-c2a45202",
+        "externalId": "299fe9c0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-c2a45202"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "299fe9c0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 10"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:41.782Z",
+        "updatedAt": "2026-03-09T20:54:41.782Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 132,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_299fe9c0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "0176f80d-ad31-49a5-aa98-eff2fa5d3586",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_299fe9c0'"
+      ]
+    },
+    {
+      "tbId": "b4c77660-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH5",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba hidrúlica 5",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "102",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "b8010c7a-7b20-4790-bf7e-9519e4421a8e",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "b8010c7a-7b20-4790-bf7e-9519e4421a8e",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH5",
+        "displayName": "Bomba hidrúlica 5",
+        "label": "Bomba hidrúlica 5",
+        "type": "METER",
+        "serialNumber": "AUTO-b8010c7a",
+        "externalId": "b4c77660-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-b8010c7a"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b4c77660-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH5"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:04.571Z",
+        "updatedAt": "2026-03-09T20:55:04.571Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 102,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas_b4c77660",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "80902cda-4e2f-4c5f-9277-76a9041f6283",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='BOMBASHIDRAULICAS' GCDR='bombashidraulicas_b4c77660'"
+      ]
+    },
+    {
+      "tbId": "c22c13d0-9e56-11f0-afe1-175479a33d89",
+      "deviceName": "3F ESRL. PF-Escada 13",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 13",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "189",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "e89c5e44-c86e-45f1-9461-cba302e1ccdb",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "e89c5e44-c86e-45f1-9461-cba302e1ccdb",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 13",
+        "displayName": "ER 13",
+        "label": "ER 13",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-e89c5e44",
+        "externalId": "c22c13d0-9e56-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-e89c5e44"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "c22c13d0-9e56-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 13"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:29.120Z",
+        "updatedAt": "2026-03-09T20:54:29.120Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 189,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_c22c13d0",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "182c5e0a-6429-4a04-95f2-2336a45fe889",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_c22c13d0'"
+      ]
+    },
+    {
+      "tbId": "e9632e20-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil25",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 25",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "174",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "9403ab26-9368-4aea-a325-f9e44e6d76f6",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "9403ab26-9368-4aea-a325-f9e44e6d76f6",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil25",
+        "displayName": "Fancoil 25",
+        "label": "Fancoil 25",
+        "type": "METER",
+        "serialNumber": "AUTO-9403ab26",
+        "externalId": "e9632e20-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-9403ab26"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e9632e20-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil25"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:21.236Z",
+        "updatedAt": "2026-03-09T20:56:21.236Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 174,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e9632e20",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "450f0178-5850-4c7a-a56a-7c1c22e65a68",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e9632e20'"
+      ]
+    },
+    {
+      "tbId": "ac8cfc90-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL3",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 3",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "87",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "7e3e6572-3fe0-470d-8b20-87a7da186274",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "7e3e6572-3fe0-470d-8b20-87a7da186274",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACEL3",
+        "displayName": "Elevador 3",
+        "label": "Elevador 3",
+        "type": "METER",
+        "serialNumber": "AUTO-7e3e6572",
+        "externalId": "ac8cfc90-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-7e3e6572"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "ac8cfc90-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F SCMAL2ACEL3"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:55.504Z",
+        "updatedAt": "2026-03-09T20:54:55.504Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 87,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_ac8cfc90",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "df2b73cb-f5e6-4274-9cf9-f74245ddec99",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_ac8cfc90'"
+      ]
+    },
+    {
+      "tbId": "aaff57b0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL6",
+      "status": "NOT_LINKED",
+      "tb": {
+        "label": "Elevador 6",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "84",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "cf3cac95-b840-4b47-88e1-80472dc204e8",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {},
+      "divergences": []
+    },
+    {
+      "tbId": "3ba89cc0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-C 02",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Condensada 2",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "128",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "95851637-e806-4909-9ef0-81e1c8cc5fe4",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "95851637-e806-4909-9ef0-81e1c8cc5fe4",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-C 02",
+        "displayName": "Bomba Condensada 2",
+        "label": "Bomba Condensada 2",
+        "type": "OTHER",
+        "serialNumber": "AUTO-95851637",
+        "externalId": "3ba89cc0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-95851637"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3ba89cc0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-C 02"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:30.845Z",
+        "updatedAt": "2026-03-09T20:55:30.845Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 128,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3ba89cc0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "b0fb045a-989f-4c45-944e-78de0a0ae42e",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3ba89cc0'"
+      ]
+    },
+    {
+      "tbId": "ad1391b0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL4",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 4",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "88",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "e84a161a-acbb-4c7c-af8d-274b904fd1a3",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "e84a161a-acbb-4c7c-af8d-274b904fd1a3",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACEL4",
+        "displayName": "Elevador 4",
+        "label": "Elevador 4",
+        "type": "METER",
+        "serialNumber": "AUTO-e84a161a",
+        "externalId": "ad1391b0-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-e84a161a"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "ad1391b0-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F SCMAL2ACEL4"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:57.709Z",
+        "updatedAt": "2026-03-09T20:54:57.709Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 88,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_ad1391b0",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "048ea66b-bcae-464a-a8fc-2297280bbc56",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_ad1391b0'"
+      ]
+    },
+    {
+      "tbId": "d9b5f750-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil8",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 8",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "157",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "e963915d-fee4-4dbd-b70a-cf55f4772ec8",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "e963915d-fee4-4dbd-b70a-cf55f4772ec8",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil8",
+        "displayName": "Fancoil 8",
+        "label": "Fancoil 8",
+        "type": "METER",
+        "serialNumber": "AUTO-e963915d",
+        "externalId": "d9b5f750-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-e963915d"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d9b5f750-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil8"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:02.946Z",
+        "updatedAt": "2026-03-09T20:56:02.946Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 157,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d9b5f750",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "c053a25b-2d6f-4ec4-978a-c35aa41563c9",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d9b5f750'"
+      ]
+    },
+    {
+      "tbId": "d52e2540-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil3",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 3",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "152",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "c9bcf09a-6fbc-4bf4-8665-ee1060c39062",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "c9bcf09a-6fbc-4bf4-8665-ee1060c39062",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil3",
+        "displayName": "Fancoil 3",
+        "label": "Fancoil 3",
+        "type": "METER",
+        "serialNumber": "AUTO-c9bcf09a",
+        "externalId": "d52e2540-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-c9bcf09a"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d52e2540-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil3"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:57.086Z",
+        "updatedAt": "2026-03-09T20:55:57.086Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 152,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d52e2540",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "465aa481-7cf8-4271-9c9b-6fd67513d59e",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d52e2540'"
+      ]
+    },
+    {
+      "tbId": "2356dfb0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 01",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 1",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "90",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "3d09486b-64ee-46d1-a1c2-9ded53c5c988",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "3d09486b-64ee-46d1-a1c2-9ded53c5c988",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 01",
+        "displayName": "ER 1",
+        "label": "ER 1",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-3d09486b",
+        "externalId": "2356dfb0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-3d09486b"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "2356dfb0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 01"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:31.495Z",
+        "updatedAt": "2026-03-09T20:54:31.495Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 90,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_2356dfb0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "b5f5d7d5-3f63-4055-9787-ff74f1183b79",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_2356dfb0'"
+      ]
+    },
+    {
+      "tbId": "277f0590-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 07",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 7",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "96",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "06f65ae5-f9e5-4c46-893d-875d2dc2226c",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "06f65ae5-f9e5-4c46-893d-875d2dc2226c",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 07",
+        "displayName": "ER 7",
+        "label": "ER 7",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-06f65ae5",
+        "externalId": "277f0590-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-06f65ae5"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "277f0590-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 07"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:38.359Z",
+        "updatedAt": "2026-03-09T20:54:38.359Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 96,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_277f0590",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "137872a3-426d-4f0b-be30-8aed846194ad",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_277f0590'"
+      ]
+    },
+    {
+      "tbId": "f4f98e50-9e60-11f0-afe1-175479a33d89",
+      "deviceName": "3F ESRL. PF-Escada 16",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 16",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "slaveId": "192",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "9a7342dc-83c0-41ad-98b2-2f7c9ffd46f9",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "9a7342dc-83c0-41ad-98b2-2f7c9ffd46f9",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 16",
+        "displayName": "ER 16",
+        "label": "ER 16",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-9a7342dc",
+        "externalId": "f4f98e50-9e60-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-9a7342dc"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "f4f98e50-9e60-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ESCADA_ROLANTE",
+          "tbDeviceName": "3F ESRL. PF-Escada 16"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:30.235Z",
+        "updatedAt": "2026-03-09T20:54:30.235Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 192,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_f4f98e50",
+        "deviceProfile": "ESCADA_ROLANTE",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "73cc107d-ac1c-45ce-a297-3acdcb04ad75",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_f4f98e50'"
+      ]
+    },
+    {
+      "tbId": "db95dae0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil10",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 10",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "159",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "fda598d5-76c9-418a-affa-64bc37a6fcb2",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "fda598d5-76c9-418a-affa-64bc37a6fcb2",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil10",
+        "displayName": "Fancoil 10",
+        "label": "Fancoil 10",
+        "type": "METER",
+        "serialNumber": "AUTO-fda598d5",
+        "externalId": "db95dae0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-fda598d5"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "db95dae0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil10"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:05.257Z",
+        "updatedAt": "2026-03-09T20:56:05.257Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 159,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_db95dae0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "48d9163c-c940-431b-be3c-a9180d823876",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_db95dae0'"
+      ]
+    },
+    {
+      "tbId": "d704e110-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil5",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 5",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "154",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "e96da70f-aecc-483d-83e4-3a35e6959eea",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "e96da70f-aecc-483d-83e4-3a35e6959eea",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil5",
+        "displayName": "Fancoil 5",
+        "label": "Fancoil 5",
+        "type": "METER",
+        "serialNumber": "AUTO-e96da70f",
+        "externalId": "d704e110-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-e96da70f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d704e110-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil5"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:59.281Z",
+        "updatedAt": "2026-03-09T20:55:59.281Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 154,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d704e110",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "ff11aad9-6aeb-43b2-b480-b85b8356731b",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d704e110'"
+      ]
+    },
+    {
+      "tbId": "28e60fa0-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F ESRL. PF-Escada 09",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "ER 9",
+        "identifier": "ESCADASROLANTES",
+        "deviceType": "ESCADA_ROLANTE",
+        "deviceProfile": "MOTOR",
+        "slaveId": "131",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "gcdrDeviceId": "4c4443d8-fa86-4ce9-92b1-53a88cab7135",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "4c4443d8-fa86-4ce9-92b1-53a88cab7135",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "9f2640b3-98b9-4c72-95e2-38c2b4073a8c",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F ESRL. PF-Escada 09",
+        "displayName": "ER 9",
+        "label": "ER 9",
+        "type": "CONTROLLER",
+        "serialNumber": "AUTO-4c4443d8",
+        "externalId": "28e60fa0-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-4c4443d8"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "28e60fa0-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F ESRL. PF-Escada 09"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:40.636Z",
+        "updatedAt": "2026-03-09T20:54:40.636Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 131,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "escadasrolantes_28e60fa0",
+        "deviceProfile": "MOTOR",
+        "deviceType": "ESCADA_ROLANTE",
+        "ingestionId": "b6573f2e-aec3-4109-9c5f-8997528074e9",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ESCADASROLANTES' GCDR='escadasrolantes_28e60fa0'"
+      ]
+    },
+    {
+      "tbId": "d4351f40-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 2",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "151",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "e0b18d2c-6418-4c00-adba-41564b82960b",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "e0b18d2c-6418-4c00-adba-41564b82960b",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil2",
+        "displayName": "Fancoil 2",
+        "label": "Fancoil 2",
+        "type": "METER",
+        "serialNumber": "AUTO-e0b18d2c",
+        "externalId": "d4351f40-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-e0b18d2c"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d4351f40-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:55.808Z",
+        "updatedAt": "2026-03-09T20:55:55.808Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 151,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d4351f40",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "898ad79c-74e5-4d9b-88dd-4a6b6c14ae9b",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d4351f40'"
+      ]
+    },
+    {
+      "tbId": "ad93e540-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL5",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 5",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "89",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "24b6cd0d-d920-4bc8-8224-089b9a106f95",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "24b6cd0d-d920-4bc8-8224-089b9a106f95",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACEL5",
+        "displayName": "Elevador 5",
+        "label": "Elevador 5",
+        "type": "METER",
+        "serialNumber": "AUTO-24b6cd0d",
+        "externalId": "ad93e540-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-24b6cd0d"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "ad93e540-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F SCMAL2ACEL5"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:53.154Z",
+        "updatedAt": "2026-03-09T20:54:53.154Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 89,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_ad93e540",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "fe88d1fc-eac3-4606-93fd-7f0f29f7f834",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_ad93e540'"
+      ]
+    },
+    {
+      "tbId": "e6a28780-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil22",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 22",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "171",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "084d0cd3-4714-4363-86ea-a5bae89edf06",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "084d0cd3-4714-4363-86ea-a5bae89edf06",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil22",
+        "displayName": "Fancoil 22",
+        "label": "Fancoil 22",
+        "type": "METER",
+        "serialNumber": "AUTO-084d0cd3",
+        "externalId": "e6a28780-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-084d0cd3"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e6a28780-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil22"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:15.535Z",
+        "updatedAt": "2026-03-09T20:56:15.535Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 171,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e6a28780",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "c03f05fe-75e0-4c9a-8a56-f3a7eab8e59e",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e6a28780'"
+      ]
+    },
+    {
+      "tbId": "df535810-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil14",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 14",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "163",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "39b68999-401e-4dde-aef6-758346b5b95a",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "39b68999-401e-4dde-aef6-758346b5b95a",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil14",
+        "displayName": "Fancoil 14",
+        "label": "Fancoil 14",
+        "type": "METER",
+        "serialNumber": "AUTO-39b68999",
+        "externalId": "df535810-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-39b68999"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "df535810-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil14"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:08.705Z",
+        "updatedAt": "2026-03-09T20:56:08.705Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 163,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_df535810",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "ca611ed8-740e-4576-851a-2566b1173613",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_df535810'"
+      ]
+    },
+    {
+      "tbId": "e03839d0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil15",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 15",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "164",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "551d5554-9634-47b4-a2fc-d05888f24e45",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "551d5554-9634-47b4-a2fc-d05888f24e45",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil15",
+        "displayName": "Fancoil 15",
+        "label": "Fancoil 15",
+        "type": "METER",
+        "serialNumber": "AUTO-551d5554",
+        "externalId": "e03839d0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-551d5554"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e03839d0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil15"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:09.825Z",
+        "updatedAt": "2026-03-09T20:56:09.825Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 164,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e03839d0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "c29b9fe4-a2f0-4f44-a878-649baa9f7721",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e03839d0'"
+      ]
+    },
+    {
+      "tbId": "e78a0150-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil23",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 23",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "172",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "5517b1a0-479b-44b4-ae71-c78e7d39d1d2",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "5517b1a0-479b-44b4-ae71-c78e7d39d1d2",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil23",
+        "displayName": "Fancoil 23",
+        "label": "Fancoil 23",
+        "type": "METER",
+        "serialNumber": "AUTO-5517b1a0",
+        "externalId": "e78a0150-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-5517b1a0"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e78a0150-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil23"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:16.667Z",
+        "updatedAt": "2026-03-09T20:56:16.667Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 172,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e78a0150",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "73ec88f3-96a6-405a-b2af-0b36c4e0c842",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e78a0150'"
+      ]
+    },
+    {
+      "tbId": "e12977a0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil16",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 16",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "165",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "93806ec7-e47c-4a24-85cd-a451d0bf6b6b",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "93806ec7-e47c-4a24-85cd-a451d0bf6b6b",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil16",
+        "displayName": "Fancoil 16",
+        "label": "Fancoil 16",
+        "type": "METER",
+        "serialNumber": "AUTO-93806ec7",
+        "externalId": "e12977a0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-93806ec7"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e12977a0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil16"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:10.937Z",
+        "updatedAt": "2026-03-09T20:56:10.937Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 165,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e12977a0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "24f7697f-d6ed-47c9-a656-b37394670b2d",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e12977a0'"
+      ]
+    },
+    {
+      "tbId": "e3cc0ef0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil19",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 19",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "168",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "f20ecdc9-877b-4c8b-a49a-2d57232d9f63",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "f20ecdc9-877b-4c8b-a49a-2d57232d9f63",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil19",
+        "displayName": "Fancoil 19",
+        "label": "Fancoil 19",
+        "type": "METER",
+        "serialNumber": "AUTO-f20ecdc9",
+        "externalId": "e3cc0ef0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-f20ecdc9"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e3cc0ef0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil19"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:14.424Z",
+        "updatedAt": "2026-03-09T20:56:14.424Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 168,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e3cc0ef0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "808bca20-f1be-414e-8761-60b0ed82d6ce",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e3cc0ef0'"
+      ]
+    },
+    {
+      "tbId": "3aefad00-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-C 01",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Condensada 1",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "127",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "5e7f1446-89c2-42d1-8059-f72bd405e8a7",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "5e7f1446-89c2-42d1-8059-f72bd405e8a7",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-C 01",
+        "displayName": "Bomba Condensada 1",
+        "label": "Bomba Condensada 1",
+        "type": "OTHER",
+        "serialNumber": "AUTO-5e7f1446",
+        "externalId": "3aefad00-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-5e7f1446"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3aefad00-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-C 01"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:29.749Z",
+        "updatedAt": "2026-03-09T20:55:29.749Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 127,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3aefad00",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "aff24f3d-baee-4c6b-b5ee-f774d7626bd3",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3aefad00'"
+      ]
+    },
+    {
+      "tbId": "ac04e0d0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACEL7",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Elevador 7",
+        "identifier": "ELEVADORES",
+        "deviceType": "ELEVADOR",
+        "deviceProfile": "ELEVADOR",
+        "slaveId": "86",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "gcdrDeviceId": "36860c96-b2dd-4bb6-858c-f76cc89ce432",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "36860c96-b2dd-4bb6-858c-f76cc89ce432",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "b3c5a27b-dbc3-4c96-90bb-de3987b7e91e",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACEL7",
+        "displayName": "Elevador 7",
+        "label": "Elevador 7",
+        "type": "METER",
+        "serialNumber": "AUTO-36860c96",
+        "externalId": "ac04e0d0-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-36860c96"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "ac04e0d0-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "ELEVADOR",
+          "tbDeviceName": "3F SCMAL2ACEL7"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:52.049Z",
+        "updatedAt": "2026-03-09T20:54:52.049Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 86,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "elevadores_ac04e0d0",
+        "deviceProfile": "ELEVADOR",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "38c94f3b-61ba-45a9-a514-d5a0958d22d3",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='ELEVADORES' GCDR='elevadores_ac04e0d0'"
+      ]
+    },
+    {
+      "tbId": "dc7d7bc0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil11",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 11",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "160",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "9c78893f-1786-4e8b-8a28-f7c85940cd24",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "9c78893f-1786-4e8b-8a28-f7c85940cd24",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil11",
+        "displayName": "Fancoil 11",
+        "label": "Fancoil 11",
+        "type": "METER",
+        "serialNumber": "AUTO-9c78893f",
+        "externalId": "dc7d7bc0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-9c78893f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "dc7d7bc0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil11"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:06.362Z",
+        "updatedAt": "2026-03-09T20:56:06.362Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 160,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_dc7d7bc0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "70ae424c-aab5-456f-b9bb-fa58ec1b0a55",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_dc7d7bc0'"
+      ]
+    },
+    {
+      "tbId": "e207f0c0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil17",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 17",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "166",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "932ddda7-1166-4b52-8dcb-165c83df9df9",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "932ddda7-1166-4b52-8dcb-165c83df9df9",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil17",
+        "displayName": "Fancoil 17",
+        "label": "Fancoil 17",
+        "type": "METER",
+        "serialNumber": "AUTO-932ddda7",
+        "externalId": "e207f0c0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-932ddda7"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "e207f0c0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil17"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:56:12.093Z",
+        "updatedAt": "2026-03-09T20:56:12.093Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 166,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_e207f0c0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "7f74403f-8254-43c9-b035-a3f5e4c36e81",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_e207f0c0'"
+      ]
+    },
+    {
+      "tbId": "b551dc10-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH1",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba hidráulica 1",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "103",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "17331125-7baa-4db8-a284-92b76f20ae81",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "17331125-7baa-4db8-a284-92b76f20ae81",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH1",
+        "displayName": "Bomba hidráulica 1 (Verificar tipo de Bomba)",
+        "label": "Bomba hidráulica 1 (Verificar tipo de Bomba)",
+        "type": "METER",
+        "serialNumber": "AUTO-17331125",
+        "externalId": "b551dc10-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-17331125"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b551dc10-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:06.965Z",
+        "updatedAt": "2026-03-09T20:55:06.965Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 103,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas_b551dc10",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "d7370115-c15e-4734-8653-2c05fc7e553a",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "label: TB='Bomba hidráulica 1' GCDR='Bomba hidráulica 1 (Verificar tipo de Bomba)'",
+        "identifier: TB='BOMBASHIDRAULICAS' GCDR='bombashidraulicas_b551dc10'"
+      ]
+    },
+    {
+      "tbId": "b33bf460-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba hidrúlica 2",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "99",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "9b094de8-18b1-4067-a06c-25bec1fdc0c5",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "9b094de8-18b1-4067-a06c-25bec1fdc0c5",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH2",
+        "displayName": "Bomba hidrúlica 2",
+        "label": "Bomba hidrúlica 2",
+        "type": "METER",
+        "serialNumber": "AUTO-9b094de8",
+        "externalId": "b33bf460-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-9b094de8"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b33bf460-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:02.336Z",
+        "updatedAt": "2026-03-09T20:55:02.336Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 99,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas_b33bf460",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "23b3db2e-b016-4c08-9def-36d5504ccd6a",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='BOMBASHIDRAULICAS' GCDR='bombashidraulicas_b33bf460'"
+      ]
+    },
+    {
+      "tbId": "38d1d610-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-S 01",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Secundária 1",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "124",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "1f84cdbf-86c1-41be-9d2a-fcf4d532584e",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "1f84cdbf-86c1-41be-9d2a-fcf4d532584e",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-S 01",
+        "displayName": "Bomba Secundária 1",
+        "label": "Bomba Secundária 1",
+        "type": "OTHER",
+        "serialNumber": "AUTO-1f84cdbf",
+        "externalId": "38d1d610-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-1f84cdbf"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "38d1d610-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-S 01"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:26.279Z",
+        "updatedAt": "2026-03-09T20:55:26.279Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 124,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_38d1d610",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "04f5c0a4-7456-4709-8592-b2f9d4bc5a86",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_38d1d610'"
+      ]
+    },
+    {
+      "tbId": "d35323b0-9c85-11f0-afe1-175479a33d89",
+      "deviceName": "3F MOTR. SCMAL2ACAC-Fancoil1",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Fancoil 1",
+        "identifier": "Fancoil",
+        "deviceType": "FANCOIL",
+        "deviceProfile": "FANCOIL",
+        "slaveId": "150",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "gcdrDeviceId": "4814df83-1195-4eae-8aba-b1ae6b041531",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "4814df83-1195-4eae-8aba-b1ae6b041531",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "c057c600-eecb-46e5-8895-3ddb50d57178",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACAC-Fancoil1",
+        "displayName": "Fancoil 1",
+        "label": "Fancoil 1",
+        "type": "METER",
+        "serialNumber": "AUTO-4814df83",
+        "externalId": "d35323b0-9c85-11f0-afe1-175479a33d89",
+        "specs": {
+          "serialNumber": "AUTO-4814df83"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "d35323b0-9c85-11f0-afe1-175479a33d89",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "FANCOIL",
+          "tbDeviceName": "3F MOTR. SCMAL2ACAC-Fancoil1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:54.695Z",
+        "updatedAt": "2026-03-09T20:55:54.695Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 150,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "fancoil_d35323b0",
+        "deviceProfile": "FANCOIL",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "d239f6ec-6c9f-461f-8186-a19ff06cd0fb",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='Fancoil' GCDR='fancoil_d35323b0'"
+      ]
+    },
+    {
+      "tbId": "38140450-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-P R",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Primária 3",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "123",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "a317f4d8-d696-41c8-a552-0668e3932a6b",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "a317f4d8-d696-41c8-a552-0668e3932a6b",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-P R",
+        "displayName": "Bomba Primária 3",
+        "label": "Bomba Primária 3",
+        "type": "OTHER",
+        "serialNumber": "AUTO-a317f4d8",
+        "externalId": "38140450-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-a317f4d8"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "38140450-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-P R"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:25.178Z",
+        "updatedAt": "2026-03-09T20:55:25.178Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 123,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_38140450",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "50551a12-ebcd-4250-8777-1602d28fde27",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_38140450'"
+      ]
+    },
+    {
+      "tbId": "3c5bc020-9181-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F MOTR. SCMAL2ACCAGBAG-C R",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba Condensada 3",
+        "identifier": "CAG",
+        "deviceType": "MOTOR",
+        "deviceProfile": "MOTOR",
+        "slaveId": "129",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "gcdrDeviceId": "687da2ad-0a08-40da-ac5c-1b1de69bb519",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "687da2ad-0a08-40da-ac5c-1b1de69bb519",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "3a5ed21f-f4dd-4174-b3d8-43938d272364",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F MOTR. SCMAL2ACCAGBAG-C R",
+        "displayName": "Bomba Condensada 3",
+        "label": "Bomba Condensada 3",
+        "type": "OTHER",
+        "serialNumber": "AUTO-687da2ad",
+        "externalId": "3c5bc020-9181-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-687da2ad"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "3c5bc020-9181-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "MOTOR",
+          "tbDeviceName": "3F MOTR. SCMAL2ACCAGBAG-C R"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:31.944Z",
+        "updatedAt": "2026-03-09T20:55:31.944Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 129,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "cag_3c5bc020",
+        "deviceProfile": "MOTOR",
+        "deviceType": "MOTOR",
+        "ingestionId": "fd919df6-e25e-4d30-8188-f7be207a100e",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "identifier: TB='CAG' GCDR='cag_3c5bc020'"
+      ]
+    },
+    {
+      "tbId": "b2899450-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBI2",
+      "status": "CONFORMANT",
+      "tb": {
+        "label": "Bomba de incendio 2",
+        "identifier": "BOMBASINCENDIO",
+        "deviceType": "BOMBA_INCENDIO",
+        "deviceProfile": "BOMBA_INCENDIO",
+        "slaveId": "98",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "47f4f731-d40c-4089-839c-77d43eb93632",
+        "gcdrDeviceId": "b1df1ef5-9379-4955-8ca9-f419d2858106",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "b1df1ef5-9379-4955-8ca9-f419d2858106",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "47f4f731-d40c-4089-839c-77d43eb93632",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBI2",
+        "displayName": "Bomba de incendio 2",
+        "label": "Bomba de incendio 2",
+        "type": "METER",
+        "serialNumber": "AUTO-b1df1ef5",
+        "externalId": "b2899450-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-b1df1ef5"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b2899450-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_INCENDIO",
+          "tbDeviceName": "3F SCMAL2ACBOMBI2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:54:58.797Z",
+        "updatedAt": "2026-03-09T20:54:58.797Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 98,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombasincendio",
+        "deviceProfile": "BOMBA_INCENDIO",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "55a28671-83f1-4ecd-8ce1-5c0c8b9c3e43",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": []
+    },
+    {
+      "tbId": "b207ba20-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBI1",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba de incendio 1",
+        "identifier": "BOMBASINCENDIO",
+        "deviceType": "BOMBA_INCENDIO",
+        "deviceProfile": "BOMBA_INCENDIO",
+        "slaveId": "97",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "47f4f731-d40c-4089-839c-77d43eb93632",
+        "gcdrDeviceId": "d689a53f-44f0-43b3-9126-307321de5b31",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "d689a53f-44f0-43b3-9126-307321de5b31",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "47f4f731-d40c-4089-839c-77d43eb93632",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBI1",
+        "displayName": "Bomba de incendio 1 (entender tipo de bomba)",
+        "label": "Bomba de incendio 1 (entender tipo de bomba)",
+        "type": "METER",
+        "serialNumber": "AUTO-d689a53f",
+        "externalId": "b207ba20-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-d689a53f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b207ba20-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_INCENDIO",
+          "tbDeviceName": "3F SCMAL2ACBOMBI1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:00.102Z",
+        "updatedAt": "2026-03-09T20:55:00.102Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 97,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombasincendio_b207ba20",
+        "deviceProfile": "BOMBA_INCENDIO",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "7660bbfa-75d2-4496-b563-ca88e58455fb",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "label: TB='Bomba de incendio 1' GCDR='Bomba de incendio 1 (entender tipo de bomba)'",
+        "identifier: TB='BOMBASINCENDIO' GCDR='bombasincendio_b207ba20'"
+      ]
+    },
+    {
+      "tbId": "b5d738b0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH6",
+      "status": "CONFORMANT",
+      "tb": {
+        "label": "Bomba hidrúlica 6",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "104",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "26c7dd48-d5f3-4068-99d8-7ced4875e197",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "26c7dd48-d5f3-4068-99d8-7ced4875e197",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH6",
+        "displayName": "Bomba hidrúlica 6",
+        "label": "Bomba hidrúlica 6",
+        "type": "METER",
+        "serialNumber": "AUTO-26c7dd48",
+        "externalId": "b5d738b0-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-26c7dd48"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b5d738b0-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH6"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:01.213Z",
+        "updatedAt": "2026-03-09T20:55:01.213Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 104,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "13ff50b9-586f-445d-a265-925d45c8fef9",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": []
+    },
+    {
+      "tbId": "b3c0dbd0-9011-11f0-a06d-e9509531b1d5",
+      "deviceName": "3F SCMAL2ACBOMBH3",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Bomba hidraulica 3",
+        "identifier": "BOMBASHIDRAULICAS",
+        "deviceType": "BOMBA_HIDRAULICA",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "slaveId": "100",
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "gcdrAssetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "gcdrDeviceId": "cc088121-264b-40a4-a3fc-45827cee6210",
+        "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+      },
+      "gcdr": {
+        "id": "cc088121-264b-40a4-a3fc-45827cee6210",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "27d75172-d0c3-4336-9fc1-eb45af426c95",
+        "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+        "name": "3F SCMAL2ACBOMBH3",
+        "displayName": "Bomba hidraulica 3 (está desativado)",
+        "label": "Bomba hidraulica 3 (está desativado)",
+        "type": "METER",
+        "serialNumber": "AUTO-cc088121",
+        "externalId": "b3c0dbd0-9011-11f0-a06d-e9509531b1d5",
+        "specs": {
+          "serialNumber": "AUTO-cc088121"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "b3c0dbd0-9011-11f0-a06d-e9509531b1d5",
+          "syncedAt": "2026-03-09T20:48:17.711Z",
+          "tbProfile": "BOMBA_HIDRAULICA",
+          "tbDeviceName": "3F SCMAL2ACBOMBH3"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:55:03.429Z",
+        "updatedAt": "2026-03-09T20:55:03.429Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "version": 1,
+        "slaveId": 100,
+        "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+        "identifier": "bombashidraulicas_b3c0dbd0",
+        "deviceProfile": "BOMBA_HIDRAULICA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "f6e2814d-f88b-42b6-8b8f-fe61ecffc61d",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": [
+        "label: TB='Bomba hidraulica 3' GCDR='Bomba hidraulica 3 (está desativado)'",
+        "identifier: TB='BOMBASHIDRAULICAS' GCDR='bombashidraulicas_b3c0dbd0'"
+      ]
+    }
+  ]
+}

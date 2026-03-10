@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:03:58Z",
+    "apiUrl": "https://gcdr-api.a.myio-bas.com",
+    "authMode": "apikey",
+    "totals": {
+      "tbDevices": 1,
+      "gcdrDevicesLoaded": 414,
+      "conformant": 0,
+      "divergent": 0,
+      "missing": 0
+    }
+  },
+  "results": []
+}

@@ -1,0 +1,4447 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:26:52Z",
+    "sourceReport": "inconformidades-report-device-map-water-2026-03-10-water-stores-20260310-051103.json",
+    "summary": {
+      "create": 0,
+      "update": 65,
+      "update_identifier": 4,
+      "skip": 2
+    }
+  },
+  "actions": {
+    "create": [],
+    "update": [
+      {
+        "action": "UPDATE",
+        "tbId": "4e757650-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. 106AB108AH",
+        "gcdrDeviceId": "b2fa6a38-70fe-4774-8e1f-879e88d988d9",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='106AB108AH' GCDR='106ab108ah_4e757650'"
+        ],
+        "tb": {
+          "label": "Allegria",
+          "identifier": "106AB108AH",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "72",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "ca3c59ad-080a-4072-ba2d-c7253aef8e68",
+          "gcdrDeviceId": "b2fa6a38-70fe-4774-8e1f-879e88d988d9",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b2fa6a38-70fe-4774-8e1f-879e88d988d9",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "ca3c59ad-080a-4072-ba2d-c7253aef8e68",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. 106AB108AH",
+          "displayName": "Allegria",
+          "label": "Allegria",
+          "type": "METER",
+          "serialNumber": "AUTO-b2fa6a38",
+          "externalId": "4e757650-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b2fa6a38"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "4e757650-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. 106AB108AH"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:30.930Z",
+          "updatedAt": "2026-03-09T20:59:30.930Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 72,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "106ab108ah_4e757650",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "2c89a809-5f31-4e57-9c4f-f1e72cb1ac07",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "da610300-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4304DEFG",
+        "gcdrDeviceId": "1b643861-7614-4f91-bb08-f57bd052af59",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='304DEFG' GCDR='304defg_da610300'"
+        ],
+        "tb": {
+          "label": "outback",
+          "identifier": "304DEFG",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "42",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "527ee6a8-1a7a-4b6f-aac9-62a83592f308",
+          "gcdrDeviceId": "1b643861-7614-4f91-bb08-f57bd052af59",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "1b643861-7614-4f91-bb08-f57bd052af59",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "527ee6a8-1a7a-4b6f-aac9-62a83592f308",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4304DEFG",
+          "displayName": "outback",
+          "label": "outback",
+          "type": "METER",
+          "serialNumber": "AUTO-1b643861",
+          "externalId": "da610300-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-1b643861"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "da610300-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4304DEFG"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:37.226Z",
+          "updatedAt": "2026-03-09T20:56:37.226Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 42,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "304defg_da610300",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "69e41398-d566-40ac-8a47-7b8906a89aca",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "6ae4d1f0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1102CDE",
+        "gcdrDeviceId": "d3561131-b9ff-4c8e-8d30-73762a0ee01b",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Mc donalds",
+          "identifier": "102CDE",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "122",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "2c27186a-2cdc-47de-9b4d-410d0af70079",
+          "gcdrDeviceId": "d3561131-b9ff-4c8e-8d30-73762a0ee01b",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "d3561131-b9ff-4c8e-8d30-73762a0ee01b",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "2c27186a-2cdc-47de-9b4d-410d0af70079",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1102CDE",
+          "displayName": "Mc donalds",
+          "label": "Mc donalds",
+          "type": "METER",
+          "serialNumber": "AUTO-d3561131",
+          "externalId": "6ae4d1f0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-d3561131"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "6ae4d1f0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1102CDE"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:08.004Z",
+          "updatedAt": "2026-03-09T21:00:08.004Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 122,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "102cde",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "2cfed017-50bc-4bdb-a0d8-15f6c4f635af",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "3a60edc0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1113A",
+        "gcdrDeviceId": "b6bd1f85-85a6-427b-9cc9-43ac5a1a48ea",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Choe´s",
+          "identifier": "113A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "60",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "3d3e693f-4bc2-4105-9b3c-2d3b4b6f0fea",
+          "gcdrDeviceId": "b6bd1f85-85a6-427b-9cc9-43ac5a1a48ea",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b6bd1f85-85a6-427b-9cc9-43ac5a1a48ea",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "3d3e693f-4bc2-4105-9b3c-2d3b4b6f0fea",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1113A",
+          "displayName": "Choe´s",
+          "label": "Choe´s",
+          "type": "METER",
+          "serialNumber": "AUTO-b6bd1f85",
+          "externalId": "3a60edc0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b6bd1f85"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "3a60edc0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1113A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:06.749Z",
+          "updatedAt": "2026-03-09T20:59:06.749Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 60,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "113a",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "d9bcdf47-5422-445c-a19f-c0021fd948d3",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "b923b8f0-9e25-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. 305BCDEFG",
+        "gcdrDeviceId": "436dcbef-ebd8-4eb4-9177-59ef55498e2d",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='305BCDEFG' GCDR='305bcdefg_b923b8f0'"
+        ],
+        "tb": {
+          "label": "Vila do Trigo",
+          "identifier": "305BCDEFG",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "121",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "b6c883cc-0b14-4258-b8b4-ca363e7da93f",
+          "gcdrDeviceId": "436dcbef-ebd8-4eb4-9177-59ef55498e2d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "436dcbef-ebd8-4eb4-9177-59ef55498e2d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "b6c883cc-0b14-4258-b8b4-ca363e7da93f",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. 305BCDEFG",
+          "displayName": "Vila do Trigo",
+          "label": "Vila do Trigo",
+          "type": "METER",
+          "serialNumber": "AUTO-436dcbef",
+          "externalId": "b923b8f0-9e25-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-436dcbef"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b923b8f0-9e25-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. 305BCDEFG"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:18.868Z",
+          "updatedAt": "2026-03-09T20:58:18.868Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 121,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "305bcdefg_b923b8f0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "703fe92a-b597-44ba-a552-47888df94296",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "4760dee0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1113B",
+        "gcdrDeviceId": "73796da1-9b29-4019-965e-de5c42675b7b",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='113B' GCDR='113b_4760dee0'"
+        ],
+        "tb": {
+          "label": "Patroni Pizza",
+          "identifier": "113B",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "68",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "2dc1acda-3db1-4dcc-97b2-662475913752",
+          "gcdrDeviceId": "73796da1-9b29-4019-965e-de5c42675b7b",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "73796da1-9b29-4019-965e-de5c42675b7b",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "2dc1acda-3db1-4dcc-97b2-662475913752",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1113B",
+          "displayName": "Patroni Pizza",
+          "label": "Patroni Pizza",
+          "type": "METER",
+          "serialNumber": "AUTO-73796da1",
+          "externalId": "4760dee0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-73796da1"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "4760dee0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1113B"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:26.278Z",
+          "updatedAt": "2026-03-09T20:59:26.278Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 68,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "113b_4760dee0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "5abdec3f-efcc-427c-b354-1fe1b9666269",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "73dcf670-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC203",
+        "gcdrDeviceId": "957825ad-0083-4ae3-8fc8-a36ed5b035bc",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Riachuelo",
+          "identifier": "203",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "1",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "924497dc-c66a-4c1f-9d1d-de5bfad63d39",
+          "gcdrDeviceId": "957825ad-0083-4ae3-8fc8-a36ed5b035bc",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "957825ad-0083-4ae3-8fc8-a36ed5b035bc",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "924497dc-c66a-4c1f-9d1d-de5bfad63d39",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC203",
+          "displayName": "Riachuelo",
+          "label": "Riachuelo",
+          "type": "METER",
+          "serialNumber": "AUTO-957825ad",
+          "externalId": "73dcf670-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-957825ad"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "73dcf670-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC203"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:11.602Z",
+          "updatedAt": "2026-03-09T20:53:11.602Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 1,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "203",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "1662b604-ccde-43fa-aa13-ca7fe03e43df",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "52150b40-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1107D",
+        "gcdrDeviceId": "40b42b05-1094-4b56-ab34-4312e83c8f0d",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='107D' GCDR='107d_52150b40'"
+        ],
+        "tb": {
+          "label": "Grilleto",
+          "identifier": "107D",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "77",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "d4c43ea1-9e40-40db-964a-b20dd3cbb0f7",
+          "gcdrDeviceId": "40b42b05-1094-4b56-ab34-4312e83c8f0d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "40b42b05-1094-4b56-ab34-4312e83c8f0d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "d4c43ea1-9e40-40db-964a-b20dd3cbb0f7",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1107D",
+          "displayName": "Grilleto",
+          "label": "Grilleto",
+          "type": "METER",
+          "serialNumber": "AUTO-40b42b05",
+          "externalId": "52150b40-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-40b42b05"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "52150b40-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1107D"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:35.486Z",
+          "updatedAt": "2026-03-09T20:59:35.486Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 77,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "107d_52150b40",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "9a7c8056-b86a-4ee9-aca0-6c70d4aeb8a5",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "58ced880-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1107A",
+        "gcdrDeviceId": "20530c9b-408c-4c2c-9936-b1721027e430",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='107A' GCDR='107a_58ced880'"
+        ],
+        "tb": {
+          "label": "Pecada da Carne",
+          "identifier": "107A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "87",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a059eb5e-9f7a-4494-935b-34b0241396ad",
+          "gcdrDeviceId": "20530c9b-408c-4c2c-9936-b1721027e430",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "20530c9b-408c-4c2c-9936-b1721027e430",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a059eb5e-9f7a-4494-935b-34b0241396ad",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1107A",
+          "displayName": "Pecada da Carne",
+          "label": "Pecada da Carne",
+          "type": "METER",
+          "serialNumber": "AUTO-20530c9b",
+          "externalId": "58ced880-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-20530c9b"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "58ced880-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1107A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:44.510Z",
+          "updatedAt": "2026-03-09T20:59:44.510Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 87,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "107a_58ced880",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "e89aab13-e549-46cf-b9b3-7810697bb1dd",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "46259fc0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1102B",
+        "gcdrDeviceId": "c8dec94d-e1b2-499e-a5f8-873bd595838f",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Imperador Burguer",
+          "identifier": "102B",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "67",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "86de1658-b330-4db8-8d06-7b2ed975240c",
+          "gcdrDeviceId": "c8dec94d-e1b2-499e-a5f8-873bd595838f",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "c8dec94d-e1b2-499e-a5f8-873bd595838f",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "86de1658-b330-4db8-8d06-7b2ed975240c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1102B",
+          "displayName": "Imperador Burguer",
+          "label": "Imperador Burguer",
+          "type": "METER",
+          "serialNumber": "AUTO-c8dec94d",
+          "externalId": "46259fc0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-c8dec94d"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "46259fc0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1102B"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:19.417Z",
+          "updatedAt": "2026-03-09T20:59:19.417Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 67,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "102b",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "6243a5be-2c56-469b-b1e4-890729f2e985",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d27349a0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. 301BCPOPQ",
+        "gcdrDeviceId": "ffef57e1-8517-447c-8f07-135955b60918",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "C&A Modas",
+          "identifier": "301BCPOPQ",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "30",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "9492e261-b66b-4978-9aa8-8de3af0445d7",
+          "gcdrDeviceId": "ffef57e1-8517-447c-8f07-135955b60918",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "ffef57e1-8517-447c-8f07-135955b60918",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "9492e261-b66b-4978-9aa8-8de3af0445d7",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. 301BCPOPQ",
+          "displayName": "C&A Modas",
+          "label": "C&A Modas",
+          "type": "METER",
+          "serialNumber": "AUTO-ffef57e1",
+          "externalId": "d27349a0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-ffef57e1"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d27349a0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. 301BCPOPQ"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:25.322Z",
+          "updatedAt": "2026-03-09T20:57:25.322Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 30,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "301bcpopq",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "e03edf55-53bc-4066-a2f0-f1981b143bcd",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "23e688c0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1111",
+        "gcdrDeviceId": "f5fea5ee-56cd-4ee8-97ff-efb6698680ef",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='111' GCDR='111_23e688c0'"
+        ],
+        "tb": {
+          "label": "Bob´s",
+          "identifier": "111",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "3",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "e37920ae-e47c-4b19-a188-ecff558ab31d",
+          "gcdrDeviceId": "f5fea5ee-56cd-4ee8-97ff-efb6698680ef",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "f5fea5ee-56cd-4ee8-97ff-efb6698680ef",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "e37920ae-e47c-4b19-a188-ecff558ab31d",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1111",
+          "displayName": "Bob´s",
+          "label": "Bob´s",
+          "type": "METER",
+          "serialNumber": "AUTO-f5fea5ee",
+          "externalId": "23e688c0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-f5fea5ee"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "23e688c0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1111"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:20.829Z",
+          "updatedAt": "2026-03-09T21:00:20.829Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 3,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "111_23e688c0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "133835c9-0829-4ffb-baeb-8eb70188baa7",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "5ac21d00-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1114B",
+        "gcdrDeviceId": "f888ad36-46b4-4a23-98c2-94743b480220",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Pastiola",
+          "identifier": "114B",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "90",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "20511337-3bd4-4172-9d1b-580cfbd150ea",
+          "gcdrDeviceId": "f888ad36-46b4-4a23-98c2-94743b480220",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "f888ad36-46b4-4a23-98c2-94743b480220",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "20511337-3bd4-4172-9d1b-580cfbd150ea",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1114B",
+          "displayName": "Pastiola",
+          "label": "Pastiola",
+          "type": "METER",
+          "serialNumber": "AUTO-f888ad36",
+          "externalId": "5ac21d00-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-f888ad36"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "5ac21d00-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1114B"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:46.903Z",
+          "updatedAt": "2026-03-09T20:59:46.903Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 90,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "114b",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "efe7f4c5-1fea-41e6-b2bb-b1720cc81486",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d31e7dc0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4306ANO",
+        "gcdrDeviceId": "6526b1c9-5cce-4e70-bc47-66c624e8d74c",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Renner",
+          "identifier": "306ANO",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "31",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "5f63b594-3430-4188-931e-6d21234d8375",
+          "gcdrDeviceId": "6526b1c9-5cce-4e70-bc47-66c624e8d74c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "6526b1c9-5cce-4e70-bc47-66c624e8d74c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "5f63b594-3430-4188-931e-6d21234d8375",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4306ANO",
+          "displayName": "Renner",
+          "label": "Renner",
+          "type": "METER",
+          "serialNumber": "AUTO-6526b1c9",
+          "externalId": "d31e7dc0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-6526b1c9"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d31e7dc0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4306ANO"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:10.338Z",
+          "updatedAt": "2026-03-09T20:57:10.338Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 31,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "306ano",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "9a559810-2054-4dd9-8305-fd96305b4e26",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "65914b70-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1114C",
+        "gcdrDeviceId": "a2196e14-ef3c-4c39-8e88-ccec1e79a47c",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='114C' GCDR='114c_65914b70'"
+        ],
+        "tb": {
+          "label": "Subway",
+          "identifier": "114C",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "114",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "b1b6d4c6-fa3a-473b-aeb2-ef316e774c01",
+          "gcdrDeviceId": "a2196e14-ef3c-4c39-8e88-ccec1e79a47c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "a2196e14-ef3c-4c39-8e88-ccec1e79a47c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "b1b6d4c6-fa3a-473b-aeb2-ef316e774c01",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1114C",
+          "displayName": "Subway",
+          "label": "Subway",
+          "type": "METER",
+          "serialNumber": "AUTO-a2196e14",
+          "externalId": "65914b70-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-a2196e14"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "65914b70-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1114C"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:02.089Z",
+          "updatedAt": "2026-03-09T21:00:02.089Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 114,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "114c_65914b70",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "93ff30dd-1503-4484-9af6-5ab3a1058507",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "6395c990-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1105AB",
+        "gcdrDeviceId": "5604a91a-1072-42a5-b155-1b7120d73feb",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Don Burguer",
+          "identifier": "105AB",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "110",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "14b96c55-3746-4f2f-b387-84ba788810ae",
+          "gcdrDeviceId": "5604a91a-1072-42a5-b155-1b7120d73feb",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "5604a91a-1072-42a5-b155-1b7120d73feb",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "14b96c55-3746-4f2f-b387-84ba788810ae",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1105AB",
+          "displayName": "Don Burguer",
+          "label": "Don Burguer",
+          "type": "METER",
+          "serialNumber": "AUTO-5604a91a",
+          "externalId": "6395c990-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-5604a91a"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "6395c990-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1105AB"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:57.427Z",
+          "updatedAt": "2026-03-09T20:59:57.427Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 110,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "105ab",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "33e62019-268f-4186-a321-38f5d2fc1800",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "3c19e860-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1115A",
+        "gcdrDeviceId": "0ab1a774-97ec-4766-989a-66f5a47104d1",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='115A' GCDR='115a_3c19e860'"
+        ],
+        "tb": {
+          "label": "Cosechas",
+          "identifier": "115A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "61",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "ed4d8d1d-5db2-4d6c-8d3c-c895f933c773",
+          "gcdrDeviceId": "0ab1a774-97ec-4766-989a-66f5a47104d1",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "0ab1a774-97ec-4766-989a-66f5a47104d1",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "ed4d8d1d-5db2-4d6c-8d3c-c895f933c773",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1115A",
+          "displayName": "Cosechas",
+          "label": "Cosechas",
+          "type": "METER",
+          "serialNumber": "AUTO-0ab1a774",
+          "externalId": "3c19e860-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-0ab1a774"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "3c19e860-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1115A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:59.935Z",
+          "updatedAt": "2026-03-09T20:58:59.935Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 61,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "115a_3c19e860",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "045d7e62-527d-4243-9a2b-db8ec62437f4",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "6b981c60-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1114D",
+        "gcdrDeviceId": "c85451d9-c36b-4d8a-abe4-761293dd3d80",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='114D' GCDR='114d_6b981c60'"
+        ],
+        "tb": {
+          "label": "Farinella",
+          "identifier": "114D",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "123",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "41084365-1151-45ec-a5f5-c79a9dbcc9d8",
+          "gcdrDeviceId": "c85451d9-c36b-4d8a-abe4-761293dd3d80",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "c85451d9-c36b-4d8a-abe4-761293dd3d80",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "41084365-1151-45ec-a5f5-c79a9dbcc9d8",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1114D",
+          "displayName": "Farinella",
+          "label": "Farinella",
+          "type": "METER",
+          "serialNumber": "AUTO-c85451d9",
+          "externalId": "6b981c60-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-c85451d9"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "6b981c60-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1114D"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:10.385Z",
+          "updatedAt": "2026-03-09T21:00:10.385Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 123,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "114d_6b981c60",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "6d44b45f-5fc3-401a-a87f-783e1df858ba",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "5a0ed290-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1110A",
+        "gcdrDeviceId": "b6ef42ca-8b39-4cc1-87f2-d5299c27cff8",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Lojas Americanas",
+          "identifier": "110A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "89",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "fbb06883-2d77-431b-bd16-77400fd5c301",
+          "gcdrDeviceId": "b6ef42ca-8b39-4cc1-87f2-d5299c27cff8",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b6ef42ca-8b39-4cc1-87f2-d5299c27cff8",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "fbb06883-2d77-431b-bd16-77400fd5c301",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1110A",
+          "displayName": "Lojas Americanas",
+          "label": "Lojas Americanas",
+          "type": "METER",
+          "serialNumber": "AUTO-b6ef42ca",
+          "externalId": "5a0ed290-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b6ef42ca"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "5a0ed290-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1110A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:45.768Z",
+          "updatedAt": "2026-03-09T20:59:45.768Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 89,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "110a",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "3b9501ee-9dcc-4a7f-9010-9d84f4a719e1",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "408001a0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1110D",
+        "gcdrDeviceId": "a4446b6d-d6b8-4aa1-801f-83a1f2bb6999",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='110D' GCDR='110d_408001a0'"
+        ],
+        "tb": {
+          "label": "ICE ROLL 110D",
+          "identifier": "110D",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "63",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "fc06fa1a-fb17-4c0b-8f26-ac9e9e48e475",
+          "gcdrDeviceId": "a4446b6d-d6b8-4aa1-801f-83a1f2bb6999",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "a4446b6d-d6b8-4aa1-801f-83a1f2bb6999",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "fc06fa1a-fb17-4c0b-8f26-ac9e9e48e475",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1110D",
+          "displayName": "ICE ROLL 110D",
+          "label": "ICE ROLL 110D",
+          "type": "METER",
+          "serialNumber": "AUTO-a4446b6d",
+          "externalId": "408001a0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-a4446b6d"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "408001a0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1110D"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:01:05.554Z",
+          "updatedAt": "2026-03-09T21:01:05.554Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 63,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "110d_408001a0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "6f4b81ce-cf30-490c-ac91-2a535a2b7c98",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c0d95e00-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4311",
+        "gcdrDeviceId": "5b8ed194-3c42-4b3f-b782-f54e74b83996",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='311' GCDR='311_c0d95e00'"
+        ],
+        "tb": {
+          "label": "take Kids",
+          "identifier": "311",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "3",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "fd1c8706-2946-45dd-acf7-234ff448c39b",
+          "gcdrDeviceId": "5b8ed194-3c42-4b3f-b782-f54e74b83996",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "5b8ed194-3c42-4b3f-b782-f54e74b83996",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "fd1c8706-2946-45dd-acf7-234ff448c39b",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4311",
+          "displayName": "take Kids",
+          "label": "take Kids",
+          "type": "METER",
+          "serialNumber": "AUTO-5b8ed194",
+          "externalId": "c0d95e00-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-5b8ed194"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c0d95e00-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4311"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:47.379Z",
+          "updatedAt": "2026-03-09T20:56:47.379Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 3,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "311_c0d95e00",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "fe9614a6-76cb-400d-a5c2-12d7ce983673",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "0d207f50-9012-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4EC002",
+        "gcdrDeviceId": "07fe84db-75fe-440a-ac15-3a200678c61a",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "PITT STOP",
+          "identifier": "EC002",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "118",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a4f59526-a48c-4a5c-8adf-d38cc9bd89a4",
+          "gcdrDeviceId": "07fe84db-75fe-440a-ac15-3a200678c61a",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "07fe84db-75fe-440a-ac15-3a200678c61a",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a4f59526-a48c-4a5c-8adf-d38cc9bd89a4",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4EC002",
+          "displayName": "PITT STOP",
+          "label": "PITT STOP",
+          "type": "METER",
+          "serialNumber": "AUTO-07fe84db",
+          "externalId": "0d207f50-9012-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-07fe84db"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "0d207f50-9012-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4EC002"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:14.342Z",
+          "updatedAt": "2026-03-09T20:58:14.342Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 118,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "ec002",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "bb0852c4-266c-4fe8-8a3b-ca2a239c02a3",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "9876ed60-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC201GH",
+        "gcdrDeviceId": "2a8ccea4-5891-455e-a690-622eae78c2be",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Cafetria do Mestre",
+          "identifier": "201GH",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "56",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "8525a096-2e35-4bcd-a0aa-7230f2300e93",
+          "gcdrDeviceId": "2a8ccea4-5891-455e-a690-622eae78c2be",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "2a8ccea4-5891-455e-a690-622eae78c2be",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "8525a096-2e35-4bcd-a0aa-7230f2300e93",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC201GH",
+          "displayName": "Cafetria do Mestre",
+          "label": "Cafetria do Mestre",
+          "type": "METER",
+          "serialNumber": "AUTO-2a8ccea4",
+          "externalId": "9876ed60-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-2a8ccea4"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "9876ed60-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC201GH"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:54:10.845Z",
+          "updatedAt": "2026-03-09T20:54:10.845Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 56,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "201gh",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "85d93854-2ca8-4515-a971-fc286313bc74",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "e1b73750-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4313A",
+        "gcdrDeviceId": "95ef4bba-6327-48bf-93df-2454f2a9023e",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='313A' GCDR='313a_e1b73750'"
+        ],
+        "tb": {
+          "label": "Terra A vista",
+          "identifier": "313A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "53",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "b31e37fb-0bce-449f-a3d0-8dc0c91d8f13",
+          "gcdrDeviceId": "95ef4bba-6327-48bf-93df-2454f2a9023e",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "95ef4bba-6327-48bf-93df-2454f2a9023e",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "b31e37fb-0bce-449f-a3d0-8dc0c91d8f13",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4313A",
+          "displayName": "Terra A vista",
+          "label": "Terra A vista",
+          "type": "METER",
+          "serialNumber": "AUTO-95ef4bba",
+          "externalId": "e1b73750-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-95ef4bba"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "e1b73750-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4313A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:44.044Z",
+          "updatedAt": "2026-03-09T20:56:44.044Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 53,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "313a_e1b73750",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "1434c55b-af94-47e5-aa25-f675e67db45c",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c686c450-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4304ABC",
+        "gcdrDeviceId": "bc4cdc3b-2a5a-4b06-95f7-d37bd6748c1d",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Marisa (água)",
+          "identifier": "304ABC",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "12",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "42f999da-93ad-4ea4-ba04-747003c5091f",
+          "gcdrDeviceId": "bc4cdc3b-2a5a-4b06-95f7-d37bd6748c1d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "bc4cdc3b-2a5a-4b06-95f7-d37bd6748c1d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "42f999da-93ad-4ea4-ba04-747003c5091f",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4304ABC",
+          "displayName": "Marisa (água)",
+          "label": "Marisa (água)",
+          "type": "METER",
+          "serialNumber": "AUTO-bc4cdc3b",
+          "externalId": "c686c450-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-bc4cdc3b"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c686c450-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4304ABC"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:54.294Z",
+          "updatedAt": "2026-03-09T20:56:54.294Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 12,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "304abc",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "20e75ad8-731c-4231-81c6-ccf481611861",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "4fa60710-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1113CD",
+        "gcdrDeviceId": "d615b0a1-8a2b-4cc4-85b2-2fcca7a8656c",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='113CD' GCDR='113cd_4fa60710'"
+        ],
+        "tb": {
+          "label": "Burguer  king",
+          "identifier": "113CD",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "73",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "084720f5-dd32-4f5a-9d12-dfa4aaf26c77",
+          "gcdrDeviceId": "d615b0a1-8a2b-4cc4-85b2-2fcca7a8656c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "d615b0a1-8a2b-4cc4-85b2-2fcca7a8656c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "084720f5-dd32-4f5a-9d12-dfa4aaf26c77",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1113CD",
+          "displayName": "Burguer  king",
+          "label": "Burguer  king",
+          "type": "METER",
+          "serialNumber": "AUTO-d615b0a1",
+          "externalId": "4fa60710-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-d615b0a1"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "4fa60710-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1113CD"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:33.146Z",
+          "updatedAt": "2026-03-09T20:59:33.146Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 73,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "113cd_4fa60710",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "63038f8c-2e51-42fa-a611-9e6535fbbabf",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "49f96410-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1102A",
+        "gcdrDeviceId": "945638fd-57a7-4164-88b7-8cc95046933e",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='102A' GCDR='102a_49f96410'"
+        ],
+        "tb": {
+          "label": "vivenda do camarão",
+          "identifier": "102A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "69",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "b3b7f06d-81a7-4d79-8ea3-72244a5e387f",
+          "gcdrDeviceId": "945638fd-57a7-4164-88b7-8cc95046933e",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "945638fd-57a7-4164-88b7-8cc95046933e",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "b3b7f06d-81a7-4d79-8ea3-72244a5e387f",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1102A",
+          "displayName": "vivenda do camarão",
+          "label": "vivenda do camarão",
+          "type": "METER",
+          "serialNumber": "AUTO-945638fd",
+          "externalId": "49f96410-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-945638fd"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "49f96410-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1102A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:28.678Z",
+          "updatedAt": "2026-03-09T20:59:28.678Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 69,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "102a_49f96410",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "7ec9ee1b-d3e0-4328-8e82-7b98fe756c42",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "644e4420-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1107B",
+        "gcdrDeviceId": "8c945215-3483-4ee0-962a-d8ae4e97296a",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Milky Moo",
+          "identifier": "107B",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "111",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "51b0e601-e141-4d1b-abb6-a66afc7bcf35",
+          "gcdrDeviceId": "8c945215-3483-4ee0-962a-d8ae4e97296a",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "8c945215-3483-4ee0-962a-d8ae4e97296a",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "51b0e601-e141-4d1b-abb6-a66afc7bcf35",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1107B",
+          "displayName": "Milky Moo",
+          "label": "Milky Moo",
+          "type": "METER",
+          "serialNumber": "AUTO-8c945215",
+          "externalId": "644e4420-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-8c945215"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "644e4420-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1107B"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:58.543Z",
+          "updatedAt": "2026-03-09T20:59:58.543Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 111,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "107b",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "c980806e-dde6-4fc9-8714-6fa1e7e99979",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d3d6f850-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4308F",
+        "gcdrDeviceId": "4f2abda0-e9ca-47c7-b7ca-58bfbefa597e",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Coelhinho Sorveteria italiana",
+          "identifier": "308F",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "32",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "b54d6f7e-e44a-44b4-ac2e-c6391a38671c",
+          "gcdrDeviceId": "4f2abda0-e9ca-47c7-b7ca-58bfbefa597e",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "4f2abda0-e9ca-47c7-b7ca-58bfbefa597e",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "b54d6f7e-e44a-44b4-ac2e-c6391a38671c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4308F",
+          "displayName": "Coelhinho Sorveteria italiana",
+          "label": "Coelhinho Sorveteria italiana",
+          "type": "METER",
+          "serialNumber": "AUTO-4f2abda0",
+          "externalId": "d3d6f850-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-4f2abda0"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d3d6f850-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4308F"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:11.617Z",
+          "updatedAt": "2026-03-09T20:57:11.617Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 32,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "308f",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "355c1d02-bc2b-4e8c-89c8-c693ae49cc4f",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "80892240-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC205BC",
+        "gcdrDeviceId": "739ecf16-bc31-41b6-972d-5fed81be0a1d",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='205BC' GCDR='205bc_80892240'"
+        ],
+        "tb": {
+          "label": "Clinica Habilitar",
+          "identifier": "205BC",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "20",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "c061f6f9-741b-452f-9123-1f64fc292896",
+          "gcdrDeviceId": "739ecf16-bc31-41b6-972d-5fed81be0a1d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "739ecf16-bc31-41b6-972d-5fed81be0a1d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "c061f6f9-741b-452f-9123-1f64fc292896",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC205BC",
+          "displayName": "Clinica Habilitar",
+          "label": "Clinica Habilitar",
+          "type": "METER",
+          "serialNumber": "AUTO-739ecf16",
+          "externalId": "80892240-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-739ecf16"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "80892240-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC205BC"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:50.098Z",
+          "updatedAt": "2026-03-09T20:53:50.098Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 20,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "205bc_80892240",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "ce2092e9-21db-465a-8b67-730381145634",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "7dcff5b0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACQ210",
+        "gcdrDeviceId": "72ecb033-51d9-4ec7-9592-097ff4ae1a0a",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='Q210' GCDR='q210_7dcff5b0'"
+        ],
+        "tb": {
+          "label": "Bob´s Quiosque",
+          "identifier": "Q210",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "16",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "dbe2d04b-17fb-4bb9-bbd8-2960ac8fe493",
+          "gcdrDeviceId": "72ecb033-51d9-4ec7-9592-097ff4ae1a0a",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "72ecb033-51d9-4ec7-9592-097ff4ae1a0a",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "dbe2d04b-17fb-4bb9-bbd8-2960ac8fe493",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACQ210",
+          "displayName": "Bob´s Quiosque",
+          "label": "Bob´s Quiosque",
+          "type": "METER",
+          "serialNumber": "AUTO-72ecb033",
+          "externalId": "7dcff5b0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-72ecb033"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "7dcff5b0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2ACQ210"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:24.041Z",
+          "updatedAt": "2026-03-09T20:53:24.041Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 16,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "q210_7dcff5b0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "836aaef7-e4b8-45fa-a353-eab9da724888",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "ff127990-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4Q307",
+        "gcdrDeviceId": "dac44277-ecc7-45f9-824f-4a44dc68627c",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='Q307' GCDR='q307_ff127990'"
+        ],
+        "tb": {
+          "label": "MC Café Quiosque",
+          "identifier": "Q307",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "97",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "439bd777-aa38-4328-bbdf-ab3e3629b085",
+          "gcdrDeviceId": "dac44277-ecc7-45f9-824f-4a44dc68627c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "dac44277-ecc7-45f9-824f-4a44dc68627c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "439bd777-aa38-4328-bbdf-ab3e3629b085",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4Q307",
+          "displayName": "MC Café Quiosque",
+          "label": "MC Café Quiosque",
+          "type": "METER",
+          "serialNumber": "AUTO-dac44277",
+          "externalId": "ff127990-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-dac44277"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "ff127990-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4Q307"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:08.612Z",
+          "updatedAt": "2026-03-09T20:58:08.612Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 97,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "q307_ff127990",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "5b1d910b-5790-430a-bc72-3df20a17938b",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "e79b6510-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4303J",
+        "gcdrDeviceId": "d43d3361-5171-4ec9-97cb-dc4f1a40089e",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Oticas Diniz",
+          "identifier": "303J",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "62",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a4ee0fef-09f1-46c8-b130-5d1360453b1f",
+          "gcdrDeviceId": "d43d3361-5171-4ec9-97cb-dc4f1a40089e",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "d43d3361-5171-4ec9-97cb-dc4f1a40089e",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a4ee0fef-09f1-46c8-b130-5d1360453b1f",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4303J",
+          "displayName": "Oticas Diniz",
+          "label": "Oticas Diniz",
+          "type": "METER",
+          "serialNumber": "AUTO-d43d3361",
+          "externalId": "e79b6510-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-d43d3361"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "e79b6510-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4303J"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:21.887Z",
+          "updatedAt": "2026-03-09T20:57:21.887Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 62,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "303j",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "91f462b5-f397-49bd-a358-e2ed5c0d7c53",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "579d3650-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. 104ABCJKL",
+        "gcdrDeviceId": "51792575-7c2e-4a3a-922f-2f6454e3fc24",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='104ABCJKL' GCDR='104abcjkl_579d3650'"
+        ],
+        "tb": {
+          "label": "são Jose Super",
+          "identifier": "104ABCJKL",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "85",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "acb7fdff-d510-4729-b09a-3ee626b6b9a1",
+          "gcdrDeviceId": "51792575-7c2e-4a3a-922f-2f6454e3fc24",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "51792575-7c2e-4a3a-922f-2f6454e3fc24",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "acb7fdff-d510-4729-b09a-3ee626b6b9a1",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. 104ABCJKL",
+          "displayName": "são Jose Super",
+          "label": "são Jose Super",
+          "type": "METER",
+          "serialNumber": "AUTO-51792575",
+          "externalId": "579d3650-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-51792575"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "579d3650-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. 104ABCJKL"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:42.289Z",
+          "updatedAt": "2026-03-09T20:59:42.289Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 85,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "104abcjkl_579d3650",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "85fc1cf3-31bd-4dca-933f-0e81e5316abc",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "09bce1f0-9012-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4Q305",
+        "gcdrDeviceId": "7b8a732e-5750-4062-98c6-64dd128afc68",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='Q305' GCDR='q305_09bce1f0'"
+        ],
+        "tb": {
+          "label": "Bob's Q305",
+          "identifier": "Q305",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "113",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "5eb3e4f2-bb8f-46e3-a095-1740061d1102",
+          "gcdrDeviceId": "7b8a732e-5750-4062-98c6-64dd128afc68",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "7b8a732e-5750-4062-98c6-64dd128afc68",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "5eb3e4f2-bb8f-46e3-a095-1740061d1102",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4Q305",
+          "displayName": "Bob's Q305",
+          "label": "Bob's Q305",
+          "type": "METER",
+          "serialNumber": "AUTO-7b8a732e",
+          "externalId": "09bce1f0-9012-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-7b8a732e"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "09bce1f0-9012-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4Q305"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:48.082Z",
+          "updatedAt": "2026-03-09T20:57:48.082Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 113,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "q305_09bce1f0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "d46aa64c-1c29-45dd-b6a6-f813a6131b5d",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "4b295890-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1105C",
+        "gcdrDeviceId": "58e94534-e997-4a74-b64f-7d08ee07a744",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Chicken Town",
+          "identifier": "105C",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "70",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "5fbee449-ca29-4f27-b7e4-19eaa3a1a0cd",
+          "gcdrDeviceId": "58e94534-e997-4a74-b64f-7d08ee07a744",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "58e94534-e997-4a74-b64f-7d08ee07a744",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "5fbee449-ca29-4f27-b7e4-19eaa3a1a0cd",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1105C",
+          "displayName": "Chicken Town",
+          "label": "Chicken Town",
+          "type": "METER",
+          "serialNumber": "AUTO-58e94534",
+          "externalId": "4b295890-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-58e94534"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "4b295890-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1105C"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:27.621Z",
+          "updatedAt": "2026-03-09T21:00:27.621Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 70,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "105c",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "b034d863-4eeb-420e-8ddb-c26ceee28ca2",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "f48b77b0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4307G",
+        "gcdrDeviceId": "ba8f743b-0dc3-41fb-ad14-80a24a324bd6",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='307G' GCDR='307g_f48b77b0'"
+        ],
+        "tb": {
+          "label": "Kopenhagen",
+          "identifier": "307G",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "81",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "117145b7-3b05-4bbf-b876-1c4d1567ba7f",
+          "gcdrDeviceId": "ba8f743b-0dc3-41fb-ad14-80a24a324bd6",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "ba8f743b-0dc3-41fb-ad14-80a24a324bd6",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "117145b7-3b05-4bbf-b876-1c4d1567ba7f",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4307G",
+          "displayName": "Kopenhagen",
+          "label": "Kopenhagen",
+          "type": "METER",
+          "serialNumber": "AUTO-ba8f743b",
+          "externalId": "f48b77b0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-ba8f743b"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "f48b77b0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4307G"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:54.832Z",
+          "updatedAt": "2026-03-09T20:57:54.832Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 81,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "307g_f48b77b0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "a7ab8471-db81-444d-85eb-21edefd4e4a1",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "f2954d00-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4Q312",
+        "gcdrDeviceId": "e543219d-c7a7-409d-a670-b5e764a21b61",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "zé coxinha Quiosque",
+          "identifier": "Q312",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "78",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "524e5011-00a0-4a42-bda5-af0a0d1e2421",
+          "gcdrDeviceId": "e543219d-c7a7-409d-a670-b5e764a21b61",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "e543219d-c7a7-409d-a670-b5e764a21b61",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "524e5011-00a0-4a42-bda5-af0a0d1e2421",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4Q312",
+          "displayName": "zé coxinha Quiosque",
+          "label": "zé coxinha Quiosque",
+          "type": "METER",
+          "serialNumber": "AUTO-e543219d",
+          "externalId": "f2954d00-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-e543219d"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "f2954d00-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4Q312"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:35.556Z",
+          "updatedAt": "2026-03-09T20:57:35.556Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 78,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "q312",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "521a8321-6568-4bdb-8ab7-e0e5580f8743",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "50d5fb90-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1116BC",
+        "gcdrDeviceId": "8f47e2f0-fcd3-4c2d-9d63-1e681581609f",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Casas Bahia",
+          "identifier": "116BC",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "75",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "330a8a78-9008-4f9f-83ad-1d59d0f1f2a1",
+          "gcdrDeviceId": "8f47e2f0-fcd3-4c2d-9d63-1e681581609f",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "8f47e2f0-fcd3-4c2d-9d63-1e681581609f",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "330a8a78-9008-4f9f-83ad-1d59d0f1f2a1",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1116BC",
+          "displayName": "Casas Bahia",
+          "label": "Casas Bahia",
+          "type": "METER",
+          "serialNumber": "AUTO-8f47e2f0",
+          "externalId": "50d5fb90-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-8f47e2f0"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "50d5fb90-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1116BC"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:02.161Z",
+          "updatedAt": "2026-03-09T20:59:02.161Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 75,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "116bc",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "08aa273d-c0c1-43e3-adc9-bf2b1028ba6c",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "7fdcb5a0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC201A",
+        "gcdrDeviceId": "efb65380-8f66-4dda-915a-a47a6b875085",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Avenida",
+          "identifier": "201A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "19",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "d2cf47d1-e647-4cc4-ae8f-6333674636a3",
+          "gcdrDeviceId": "efb65380-8f66-4dda-915a-a47a6b875085",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "efb65380-8f66-4dda-915a-a47a6b875085",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "d2cf47d1-e647-4cc4-ae8f-6333674636a3",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC201A",
+          "displayName": "Avenida",
+          "label": "Avenida",
+          "type": "METER",
+          "serialNumber": "AUTO-efb65380",
+          "externalId": "7fdcb5a0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-efb65380"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "7fdcb5a0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC201A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:26.274Z",
+          "updatedAt": "2026-03-09T20:53:26.274Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 19,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "201a",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "9e7fcd0d-6377-47ad-b97d-70d00079a150",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c1899b30-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4401",
+        "gcdrDeviceId": "6255116e-3c74-40a6-8f86-e69ffdc9e5cd",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='401' GCDR='401_c1899b30'"
+        ],
+        "tb": {
+          "label": "vila Park Boliche",
+          "identifier": "401",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "4",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "79eef3aa-03bd-4de6-91dd-38404b759abe",
+          "gcdrDeviceId": "6255116e-3c74-40a6-8f86-e69ffdc9e5cd",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "6255116e-3c74-40a6-8f86-e69ffdc9e5cd",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "79eef3aa-03bd-4de6-91dd-38404b759abe",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4401",
+          "displayName": "vila Park Boliche",
+          "label": "vila Park Boliche",
+          "type": "METER",
+          "serialNumber": "AUTO-6255116e",
+          "externalId": "c1899b30-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-6255116e"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c1899b30-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4401"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:49.709Z",
+          "updatedAt": "2026-03-09T20:56:49.709Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 4,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "401_c1899b30",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "566dc1af-3c48-4a95-be43-283afbb31402",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "de66d3d0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4307I",
+        "gcdrDeviceId": "d5b76b97-0ecc-4a0c-bd7d-dcc9e1245f4a",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Let´s Esmalteria",
+          "identifier": "307I",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "48",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "93b60c0f-f521-4134-bf34-13009bcf19c7",
+          "gcdrDeviceId": "d5b76b97-0ecc-4a0c-bd7d-dcc9e1245f4a",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "d5b76b97-0ecc-4a0c-bd7d-dcc9e1245f4a",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "93b60c0f-f521-4134-bf34-13009bcf19c7",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4307I",
+          "displayName": "Let´s Esmalteria",
+          "label": "Let´s Esmalteria",
+          "type": "METER",
+          "serialNumber": "AUTO-d5b76b97",
+          "externalId": "de66d3d0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-d5b76b97"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "de66d3d0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4307I"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:40.546Z",
+          "updatedAt": "2026-03-09T20:56:40.546Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 48,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "307i",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "f67504b2-0530-4da6-a731-7836b93b93f6",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "f5cd4680-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4309A",
+        "gcdrDeviceId": "6aa29dcb-a932-4a99-ab03-6fdafb154488",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Jacklanyne Joias",
+          "identifier": "309A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "83",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "31a9650a-429b-488e-8b61-e848291cbbe7",
+          "gcdrDeviceId": "6aa29dcb-a932-4a99-ab03-6fdafb154488",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "6aa29dcb-a932-4a99-ab03-6fdafb154488",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "31a9650a-429b-488e-8b61-e848291cbbe7",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4309A",
+          "displayName": "Jacklanyne Joias",
+          "label": "Jacklanyne Joias",
+          "type": "METER",
+          "serialNumber": "AUTO-6aa29dcb",
+          "externalId": "f5cd4680-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-6aa29dcb"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "f5cd4680-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4309A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:38.860Z",
+          "updatedAt": "2026-03-09T20:57:38.860Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 83,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "309a",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "5a2ea7e0-8979-40ea-a690-72642ec56be7",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "0bbecc70-9012-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4302AB",
+        "gcdrDeviceId": "218a1641-4c37-4abe-8234-5320af8fffdf",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Boticario",
+          "identifier": "302AB",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "116",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "abc0ea2d-8663-4f44-925e-e8fb9db77e30",
+          "gcdrDeviceId": "218a1641-4c37-4abe-8234-5320af8fffdf",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "218a1641-4c37-4abe-8234-5320af8fffdf",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "abc0ea2d-8663-4f44-925e-e8fb9db77e30",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4302AB",
+          "displayName": "Boticario",
+          "label": "Boticario",
+          "type": "METER",
+          "serialNumber": "AUTO-218a1641",
+          "externalId": "0bbecc70-9012-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-218a1641"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "0bbecc70-9012-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4302AB"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:49.173Z",
+          "updatedAt": "2026-03-09T20:57:49.173Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 116,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "302ab",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "918659ac-abfc-481d-8e69-fa37d8fc6495",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c9d775f0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4306P",
+        "gcdrDeviceId": "fe8d3c5e-4d34-4812-9b06-26bda1158d97",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Borelli",
+          "identifier": "306P",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "17",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "91dfb5e2-b88b-49cc-a074-7f72c5f37ac5",
+          "gcdrDeviceId": "fe8d3c5e-4d34-4812-9b06-26bda1158d97",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "fe8d3c5e-4d34-4812-9b06-26bda1158d97",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "91dfb5e2-b88b-49cc-a074-7f72c5f37ac5",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4306P",
+          "displayName": "Borelli",
+          "label": "Borelli",
+          "type": "METER",
+          "serialNumber": "AUTO-fe8d3c5e",
+          "externalId": "c9d775f0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-fe8d3c5e"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c9d775f0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4306P"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:04.562Z",
+          "updatedAt": "2026-03-09T20:57:04.562Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 17,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "306p",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "0af58841-7fce-4726-9f3a-4692f661483f",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "8dbd42c0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC205HIJ",
+        "gcdrDeviceId": "1b2ebebd-97a0-4228-af61-55bbc0472d8b",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='205HIJ' GCDR='205hij_8dbd42c0'"
+        ],
+        "tb": {
+          "label": "RI Happy",
+          "identifier": "205HIJ",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "40",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "18c96031-9de4-4629-ba14-4af76d8cd05c",
+          "gcdrDeviceId": "1b2ebebd-97a0-4228-af61-55bbc0472d8b",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "1b2ebebd-97a0-4228-af61-55bbc0472d8b",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "18c96031-9de4-4629-ba14-4af76d8cd05c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC205HIJ",
+          "displayName": "RI Happy",
+          "label": "RI Happy",
+          "type": "METER",
+          "serialNumber": "AUTO-1b2ebebd",
+          "externalId": "8dbd42c0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-1b2ebebd"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "8dbd42c0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC205HIJ"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:55:13.796Z",
+          "updatedAt": "2026-03-09T20:55:13.796Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 40,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "205hij_8dbd42c0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "f54172b1-afe8-4603-b126-31f77ee43e53",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "90e22970-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC201STUV",
+        "gcdrDeviceId": "0d6fca87-ffc4-4ecd-a1cf-9227748d0263",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='201STUV' GCDR='201stuv_90e22970'"
+        ],
+        "tb": {
+          "label": "Loucic Uniformes",
+          "identifier": "201STUV",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "45",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "4b63efb5-8f49-4ef8-a4ab-df8958233cb2",
+          "gcdrDeviceId": "0d6fca87-ffc4-4ecd-a1cf-9227748d0263",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "0d6fca87-ffc4-4ecd-a1cf-9227748d0263",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "4b63efb5-8f49-4ef8-a4ab-df8958233cb2",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC201STUV",
+          "displayName": "Loucic Uniformes",
+          "label": "Loucic Uniformes",
+          "type": "METER",
+          "serialNumber": "AUTO-0d6fca87",
+          "externalId": "90e22970-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-0d6fca87"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "90e22970-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC201STUV"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:54:02.950Z",
+          "updatedAt": "2026-03-09T20:54:02.950Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 45,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "201stuv_90e22970",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "d0cb7590-86a5-4e22-b8d1-43d6e72226a6",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "8577cc70-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC205MN",
+        "gcdrDeviceId": "59600fd2-c57c-4d9d-824e-cd0521c00260",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Le Biscuit",
+          "identifier": "205MN",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "28",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "94ce77f8-75b4-4eb1-bad2-94366d91040b",
+          "gcdrDeviceId": "59600fd2-c57c-4d9d-824e-cd0521c00260",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "59600fd2-c57c-4d9d-824e-cd0521c00260",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "94ce77f8-75b4-4eb1-bad2-94366d91040b",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC205MN",
+          "displayName": "Le Biscuit",
+          "label": "Le Biscuit",
+          "type": "METER",
+          "serialNumber": "AUTO-59600fd2",
+          "externalId": "8577cc70-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-59600fd2"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "8577cc70-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC205MN"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:55.782Z",
+          "updatedAt": "2026-03-09T20:53:55.782Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 28,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "205mn",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "012e7683-c0b1-4da3-982f-4c288758ec9a",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "cbb5d2e0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4308G",
+        "gcdrDeviceId": "7218df55-5cde-4cb6-a476-27211c6e1bf0",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='308G' GCDR='308g_cbb5d2e0'"
+        ],
+        "tb": {
+          "label": "oticas carol",
+          "identifier": "308G",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "20",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "54c7f370-03a8-4d98-8d9a-fafcf6e5e217",
+          "gcdrDeviceId": "7218df55-5cde-4cb6-a476-27211c6e1bf0",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "7218df55-5cde-4cb6-a476-27211c6e1bf0",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "54c7f370-03a8-4d98-8d9a-fafcf6e5e217",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4308G",
+          "displayName": "oticas carol",
+          "label": "oticas carol",
+          "type": "METER",
+          "serialNumber": "AUTO-7218df55",
+          "externalId": "cbb5d2e0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-7218df55"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cbb5d2e0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4308G"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:02.335Z",
+          "updatedAt": "2026-03-09T20:57:02.335Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 20,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "308g_cbb5d2e0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "6c1ad181-48b3-40cf-a552-0460ddf46d00",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "393035f0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1115HI",
+        "gcdrDeviceId": "855447be-0c73-4370-bf48-e2f9f2b9887c",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Yaz Docerias",
+          "identifier": "115HI",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "59",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "190690c1-722a-40e2-a2e4-4f84a7b5a2a2",
+          "gcdrDeviceId": "855447be-0c73-4370-bf48-e2f9f2b9887c",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "855447be-0c73-4370-bf48-e2f9f2b9887c",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "190690c1-722a-40e2-a2e4-4f84a7b5a2a2",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1115HI",
+          "displayName": "Yaz Docerias",
+          "label": "Yaz Docerias",
+          "type": "METER",
+          "serialNumber": "AUTO-855447be",
+          "externalId": "393035f0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-855447be"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "393035f0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1115HI"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:05.628Z",
+          "updatedAt": "2026-03-09T20:59:05.628Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 59,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "115hi",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "a9703d15-b66f-4956-a313-e754cde43b63",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "70d7ccc0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1Q103",
+        "gcdrDeviceId": "2a0067f0-eccf-4a81-9da0-190550de07bc",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Chiquinhos Sorvetes Quiosque",
+          "identifier": "Q103",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "132",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "abcad9b9-4bc3-4986-ada4-3b7cc50dba74",
+          "gcdrDeviceId": "2a0067f0-eccf-4a81-9da0-190550de07bc",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "2a0067f0-eccf-4a81-9da0-190550de07bc",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "abcad9b9-4bc3-4986-ada4-3b7cc50dba74",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1Q103",
+          "displayName": "Chiquinhos Sorvetes Quiosque",
+          "label": "Chiquinhos Sorvetes Quiosque",
+          "type": "METER",
+          "serialNumber": "AUTO-2a0067f0",
+          "externalId": "70d7ccc0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-2a0067f0"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "70d7ccc0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1Q103"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:17.302Z",
+          "updatedAt": "2026-03-09T21:00:17.302Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 132,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "q103",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "01750725-8f69-41e6-8e24-4d29e53ef87f",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "01327360-9012-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4301G",
+        "gcdrDeviceId": "91e5510a-9730-43a5-b8c5-0e22caaa7053",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "L´occitane",
+          "identifier": "301G",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "100",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "e744f805-0745-4c1f-b186-f3aabdc3ec1c",
+          "gcdrDeviceId": "91e5510a-9730-43a5-b8c5-0e22caaa7053",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "91e5510a-9730-43a5-b8c5-0e22caaa7053",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "e744f805-0745-4c1f-b186-f3aabdc3ec1c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4301G",
+          "displayName": "L´occitane",
+          "label": "L´occitane",
+          "type": "METER",
+          "serialNumber": "AUTO-91e5510a",
+          "externalId": "01327360-9012-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-91e5510a"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "01327360-9012-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4301G"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:42.372Z",
+          "updatedAt": "2026-03-09T20:57:42.372Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 100,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "301g",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "533e8546-adb9-4867-ab8b-d558cea680e7",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "41b1cae0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1115J",
+        "gcdrDeviceId": "e0b1915b-ac3e-4a8f-ac2c-398cdd05d810",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Pipocando",
+          "identifier": "115J",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "64",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "4aabc9d4-d372-44ac-9e1d-494ddd85ed8c",
+          "gcdrDeviceId": "e0b1915b-ac3e-4a8f-ac2c-398cdd05d810",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "e0b1915b-ac3e-4a8f-ac2c-398cdd05d810",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "4aabc9d4-d372-44ac-9e1d-494ddd85ed8c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1115J",
+          "displayName": "Pipocando",
+          "label": "Pipocando",
+          "type": "METER",
+          "serialNumber": "AUTO-e0b1915b",
+          "externalId": "41b1cae0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-e0b1915b"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "41b1cae0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1115J"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:14.802Z",
+          "updatedAt": "2026-03-09T20:59:14.802Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 64,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "115j",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "8f04e78d-296e-46d8-ab19-653f11e3da2e",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "c4ad2250-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4302D",
+        "gcdrDeviceId": "b5e05c54-e890-46d2-b361-e6b21382bd78",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Espaço Laser",
+          "identifier": "302D",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "9",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "f250261f-661b-4451-99be-9f9a0fcaac5c",
+          "gcdrDeviceId": "b5e05c54-e890-46d2-b361-e6b21382bd78",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b5e05c54-e890-46d2-b361-e6b21382bd78",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "f250261f-661b-4451-99be-9f9a0fcaac5c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4302D",
+          "displayName": "Espaço Laser",
+          "label": "Espaço Laser",
+          "type": "METER",
+          "serialNumber": "AUTO-b5e05c54",
+          "externalId": "c4ad2250-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b5e05c54"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "c4ad2250-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4302D"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:50.810Z",
+          "updatedAt": "2026-03-09T20:56:50.810Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 9,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "302d",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "40f24a26-40ce-443e-a698-123469004fd6",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "72416ee0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1102LM",
+        "gcdrDeviceId": "97e10ac2-d6a1-456f-a930-19504be376ca",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Móveis Simonetti",
+          "identifier": "102LM",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "134",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "08202a59-dd34-43a6-aeb8-bf3b1c497384",
+          "gcdrDeviceId": "97e10ac2-d6a1-456f-a930-19504be376ca",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "97e10ac2-d6a1-456f-a930-19504be376ca",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "08202a59-dd34-43a6-aeb8-bf3b1c497384",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1102LM",
+          "displayName": "Móveis Simonetti",
+          "label": "Móveis Simonetti",
+          "type": "METER",
+          "serialNumber": "AUTO-97e10ac2",
+          "externalId": "72416ee0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-97e10ac2"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "72416ee0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1102LM"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:04.390Z",
+          "updatedAt": "2026-03-09T20:59:04.390Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 134,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "102lm",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "47bfb2c6-bc27-43d8-9829-1d5166ecd143",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "a4706b00-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC212BCD",
+        "gcdrDeviceId": "b389aa3f-8896-4209-9e85-ae0640f5fa55",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='212BCD' GCDR='212bcd_a4706b00'"
+        ],
+        "tb": {
+          "label": "Rede Inova",
+          "identifier": "212BCD",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "74",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "245112a9-85bb-4397-9ac6-f93e785f1b5c",
+          "gcdrDeviceId": "b389aa3f-8896-4209-9e85-ae0640f5fa55",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b389aa3f-8896-4209-9e85-ae0640f5fa55",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "245112a9-85bb-4397-9ac6-f93e785f1b5c",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC212BCD",
+          "displayName": "Rede Inova",
+          "label": "Rede Inova",
+          "type": "METER",
+          "serialNumber": "AUTO-b389aa3f",
+          "externalId": "a4706b00-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b389aa3f"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "a4706b00-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC212BCD"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:54:21.244Z",
+          "updatedAt": "2026-03-09T20:54:21.244Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 74,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "212bcd_a4706b00",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "9320130b-ff5f-46c2-91aa-167927a64b0d",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "823af0f0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC201C",
+        "gcdrDeviceId": "3a8966c5-64ce-4164-98cd-a1ee07944d73",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='201C' GCDR='201c_823af0f0'"
+        ],
+        "tb": {
+          "label": "Sipolatti",
+          "identifier": "201C",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "23",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "858b7236-b08f-43d6-905f-ac50f9e49338",
+          "gcdrDeviceId": "3a8966c5-64ce-4164-98cd-a1ee07944d73",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "3a8966c5-64ce-4164-98cd-a1ee07944d73",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "858b7236-b08f-43d6-905f-ac50f9e49338",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC201C",
+          "displayName": "Sipolatti",
+          "label": "Sipolatti",
+          "type": "METER",
+          "serialNumber": "AUTO-3a8966c5",
+          "externalId": "823af0f0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-3a8966c5"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "823af0f0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC201C"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:28.662Z",
+          "updatedAt": "2026-03-09T20:53:28.662Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 23,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "201c_823af0f0",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "13dca4dd-7251-468b-bf7d-42542de69cc3",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "a70f31c0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC209E",
+        "gcdrDeviceId": "798db98d-a16a-4fd3-a249-dbecb6087c51",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Puket",
+          "identifier": "209E",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "78",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "2b4f43e3-9c1a-4117-9958-c88a17a90ed8",
+          "gcdrDeviceId": "798db98d-a16a-4fd3-a249-dbecb6087c51",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "798db98d-a16a-4fd3-a249-dbecb6087c51",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "2b4f43e3-9c1a-4117-9958-c88a17a90ed8",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC209E",
+          "displayName": "Puket",
+          "label": "Puket",
+          "type": "METER",
+          "serialNumber": "AUTO-798db98d",
+          "externalId": "a70f31c0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-798db98d"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "a70f31c0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC209E"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:54:23.476Z",
+          "updatedAt": "2026-03-09T20:54:23.476Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 78,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "209e",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "efb5f6e2-7d79-4dbc-9690-1af15d99109b",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "3d4485b0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1116G",
+        "gcdrDeviceId": "3cf9d20c-fc8a-4fbb-88f4-3bb07a7a6c06",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Multcoisas",
+          "identifier": "116G",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "62",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "13608077-9885-48e6-8a69-9cc193d058a1",
+          "gcdrDeviceId": "3cf9d20c-fc8a-4fbb-88f4-3bb07a7a6c06",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "3cf9d20c-fc8a-4fbb-88f4-3bb07a7a6c06",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "13608077-9885-48e6-8a69-9cc193d058a1",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1116G",
+          "displayName": "Multcoisas",
+          "label": "Multcoisas",
+          "type": "METER",
+          "serialNumber": "AUTO-3cf9d20c",
+          "externalId": "3d4485b0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-3cf9d20c"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "3d4485b0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1116G"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:09.021Z",
+          "updatedAt": "2026-03-09T20:59:09.021Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 62,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "116g",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "40121dff-880f-4b5a-a83b-3d0e270827e8",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "77d8b520-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2AC205KL",
+        "gcdrDeviceId": "02e580c9-df28-4d0b-b156-c6fdb359d453",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''",
+          "identifier: TB='205KL' GCDR='205kl_77d8b520'"
+        ],
+        "tb": {
+          "label": "EMPÓRIO MAIA",
+          "identifier": "205KL",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "7",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "939fe345-3f9f-4bd8-9bb3-ba6e1711b356",
+          "gcdrDeviceId": "02e580c9-df28-4d0b-b156-c6fdb359d453",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "02e580c9-df28-4d0b-b156-c6fdb359d453",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "939fe345-3f9f-4bd8-9bb3-ba6e1711b356",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2AC205KL",
+          "displayName": "EMPÓRIO MAIA",
+          "label": "EMPÓRIO MAIA",
+          "type": "METER",
+          "serialNumber": "AUTO-02e580c9",
+          "externalId": "77d8b520-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-02e580c9"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "77d8b520-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL2AC205KL"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:19.495Z",
+          "updatedAt": "2026-03-09T20:53:19.495Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 7,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "205kl_77d8b520",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "97fea679-4e39-4a6e-a150-cb0673ef1e60",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d507fe40-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4Q314",
+        "gcdrDeviceId": "247ab6ab-20c7-42df-99cc-3b41e0a7b2d3",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "BURGUER KING QUIOSQUE",
+          "identifier": "Q314",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "34",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "d490f7d8-38b5-4ef1-9f8b-16187d1cc26b",
+          "gcdrDeviceId": "247ab6ab-20c7-42df-99cc-3b41e0a7b2d3",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "247ab6ab-20c7-42df-99cc-3b41e0a7b2d3",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "d490f7d8-38b5-4ef1-9f8b-16187d1cc26b",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4Q314",
+          "displayName": "BURGUER KING QUIOSQUE",
+          "label": "BURGUER KING QUIOSQUE",
+          "type": "METER",
+          "serialNumber": "AUTO-247ab6ab",
+          "externalId": "d507fe40-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-247ab6ab"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d507fe40-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4Q314"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:15.051Z",
+          "updatedAt": "2026-03-09T20:57:15.051Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 34,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "q314",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "8052f473-4ee6-46ed-954b-4d2747b2e9d0",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "d6b31630-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL3L4301D",
+        "gcdrDeviceId": "4b5e21ad-30fc-48f1-95c1-a98dfcb107ac",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "CHeirin Bão",
+          "identifier": "301D",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "37",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "f2abcfe2-cc7b-4ee8-99df-b31f31c184e5",
+          "gcdrDeviceId": "4b5e21ad-30fc-48f1-95c1-a98dfcb107ac",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "4b5e21ad-30fc-48f1-95c1-a98dfcb107ac",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "f2abcfe2-cc7b-4ee8-99df-b31f31c184e5",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL3L4301D",
+          "displayName": "CHeirin Bão",
+          "label": "CHeirin Bão",
+          "type": "METER",
+          "serialNumber": "AUTO-4b5e21ad",
+          "externalId": "d6b31630-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-4b5e21ad"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "d6b31630-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL3L4301D"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:57:13.830Z",
+          "updatedAt": "2026-03-09T20:57:13.830Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 37,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "301d",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "de4f05f7-72a9-45f3-bcd1-0769ad52a139",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "5deb7080-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1107C",
+        "gcdrDeviceId": "452b452c-c872-4a88-9d71-1bee17e7b6d2",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Green Station",
+          "identifier": "107C",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "97",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a42b4d59-dae6-4ae1-bc13-4c5ff599e1d7",
+          "gcdrDeviceId": "452b452c-c872-4a88-9d71-1bee17e7b6d2",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "452b452c-c872-4a88-9d71-1bee17e7b6d2",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a42b4d59-dae6-4ae1-bc13-4c5ff599e1d7",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1107C",
+          "displayName": "Green Station",
+          "label": "Green Station",
+          "type": "METER",
+          "serialNumber": "AUTO-452b452c",
+          "externalId": "5deb7080-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-452b452c"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "5deb7080-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1107C"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:51.737Z",
+          "updatedAt": "2026-03-09T20:59:51.737Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 97,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "107c",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "5f03117b-8458-4e89-a984-775dc3c86990",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "42e7d9e0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1112H",
+        "gcdrDeviceId": "f0d1ec6e-4a87-4db9-b8d6-3e04fb21d394",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Paraiso Makeup",
+          "identifier": "112H",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "65",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "004e4dba-09f1-4d6b-8358-5fcedd6b92a6",
+          "gcdrDeviceId": "f0d1ec6e-4a87-4db9-b8d6-3e04fb21d394",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "f0d1ec6e-4a87-4db9-b8d6-3e04fb21d394",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "004e4dba-09f1-4d6b-8358-5fcedd6b92a6",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1112H",
+          "displayName": "Paraiso Makeup",
+          "label": "Paraiso Makeup",
+          "type": "METER",
+          "serialNumber": "AUTO-f0d1ec6e",
+          "externalId": "42e7d9e0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-f0d1ec6e"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "42e7d9e0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1112H"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:56.266Z",
+          "updatedAt": "2026-03-09T21:00:56.266Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 65,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "112h",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "06400980-37b9-4bb4-bf6a-dcf6d69b359a",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE",
+        "tbId": "356bb3e0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1103B",
+        "gcdrDeviceId": "30b7d284-eef0-42f2-8d71-fdfdd7428773",
+        "divergences": [
+          "deviceProfile: TB='HIDROMETRO' GCDR=''"
+        ],
+        "tb": {
+          "label": "Shopping do imovel",
+          "identifier": "103B",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "55",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a823d4a6-2b09-4e98-a393-55bd09e57c00",
+          "gcdrDeviceId": "30b7d284-eef0-42f2-8d71-fdfdd7428773",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "30b7d284-eef0-42f2-8d71-fdfdd7428773",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a823d4a6-2b09-4e98-a393-55bd09e57c00",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1103B",
+          "displayName": "Shopping do imovel",
+          "label": "Shopping do imovel",
+          "type": "METER",
+          "serialNumber": "AUTO-30b7d284",
+          "externalId": "356bb3e0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-30b7d284"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "356bb3e0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "HIDR. SCMAL0L1103B"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:55.150Z",
+          "updatedAt": "2026-03-09T21:00:55.150Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 55,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "103b",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "383c44fa-cc92-4798-b45a-e2438570b9d5",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      }
+    ],
+    "update_identifier": [
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "2f396620-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1107E",
+        "gcdrDeviceId": "9b24ec8c-06a3-4d7a-b23d-636c9d6f4893",
+        "identifierTb": "107E",
+        "identifierGcdr": "107e_2f396620",
+        "tb": {
+          "label": "Divino Fogão",
+          "identifier": "107E",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "47",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "1ff29558-479e-447b-8da4-cd7471cba68e",
+          "gcdrDeviceId": "9b24ec8c-06a3-4d7a-b23d-636c9d6f4893",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "9b24ec8c-06a3-4d7a-b23d-636c9d6f4893",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "1ff29558-479e-447b-8da4-cd7471cba68e",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1107E",
+          "displayName": "Divino Fogão",
+          "label": "Divino Fogão",
+          "type": "METER",
+          "serialNumber": "AUTO-9b24ec8c",
+          "externalId": "2f396620-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-9b24ec8c"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "2f396620-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "HIDR. SCMAL0L1107E"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:52.779Z",
+          "updatedAt": "2026-03-09T21:00:52.779Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 47,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "107e_2f396620",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "52b0f992-171b-483e-9895-1fcd1bca34f3",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "aad42551-a262-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. SCMAL0L1104H",
+        "gcdrDeviceId": "23364c9c-b3e2-4305-b849-0759b916cf2f",
+        "identifierTb": "104H",
+        "identifierGcdr": "104h_aad42551",
+        "tb": {
+          "label": "GO PLAY",
+          "identifier": "104H",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "141",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "1597ab80-94bf-427a-95ed-1856ed254fea",
+          "gcdrDeviceId": "23364c9c-b3e2-4305-b849-0759b916cf2f",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "23364c9c-b3e2-4305-b849-0759b916cf2f",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "1597ab80-94bf-427a-95ed-1856ed254fea",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1104H",
+          "displayName": "GO PLAY",
+          "label": "GO PLAY",
+          "type": "METER",
+          "serialNumber": "AUTO-23364c9c",
+          "externalId": "aad42551-a262-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-23364c9c"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "aad42551-a262-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "HIDR. SCMAL0L1104H"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:59:24.042Z",
+          "updatedAt": "2026-03-09T20:59:24.042Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 141,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "104h_aad42551",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "aca5c404-0f04-44d5-a437-4f03e306f748"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "cf75c110-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "Hidr. SCMAQ306_L3",
+        "gcdrDeviceId": "9451a8c8-0d9b-48de-b9df-67079ffa3a6b",
+        "identifierTb": "Q306",
+        "identifierGcdr": "q306_cf75c110",
+        "tb": {
+          "label": "Ale Pudim.",
+          "identifier": "Q306",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "126",
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "499caa2c-242f-420a-86a9-980e08994cbd",
+          "gcdrDeviceId": "9451a8c8-0d9b-48de-b9df-67079ffa3a6b",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "9451a8c8-0d9b-48de-b9df-67079ffa3a6b",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "499caa2c-242f-420a-86a9-980e08994cbd",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "Hidr. SCMAQ306_L3",
+          "displayName": "Ale Pudim.",
+          "label": "Ale Pudim.",
+          "type": "METER",
+          "serialNumber": "AUTO-9451a8c8",
+          "externalId": "cf75c110-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-9451a8c8"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "cf75c110-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "Hidr. SCMAQ306_L3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:56:58.761Z",
+          "updatedAt": "2026-03-09T20:56:58.761Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 126,
+          "centralId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e",
+          "identifier": "q306_cf75c110",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "c446e297-78cc-4539-980d-39805e9ecc71",
+          "ingestionGatewayId": "fcb3ccd1-4b85-4cef-a1de-0b8a80bec81e"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "361bf110-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1112J",
+        "gcdrDeviceId": "f706cc66-7f3a-4d8b-b95d-8bd1dd81269f",
+        "identifierTb": "112J",
+        "identifierGcdr": "112j_361bf110",
+        "tb": {
+          "label": "Chopp Brahma",
+          "identifier": "112J",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "56",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "74adf594-9b34-4c50-ba6b-d39de1f85d36",
+          "gcdrDeviceId": "f706cc66-7f3a-4d8b-b95d-8bd1dd81269f",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "f706cc66-7f3a-4d8b-b95d-8bd1dd81269f",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "74adf594-9b34-4c50-ba6b-d39de1f85d36",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1112J",
+          "displayName": "Chopp Brahma",
+          "label": "Chopp Brahma",
+          "type": "METER",
+          "serialNumber": "AUTO-f706cc66",
+          "externalId": "361bf110-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-f706cc66"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "361bf110-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "HIDR. SCMAL0L1112J"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:01:03.304Z",
+          "updatedAt": "2026-03-09T21:01:03.304Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 56,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "112j_361bf110",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "6029b5db-6f7a-47b0-be3b-9bc42e15bf9f",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      }
+    ],
+    "skip": [
+      {
+        "action": "SKIP",
+        "tbId": "143c3860-a089-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. SCMAL0L102A",
+        "gcdrDeviceId": "11fa9356-1063-41ea-970a-b7eee85e21df",
+        "divergences": [],
+        "tb": {
+          "label": "Faculdade Mandic",
+          "identifier": "02A",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "140",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "e9f53b17-7b5c-4c30-a63a-6f8e56f9ca21",
+          "gcdrDeviceId": "11fa9356-1063-41ea-970a-b7eee85e21df",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "11fa9356-1063-41ea-970a-b7eee85e21df",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "e9f53b17-7b5c-4c30-a63a-6f8e56f9ca21",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L102A",
+          "displayName": "Faculdade Mandic",
+          "label": "Faculdade Mandic",
+          "type": "METER",
+          "serialNumber": "AUTO-11fa9356",
+          "externalId": "143c3860-a089-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-11fa9356"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "143c3860-a089-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "HIDR. SCMAL0L102A"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:24.521Z",
+          "updatedAt": "2026-03-09T20:58:24.521Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 140,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "02a",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "9f41342a-6821-4e34-9bf7-9975b9dabc56"
+        }
+      },
+      {
+        "action": "SKIP",
+        "tbId": "2201ea40-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL0L1101",
+        "gcdrDeviceId": "a98cac94-168c-4bda-a329-eabbae2e909f",
+        "divergences": [],
+        "tb": {
+          "label": "Cine Araújo",
+          "identifier": "101",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO",
+          "slaveId": "1",
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "a4360038-a789-448a-960f-a993c78fddd0",
+          "gcdrDeviceId": "a98cac94-168c-4bda-a329-eabbae2e909f",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "a98cac94-168c-4bda-a329-eabbae2e909f",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "a4360038-a789-448a-960f-a993c78fddd0",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL0L1101",
+          "displayName": "Cine Araújo",
+          "label": "Cine Araújo",
+          "type": "METER",
+          "serialNumber": "AUTO-a98cac94",
+          "externalId": "2201ea40-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-a98cac94"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "2201ea40-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO",
+            "tbDeviceName": "HIDR. SCMAL0L1101"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T21:00:44.818Z",
+          "updatedAt": "2026-03-09T21:00:44.818Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 1,
+          "centralId": "45250d44-bad0-4071-aaa0-8091cfb12691",
+          "identifier": "101",
+          "deviceProfile": "HIDROMETRO",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "8160b1ec-dffe-4b32-8589-090b9e525d6a",
+          "ingestionGatewayId": "45250d44-bad0-4071-aaa0-8091cfb12691"
+        }
+      }
+    ]
+  }
+}

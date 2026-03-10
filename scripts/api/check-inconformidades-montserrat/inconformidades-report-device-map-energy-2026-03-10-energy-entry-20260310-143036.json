@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T17:30:58Z",
+    "apiUrl": "https://gcdr-api.a.myio-bas.com",
+    "authMode": "apikey",
+    "totals": {
+      "tbDevices": 4,
+      "gcdrDevicesLoaded": 179,
+      "conformant": 1,
+      "divergent": 2,
+      "missing": 0
+    }
+  },
+  "results": [
+    {
+      "tbId": "52e954a0-d11f-11f0-998e-25174baff087",
+      "deviceName": "3F SCMS AC-Geral_Trafo1",
+      "status": "CONFORMANT",
+      "tb": {
+        "label": "Trafo Entrada 1",
+        "identifier": "ENTRADA",
+        "deviceType": "ENTRADA",
+        "deviceProfile": "ENTRADA",
+        "slaveId": "169",
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "gcdrCustomerId": "",
+        "gcdrAssetId": "",
+        "gcdrDeviceId": "fdee257f-f11d-4293-9abd-9dcdf8b30416",
+        "gcdrSyncAt": ""
+      },
+      "gcdr": {
+        "id": "fdee257f-f11d-4293-9abd-9dcdf8b30416",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "113c72e1-a83a-44f0-8bfa-ffe7b24bb343",
+        "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+        "name": "AC-Geral_Trafo1",
+        "displayName": "Trafo Entrada 1",
+        "label": "Trafo Entrada 1",
+        "type": "METER",
+        "serialNumber": "AUTO-fdee257f",
+        "externalId": "52e954a0-d11f-11f0-998e-25174baff087",
+        "specs": {
+          "serialNumber": "AUTO-fdee257f"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "52e954a0-d11f-11f0-998e-25174baff087",
+          "syncedAt": "2026-03-09T23:10:56.959Z",
+          "tbProfile": "ENTRADA",
+          "tbDeviceName": "AC-Geral_Trafo1"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T20:53:35.474Z",
+        "updatedAt": "2026-03-10T00:22:06.129Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "updatedBy": "00000000-0000-0000-0000-000000000001",
+        "version": 4,
+        "slaveId": 169,
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "identifier": "entrada",
+        "deviceProfile": "ENTRADA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "244a86fb-c925-404c-a081-e2dcabb8f9c3",
+        "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+      },
+      "divergences": []
+    },
+    {
+      "tbId": "68fca630-eb04-11f0-998e-25174baff087",
+      "deviceName": "3F SCMS AC-ARGERAL",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Trafo Entrada AC",
+        "identifier": "ENTRADA",
+        "deviceType": "ENTRADA",
+        "deviceProfile": "ENTRADA",
+        "slaveId": "174",
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "gcdrCustomerId": "",
+        "gcdrAssetId": "",
+        "gcdrDeviceId": "a9d3f8e6-3961-4e02-aea8-5d9024a17279",
+        "gcdrSyncAt": ""
+      },
+      "gcdr": {
+        "id": "a9d3f8e6-3961-4e02-aea8-5d9024a17279",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "113c72e1-a83a-44f0-8bfa-ffe7b24bb343",
+        "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+        "name": "3F AC-ARGERAL",
+        "displayName": "Trafo Entrada AC",
+        "label": "Trafo Entrada AC",
+        "type": "METER",
+        "serialNumber": "AUTO-a9d3f8e6",
+        "externalId": "68fca630-eb04-11f0-998e-25174baff087",
+        "specs": {
+          "serialNumber": "AUTO-a9d3f8e6"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "68fca630-eb04-11f0-998e-25174baff087",
+          "syncedAt": "2026-03-09T23:10:56.959Z",
+          "tbProfile": "ENTRADA",
+          "tbDeviceName": "3F AC-ARGERAL"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T23:10:34.301Z",
+        "updatedAt": "2026-03-09T23:12:58.522Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "updatedBy": "00000000-0000-0000-0000-000000000001",
+        "version": 2,
+        "slaveId": 174,
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "identifier": "entrada_68fca630",
+        "deviceProfile": "ENTRADA",
+        "deviceType": "3F_MEDIDOR",
+        "ingestionId": "78c9cced-6040-48a7-828f-80f8e969827a"
+      },
+      "divergences": [
+        "identifier: TB='ENTRADA' GCDR='entrada_68fca630'"
+      ]
+    },
+    {
+      "tbId": "52e8df71-d11f-11f0-998e-25174baff087",
+      "deviceName": "AC-Geral_Trafo2",
+      "status": "DIVERGENT",
+      "tb": {
+        "label": "Trafo Entrada 2",
+        "identifier": "ENTRADA",
+        "deviceType": "ENTRADA",
+        "deviceProfile": "ENTRADA",
+        "slaveId": "170",
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "gcdrCustomerId": "",
+        "gcdrAssetId": "",
+        "gcdrDeviceId": "da48b7cf-5a89-40f8-9135-0f5a20473ecd",
+        "gcdrSyncAt": ""
+      },
+      "gcdr": {
+        "id": "da48b7cf-5a89-40f8-9135-0f5a20473ecd",
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "assetId": "113c72e1-a83a-44f0-8bfa-ffe7b24bb343",
+        "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+        "name": "AC-Geral_Trafo2",
+        "displayName": "Trafo Entrada 2",
+        "label": "Trafo Entrada 2",
+        "type": "METER",
+        "serialNumber": "AUTO-da48b7cf",
+        "externalId": "52e8df71-d11f-11f0-998e-25174baff087",
+        "specs": {
+          "serialNumber": "AUTO-da48b7cf"
+        },
+        "connectivityStatus": "UNKNOWN",
+        "credentials": {},
+        "telemetryConfig": {
+          "attributeKeys": [],
+          "telemetryKeys": [],
+          "reportingInterval": 60
+        },
+        "tags": [],
+        "metadata": {
+          "tbId": "52e8df71-d11f-11f0-998e-25174baff087",
+          "syncedAt": "2026-03-09T23:10:56.959Z",
+          "tbProfile": "ENTRADA",
+          "tbDeviceName": "AC-Geral_Trafo2"
+        },
+        "attributes": {},
+        "status": "ACTIVE",
+        "createdAt": "2026-03-09T23:10:33.112Z",
+        "updatedAt": "2026-03-09T23:12:57.561Z",
+        "createdBy": "00000000-0000-0000-0000-000000000001",
+        "updatedBy": "00000000-0000-0000-0000-000000000001",
+        "version": 2,
+        "slaveId": 170,
+        "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+        "identifier": "entrada_52e8df71",
+        "deviceProfile": "ENTRADA",
+        "deviceType": "3F_MEDIDOR"
+      },
+      "divergences": [
+        "identifier: TB='ENTRADA' GCDR='entrada_52e8df71'"
+      ]
+    }
+  ]
+}

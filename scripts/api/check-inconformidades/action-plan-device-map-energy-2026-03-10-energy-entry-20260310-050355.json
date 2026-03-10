@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:26:50Z",
+    "sourceReport": "inconformidades-report-device-map-energy-2026-03-10-energy-entry-20260310-050355.json",
+    "summary": {
+      "create": 0,
+      "update": 0,
+      "update_identifier": 0,
+      "skip": 0
+    }
+  },
+  "actions": {
+    "create": [],
+    "update": [],
+    "update_identifier": [],
+    "skip": []
+  }
+}

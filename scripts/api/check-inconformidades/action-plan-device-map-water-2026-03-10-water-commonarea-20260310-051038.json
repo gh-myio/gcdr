@@ -1,0 +1,329 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:26:51Z",
+    "sourceReport": "inconformidades-report-device-map-water-2026-03-10-water-commonarea-20260310-051038.json",
+    "summary": {
+      "create": 0,
+      "update": 0,
+      "update_identifier": 4,
+      "skip": 1
+    }
+  },
+  "actions": {
+    "create": [],
+    "update": [],
+    "update_identifier": [
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "ba2b5090-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHICEBAL2",
+        "gcdrDeviceId": "4024376a-3715-474e-a04c-1fc2fa1a7d80",
+        "identifierTb": "BANHEIROS",
+        "identifierGcdr": "banheiros_ba2b5090",
+        "tb": {
+          "label": "AC- Hidrometro Cesan Banheiros L2",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "112",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "4024376a-3715-474e-a04c-1fc2fa1a7d80",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "4024376a-3715-474e-a04c-1fc2fa1a7d80",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHICEBAL2",
+          "displayName": "AC- Hidrometro Cesan Banheiros L2",
+          "label": "AC- Hidrometro Cesan Banheiros L2",
+          "type": "METER",
+          "serialNumber": "AUTO-4024376a",
+          "externalId": "ba2b5090-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-4024376a"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "ba2b5090-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMAL2ACACHICEBAL2"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:36.574Z",
+          "updatedAt": "2026-03-09T20:53:36.574Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 112,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "banheiros_ba2b5090",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "7739db82-8f1c-42f9-b0b7-546badce61d5",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "b9154cb0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHINABAL3",
+        "gcdrDeviceId": "8604db12-c22f-41e6-8c34-82f86038217d",
+        "identifierTb": "BANHEIROS",
+        "identifierGcdr": "banheiros_b9154cb0",
+        "tb": {
+          "label": "AC- Hidrometro Nascente Banheiros L3",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "110",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "8604db12-c22f-41e6-8c34-82f86038217d",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "8604db12-c22f-41e6-8c34-82f86038217d",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHINABAL3",
+          "displayName": "AC- Hidrometro Nascente Banheiros L3",
+          "label": "AC- Hidrometro Nascente Banheiros L3",
+          "type": "METER",
+          "serialNumber": "AUTO-8604db12",
+          "externalId": "b9154cb0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-8604db12"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b9154cb0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMAL2ACACHINABAL3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:43.324Z",
+          "updatedAt": "2026-03-09T20:53:43.324Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 110,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "banheiros_b9154cb0",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "f31463e8-c644-45a1-ba85-e5c00f5155cc",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "b8906540-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHICEBAL1",
+        "gcdrDeviceId": "3c7fd801-da25-4b3c-888d-ff92a03c9b68",
+        "identifierTb": "BANHEIROS",
+        "identifierGcdr": "banheiros_b8906540",
+        "tb": {
+          "label": "AC- Hidrometro Cesan Banheiros L1",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "109",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "3c7fd801-da25-4b3c-888d-ff92a03c9b68",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "3c7fd801-da25-4b3c-888d-ff92a03c9b68",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHICEBAL1",
+          "displayName": "AC- Hidrometro Cesan Banheiros L1",
+          "label": "AC- Hidrometro Cesan Banheiros L1",
+          "type": "METER",
+          "serialNumber": "AUTO-3c7fd801",
+          "externalId": "b8906540-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-3c7fd801"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b8906540-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMAL2ACACHICEBAL1"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:41.124Z",
+          "updatedAt": "2026-03-09T20:53:41.124Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 109,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "banheiros_b8906540",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "da3df4b3-366f-43b6-8ca0-7d8c14fbfa8b",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "b70865b0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHICEBAL3",
+        "gcdrDeviceId": "6210b694-cd42-4bec-833a-fe1594d4c451",
+        "identifierTb": "BANHEIROS",
+        "identifierGcdr": "banheiros_b70865b0",
+        "tb": {
+          "label": "AC- Hidrometro Cesan Banheiros L3",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "106",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "6210b694-cd42-4bec-833a-fe1594d4c451",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "6210b694-cd42-4bec-833a-fe1594d4c451",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHICEBAL3",
+          "displayName": "AC- Hidrometro Cesan Banheiros L3",
+          "label": "AC- Hidrometro Cesan Banheiros L3",
+          "type": "METER",
+          "serialNumber": "AUTO-6210b694",
+          "externalId": "b70865b0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-6210b694"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b70865b0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMAL2ACACHICEBAL3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:37.674Z",
+          "updatedAt": "2026-03-09T20:53:37.674Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 106,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "banheiros_b70865b0",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "0e1d5a08-f61e-4758-ae1d-563b1e3649d2",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      }
+    ],
+    "skip": [
+      {
+        "action": "SKIP",
+        "tbId": "b68504e0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHINABAL1",
+        "gcdrDeviceId": "74a193b0-9031-4d5b-a2e5-91ceda1a664a",
+        "divergences": [],
+        "tb": {
+          "label": "AC- Hidrometro  Nascente para banheiros L1",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "105",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "74a193b0-9031-4d5b-a2e5-91ceda1a664a",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "74a193b0-9031-4d5b-a2e5-91ceda1a664a",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHINABAL1",
+          "displayName": "AC- Hidrometro  Nascente para banheiros L1",
+          "label": "AC- Hidrometro  Nascente para banheiros L1",
+          "type": "METER",
+          "serialNumber": "AUTO-74a193b0",
+          "externalId": "b68504e0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-74a193b0"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b68504e0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMAL2ACACHINABAL1"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:34.363Z",
+          "updatedAt": "2026-03-09T20:53:34.363Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 105,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "banheiros",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "3cbb1a7a-7a8a-42ad-9332-ec1c5d6a34e0",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      }
+    ]
+  }
+}

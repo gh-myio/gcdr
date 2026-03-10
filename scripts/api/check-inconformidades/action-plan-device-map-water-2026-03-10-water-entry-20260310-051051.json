@@ -1,0 +1,350 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T08:26:51Z",
+    "sourceReport": "inconformidades-report-device-map-water-2026-03-10-water-entry-20260310-051051.json",
+    "summary": {
+      "create": 1,
+      "update": 0,
+      "update_identifier": 4,
+      "skip": 1
+    }
+  },
+  "actions": {
+    "create": [
+      {
+        "action": "CREATE",
+        "line": "|55d130de-489d-42dc-a579-ed8745b70c46|d3202744-05dd-46d1-af33-495e9a2ecd52|111|HIDR. SCMAL2ACACHITACETORE|AC- Hidrometro TAG Cesan para as t.orres de resfriamento|b9a382f0-9011-11f0-a06d-e9509531b1d5",
+        "tbId": "b9a382f0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHITACETORE",
+        "divergences": [],
+        "tb": {
+          "label": "AC- Hidrometro TAG Cesan para as t.orres de resfriamento",
+          "identifier": "ENTRADA",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "111",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "fdee257f-f11d-4293-9abd-9dcdf8b30416",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {}
+      }
+    ],
+    "update": [],
+    "update_identifier": [
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "bab19790-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHIPRNA",
+        "gcdrDeviceId": "e0bc3fb7-dfd2-4f69-b6e6-9e8d6bb30273",
+        "identifierTb": "HIDROMETROS",
+        "identifierGcdr": "hidrometros_bab19790",
+        "tb": {
+          "label": "AC- Hidrometro Principal Nascente (Pendente de verificação tecnica)",
+          "identifier": "HIDROMETROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "113",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "e0bc3fb7-dfd2-4f69-b6e6-9e8d6bb30273",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "e0bc3fb7-dfd2-4f69-b6e6-9e8d6bb30273",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHIPRNA",
+          "displayName": "AC- Hidrometro Principal Nascente (Pendente de verificação tecnica)",
+          "label": "AC- Hidrometro Principal Nascente (Pendente de verificação tecnica)",
+          "type": "METER",
+          "serialNumber": "AUTO-e0bc3fb7",
+          "externalId": "bab19790-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-e0bc3fb7"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "bab19790-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_SHOPPING",
+            "tbDeviceName": "HIDR. SCMAL2ACACHIPRNA"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:42.224Z",
+          "updatedAt": "2026-03-09T20:53:42.224Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 113,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "hidrometros_bab19790",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "b730eb4c-caf9-4949-889b-ab06510a1dc8",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "bc3bba00-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR_2",
+        "gcdrDeviceId": "c90e0163-8833-4315-80bf-48bd77aefee6",
+        "identifierTb": "HIDROMETROS",
+        "identifierGcdr": "hidrometros_bc3bba00",
+        "tb": {
+          "label": "AC- Hidrometro purga de água condensada UR02",
+          "identifier": "HIDROMETROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "116",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "c90e0163-8833-4315-80bf-48bd77aefee6",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "c90e0163-8833-4315-80bf-48bd77aefee6",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHIPUÁGCOUR_2",
+          "displayName": "AC- Hidrometro purga de água condensada UR02",
+          "label": "AC- Hidrometro purga de água condensada UR02",
+          "type": "METER",
+          "serialNumber": "AUTO-c90e0163",
+          "externalId": "bc3bba00-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-c90e0163"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "bc3bba00-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_SHOPPING",
+            "tbDeviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR_2"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:46.788Z",
+          "updatedAt": "2026-03-09T20:53:46.788Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 116,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "hidrometros_bc3bba00",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "bff8df7e-9f6c-4b5c-adc3-ba382d851f91",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "bb321230-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR",
+        "gcdrDeviceId": "b8abdd64-2690-48f4-86d7-e96aa2e5af66",
+        "identifierTb": "HIDROMETROS",
+        "identifierGcdr": "hidrometros_bb321230",
+        "tb": {
+          "label": "AC- Hidrometro purga de água condensada UR01 (Precisa ser feito o mapeamento desse ponto)",
+          "identifier": "HIDROMETROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "114",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "b8abdd64-2690-48f4-86d7-e96aa2e5af66",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "b8abdd64-2690-48f4-86d7-e96aa2e5af66",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHIPUÁGCOUR",
+          "displayName": "AC- Hidrometro purga de água condensada UR01 (Precisa ser feito o mapeamento desse ponto)",
+          "label": "AC- Hidrometro purga de água condensada UR01 (Precisa ser feito o mapeamento desse ponto)",
+          "type": "METER",
+          "serialNumber": "AUTO-b8abdd64",
+          "externalId": "bb321230-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-b8abdd64"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "bb321230-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_SHOPPING",
+            "tbDeviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:44.426Z",
+          "updatedAt": "2026-03-09T20:53:44.426Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 114,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "hidrometros_bb321230",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "b763cf91-07b3-4010-b3d5-c50e8d9c0e1a",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      },
+      {
+        "action": "UPDATE_IDENTIFIER",
+        "tbId": "b80f7570-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHICI",
+        "gcdrDeviceId": "8c2177a8-97fe-4a64-ac18-6f01f9d41400",
+        "identifierTb": "HIDROMETROS",
+        "identifierGcdr": "hidrometros_b80f7570",
+        "tb": {
+          "label": "AC- Hidrometro C.isterna (instalado, mas não há consumo de água suficiente)",
+          "identifier": "HIDROMETROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "108",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "8c2177a8-97fe-4a64-ac18-6f01f9d41400",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "8c2177a8-97fe-4a64-ac18-6f01f9d41400",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHICI",
+          "displayName": "AC- Hidrometro C.isterna (instalado, mas não há consumo de água suficiente)",
+          "label": "AC- Hidrometro C.isterna (instalado, mas não há consumo de água suficiente)",
+          "type": "METER",
+          "serialNumber": "AUTO-8c2177a8",
+          "externalId": "b80f7570-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-8c2177a8"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b80f7570-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_SHOPPING",
+            "tbDeviceName": "HIDR. SCMAL2ACACHICI"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:40.020Z",
+          "updatedAt": "2026-03-09T20:53:40.020Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 108,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "hidrometros_b80f7570",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "4067f66d-a0fd-48d4-b4a0-1b4bbb60a947",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      }
+    ],
+    "skip": [
+      {
+        "action": "SKIP",
+        "tbId": "b78cb0e0-9011-11f0-a06d-e9509531b1d5",
+        "deviceName": "HIDR. SCMAL2ACACHITA",
+        "gcdrDeviceId": "e46e0faf-3aed-4536-87f3-480d9eef4cd0",
+        "divergences": [],
+        "tb": {
+          "label": "AC- Hidrometro TAG",
+          "identifier": "HIDROMETROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "slaveId": "107",
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "gcdrCustomerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "gcdrAssetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "gcdrDeviceId": "e46e0faf-3aed-4536-87f3-480d9eef4cd0",
+          "gcdrSyncAt": "2026-03-09T20:48:17.711Z"
+        },
+        "gcdr": {
+          "id": "e46e0faf-3aed-4536-87f3-480d9eef4cd0",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "55d130de-489d-42dc-a579-ed8745b70c46",
+          "customerId": "e04046d4-baa4-44e9-a378-4dfebe4140f1",
+          "name": "HIDR. SCMAL2ACACHITA",
+          "displayName": "AC- Hidrometro TAG",
+          "label": "AC- Hidrometro TAG",
+          "type": "METER",
+          "serialNumber": "AUTO-e46e0faf",
+          "externalId": "b78cb0e0-9011-11f0-a06d-e9509531b1d5",
+          "specs": {
+            "serialNumber": "AUTO-e46e0faf"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "b78cb0e0-9011-11f0-a06d-e9509531b1d5",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "HIDROMETRO_SHOPPING",
+            "tbDeviceName": "HIDR. SCMAL2ACACHITA"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:53:38.784Z",
+          "updatedAt": "2026-03-09T20:53:38.784Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "version": 1,
+          "slaveId": 107,
+          "centralId": "d3202744-05dd-46d1-af33-495e9a2ecd52",
+          "identifier": "hidrometros",
+          "deviceProfile": "HIDROMETRO_SHOPPING",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "0e1e3803-77e8-49a1-bee1-abe23241e50b",
+          "ingestionGatewayId": "d3202744-05dd-46d1-af33-495e9a2ecd52"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+gcdrDeviceId|gcdrAssetId|central_id|slave_id|name|display_name|tb_id
+# FAILED: 3F ESRL. PF-Escada 15 [39e70e00-9e63-11f0-afe1-175479a33d89] — unknown error
+# FAILED: 3F SCMAL2ACEL6 [aaff57b0-9011-11f0-a06d-e9509531b1d5] — unknown error
+# FAILED: HIDR. SCMAL2ACACHITACETORE [b9a382f0-9011-11f0-a06d-e9509531b1d5] — unknown error

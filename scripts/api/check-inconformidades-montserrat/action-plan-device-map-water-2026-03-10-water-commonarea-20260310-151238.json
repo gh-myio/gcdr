@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-10T18:15:08Z",
+    "sourceReport": "inconformidades-report-device-map-water-2026-03-10-water-commonarea-20260310-151238.json",
+    "summary": {
+      "create": 0,
+      "update": 0,
+      "update_identifier": 0,
+      "skip": 3
+    }
+  },
+  "actions": {
+    "create": [],
+    "update": [],
+    "update_identifier": [],
+    "skip": [
+      {
+        "action": "SKIP",
+        "tbId": "3cc68df0-a93d-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. SCMSBANFEML2",
+        "gcdrDeviceId": "ef419659-a0c6-4f04-b5ef-d23b89cf3250",
+        "divergences": [],
+        "tb": {
+          "label": "BANHEIROS L2",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "153",
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "gcdrCustomerId": "",
+          "gcdrAssetId": "",
+          "gcdrDeviceId": "ef419659-a0c6-4f04-b5ef-d23b89cf3250",
+          "gcdrSyncAt": ""
+        },
+        "gcdr": {
+          "id": "ef419659-a0c6-4f04-b5ef-d23b89cf3250",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "67a52596-5528-4809-bf9d-3f94c197696f",
+          "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+          "name": "check",
+          "displayName": "BANHEIROS L2",
+          "label": "BANHEIROS L2",
+          "type": "METER",
+          "serialNumber": "AUTO-ef419659",
+          "externalId": "3cc68df0-a93d-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-ef419659"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "83744320-9f9a-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T20:48:17.711Z",
+            "tbProfile": "",
+            "tbDeviceName": "check"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T20:58:47.186Z",
+          "updatedAt": "2026-03-10T17:04:05.751Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "updatedBy": "00000000-0000-0000-0000-000000000001",
+          "version": 5,
+          "slaveId": 153,
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "identifier": "BANHEIROS",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "3F_MEDIDOR"
+        }
+      },
+      {
+        "action": "SKIP",
+        "tbId": "3dab48a0-a93d-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. SCMSBANMASCL3",
+        "gcdrDeviceId": "f74ee6d4-fe3b-40ca-ad02-a2d5f27eb3eb",
+        "divergences": [],
+        "tb": {
+          "label": "BANHEIROS L3",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "154",
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "gcdrCustomerId": "",
+          "gcdrAssetId": "",
+          "gcdrDeviceId": "f74ee6d4-fe3b-40ca-ad02-a2d5f27eb3eb",
+          "gcdrSyncAt": ""
+        },
+        "gcdr": {
+          "id": "f74ee6d4-fe3b-40ca-ad02-a2d5f27eb3eb",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "763f1585-cd5a-4484-82e4-bc7658f0a595",
+          "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+          "name": "HIDR. SCMSBANMASCL3",
+          "displayName": "BANHEIROS L3",
+          "label": "BANHEIROS L3",
+          "type": "METER",
+          "serialNumber": "AUTO-f74ee6d4",
+          "externalId": "3dab48a0-a93d-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-f74ee6d4"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "3dab48a0-a93d-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T23:10:56.959Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMSBANMASCL3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T23:13:53.276Z",
+          "updatedAt": "2026-03-10T18:06:16.739Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "updatedBy": "00000000-0000-0000-0000-000000000001",
+          "version": 3,
+          "slaveId": 154,
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "identifier": "BANHEIROS",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "7e7f311f-63ad-4dbc-a498-380f9b8dd2b5",
+          "ingestionGatewayId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4"
+        }
+      },
+      {
+        "action": "SKIP",
+        "tbId": "3e8de070-a93d-11f0-afe1-175479a33d89",
+        "deviceName": "HIDR. SCMSBANFEML3",
+        "gcdrDeviceId": "65498e72-2c2c-4770-a800-a3ff96afe2ed",
+        "divergences": [],
+        "tb": {
+          "label": "BANHEIROS L4",
+          "identifier": "BANHEIROS",
+          "deviceType": "HIDROMETRO",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "slaveId": "155",
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "gcdrCustomerId": "",
+          "gcdrAssetId": "",
+          "gcdrDeviceId": "65498e72-2c2c-4770-a800-a3ff96afe2ed",
+          "gcdrSyncAt": ""
+        },
+        "gcdr": {
+          "id": "65498e72-2c2c-4770-a800-a3ff96afe2ed",
+          "tenantId": "11111111-1111-1111-1111-111111111111",
+          "assetId": "8e094e1a-fa31-487b-b21a-88a5e7de135d",
+          "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+          "name": "HIDR. SCMSBANFEML3",
+          "displayName": "BANHEIROS L4",
+          "label": "BANHEIROS L4",
+          "type": "METER",
+          "serialNumber": "AUTO-65498e72",
+          "externalId": "3e8de070-a93d-11f0-afe1-175479a33d89",
+          "specs": {
+            "serialNumber": "AUTO-65498e72"
+          },
+          "connectivityStatus": "UNKNOWN",
+          "credentials": {},
+          "telemetryConfig": {
+            "attributeKeys": [],
+            "telemetryKeys": [],
+            "reportingInterval": 60
+          },
+          "tags": [],
+          "metadata": {
+            "tbId": "3e8de070-a93d-11f0-afe1-175479a33d89",
+            "syncedAt": "2026-03-09T23:10:56.959Z",
+            "tbProfile": "HIDROMETRO_AREA_COMUM",
+            "tbDeviceName": "HIDR. SCMSBANFEML3"
+          },
+          "attributes": {},
+          "status": "ACTIVE",
+          "createdAt": "2026-03-09T23:13:54.370Z",
+          "updatedAt": "2026-03-10T18:06:18.622Z",
+          "createdBy": "00000000-0000-0000-0000-000000000001",
+          "updatedBy": "00000000-0000-0000-0000-000000000001",
+          "version": 3,
+          "slaveId": 155,
+          "centralId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4",
+          "identifier": "BANHEIROS",
+          "deviceProfile": "HIDROMETRO_AREA_COMUM",
+          "deviceType": "HIDROMETRO",
+          "ingestionId": "e8e4d11e-a260-4576-b2b2-8476219c36f0",
+          "ingestionGatewayId": "186bbdcb-95bc-4290-bf33-1ce89e48ffb4"
+        }
+      }
+    ]
+  }
+}
