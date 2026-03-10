@@ -515,7 +515,7 @@ export class CustomerRepository implements ICustomerRepository {
       .from(customers)
       .where(and(
         eq(customers.tenantId, tenantId),
-        sql`${customers.id} = ANY(${ancestorIds})`
+        inArray(customers.id, ancestorIds)
       ))
       .orderBy(customers.depth);
 
