@@ -15,18 +15,19 @@
 #   --auth jwt      → POST /auth/login with email + password
 #
 # Usage:
-#   ./check-inconformidades.sh --file device-map-energy-2026-03-10-energy-entry.txt
-#   ./check-inconformidades.sh --file target.txt --auth jwt
-#   GCDR_API_URL=http://localhost:3015 ./check-inconformidades.sh --file device-map-water-2026-03-10-water-stores.txt
+#   ./check-inconformidades.sh --customer montserrat --file device-map-energy-2026-03-10-energy-entry.txt
+#   ./check-inconformidades.sh --customer mestre-alvaro --file target.txt --auth jwt
+#   GCDR_API_URL=http://localhost:3015 ./check-inconformidades.sh --customer montserrat --file device-map-water-2026-03-10-water-stores.txt
 #
 # Output:
 #   - Colored summary to stdout
-#   - inconformidades-report-<input-basename>-<timestamp>.json in the same directory
+#   - inconformidades-report-<input-basename>-<timestamp>.json in customers/<name>/
 # =============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CUSTOMER_NAME=""
 TARGET_FILE=""
 
 # ---------------------------------------------------------------------------
@@ -42,18 +43,36 @@ PAGE_SIZE=500
 # Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --customer) CUSTOMER_NAME="$2"; shift 2 ;;
     --auth) AUTH_MODE="$2"; shift 2 ;;
     --url)  API_URL="$2";   shift 2 ;;
-    --file) TARGET_FILE="$SCRIPT_DIR/$2"; shift 2 ;;
+    --file) TARGET_FILE="$2"; shift 2 ;;   # just filename, not full path
     *) shift ;;
   esac
 done
 
+[[ -z "$CUSTOMER_NAME" ]] && { echo "[FAIL] --customer <name> is required"; exit 1; }
+CUSTOMER_DIR="$SCRIPT_DIR/customers/$CUSTOMER_NAME"
+[[ ! -d "$CUSTOMER_DIR" ]] && { echo "[FAIL] Customer directory not found: $CUSTOMER_DIR"; exit 1; }
+
+# Load local config (overrides defaults; env vars still take precedence)
+[[ -f "$CUSTOMER_DIR/config.env" ]] && source "$CUSTOMER_DIR/config.env"
+
+# Re-apply env-var overrides after sourcing config (env vars take precedence)
+API_URL="${GCDR_API_URL:-$API_URL}"
+API_KEY="${GCDR_API_KEY:-$API_KEY}"
+AUTH_MODE="${GCDR_AUTH_MODE:-$AUTH_MODE}"
+
+# Resolve full path for target file
+if [[ -n "$TARGET_FILE" ]]; then
+  TARGET_FILE="$CUSTOMER_DIR/$TARGET_FILE"
+fi
+
 # Default to target.txt for backwards compatibility
-[[ -z "$TARGET_FILE" ]] && TARGET_FILE="$SCRIPT_DIR/target.txt"
+[[ -z "$TARGET_FILE" ]] && TARGET_FILE="$CUSTOMER_DIR/target.txt"
 
 INPUT_BASENAME="$(basename "$TARGET_FILE" .txt)"
-REPORT_FILE="$SCRIPT_DIR/inconformidades-report-${INPUT_BASENAME}-$(date +%Y%m%d-%H%M%S).json"
+REPORT_FILE="$CUSTOMER_DIR/inconformidades-report-${INPUT_BASENAME}-$(date +%Y%m%d-%H%M%S).json"
 
 # ---------------------------------------------------------------------------
 # Colors
@@ -112,16 +131,22 @@ gcdr_get() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 1 — Extract unique customer IDs from target.txt
+# Step 1 — Extract unique customer IDs from target file
 # ---------------------------------------------------------------------------
-section "Step 1 — Collecting customer IDs from target.txt..."
+section "Step 1 — Collecting customer IDs from target file..."
 
 CUSTOMER_IDS=$(awk -F'|' 'NF==12 && $1!="tbId" && $1!~/^\[/ && $9!="" {print $9}' "$TARGET_FILE" | sort -u)
 CUSTOMER_COUNT=$(echo "$CUSTOMER_IDS" | grep -c . || true)
 
 if [[ "$CUSTOMER_COUNT" -eq 0 ]]; then
-  warn "No gcdrCustomerId found in target.txt — will search the full tenant."
-  CUSTOMER_IDS=""
+  if [[ -n "${GCDR_CUSTOMER_ID:-}" ]]; then
+    info "Using GCDR_CUSTOMER_ID from config.env: $GCDR_CUSTOMER_ID"
+    CUSTOMER_IDS="$GCDR_CUSTOMER_ID"
+    CUSTOMER_COUNT=1
+  else
+    warn "No gcdrCustomerId found in $(basename "$TARGET_FILE") — will search the full tenant."
+    CUSTOMER_IDS=""
+  fi
 fi
 
 info "Customers to fetch: $CUSTOMER_COUNT"
@@ -188,7 +213,7 @@ GCDR_TOTAL=$(jq 'length' "$GCDR_DEVICES_FILE")
 ok "Total GCDR devices loaded: $GCDR_TOTAL"
 
 # ---------------------------------------------------------------------------
-# Step 3 — Compare target.txt against in-memory GCDR dataset
+# Step 3 — Compare target file against in-memory GCDR dataset
 # ---------------------------------------------------------------------------
 section "Step 3 — Comparing $TOTAL_DEVICES TB device(s) against GCDR..."
 echo ""

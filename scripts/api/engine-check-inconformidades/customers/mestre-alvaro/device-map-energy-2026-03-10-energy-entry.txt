@@ -1,0 +1,2 @@
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+0d69ca50-9e29-11f0-afe1-175479a33d89|3F SCMAL2AC Trafo Entrada Shopping|Rede Geral Entrada|TRAFO|ENTRADA|ENTRADA|118|d3202744-05dd-46d1-af33-495e9a2ecd52|e04046d4-baa4-44e9-a378-4dfebe4140f1|470f8e94-4c8b-4fac-8c24-c41ab5deea20|9da75ed2-1d0b-48de-aee1-a524ab361fee|2026-03-09T20:48:17.711Z

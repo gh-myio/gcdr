@@ -206,11 +206,13 @@ export class DeviceService {
       throw new ValidationError('Device is already in this asset');
     }
 
+    const resolvedCustomerId = data.newCustomerId ?? newAsset.customerId;
+
     const movedDevice = await this.repository.move(
       tenantId,
       deviceId,
       data.newAssetId,
-      newAsset.customerId,
+      resolvedCustomerId,
       userId
     );
 

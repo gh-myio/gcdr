@@ -154,6 +154,7 @@ export type UpdateConnectivityDTO = z.infer<typeof UpdateConnectivitySchema>;
 // Move Device Schema
 export const MoveDeviceSchema = z.object({
   newAssetId: z.string().uuid(),
+  newCustomerId: z.string().uuid().optional(),
 });
 
 export type MoveDeviceDTO = z.infer<typeof MoveDeviceSchema>;

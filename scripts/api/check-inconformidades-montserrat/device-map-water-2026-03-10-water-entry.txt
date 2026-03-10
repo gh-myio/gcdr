@@ -1,0 +1,2 @@
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+3af06e60-a93d-11f0-afe1-175479a33d89|HIDR. SCMSBANFEML1|Entrada Shopping|ENTRADA|HIDROMETRO|HIDROMETRO_SHOPPING|151|186bbdcb-95bc-4290-bf33-1ce89e48ffb4|||3beca315-ead1-432a-85ca-ddf5cd5175d3|

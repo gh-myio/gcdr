@@ -29,6 +29,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_FILE=""
 
+# Load local config (overrides defaults; env vars still take precedence)
+[[ -f "$SCRIPT_DIR/config.env" ]] && source "$SCRIPT_DIR/config.env"
+
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
 # ---------------------------------------------------------------------------
@@ -120,8 +123,14 @@ CUSTOMER_IDS=$(awk -F'|' 'NF==12 && $1!="tbId" && $1!~/^\[/ && $9!="" {print $9}
 CUSTOMER_COUNT=$(echo "$CUSTOMER_IDS" | grep -c . || true)
 
 if [[ "$CUSTOMER_COUNT" -eq 0 ]]; then
-  warn "No gcdrCustomerId found in target.txt — will search the full tenant."
-  CUSTOMER_IDS=""
+  if [[ -n "${GCDR_CUSTOMER_ID:-}" ]]; then
+    info "Using GCDR_CUSTOMER_ID from config.env: $GCDR_CUSTOMER_ID"
+    CUSTOMER_IDS="$GCDR_CUSTOMER_ID"
+    CUSTOMER_COUNT=1
+  else
+    warn "No gcdrCustomerId found in $(basename "$TARGET_FILE") — will search the full tenant."
+    CUSTOMER_IDS=""
+  fi
 fi
 
 info "Customers to fetch: $CUSTOMER_COUNT"

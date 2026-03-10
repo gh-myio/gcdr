@@ -378,7 +378,9 @@ export const devices = pgTable('devices', {
   lastAlarmTimeIdx: index('devices_last_alarm_time_idx').on(table.tenantId, table.lastAlarmTime),
 
   // RFC-0008: Unique constraints
-  tenantIdentifierUnique: uniqueIndex('devices_tenant_identifier_unique').on(table.tenantId, table.identifier),
+  // NOTE: tenantIdentifierUnique was removed — identifier is a Modbus register
+  // name (e.g. 'CAG', 'TEMPERATURA') that repeats across devices on different
+  // centrals/slaves within the same tenant. See fix-identifier-unique-constraint.sql
   tenantCentralSlaveUnique: uniqueIndex('devices_tenant_central_slave_unique').on(table.tenantId, table.centralId, table.slaveId),
   tenantCustomerNameUnique: uniqueIndex('devices_tenant_customer_name_unique').on(table.tenantId, table.customerId, table.name),
 

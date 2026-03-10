@@ -1,0 +1,5 @@
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+52e954a0-d11f-11f0-998e-25174baff087|3F SCMS AC-Geral_Trafo1|Trafo Entrada 1|ENTRADA|ENTRADA|ENTRADA|169|186bbdcb-95bc-4290-bf33-1ce89e48ffb4|||fdee257f-f11d-4293-9abd-9dcdf8b30416|
+68fca630-eb04-11f0-998e-25174baff087|3F SCMS AC-ARGERAL|Trafo Entrada AC|ENTRADA|ENTRADA|ENTRADA|174|186bbdcb-95bc-4290-bf33-1ce89e48ffb4|||a9d3f8e6-3961-4e02-aea8-5d9024a17279|
+52e8df71-d11f-11f0-998e-25174baff087|AC-Geral_Trafo2|Trafo Entrada 2|ENTRADA|ENTRADA|ENTRADA|170|186bbdcb-95bc-4290-bf33-1ce89e48ffb4|||da48b7cf-5a89-40f8-9135-0f5a20473ecd|
+52e8df70-d11f-11f0-998e-25174baff087|AC-Geral_Trafo3|Trafo Entrada 3|ENTRADA|ENTRADA|ENTRADA|171|186bbdcb-95bc-4290-bf33-1ce89e48ffb4|||b68eafee-600a-4b6a-ba05-d500d949d917|
