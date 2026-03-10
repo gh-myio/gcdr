@@ -69,6 +69,7 @@ export class CustomerApiKeyService {
       description: data.description,
       scopes: data.scopes as ApiKeyScope[],
       expiresAt: data.expiresAt || null,
+      hierarchyAccess: data.hierarchyAccess ?? 'SELF',
       isActive: true,
       usageCount: 0,
       createdAt: now,
@@ -139,6 +140,7 @@ export class CustomerApiKeyService {
       customerId: apiKey.customerId,
       scopes: apiKey.scopes,
       name: apiKey.name,
+      hierarchyAccess: apiKey.hierarchyAccess,
     };
   }
 
@@ -196,6 +198,7 @@ export class CustomerApiKeyService {
       customerId: apiKey.customerId,
       scopes: apiKey.scopes,
       name: apiKey.name,
+      hierarchyAccess: apiKey.hierarchyAccess,
     };
   }
 

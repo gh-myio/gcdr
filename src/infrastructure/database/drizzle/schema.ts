@@ -813,6 +813,12 @@ export const customerApiKeys = pgTable('customer_api_keys', {
   // Status
   isActive: boolean('is_active').notNull().default(true),
 
+  // Hierarchy access control
+  // SELF    → key can only access its own customer data (default)
+  // SUBTREE → key can access customer + all descendants (?deep=1)
+  // TENANT  → key has no customer restriction (full tenant access)
+  hierarchyAccess: varchar('hierarchy_access', { length: 10 }).notNull().default('SELF'),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

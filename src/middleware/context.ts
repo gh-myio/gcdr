@@ -10,7 +10,8 @@ export interface RequestContext {
   customerId?: string;
   apiKeyId?: string;
   apiKeyScopes?: string[];
-  // Resolved when ?deep=1 with an API key: customer + all descendants
+  apiKeyHierarchyAccess?: 'SELF' | 'SUBTREE' | 'TENANT';
+  // Resolved when ?deep=1 with SUBTREE/TENANT key: customer + all descendants
   allowedCustomerIds?: string[];
 }
 

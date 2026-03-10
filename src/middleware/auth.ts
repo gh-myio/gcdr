@@ -136,9 +136,13 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope | ApiKeyScope[]
         // Set context from API Key
         req.context.tenantId = apiKeyContext.tenantId;
         req.context.userId = apiKeyContext.keyId;
-        req.context.customerId = apiKeyContext.customerId;
         req.context.apiKeyId = apiKeyContext.keyId;
         req.context.apiKeyScopes = apiKeyContext.scopes;
+        req.context.apiKeyHierarchyAccess = apiKeyContext.hierarchyAccess;
+        // TENANT keys have no customer restriction
+        if (apiKeyContext.hierarchyAccess !== 'TENANT') {
+          req.context.customerId = apiKeyContext.customerId;
+        }
 
         // Create a minimal user object for API Key auth
         req.user = {

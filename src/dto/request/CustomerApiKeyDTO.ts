@@ -37,6 +37,10 @@ export const CreateCustomerApiKeySchema = z.object({
     .datetime()
     .optional()
     .nullable(),
+
+  hierarchyAccess: z
+    .enum(['SELF', 'SUBTREE', 'TENANT'])
+    .default('SELF'),
 });
 
 export type CreateCustomerApiKeyDTO = z.infer<typeof CreateCustomerApiKeySchema>;

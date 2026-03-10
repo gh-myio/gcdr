@@ -1,6 +1,14 @@
 import { BaseEntity } from '../../shared/types';
 
 /**
+ * Hierarchy access level for Customer API Keys
+ * SELF    → key can only access its own customer data (default)
+ * SUBTREE → key can access customer + all descendants (?deep=1)
+ * TENANT  → key has no customer restriction (full tenant access)
+ */
+export type HierarchyAccess = 'SELF' | 'SUBTREE' | 'TENANT';
+
+/**
  * Scopes available for Customer API Keys
  */
 export type ApiKeyScope =
@@ -55,6 +63,9 @@ export interface CustomerApiKey extends BaseEntity {
   /** Whether the key is active */
   isActive: boolean;
 
+  /** Hierarchy access control */
+  hierarchyAccess: HierarchyAccess;
+
   /** Usage statistics */
   usageCount: number;
 }
@@ -80,6 +91,7 @@ export interface ApiKeyContext {
   customerId: string;
   scopes: ApiKeyScope[];
   name: string;
+  hierarchyAccess: HierarchyAccess;
 }
 
 /**
