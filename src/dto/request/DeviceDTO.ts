@@ -167,6 +167,7 @@ export interface ListDevicesParams extends PaginationParams {
   status?: string;
   connectivityStatus?: string;
   serialNumber?: string;
+  // smart full-text search across name, displayName, label, code, serialNumber, externalId, identifier, metadata
   search?: string;
 
   // RFC-0008: New filter options
@@ -179,4 +180,8 @@ export interface ListDevicesParams extends PaginationParams {
   ingestionGatewayId?: string;
   inactive?: boolean;         // Filter for inactive devices
   inactiveHours?: number;     // Hours threshold for inactivity
+
+  // Additional exact-match filters
+  label?: string;
+  externalId?: string;
 }

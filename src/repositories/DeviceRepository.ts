@@ -11,6 +11,66 @@ import { countWhere } from './helpers/countQuery';
 
 const { devices } = schema;
 
+/**
+ * Builds the smart full-text search condition across all relevant text columns.
+ * Covers: name, displayName, label, code, serialNumber, externalId, identifier, metadata (as text).
+ */
+function buildSearchCondition(term: string) {
+  const q = `%${term}%`;
+  return sql`(
+    ${devices.name}        ILIKE ${q} OR
+    ${devices.displayName} ILIKE ${q} OR
+    ${devices.label}       ILIKE ${q} OR
+    ${devices.code}        ILIKE ${q} OR
+    ${devices.serialNumber} ILIKE ${q} OR
+    ${devices.externalId}  ILIKE ${q} OR
+    ${devices.identifier}  ILIKE ${q} OR
+    ${devices.metadata}::text ILIKE ${q}
+  )`;
+}
+
+/**
+ * Appends the shared filter conditions that apply to all list variants.
+ */
+function applyCommonFilters(conditions: ReturnType<typeof sql>[], params: ListDevicesParams) {
+  if (params.type) {
+    conditions.push(eq(devices.type, params.type as typeof devices.type.enumValues[number]));
+  }
+  if (params.status) {
+    conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
+  }
+  if (params.connectivityStatus) {
+    conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
+  }
+  if (params.centralId) {
+    conditions.push(eq(devices.centralId, params.centralId));
+  }
+  if (params.slaveId !== undefined) {
+    conditions.push(eq(devices.slaveId, params.slaveId));
+  }
+  if (params.deviceProfile) {
+    conditions.push(eq(devices.deviceProfile, params.deviceProfile));
+  }
+  if (params.identifier) {
+    conditions.push(eq(devices.identifier, params.identifier));
+  }
+  if (params.ingestionId) {
+    conditions.push(eq(devices.ingestionId, params.ingestionId));
+  }
+  if (params.ingestionGatewayId) {
+    conditions.push(eq(devices.ingestionGatewayId, params.ingestionGatewayId));
+  }
+  if (params.label) {
+    conditions.push(eq(devices.label, params.label));
+  }
+  if (params.externalId) {
+    conditions.push(eq(devices.externalId, params.externalId));
+  }
+  if (params.search) {
+    conditions.push(buildSearchCondition(params.search));
+  }
+}
+
 export class DeviceRepository implements IDeviceRepository {
 
   async create(tenantId: string, data: CreateDeviceDTO, customerId: string, createdBy: string): Promise<Device> {
@@ -176,29 +236,7 @@ export class DeviceRepository implements IDeviceRepository {
       conditions.push(eq(devices.customerId, params.customerId));
     }
 
-    if (params?.type) {
-      conditions.push(eq(devices.type, params.type as typeof devices.type.enumValues[number]));
-    }
-
-    if (params?.status) {
-      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
-    }
-
-    if (params?.connectivityStatus) {
-      conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
-    }
-
-    if (params?.centralId) {
-      conditions.push(eq(devices.centralId, params.centralId));
-    }
-
-    if (params?.slaveId !== undefined) {
-      conditions.push(eq(devices.slaveId, params.slaveId));
-    }
-
-    if (params?.search) {
-      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
-    }
+    if (params) applyCommonFilters(conditions, params);
 
     const [results, total] = await Promise.all([
       db.select()
@@ -234,21 +272,7 @@ export class DeviceRepository implements IDeviceRepository {
       eq(devices.assetId, assetId),
     ];
 
-    if (params?.type) {
-      conditions.push(eq(devices.type, params.type as typeof devices.type.enumValues[number]));
-    }
-
-    if (params?.status) {
-      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
-    }
-
-    if (params?.connectivityStatus) {
-      conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
-    }
-
-    if (params?.search) {
-      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
-    }
+    if (params) applyCommonFilters(conditions, params);
 
     const [results, total] = await Promise.all([
       db.select()
@@ -284,21 +308,7 @@ export class DeviceRepository implements IDeviceRepository {
       eq(devices.customerId, customerId),
     ];
 
-    if (params?.type) {
-      conditions.push(eq(devices.type, params.type as typeof devices.type.enumValues[number]));
-    }
-
-    if (params?.status) {
-      conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
-    }
-
-    if (params?.connectivityStatus) {
-      conditions.push(eq(devices.connectivityStatus, params.connectivityStatus as typeof devices.connectivityStatus.enumValues[number]));
-    }
-
-    if (params?.search) {
-      conditions.push(sql`(${devices.name} ILIKE ${`%${params.search}%`} OR ${devices.displayName} ILIKE ${`%${params.search}%`})`);
-    }
+    if (params) applyCommonFilters(conditions, params);
 
     const [results, total] = await Promise.all([
       db.select()

@@ -57,6 +57,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       assetId, customerId, type, status, connectivityStatus,
       centralId, slaveId,
       search, name,
+      deviceProfile, identifier, ingestionId, ingestionGatewayId,
+      label, externalId,
       limit, cursor, page, pageSize,
     } = req.query;
 
@@ -84,6 +86,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       centralId: centralId as string | undefined,
       slaveId: slaveId ? parseInt(slaveId as string, 10) : undefined,
       search: (search || name) as string | undefined,
+      deviceProfile: deviceProfile as string | undefined,
+      identifier: identifier as string | undefined,
+      ingestionId: ingestionId as string | undefined,
+      ingestionGatewayId: ingestionGatewayId as string | undefined,
+      label: label as string | undefined,
+      externalId: externalId as string | undefined,
       limit: resolvedLimit,
       cursor: resolvedCursor,
     };
