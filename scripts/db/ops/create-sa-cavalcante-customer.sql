@@ -67,7 +67,7 @@ BEGIN
     v_sc_name,
     v_sc_name,
     v_sc_code,
-    'ENTERPRISE',
+    'HOLDING',
     v_sc_path,
     v_sc_depth,
     'ACTIVE',

@@ -393,6 +393,31 @@ export class DeviceRepository implements IDeviceRepository {
     return result[0]?.count || 0;
   }
 
+  async countByConnectivityStatus(
+    tenantId: string,
+  ): Promise<{ total: number; byConnectivity: Record<string, number> }> {
+    const rows = await db
+      .select({
+        status: devices.connectivityStatus,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        sql`${devices.deletedAt} is null`,
+      ))
+      .groupBy(devices.connectivityStatus);
+
+    const byConnectivity: Record<string, number> = {};
+    let total = 0;
+    for (const row of rows) {
+      byConnectivity[row.status] = row.count;
+      total += row.count;
+    }
+
+    return { total, byConnectivity };
+  }
+
   private mapToEntity(row: typeof devices.$inferSelect): Device {
     return {
       id: row.id,

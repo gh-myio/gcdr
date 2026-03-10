@@ -195,6 +195,57 @@ export class AuditLogRepository implements IAuditLogRepository {
     return result?.count ?? 0;
   }
 
+  async getAuditPeriodSummary(
+    tenantId: string,
+    from: Date,
+    to: Date,
+  ): Promise<{ total: number; byCategory: Record<string, number>; byAction: Record<string, number> }> {
+    const periodConditions = and(
+      eq(auditLogs.tenantId, tenantId),
+      gte(auditLogs.createdAt, from),
+      lte(auditLogs.createdAt, to),
+    );
+
+    const [countResult, categoryRows, actionRows] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(auditLogs)
+        .where(periodConditions),
+      db
+        .select({
+          category: auditLogs.eventCategory,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(auditLogs)
+        .where(periodConditions)
+        .groupBy(auditLogs.eventCategory),
+      db
+        .select({
+          action: auditLogs.action,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(auditLogs)
+        .where(periodConditions)
+        .groupBy(auditLogs.action),
+    ]);
+
+    const byCategory: Record<string, number> = {};
+    for (const row of categoryRows) {
+      byCategory[row.category] = row.count;
+    }
+
+    const byAction: Record<string, number> = {};
+    for (const row of actionRows) {
+      byAction[row.action] = row.count;
+    }
+
+    return {
+      total: countResult[0]?.count ?? 0,
+      byCategory,
+      byAction,
+    };
+  }
+
   async deleteExpired(level: AuditLevel, beforeDate: Date): Promise<number> {
     const result = await db
       .delete(auditLogs)
