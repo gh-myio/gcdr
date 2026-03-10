@@ -80,6 +80,7 @@ export type MoveAssetDTO = z.infer<typeof MoveAssetSchema>;
 // List Assets Params
 export interface ListAssetsParams extends PaginationParams {
   customerId?: string;
+  customerIds?: string[];  // deep=1: customer + all descendants
   parentAssetId?: string | null;
   type?: string;
   status?: string;

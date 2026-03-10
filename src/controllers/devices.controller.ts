@@ -9,10 +9,14 @@ import {
   ListDevicesParams
 } from '../dto/request/DeviceDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
+import { resolveDeepCustomers } from '../middleware/deepCustomers';
 import { ValidationError } from '../shared/errors/AppError';
 import { EventType } from '../shared/types';
 
 const router = Router();
+
+// Apply deep customer resolution to all list endpoints
+router.use('/', resolveDeepCustomers);
 
 /**
  * POST /devices
@@ -64,9 +68,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       ? String((parseInt(page as string, 10) - 1) * resolvedLimit)
       : cursor as string | undefined;
 
+    // Hierarchy scoping: allowedCustomerIds (deep) > customerId (SELF from API key) > query param
+    const { allowedCustomerIds, customerId: ctxCustomerId } = req.context;
+    const resolvedCustomerId = !allowedCustomerIds
+      ? (ctxCustomerId ?? customerId as string | undefined)
+      : undefined;
+
     const params: ListDevicesParams = {
       assetId: assetId as string | undefined,
-      customerId: customerId as string | undefined,
+      customerId: resolvedCustomerId,
+      customerIds: allowedCustomerIds,
       type: type as string | undefined,
       status: status as string | undefined,
       connectivityStatus: connectivityStatus as string | undefined,

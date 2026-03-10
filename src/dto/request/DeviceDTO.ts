@@ -162,6 +162,7 @@ export type MoveDeviceDTO = z.infer<typeof MoveDeviceSchema>;
 export interface ListDevicesParams extends PaginationParams {
   assetId?: string;
   customerId?: string;
+  customerIds?: string[];  // deep=1: customer + all descendants
   type?: string;
   status?: string;
   connectivityStatus?: string;

@@ -10,6 +10,8 @@ export interface RequestContext {
   customerId?: string;
   apiKeyId?: string;
   apiKeyScopes?: string[];
+  // Resolved when ?deep=1 with an API key: customer + all descendants
+  allowedCustomerIds?: string[];
 }
 
 export interface JWTUser {

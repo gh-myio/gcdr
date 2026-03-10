@@ -7,10 +7,14 @@ import {
   ListAssetsParams,
 } from '../dto/request/AssetDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
+import { resolveDeepCustomers } from '../middleware/deepCustomers';
 import { ValidationError } from '../shared/errors/AppError';
 import { EventType } from '../shared/types';
 
 const router = Router();
+
+// Apply deep customer resolution to all list endpoints
+router.use('/', resolveDeepCustomers);
 
 /**
  * POST /assets
@@ -42,11 +46,17 @@ router.post('/',
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId, requestId } = req.context;
+    const { tenantId, requestId, allowedCustomerIds, customerId: ctxCustomerId } = req.context;
     const { customerId, parentAssetId, type, status, search, limit, cursor } = req.query;
 
+    // Hierarchy scoping: allowedCustomerIds (deep) > customerId (SELF from API key) > query param
+    const resolvedCustomerId = !allowedCustomerIds
+      ? (ctxCustomerId ?? customerId as string | undefined)
+      : undefined;
+
     const params: ListAssetsParams = {
-      customerId: customerId as string | undefined,
+      customerId: resolvedCustomerId,
+      customerIds: allowedCustomerIds,
       parentAssetId: parentAssetId as string | undefined,
       type: type as string | undefined,
       status: status as string | undefined,

@@ -1,4 +1,4 @@
-import { eq, and, like, isNull, sql } from 'drizzle-orm';
+import { eq, and, like, isNull, sql, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Asset } from '../domain/entities/Asset';
 import { CreateAssetDTO, UpdateAssetDTO, ListAssetsParams } from '../dto/request/AssetDTO';
@@ -164,6 +164,12 @@ export class AssetRepository implements IAssetRepository {
 
     // Build conditions
     const conditions = [eq(assets.tenantId, tenantId)];
+
+    if (params?.customerIds && params.customerIds.length > 0) {
+      conditions.push(inArray(assets.customerId, params.customerIds));
+    } else if (params?.customerId) {
+      conditions.push(eq(assets.customerId, params.customerId));
+    }
 
     if (params?.type) {
       conditions.push(eq(assets.type, params.type as typeof assets.type.enumValues[number]));

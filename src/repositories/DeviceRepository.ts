@@ -170,7 +170,9 @@ export class DeviceRepository implements IDeviceRepository {
     // Build conditions
     const conditions = [eq(devices.tenantId, tenantId)];
 
-    if (params?.customerId) {
+    if (params?.customerIds && params.customerIds.length > 0) {
+      conditions.push(inArray(devices.customerId, params.customerIds));
+    } else if (params?.customerId) {
       conditions.push(eq(devices.customerId, params.customerId));
     }
 
