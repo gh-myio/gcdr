@@ -1,0 +1,1 @@
+tbId|deviceName|label|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
