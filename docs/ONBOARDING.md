@@ -91,11 +91,11 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Partners** | 15 | Parceiros, API Keys, OAuth Clients, Webhooks |
 | **Authorization** | 18 | RBAC completo (Roles, Policies, Assignments) |
 | **Assets** | 11 | Ativos com hierarquia (SITE → BUILDING → FLOOR → AREA → EQUIPMENT) |
-| **Devices** | 9 | Dispositivos IoT com conectividade (filtros por `centralId`, `slaveId`) |
+| **Devices** | 10 | Dispositivos IoT com conectividade (filtros por `centralId`, `slaveId`); `POST /devices/:id/move` para relocar entre customers/assets |
 | **Rules** | 10 | Regras de negócio (ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW) com guard configs para Decision Engine |
 | **Alarm Bundles** | 3 | Bundle de regras para integração Node-RED (M2M) com versionamento |
 | **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./SIMULATOR-MANUAL.md)) |
-| **Customer API Keys** | 4 | Gerenciamento de API Keys por customer |
+| **Customer API Keys** | 4 | Gerenciamento de API Keys por customer; campo `hierarchyAccess` (SELF/SUBTREE/TENANT) controla acesso à árvore de clientes |
 | **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
 | **Registration** | 6 | Auto-cadastro de usuários com aprovação (RFC-0011) |
 | **Admin Users** | 4 | Aprovação, rejeição e desbloqueio de usuários (RFC-0011) |
@@ -1659,6 +1659,61 @@ await auditLogService.log({
 
 > **Nota**: O sistema de eventos externo (AWS EventBridge) foi removido. O GCDR agora usa apenas audit logs locais no PostgreSQL para rastreabilidade e compliance.
 
+### Verificar Conformidade de Devices (engine-check-inconformidades)
+
+O diretório `scripts/api/engine-check-inconformidades/` contém um pipeline completo de verificação e sincronização de devices entre uma fonte de dados externa (device-maps) e o GCDR.
+
+**Pipeline em 4 passos (via `run-all.sh`):**
+
+```
+Step 1 — check-inconformidades.sh × N arquivos → inconformidades-report-*.json
+Step 2 — generate-action-plan.sh               → action-plan-*.json
+Step 3 — detect-relocations.sh                 → relocation-plan-*.json
+Step 4 — generate-registry.sh                  → device-registry-*.txt
+```
+
+**Uso básico:**
+
+```bash
+cd scripts/api/engine-check-inconformidades
+
+# Configurar variáveis
+export GCDR_API_KEY=gcdr_cust_xxxxx
+export GCDR_CUSTOMER_ID=<uuid>
+export DEFAULT_GCDR_ASSET_ID=<uuid>
+
+# Rodar pipeline completo para um customer
+./run-all.sh --customer montserrat
+
+# Apenas verificar (sem gerar action plans)
+./run-all.sh --customer montserrat --checks-only
+```
+
+**Após revisar os planos, aplicar as correções:**
+
+```bash
+./relocate-devices.sh --customer montserrat --dry-run   # previw de relocações
+./relocate-devices.sh --customer montserrat              # executar POST /devices/:id/move
+
+./consolidate-creates.sh --customer montserrat --dry-run # preview de criações
+./consolidate-creates.sh --customer montserrat           # criar devices novos
+
+./apply-updates.sh --customer montserrat --dry-run       # preview de patches
+./apply-updates.sh --customer montserrat                 # aplicar PATCH /devices/:id
+```
+
+**Registro de devices (`device-registry-*.txt`):**
+
+Gerado automaticamente ao final do `run-all.sh`. Formato pipe-delimited:
+
+```
+gcdrId|parentAssetGcdrId|central_id|slave_id|name|display_name|tb_id
+```
+
+Contém todos os devices existentes no GCDR (ações: SKIP, UPDATE, UPDATE_IDENTIFIER). Útil como mapa de referência para integrações ThingsBoard.
+
+**Dados de cada customer ficam em:** `customers/<name>/`
+
 ---
 
 ## 11. Troubleshooting
@@ -1791,6 +1846,8 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [Frontend: Usuários, Grupos e Roles](./FRONTEND-Users-Groups-Roles.md) - Guia frontend para modelo de usuário, RBAC e grupos
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 - [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
+- [RFC-0022: Device Conformity Tooling](./RFC-0022-Device-Conformity-Tooling.md) - Scripts `engine-check-inconformidades`: pipeline de verificação, action plans, relocações e registry
+- [RFC-0023: Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md) - Proposta de endpoint assíncrono que substitui os shell scripts por um Job API com fases e log de execução
 
 ### Documentação Externa
 
@@ -1853,6 +1910,53 @@ Use este checklist para acompanhar seu progresso:
 ---
 
 ## Changelog
+
+### 2026-03-10
+
+**Devices: remoção da constraint `devices_tenant_identifier_unique`**
+- Constraint `UNIQUE(tenant_id, identifier)` removida — identificadores Modbus curtos (ex: `CAG`, `TEMPERATURA`) se repetem entre centrais/slaves do mesmo tenant sem conflito real
+- Index de lookup `devices_identifier_idx` mantido para performance de busca
+- Migration manual: `scripts/db/migrations/fix-identifier-unique-constraint.sql`
+- Schema Drizzle atualizado em `src/infrastructure/database/drizzle/schema.ts`
+- Resolvia 37 erros de `apply-updates.sh` que falhavam por colisão de constraint
+
+**Devices: endpoint `POST /devices/:id/move`**
+- Endpoint para relocar device entre customers e/ou assets: `POST /devices/:id/move` com body `{newAssetId, newCustomerId}`
+- Substituiu o uso incorreto de `PATCH /devices/:id` nos scripts de manutenção
+- Script `scripts/api/engine-check-inconformidades/relocate-devices.sh` corrigido para usar o endpoint correto
+
+**CustomerRepository: correção de erro 22P02 (malformed array literal)**
+- `getAncestors` usava `sql\`${customers.id} = ANY(${ancestorIds})\`` que serializava o array JS como string literal, causando erro PostgreSQL `22P02 invalid input syntax for type uuid`
+- Corrigido para `inArray(customers.id, ancestorIds)` (drizzle-orm) que gera parameterização correta `ARRAY[$1,$2,...]`
+- Afetava endpoints que percorrem hierarquia de customers (ex: `GET /customers/:id/ancestors`, bundle auth)
+
+**engine-check-inconformidades: pipeline multi-customer**
+- Diretório `scripts/api/engine-check-inconformidades/` é agora o canônico (substitui `check-inconformidades-montserrat/`)
+- Todos os scripts usam `--customer <name>` e armazenam dados em `customers/<name>/`
+- Scripts: `check-inconformidades.sh`, `generate-action-plan.sh`, `detect-relocations.sh`, `relocate-devices.sh`, `consolidate-creates.sh`, `apply-updates.sh`, `generate-registry.sh`, `run-all.sh`
+- README atualizado com pipeline completo em 4 passos
+
+**generate-registry.sh: novo script de registro de devices**
+- Ao final do `run-all.sh` (Step 4), gera arquivo `device-registry-<timestamp>.txt` com todos os devices já existentes no GCDR
+- Formato pipe-delimited: `gcdrId|parentAssetGcdrId|central_id|slave_id|name|display_name|tb_id`
+- Fonte: seções `skip`, `update`, `update_identifier` dos `action-plan-*.json` (todos têm objeto `gcdr` completo)
+- Deduplicado via `sort -u`; útil como mapa de referência para integrações ThingsBoard
+
+**API Keys: campo `hierarchyAccess`**
+- Customer API Keys agora têm campo `hierarchyAccess` com valores `SELF` | `SUBTREE` | `TENANT`
+- Controla qual nível da árvore de customers a chave pode acessar ao chamar `GET /customers/:id/tree`
+- `SELF` = apenas o customer dono; `SUBTREE` = customer + descendentes; `TENANT` = todos do tenant
+
+**Scripts: gitignore de arquivos gerados**
+- Arquivos gerados pelos scripts de check-inconformidades ignorados: `inconformidades-report-*.json`, `action-plan-*.json`, `relocation-plan-*.json`, `apply-updates-*.log`, `consolidated-creates-*.txt`, `device-registry-*.txt`
+- Arquivos de teste gerados também ignorados: `tests/get_bundles/**/simple_bundle_output.json`
+
+**RFC-0023: Device Sync Job API**
+- Proposta de endpoint assíncrono `POST /device-sync/jobs` que executa o pipeline completo in-process (sem Redis/BullMQ)
+- 6 fases: CHECK → ACTION_PLAN → DETECT_RELOCATIONS → RELOCATE → APPLY_UPDATES → CONSOLIDATE_CREATES
+- Polling via `GET /device-sync/jobs/:jobId` e log via `GET /device-sync/jobs/:jobId/log`
+- Tabela `device_sync_jobs` com `phases_summary` e `log_entries` JSONB
+- RFC: `docs/RFC-0023-Device-Sync-Job-API.md`
 
 ### 2026-02-26
 
