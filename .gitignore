@@ -153,6 +153,16 @@ Copia.env.txt
 # Test outputs (generated dynamically)
 tests/get_bundles/simple_bundle_output.json
 tests/get_bundles/*.jpeg
+tests/get_bundles/**/simple_bundle_output.json
+tests/get_bundles/*_test/myTest-*/
+
+# check-inconformidades — generated files (reports, plans, logs, registry)
+scripts/api/**/inconformidades-report-*.json
+scripts/api/**/action-plan-*.json
+scripts/api/**/relocation-plan-*.json
+scripts/api/**/apply-updates-*.log
+scripts/api/**/consolidated-creates-*.txt
+scripts/api/**/device-registry-*.txt
 
 # Temporary documentation files
 docs/toCheck*.txt
