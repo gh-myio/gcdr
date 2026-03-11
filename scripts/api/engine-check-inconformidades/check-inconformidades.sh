@@ -242,11 +242,6 @@ lookup_gcdr_device() {
     result=$(jq -r --arg eid "$tb_id" '.[] | select(.externalId == $eid)' "$GCDR_DEVICES_FILE")
   fi
 
-  # Priority 3: by identifier (exact)
-  if [[ -z "$result" && -n "$identifier" ]]; then
-    result=$(jq -r --arg idf "$identifier" '.[] | select(.identifier == $idf)' "$GCDR_DEVICES_FILE" | head -c 4096)
-  fi
-
   echo "$result"
 }
 

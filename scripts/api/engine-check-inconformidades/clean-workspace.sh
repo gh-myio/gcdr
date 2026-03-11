@@ -48,7 +48,8 @@ for dir in "${SEARCH_DIRS[@]}"; do
     "$dir"/action-plan-*.json \
     "$dir"/relocation-plan-*.json \
     "$dir"/apply-updates-*.log \
-    "$dir"/consolidated-creates-*.txt
+    "$dir"/consolidated-creates-*.txt \
+    "$dir"/device-registry-*.txt
   do
     for f in $pattern; do
       [[ -f "$f" ]] && TO_DELETE+=("$f")

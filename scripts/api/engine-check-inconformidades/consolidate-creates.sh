@@ -135,6 +135,8 @@ for plan_file in "${PLANS[@]}"; do
     device_type=$(echo "$item"   | jq -r '.tb.deviceType   // "OTHER"')
     device_profile=$(echo "$item"| jq -r '.tb.deviceProfile // ""')
     customer_id=$(echo "$item"   | jq -r '.tb.gcdrCustomerId // ""')
+    # Fall back to GCDR_CUSTOMER_ID from config.env when customerId is empty
+    [[ -z "$customer_id" && -n "${GCDR_CUSTOMER_ID:-}" ]] && customer_id="$GCDR_CUSTOMER_ID"
 
     # Build POST body
     BODY=$(jq -n \
