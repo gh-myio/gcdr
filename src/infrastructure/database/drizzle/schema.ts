@@ -1315,3 +1315,36 @@ export const templates = pgTable('templates', {
   slugTenantUnique: uniqueIndex('tmpl_slug_tenant_unique').on(table.slug, table.tenantId),
   tenantTypeStatusIdx: index('tmpl_tenant_type_status_idx').on(table.tenantId, table.type, table.status),
 }));
+
+// =============================================================================
+// RFC-0023: DEVICE SYNC JOBS
+// =============================================================================
+
+export const deviceSyncJobStatusEnum = pgEnum('device_sync_job_status', ['QUEUED', 'RUNNING', 'DONE', 'PARTIAL', 'FAILED']);
+export const deviceSyncJobPhaseEnum  = pgEnum('device_sync_job_phase',  ['QUEUED', 'CHECK', 'ACTION_PLAN', 'DETECT_RELOCATIONS', 'RELOCATE', 'APPLY_UPDATES', 'CONSOLIDATE_CREATES', 'DONE']);
+
+export const deviceSyncJobs = pgTable('device_sync_jobs', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  customerId:   uuid('customer_id').notNull(),
+  status:       deviceSyncJobStatusEnum('status').notNull().default('QUEUED'),
+  currentPhase: deviceSyncJobPhaseEnum('current_phase').notNull().default('QUEUED'),
+  dryRun:       boolean('dry_run').notNull().default(false),
+
+  // Input
+  inputConfig:  jsonb('input_config').notNull().default({}),   // { defaultAssetId? }
+  inputFiles:   jsonb('input_files').notNull().default([]),    // [{ name, content }]
+
+  // Runtime state
+  phasesSummary: jsonb('phases_summary').notNull().default({}),
+  logEntries:    jsonb('log_entries').notNull().default([]),
+  errorMessage:  text('error_message'),
+
+  // Timestamps
+  createdAt:   timestamp('created_at',   { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at',   { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+}, (table) => ({
+  tenantCustomerIdx: index('device_sync_jobs_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantStatusIdx:   index('device_sync_jobs_tenant_status_idx').on(table.tenantId, table.status),
+}));

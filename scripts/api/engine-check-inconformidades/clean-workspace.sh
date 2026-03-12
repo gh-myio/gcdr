@@ -6,7 +6,7 @@
 #
 # Usage:
 #   ./clean-workspace.sh                        (clean all customers, interactive)
-#   ./clean-workspace.sh --customer montserrat  (only one customer)
+#   ./clean-workspace.sh --customer MOXUARA --force  (only one customer)
 #   ./clean-workspace.sh --force                (skip confirmation)
 # =============================================================================
 

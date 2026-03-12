@@ -12,7 +12,7 @@
 #   --auth jwt      → POST /auth/login with email + password
 #
 # Usage:
-#   ./consolidate-creates.sh --customer montserrat
+#   ./consolidate-creates.sh --customer moxuara
 #   ./consolidate-creates.sh --customer mestre-alvaro --auth jwt
 #   GCDR_API_URL=http://localhost:3015 ./consolidate-creates.sh --customer montserrat
 #   ./consolidate-creates.sh --customer montserrat --dry-run   (prints POST body, no actual request)

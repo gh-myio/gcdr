@@ -59,6 +59,8 @@ tags:
     description: Admin user management - approval, rejection, unlock (RFC-0011)
   - name: Templates
     description: HTML template engine for email notifications with preview and tag catalog (RFC-0021)
+  - name: Device Sync Jobs
+    description: Async device synchronization pipeline TB→GCDR (RFC-0023). Creates background jobs that run CHECK → ACTION_PLAN → DETECT_RELOCATIONS → RELOCATE → APPLY_UPDATES → CONSOLIDATE_CREATES phases with structured logs.
 
 security:
   - bearerAuth: []
@@ -168,6 +170,97 @@ components:
           type: string
       required:
         - success
+
+    # RFC-0023: Device Sync Jobs schemas
+    DeviceSyncLogEntry:
+      type: object
+      properties:
+        ts:
+          type: string
+          format: date-time
+        phase:
+          type: string
+          enum: [QUEUED, CHECK, ACTION_PLAN, DETECT_RELOCATIONS, RELOCATE, APPLY_UPDATES, CONSOLIDATE_CREATES, DONE]
+        level:
+          type: string
+          enum: [INFO, WARN, OK, FAIL, ERROR]
+          description: INFO=gray, WARN=yellow, OK=green, FAIL=red, ERROR=dark red
+        message:
+          type: string
+
+    DeviceSyncPhasesSummary:
+      type: object
+      properties:
+        check:
+          type: object
+          properties:
+            conformant: { type: integer }
+            divergent:  { type: integer }
+            notLinked:  { type: integer }
+        actionPlan:
+          type: object
+          properties:
+            create:           { type: integer }
+            update:           { type: integer }
+            updateIdentifier: { type: integer }
+            skip:             { type: integer }
+        detectRelocations:
+          type: object
+          properties:
+            relocate:       { type: integer }
+            genuineCreates: { type: integer }
+        relocate:
+          type: object
+          properties:
+            ok:   { type: integer }
+            fail: { type: integer }
+        applyUpdates:
+          type: object
+          properties:
+            ok:   { type: integer }
+            fail: { type: integer }
+        consolidateCreates:
+          type: object
+          properties:
+            ok:   { type: integer }
+            fail: { type: integer }
+
+    DeviceSyncJobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, DONE, PARTIAL, FAILED]
+        currentPhase:
+          type: string
+          enum: [QUEUED, CHECK, ACTION_PLAN, DETECT_RELOCATIONS, RELOCATE, APPLY_UPDATES, CONSOLIDATE_CREATES, DONE]
+        dryRun:
+          type: boolean
+        customerId:
+          type: string
+          format: uuid
+        summary:
+          $ref: '#/components/schemas/DeviceSyncPhasesSummary'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+
+    DeviceSyncJobSummary:
+      allOf:
+        - $ref: '#/components/schemas/DeviceSyncJobStatus'
         - message
 
     # Authentication Schemas
@@ -8409,3 +8502,213 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  # ===========================================================================
+  # RFC-0023: Device Sync Jobs
+  # ===========================================================================
+
+  /api/v1/device-sync/jobs:
+    post:
+      tags: [Device Sync Jobs]
+      summary: Create and enqueue a device sync job
+      description: |
+        Creates a new device synchronization job and immediately enqueues it for background processing.
+        Returns `202 Accepted` with the `jobId`. The job runs asynchronously through 6 phases:
+        `CHECK → ACTION_PLAN → DETECT_RELOCATIONS → RELOCATE → APPLY_UPDATES → CONSOLIDATE_CREATES`
+
+        Use `GET /api/v1/device-sync/jobs/:jobId` to poll status.
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, files]
+              properties:
+                customerId:
+                  type: string
+                  format: uuid
+                  description: Target customer for the sync
+                defaultAssetId:
+                  type: string
+                  format: uuid
+                  description: Default asset used when gcdrAssetId is empty in the file
+                dryRun:
+                  type: boolean
+                  default: false
+                  description: If true, simulates all operations without writing to DB
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [name, content]
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      content:
+                        type: string
+                        description: Pipe-delimited device-map. First line must be the header tbId|deviceName|...
+            example:
+              customerId: "84e0370e-636a-4741-9874-504b5e0b3577"
+              defaultAssetId: "8a9c669b-855f-4c2f-bd60-e0541238b980"
+              dryRun: false
+              files:
+                - name: "energy-stores"
+                  content: "tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt\n52ea1510-...|3F SCMOXUARA102BCL1|SUPERMERCADOS_BH|102BC_L1|3F_MEDIDOR|3F_MEDIDOR|2|e982edf9-...|||||"
+      responses:
+        '202':
+          description: Job accepted and enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      jobId:   { type: string, format: uuid }
+                      status:  { type: string, example: QUEUED }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+    get:
+      tags: [Device Sync Jobs]
+      summary: List device sync jobs
+      description: Lists jobs for the tenant with optional filters and pagination.
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [QUEUED, RUNNING, DONE, PARTIAL, FAILED]
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeviceSyncJobSummary'
+                  pagination:
+                    type: object
+                    properties:
+                      page:       { type: integer }
+                      pageSize:   { type: integer }
+                      total:      { type: integer }
+                      totalPages: { type: integer }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/v1/device-sync/jobs/{jobId}:
+    get:
+      tags: [Device Sync Jobs]
+      summary: Get job status and summary
+      description: |
+        Returns the current status, active phase, per-phase summary counters, and duration.
+        Poll until `status` is `DONE`, `PARTIAL`, or `FAILED`.
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/DeviceSyncJobStatus'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/v1/device-sync/jobs/{jobId}/log:
+    get:
+      tags: [Device Sync Jobs]
+      summary: Get structured job log
+      description: Returns the full structured log. Filter entries by `level=FAIL` to highlight errors.
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Structured log entries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          jobId:
+                            type: string
+                            format: uuid
+                          status:
+                            type: string
+                            enum: [QUEUED, RUNNING, DONE, PARTIAL, FAILED]
+                          entries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DeviceSyncLogEntry'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }

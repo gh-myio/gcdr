@@ -107,6 +107,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Public Single Apps** | 12 | Apps públicos de formulário com respostas versionadas (RFC-0020) |
 | **Templates** | 8 | Motor de templates HTML para email (6 tipos: EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT) com preview e catálogo de tags (RFC-0021) |
 | **Template Types** | 3 | Catálogo de tipos de template: listar, detalhar e editar label/descrição/ícone (`GET /template-types`, `PATCH /template-types/:type`) |
+| **Device Sync Jobs** | 4 | Sincronização assíncrona de devices TB→GCDR (RFC-0023). `POST /device-sync/jobs` enfileira o pipeline completo (6 fases); polling via `GET /jobs/:jobId`; log estruturado via `GET /jobs/:jobId/log` |
 
 ### Exemplos de Requisições
 
@@ -1847,7 +1848,9 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 - [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
 - [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 - [RFC-0022: Device Conformity Tooling](./RFC-0022-Device-Conformity-Tooling.md) - Scripts `engine-check-inconformidades`: pipeline de verificação, action plans, relocações e registry
-- [RFC-0023: Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md) - Proposta de endpoint assíncrono que substitui os shell scripts por um Job API com fases e log de execução
+- [RFC-0023: Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md) - Spec do endpoint assíncrono que substitui os shell scripts por uma Job API com fases e log de execução
+- [ARCHITECTURE: Device Sync Jobs](./ARCHITECTURE-Device-Sync-Jobs.md) - Arquitetura da implementação: pipeline de 6 fases, decisões de design, modelo de dados e limitações conhecidas
+- [Frontend: Device Sync Jobs](./FRONTEND-Device-Sync-Jobs.md) - Guia de integração frontend: payloads, exemplos de polling, badges de status e progresso
 
 ### Documentação Externa
 
