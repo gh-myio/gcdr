@@ -1,0 +1,2 @@
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+1b9211f0-cae3-11f0-998e-25174baff087|Hidr. shopping_principal|Entrada Geral|ENTRADA|HIDROMETRO|HIDROMETRO_SHOPPING|311|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||

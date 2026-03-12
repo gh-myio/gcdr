@@ -1,0 +1,6 @@
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+47490d70-dcfa-11f0-998e-25174baff087|Hidr. Banheiro_Fem_L3|Banheiro_Fem_L3|BANHEIROS|HIDROMETRO|HIDROMETRO_AREA_COMUM|309|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||
+47493480-dcfa-11f0-998e-25174baff087|Hidr. Banheiro_L2|Banheiro_L2|BANHEIROS|HIDROMETRO|HIDROMETRO_AREA_COMUM|310|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||
+47490d71-dcfa-11f0-998e-25174baff087|Hidr. Banheiro_Masc_L3|Banheiro_Masc_L3|BANHEIROS|HIDROMETRO|HIDROMETRO_AREA_COMUM|308|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||
+fb516f40-dfb8-11f0-998e-25174baff087|Hidr. SCMoxuaraBanheiroL4|Refeitório e Vestiário|ÁREA COMUM|HIDROMETRO|HIDROMETRO_AREA_COMUM|330|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||
+03adcaa0-de95-11f0-998e-25174baff087|HIDR. SCMOXUARA Torres|Torre de Refrigeração|ÁREA COMUM|HIDROMETRO|HIDROMETRO_AREA_COMUM|329|e982edf9-edb1-4aa6-8a14-4782465ae5a3||||
