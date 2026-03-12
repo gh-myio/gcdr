@@ -60,33 +60,54 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 /**
  * GET /rules/notification-categories
- * List the 3 notification recipient categories available on every rule.
- * Each category maps to a templateType for email rendering.
+ * List alarm actions available as notification trigger points (RFC-0024).
+ * Each action represents a lifecycle event in the alarm state machine.
  */
 router.get('/notification-categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { requestId } = req.context;
     sendSuccess(res, [
       {
-        id: 'alarmNotify',
-        label: 'Notificação de Alarme',
-        description: 'Destinatários que recebem o email imediato quando um alarme é disparado pela rule.',
+        id: 'OPEN',
+        label: 'Alarme Disparado',
+        description: 'Notificação imediata quando um alarme é aberto.',
         icon: 'bell-alert',
         templateType: 'EMAIL_ALARM',
       },
       {
-        id: 'alarmReport',
-        label: 'Relatório de Alarme',
-        description: 'Destinatários que recebem o relatório periódico consolidado dos alarmes da rule.',
-        icon: 'chart-bar',
-        templateType: 'EMAIL_REPORT',
+        id: 'ACK',
+        label: 'Alarme Reconhecido',
+        description: 'Notificação quando um operador reconhece o alarme.',
+        icon: 'check-circle',
+        templateType: 'EMAIL_ALARM',
       },
       {
-        id: 'alarmInsight',
-        label: 'Insight de Alarme',
-        description: 'Destinatários que recebem análises e insights analíticos gerados a partir dos dados da rule.',
-        icon: 'light-bulb',
-        templateType: 'INSIGHT',
+        id: 'ESCALATE',
+        label: 'Alarme Escalado',
+        description: 'Notificação quando o alarme é escalado para nível superior.',
+        icon: 'arrow-up-circle',
+        templateType: 'EMAIL_ALARM',
+      },
+      {
+        id: 'SNOOZE',
+        label: 'Alarme Sonecado',
+        description: 'Notificação quando o alarme é adiado temporariamente.',
+        icon: 'clock',
+        templateType: 'EMAIL_ALARM',
+      },
+      {
+        id: 'CLOSE',
+        label: 'Alarme Fechado',
+        description: 'Notificação quando o alarme é encerrado.',
+        icon: 'x-circle',
+        templateType: 'EMAIL_ALARM',
+      },
+      {
+        id: 'STATE_HISTORY',
+        label: 'Histórico de Estado',
+        description: 'Relatório periódico consolidado do histórico de estados do alarme.',
+        icon: 'chart-bar',
+        templateType: 'EMAIL_REPORT',
       },
     ], 200, requestId);
   } catch (err) {

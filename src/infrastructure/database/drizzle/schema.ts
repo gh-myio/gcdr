@@ -1317,6 +1317,42 @@ export const templates = pgTable('templates', {
 }));
 
 // =============================================================================
+// RFC-0024: ALARM DISPATCH CONFIGURATION
+// =============================================================================
+
+export const alarmActionEnum = pgEnum('alarm_action', ['OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY']);
+
+export const customerChannels = pgTable('customer_channels', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  tenantId:   uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+  channel:    varchar('channel', { length: 50 }).notNull(),
+  active:     boolean('active').notNull().default(true),
+  config:     jsonb('config').notNull().default({}),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:  uuid('created_by'),
+}, (table) => ({
+  tenantCustomerChannelUnique: uniqueIndex('customer_channels_unique').on(table.tenantId, table.customerId, table.channel),
+  tenantCustomerIdx:  index('customer_channels_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantActiveIdx:    index('customer_channels_tenant_active_idx').on(table.tenantId, table.active),
+}));
+
+export const groupDispatchConfigs = pgTable('group_dispatch_configs', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  groupId:   uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+  channel:   varchar('channel', { length: 50 }).notNull(),
+  action:    alarmActionEnum('action').notNull(),
+  active:    boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantGroupChannelActionUnique: uniqueIndex('group_dispatch_configs_unique').on(table.tenantId, table.groupId, table.channel, table.action),
+  tenantGroupIdx: index('group_dispatch_configs_tenant_group_idx').on(table.tenantId, table.groupId),
+}));
+
+// =============================================================================
 // RFC-0023: DEVICE SYNC JOBS
 // =============================================================================
 

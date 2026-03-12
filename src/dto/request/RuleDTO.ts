@@ -117,34 +117,52 @@ const NotificationChannelSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
-// Notification recipient schemas
-const NotificationRecipientSchema = z.object({
-  name: z.string().min(1).max(255),
-  email: z.string().email(),
-  sourceType: z.enum(['USER', 'GROUP_MEMBER', 'MANUAL']),
-  userId: z.string().uuid().optional(),
-  groupId: z.string().uuid().optional(),
-});
+// Alarm lifecycle actions (RFC-0024)
+export const AlarmActionSchema = z.enum(['OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY']);
 
+// SMTP relay config
 const NotificationEmailRelaySchema = z.object({
-  host: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
+  host:   z.string().min(1),
+  port:   z.number().int().min(1).max(65535),
   secure: z.boolean(),
-  user: z.string().optional(),
-  from: z.string().min(1),
+  user:   z.string().optional(),
+  from:   z.string().min(1),
 });
 
-const RuleNotificationChannelSchema = z.object({
-  enabled: z.boolean().default(false),
+// RFC-0024 notification recipient — discriminated union by sourceType
+const NotificationRecipientSchema = z.discriminatedUnion('sourceType', [
+  z.object({
+    sourceType:      z.literal('USER'),
+    userId:          z.string().uuid(),
+    name:            z.string().min(1).max(255),
+    email:           z.string().email().optional(),
+    telegramHandle:  z.string().optional(),
+    whatsappNumber:  z.string().optional(),
+  }),
+  z.object({
+    sourceType: z.literal('GROUP'),
+    groupId:    z.string().uuid(),
+    name:       z.string().min(1).max(255),
+  }),
+  z.object({
+    sourceType:     z.literal('MANUAL'),
+    name:           z.string().min(1).max(255),
+    channel:        z.string().min(1),
+    email:          z.string().email().optional(),
+    telegramHandle: z.string().optional(),
+    whatsappNumber: z.string().optional(),
+  }),
+]);
+
+// Per-action notification config
+const RuleActionNotificationSchema = z.object({
+  enabled:    z.boolean().default(false),
   recipients: z.array(NotificationRecipientSchema).default([]),
   emailRelay: NotificationEmailRelaySchema.optional(),
 });
 
-const RuleNotificationsSchema = z.object({
-  alarmNotify: RuleNotificationChannelSchema.optional(),
-  alarmReport: RuleNotificationChannelSchema.optional(),
-  alarmInsight: RuleNotificationChannelSchema.optional(),
-});
+// Notifications keyed by AlarmAction (RFC-0024)
+const RuleNotificationsSchema = z.record(AlarmActionSchema, RuleActionNotificationSchema);
 
 // Per-device value override schema (RFC-0018)
 const RuleValueOverrideSchema = z.object({

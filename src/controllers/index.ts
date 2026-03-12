@@ -42,3 +42,7 @@ export { dashboardController } from './dashboard.controller';
 
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';
+
+// RFC-0024: Alarm Dispatch Configuration
+export { default as customerChannelsController } from './customer-channels.controller';
+export { default as groupDispatchController } from './group-dispatch.controller';

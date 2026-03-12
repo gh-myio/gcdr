@@ -61,6 +61,9 @@ import {
   dashboardController,
   // RFC-0023: Device Sync Jobs
   deviceSyncJobsController,
+  // RFC-0024: Alarm Dispatch Configuration
+  customerChannelsController,
+  groupDispatchController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -187,6 +190,9 @@ apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListB
 apiV1Router.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
 apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCustomerHandler);
 
+// RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
+apiV1Router.use('/customers/:customerId/channels', authMiddleware, customerChannelsController);
+
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
 apiV1Router.use('/customers', hybridAuthByMethod('customers:read', 'customers:write'), customersController);
@@ -229,6 +235,9 @@ apiV1Router.use('/integrations', authMiddleware, integrationsController);
 
 // Partners
 apiV1Router.use('/partners', authMiddleware, partnersController);
+
+// RFC-0024: Group dispatch matrix (nested — must come before general /groups router)
+apiV1Router.use('/groups/:groupId/dispatch', authMiddleware, groupDispatchController);
 
 // Groups
 apiV1Router.use('/groups', authMiddleware, groupsController);

@@ -145,6 +145,9 @@ export interface MaintenanceWindowConfig {
   affectedRules?: string[]; // Rule IDs to suppress, empty means all
 }
 
+// Alarm lifecycle actions (RFC-0024)
+export type AlarmAction = 'OPEN' | 'ACK' | 'ESCALATE' | 'SNOOZE' | 'CLOSE' | 'STATE_HISTORY';
+
 // Notification Channel Configuration (delivery mechanism — webhook, SMS config, etc.)
 export interface NotificationChannel {
   type: 'EMAIL' | 'SMS' | 'WEBHOOK' | 'SLACK' | 'TEAMS' | 'PAGERDUTY' | 'CUSTOM';
@@ -152,20 +155,7 @@ export interface NotificationChannel {
   enabled: boolean;
 }
 
-// Individual recipient of a rule notification
-// sourceType:
-//   USER         — user selected directly from the customer's user list
-//   GROUP_MEMBER — user added via a notification group; groupId indicates origin
-//   MANUAL       — email typed manually (no userId/groupId)
-export interface NotificationRecipient {
-  name: string;
-  email: string;
-  sourceType: 'USER' | 'GROUP_MEMBER' | 'MANUAL';
-  userId?: string;   // UUID of the user record (USER or GROUP_MEMBER)
-  groupId?: string;  // UUID of the group (GROUP_MEMBER only)
-}
-
-// SMTP relay config for outbound notification emails (per notification category)
+// SMTP relay config for outbound notification emails
 export interface NotificationEmailRelay {
   host: string;      // SMTP host (e.g. smtp.sendgrid.net)
   port: number;      // SMTP port (465 or 587)
@@ -174,19 +164,59 @@ export interface NotificationEmailRelay {
   from: string;      // From address (e.g. "Alertas MYIO <noreply@empresa.com.br>")
 }
 
-// Recipients for a single notification category
-export interface RuleNotificationChannel {
+// RFC-0024 notification recipient — discriminated union by sourceType
+export type NotificationRecipient =
+  | {
+      sourceType: 'USER';
+      userId: string;
+      name: string;
+      email?: string;
+      telegramHandle?: string;
+      whatsappNumber?: string;
+    }
+  | {
+      sourceType: 'GROUP';
+      groupId: string;
+      name: string;
+    }
+  | {
+      sourceType: 'MANUAL';
+      name: string;
+      channel: string;
+      email?: string;
+      telegramHandle?: string;
+      whatsappNumber?: string;
+    };
+
+// Notification config for a single alarm action
+export interface RuleActionNotification {
   enabled: boolean;
   recipients: NotificationRecipient[];
-  emailRelay?: NotificationEmailRelay;  // SMTP settings for this category
+  emailRelay?: NotificationEmailRelay;
 }
 
-// Per-category notification settings for a rule
-// Each category is independent — different recipient lists per purpose
-export interface RuleNotifications {
-  alarmNotify?: RuleNotificationChannel;   // Alarm fired notification
-  alarmReport?: RuleNotificationChannel;   // Alarm report digest
-  alarmInsight?: RuleNotificationChannel;  // Alarm insight / analytics
+// Per-action notification settings for a rule (RFC-0024)
+// Keyed by AlarmAction — each action can have independent recipient lists
+export type RuleNotifications = Partial<Record<AlarmAction, RuleActionNotification>>;
+
+// Legacy per-category notification channel (kept for backward compat during migration)
+export interface RuleNotificationChannel {
+  enabled: boolean;
+  recipients: Array<{
+    name: string;
+    email: string;
+    sourceType: 'USER' | 'GROUP_MEMBER' | 'MANUAL';
+    userId?: string;
+    groupId?: string;
+  }>;
+  emailRelay?: NotificationEmailRelay;
+}
+
+// @deprecated — use RuleNotifications (RFC-0024)
+export interface LegacyRuleNotifications {
+  alarmNotify?: RuleNotificationChannel;
+  alarmReport?: RuleNotificationChannel;
+  alarmInsight?: RuleNotificationChannel;
 }
 
 // Per-device value override for rules with scope_entity_ids
