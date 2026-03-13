@@ -120,10 +120,50 @@ const NotificationChannelSchema = z.object({
 // Alarm lifecycle actions (RFC-0024)
 export const AlarmActionSchema = z.enum(['OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY']);
 
-// notifications is a JSONB field stored and forwarded as-is.
-// Both legacy format (alarmNotify/alarmReport/alarmInsight) and RFC-0024 format
-// (OPEN/ACK/ESCALATE/...) are accepted — the alarm orchestrator is the reader.
-const RuleNotificationsSchema = z.record(z.string(), z.unknown());
+// SMTP relay config
+const NotificationEmailRelaySchema = z.object({
+  host:   z.string().min(1),
+  port:   z.number().int().min(1).max(65535),
+  secure: z.boolean(),
+  user:   z.string().optional(),
+  from:   z.string().min(1),
+});
+
+// RFC-0024 notification recipient — discriminated union by sourceType
+const NotificationRecipientSchema = z.discriminatedUnion('sourceType', [
+  z.object({
+    sourceType:     z.literal('USER'),
+    userId:         z.string().uuid(),
+    name:           z.string().min(1).max(255),
+    email:          z.string().email().optional(),
+    telegramHandle: z.string().optional(),
+    whatsappNumber: z.string().optional(),
+  }),
+  z.object({
+    sourceType: z.literal('GROUP'),
+    groupId:    z.string().uuid(),
+    name:       z.string().min(1).max(255),
+  }),
+  z.object({
+    sourceType:     z.literal('MANUAL'),
+    name:           z.string().min(1).max(255),
+    channel:        z.string().min(1),
+    email:          z.string().email().optional(),
+    telegramHandle: z.string().optional(),
+    whatsappNumber: z.string().optional(),
+  }),
+]);
+
+// Per-action notification config
+const RuleActionNotificationSchema = z.object({
+  enabled:    z.boolean().default(false),
+  recipients: z.array(NotificationRecipientSchema).default([]),
+  emailRelay: NotificationEmailRelaySchema.optional(),
+});
+
+// Notifications keyed by AlarmAction — RFC-0024 format only.
+// Legacy keys (alarmNotify/alarmReport/alarmInsight) are no longer accepted.
+const RuleNotificationsSchema = z.record(AlarmActionSchema, RuleActionNotificationSchema);
 
 // Per-device value override schema (RFC-0018)
 const RuleValueOverrideSchema = z.object({
