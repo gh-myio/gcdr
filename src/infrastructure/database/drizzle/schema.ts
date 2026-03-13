@@ -613,11 +613,8 @@ export const rules = pgTable('rules', {
     'valid_maintenance_config',
     sql`${table.type} != 'MAINTENANCE_WINDOW' OR ${table.maintenanceConfig} IS NOT NULL`
   ),
-  // Scope entity validation
-  validScopeEntity: check(
-    'valid_scope_entity',
-    sql`${table.scopeType} = 'GLOBAL' OR cardinality(${table.scopeEntityIds}) > 0`
-  ),
+  // valid_scope_entity constraint removed — DEVICE scope with empty entityIds is valid
+  // (intermediate state when user clears devices before adding new ones). See migration 0015.
 }));
 
 // =============================================================================

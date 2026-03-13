@@ -70,11 +70,6 @@ export class RuleService {
     // Check if rule exists
     await this.getById(tenantId, id);
 
-    // Validate scope if being updated
-    if (data.scope) {
-      await this.validateScope(tenantId, data.scope);
-    }
-
     const rule = await this.repository.update(tenantId, id, data, userId);
 
     alarmBundleService.invalidateCache(tenantId, rule.customerId, {
@@ -264,17 +259,9 @@ export class RuleService {
 
   // Private helper methods
 
-  private async validateScope(_tenantId: string, scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
-    // Enforce DB check constraint "valid_scope_entity":
-    // scopeType = 'GLOBAL' OR cardinality(scopeEntityIds) > 0
-    if (scope.type !== 'GLOBAL') {
-      const hasEntity = (scope.entityIds && scope.entityIds.length > 0) || !!scope.entityId;
-      if (!hasEntity) {
-        throw new ValidationError(
-          `scope.entityIds must contain at least one entity when scope.type is "${scope.type}". Use type "GLOBAL" for rules without a specific target.`
-        );
-      }
-    }
+  private async validateScope(_tenantId: string, _scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
+    // entityId and entityIds are optional — no validation required.
+    // DEVICE scope with empty entityIds is valid (rule saved without devices yet).
   }
 
   /**
