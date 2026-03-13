@@ -264,8 +264,17 @@ export class RuleService {
 
   // Private helper methods
 
-  private async validateScope(_tenantId: string, _scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
-    // entityId and entityIds are optional — no validation required
+  private async validateScope(_tenantId: string, scope: { type: string; entityId?: string; entityIds?: string[] }): Promise<void> {
+    // Enforce DB check constraint "valid_scope_entity":
+    // scopeType = 'GLOBAL' OR cardinality(scopeEntityIds) > 0
+    if (scope.type !== 'GLOBAL') {
+      const hasEntity = (scope.entityIds && scope.entityIds.length > 0) || !!scope.entityId;
+      if (!hasEntity) {
+        throw new ValidationError(
+          `scope.entityIds must contain at least one entity when scope.type is "${scope.type}". Use type "GLOBAL" for rules without a specific target.`
+        );
+      }
+    }
   }
 
   /**
