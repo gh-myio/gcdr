@@ -48,7 +48,18 @@ const AlarmThresholdConfigSchema = z.object({
   // Schedule configuration
   startAt: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/).optional(),
   endAt: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/).optional(),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+  // Accepts array [0,1,5] or object {"0":true,"1":true,"5":true} — both normalized to array
+  daysOfWeek: z.preprocess(
+    (v) => {
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+        return Object.entries(v as Record<string, boolean>)
+          .filter(([, active]) => active)
+          .map(([day]) => Number(day));
+      }
+      return v;
+    },
+    z.array(z.number().int().min(0).max(6))
+  ).optional(),
   // Channel targeting for OUTLET devices
   channelId: z.number().int().min(0).optional(),
   // Energy unit multiplier
