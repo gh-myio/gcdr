@@ -3743,6 +3743,90 @@ components:
           items:
             $ref: '#/components/schemas/TemplateTag'
 
+    RuleMeta:
+      type: object
+      description: |
+        Simplified rule summary used in the EnrichedCustomer response (`GET /customers/external/:id?allRules=1`).
+        The `id` field may be a plain rule UUID or a synthesized key of the form `{ruleId}_{deviceId}`
+        when the rule has a per-device value override (`scopeEntityOverrides`). In that case `parentRuleId`
+        is set to the base rule UUID.
+      required: [id, name, scope, metric, operator, value]
+      properties:
+        id:
+          type: string
+          description: Rule UUID or synthesized override key (`{ruleId}_{deviceId}`)
+          example: 'cccc0001-0001-0001-0001-000000000002_6857b8cb-34aa-4e2e-9113-8598c2601f31'
+        parentRuleId:
+          type: string
+          format: uuid
+          description: Base rule UUID — only present when `id` is a synthesized override key
+          example: 'cccc0001-0001-0001-0001-000000000002'
+        name:
+          type: string
+          example: 'Consumo Elevado'
+        scope:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [GLOBAL, CUSTOMER, ASSET, DEVICE]
+            entityId:
+              type: string
+              format: uuid
+        metric:
+          type: string
+          example: 'instantaneous_power'
+        operator:
+          type: string
+          enum: [GT, GTE, LT, LTE, EQ, NEQ, BETWEEN, OUTSIDE, UNCHANGED]
+          example: 'GT'
+        value:
+          type: number
+          description: Trigger threshold — may be overridden per device (see parentRuleId)
+          example: 299
+        valueHigh:
+          type: number
+          description: Upper bound for BETWEEN/OUTSIDE operators
+        duration:
+          type: integer
+          description: Seconds the condition must persist before firing
+        hysteresis:
+          type: number
+        aggregation:
+          type: string
+          enum: [AVG, MIN, MAX, SUM, COUNT, LAST]
+        startAt:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          example: '08:00'
+        endAt:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          example: '18:00'
+        daysOfWeek:
+          type: object
+          description: Map of day index (0=Sun … 6=Sat) to active boolean
+          example: { "0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": false }
+        channelId:
+          type: integer
+          description: Channel index for multi-channel OUTLET devices
+        keyMulti:
+          type: number
+          description: Energy unit multiplier (1 = W, 0.25 = Wh)
+          default: 1
+
+    SetDeviceOverride:
+      type: object
+      description: Per-device value override for an alarm threshold rule
+      properties:
+        value:
+          type: number
+          description: Override trigger threshold for this device
+          example: 299
+        valueHigh:
+          type: number
+          description: Override upper bound for BETWEEN/OUTSIDE operators
+
 paths:
   # Health
   /health:
@@ -4519,14 +4603,24 @@ paths:
                                     - properties:
                                         ruleIds:
                                           type: array
+                                          description: |
+                                            Rule IDs applicable to this device. When the rule has a per-device
+                                            value override (`scopeEntityOverrides`), the entry uses the synthesized
+                                            key `{ruleId}_{deviceId}` instead of the plain rule UUID — matching
+                                            the alarm bundle format consumed by Node-RED.
                                           items:
                                             type: string
-                                            format: uuid
+                                          example:
+                                            - 'cccc0001-0001-0001-0001-000000000002_6857b8cb-34aa-4e2e-9113-8598c2601f31'
+                                            - 'cccc0001-0001-0001-0001-000000000001'
                               rules:
                                 type: object
                                 additionalProperties:
                                   $ref: '#/components/schemas/RuleMeta'
-                                description: Unified rules dictionary keyed by rule ID (present when allRules=1)
+                                description: |
+                                  Unified rules dictionary keyed by rule ID (present when allRules=1).
+                                  Includes both base rules and synthesized override variants (key = `{ruleId}_{deviceId}`).
+                                  Override variants have `parentRuleId` set and reflect the per-device `value`/`valueHigh`.
         '404':
           description: Customer not found
           content:
@@ -6356,6 +6450,81 @@ paths:
                             type: integer
         '404':
           description: Rule not found
+
+  /rules/{id}/overrides/{deviceId}:
+    put:
+      tags: [Rules]
+      summary: Set per-device value override
+      description: |
+        Sets (or replaces) the value override for a specific device in a rule's `scopeEntityOverrides`.
+        Other devices' overrides are preserved.
+        When an override exists, the device receives a synthesized rule key `{ruleId}_{deviceId}`
+        in `GET /customers/external/:id` and in the alarm bundle.
+      operationId: setDeviceOverride
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDeviceOverride'
+            examples:
+              threshold:
+                summary: Override trigger threshold
+                value: { "value": 299 }
+              between:
+                summary: Override BETWEEN bounds
+                value: { "value": 200, "valueHigh": 350 }
+      responses:
+        '200':
+          description: Rule updated with new override
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+        '404':
+          description: Rule or device not found
+    delete:
+      tags: [Rules]
+      summary: Remove per-device value override
+      description: |
+        Removes the value override for a specific device. The device reverts to the rule's default
+        `alarmConfig.value`. Other devices' overrides are preserved.
+      operationId: deleteDeviceOverride
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule updated — override removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Rule'
+        '404':
+          description: Rule or device not found
 
   /rules/evaluate:
     post:
