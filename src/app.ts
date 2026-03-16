@@ -64,6 +64,7 @@ import {
   // RFC-0024: Alarm Dispatch Configuration
   customerChannelsController,
   groupDispatchController,
+  userContactsController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -189,6 +190,9 @@ apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListB
 // Customer Themes (nested routes)
 apiV1Router.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
 apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCustomerHandler);
+
+// RFC-0024: User notification contacts (nested — must come before general /users router)
+apiV1Router.use('/users/:userId/contacts', authMiddleware, userContactsController);
 
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
 apiV1Router.use('/customers/:customerId/channels', authMiddleware, customerChannelsController);

@@ -1381,3 +1381,24 @@ export const deviceSyncJobs = pgTable('device_sync_jobs', {
   tenantCustomerIdx: index('device_sync_jobs_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantStatusIdx:   index('device_sync_jobs_tenant_status_idx').on(table.tenantId, table.status),
 }));
+
+// =============================================================================
+// USER CONTACTS (RFC-0024 follow-up)
+// =============================================================================
+
+export const userContacts = pgTable('user_contacts', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  channel:   varchar('channel', { length: 50 }).notNull(),
+  value:     varchar('value', { length: 500 }).notNull(),
+  label:     varchar('label', { length: 100 }),
+  verified:  boolean('verified').notNull().default(false),
+  active:    boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantUserChannelValueUnique: uniqueIndex('user_contacts_unique').on(table.tenantId, table.userId, table.channel, table.value),
+  tenantUserIdx:    index('user_contacts_tenant_user_idx').on(table.tenantId, table.userId),
+  tenantChannelIdx: index('user_contacts_tenant_channel_idx').on(table.tenantId, table.channel),
+}));

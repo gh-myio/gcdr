@@ -1,7 +1,10 @@
 -- RFC-0024: Alarm Dispatch Configuration
 -- Two-level notification dispatch: customer channels (credentials + kill switch) + group dispatch matrix
 
-CREATE TYPE "alarm_action" AS ENUM ('OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY');
+DO $$ BEGIN
+  CREATE TYPE "alarm_action" AS ENUM ('OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Customer-level channel registry (credentials + global active toggle)
 CREATE TABLE IF NOT EXISTS "customer_channels" (
