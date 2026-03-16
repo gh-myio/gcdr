@@ -12,6 +12,9 @@ export interface ITemplateRepository {
   list(tenantId: string, filter?: ListTemplatesFilter): Promise<TemplateSummary[]>;
   update(tenantId: string, slug: string, data: UpdateTemplateDTO): Promise<Template>;
   archive(tenantId: string, slug: string): Promise<void>;
+  /** Tenant-level template (customer_id IS NULL) */
   getActiveByType(tenantId: string, type: TemplateType): Promise<Template | null>;
+  /** Customer-specific template override */
+  getActiveByTypeForCustomer(tenantId: string, customerId: string, type: TemplateType): Promise<Template | null>;
   getByTypeAndVersion(tenantId: string, type: TemplateType, version: number): Promise<Template | null>;
 }

@@ -3,8 +3,11 @@ import { CreateTemplateDTO, UpdateTemplateDTO, ListTemplatesQuery } from '../dto
 import { TemplateRepository } from '../repositories/TemplateRepository';
 import { ITemplateRepository } from '../repositories/interfaces/ITemplateRepository';
 import { lookAndFeelRepository } from '../repositories/LookAndFeelRepository';
+import { CustomerRepository } from '../repositories/CustomerRepository';
 import { LookAndFeel } from '../domain/entities/LookAndFeel';
 import { ConflictError, NotFoundError, AppError } from '../shared/errors/AppError';
+
+const customerRepo = new CustomerRepository();
 
 // Tenant/customer da plataforma MYIO — usado como fallback de tema
 const MYIO_TENANT_ID  = '11111111-1111-1111-1111-111111111111';
@@ -349,13 +352,39 @@ export class TemplateService {
   }
 
   /**
+   * Builds the customer ancestor chain for hierarchy resolution.
+   * Returns [customerId, parentId, grandParentId, ...] stopping before MYIO_CUSTOMER_ID.
+   */
+  private async getCustomerChain(tenantId: string, customerId: string): Promise<string[]> {
+    const chain: string[] = [];
+    let currentId: string | null = customerId;
+    const MAX_DEPTH = 6;
+
+    while (currentId && currentId !== MYIO_CUSTOMER_ID && chain.length < MAX_DEPTH) {
+      chain.push(currentId);
+      const customer = await customerRepo.getById(tenantId, currentId);
+      currentId = customer?.parentCustomerId ?? null;
+    }
+
+    return chain;
+  }
+
+  /**
    * Render endpoint for EMAIL_SENDER.
    * Finds the template (by version or latest ACTIVE), merges customer theme as CSS vars,
    * and returns the HTML ready for tag substitution by the caller.
    *
-   * Fallback chain:
-   *   template: tenant → MYIO default tenant → 404
-   *   theme:    customer default → MYIO platform customer → no theme (plain HTML)
+   * Template resolution (first match wins):
+   *   1. customer-specific template (customer_id = customerId, type, status=ACTIVE)
+   *   2. parent customer template (walks parentCustomerId chain)
+   *   3. tenant default template (customer_id IS NULL)
+   *   → 404 if none found
+   *
+   * Theme resolution (first match wins):
+   *   1. customer theme for this specific type (template_type = type, is_default)
+   *   2. customer generic default theme (template_type IS NULL, is_default)
+   *   3. parent customer generic default (walks parentCustomerId chain)
+   *   4. MYIO platform customer default (always exists)
    */
   async renderForEmailSender(
     tenantId: string,
@@ -364,11 +393,14 @@ export class TemplateService {
     version?: number,
   ): Promise<{
     html: string;
-    template: { id: string; slug: string; type: string; version: number; status: string };
-    themeSource: 'customer' | 'default' | 'none';
+    template: { id: string; slug: string; type: string; version: number; status: string; customerId: string | null };
+    theme: { id: string; name: string; customerId: string } | null;
+    templateSource: 'customer' | 'parent_customer' | 'tenant';
+    themeSource: 'customer_type' | 'customer_default' | 'parent_default' | 'tenant';
   }> {
     // 1. Find template
     let template: Template | null = null;
+    let templateSource: 'customer' | 'parent_customer' | 'tenant' = 'tenant';
 
     if (version !== undefined) {
       template = await this.repository.getByTypeAndVersion(tenantId, type, version);
@@ -379,12 +411,25 @@ export class TemplateService {
           404,
         );
       }
+      templateSource = template.customerId ? 'customer' : 'tenant';
     } else {
-      // Try tenant first, then MYIO default tenant as fallback
-      template = await this.repository.getActiveByType(tenantId, type);
-      if (!template && tenantId !== MYIO_TENANT_ID) {
-        template = await this.repository.getActiveByType(MYIO_TENANT_ID, type);
+      const chain = await this.getCustomerChain(tenantId, customerId);
+
+      // Walk the chain: customer → ancestors
+      for (let i = 0; i < chain.length; i++) {
+        template = await this.repository.getActiveByTypeForCustomer(tenantId, chain[i], type);
+        if (template) {
+          templateSource = i === 0 ? 'customer' : 'parent_customer';
+          break;
+        }
       }
+
+      // Fallback to tenant default
+      if (!template) {
+        template = await this.repository.getActiveByType(tenantId, type);
+        templateSource = 'tenant';
+      }
+
       if (!template) {
         throw new AppError(
           'TEMPLATE_NOT_FOUND',
@@ -394,24 +439,42 @@ export class TemplateService {
       }
     }
 
-    // 2. Find theme — fallback chain:
-    //    a) customer + type-specific  →  b) customer + global (is_default)
-    //    c) MYIO customer + type-specific  →  d) MYIO customer + global
+    // 2. Find theme — walk the customer chain
     let theme: LookAndFeel | null = null;
-    let themeSource: 'customer' | 'default' | 'none' = 'none';
+    let themeSource: 'customer_type' | 'customer_default' | 'parent_default' | 'tenant' = 'tenant';
 
-    theme = await lookAndFeelRepository.getByCustomerAndType(tenantId, customerId, type);
-    if (!theme) {
-      theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, customerId);
+    const chain = await this.getCustomerChain(tenantId, customerId);
+
+    // 2a. Customer: theme specific to this template type
+    if (chain.length > 0) {
+      theme = await lookAndFeelRepository.getByCustomerAndType(tenantId, chain[0], type);
+      if (theme) themeSource = 'customer_type';
     }
-    if (theme) {
-      themeSource = 'customer';
-    } else {
+
+    // 2b. Customer: generic default theme
+    if (!theme && chain.length > 0) {
+      theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, chain[0]);
+      if (theme) themeSource = 'customer_default';
+    }
+
+    // 2c. Parent chain: generic default
+    if (!theme) {
+      for (let i = 1; i < chain.length; i++) {
+        theme = await lookAndFeelRepository.getDefaultByCustomer(tenantId, chain[i]);
+        if (theme) {
+          themeSource = 'parent_default';
+          break;
+        }
+      }
+    }
+
+    // 2d. Tenant fallback: MYIO platform customer
+    if (!theme) {
       theme = await lookAndFeelRepository.getByCustomerAndType(MYIO_TENANT_ID, MYIO_CUSTOMER_ID, type);
       if (!theme) {
         theme = await lookAndFeelRepository.getDefaultByCustomer(MYIO_TENANT_ID, MYIO_CUSTOMER_ID);
       }
-      if (theme) themeSource = 'default';
+      themeSource = 'tenant';
     }
 
     // 3. Merge theme into HTML
@@ -425,7 +488,10 @@ export class TemplateService {
         type: template.type,
         version: template.version,
         status: template.status,
+        customerId: template.customerId,
       },
+      theme: theme ? { id: theme.id, name: theme.name, customerId: theme.customerId } : null,
+      templateSource,
       themeSource,
     };
   }
@@ -442,12 +508,14 @@ export class TemplateService {
     version?: number,
   ): Promise<{
     html: string;
-    template: { id: string; slug: string; type: string; version: number };
-    themeSource: 'customer' | 'default' | 'none';
+    template: { id: string; slug: string; type: string; version: number; status: string; customerId: string | null };
+    theme: { id: string; name: string; customerId: string } | null;
+    templateSource: 'customer' | 'parent_customer' | 'tenant';
+    themeSource: 'customer_type' | 'customer_default' | 'parent_default' | 'tenant';
   }> {
     const result = await this.renderForEmailSender(tenantId, type, customerId, version);
     const html = renderTemplate(result.html, data);
-    return { html, template: result.template, themeSource: result.themeSource };
+    return { html, template: result.template, theme: result.theme, templateSource: result.templateSource, themeSource: result.themeSource };
   }
 }
 

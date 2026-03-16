@@ -3558,11 +3558,16 @@ components:
         tenantId:
           type: string
           format: uuid
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "null = tenant default template; UUID = customer-specific override"
         name:
           type: string
         type:
           type: string
-          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
         status:
           type: string
           enum: [DRAFT, ACTIVE, ARCHIVED]
@@ -3597,11 +3602,16 @@ components:
         tenantId:
           type: string
           format: uuid
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "null = tenant default; UUID = customer-specific override"
         name:
           type: string
         type:
           type: string
-          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
         status:
           type: string
           enum: [DRAFT, ACTIVE, ARCHIVED]
@@ -3621,6 +3631,51 @@ components:
           type: string
           format: date-time
 
+    TemplateRenderResult:
+      type: object
+      properties:
+        html:
+          type: string
+          description: HTML ready for tag substitution (GET) or fully rendered (POST)
+        template:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            slug:
+              type: string
+            type:
+              type: string
+            version:
+              type: integer
+            status:
+              type: string
+            customerId:
+              type: string
+              format: uuid
+              nullable: true
+        theme:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            customerId:
+              type: string
+              format: uuid
+        templateSource:
+          type: string
+          enum: [customer, parent_customer, tenant]
+          description: "customer = template owned by this customer; parent_customer = inherited from parent; tenant = tenant default"
+        themeSource:
+          type: string
+          enum: [customer_type, customer_default, parent_default, tenant]
+          description: "customer_type = theme for this specific template type; customer_default = generic customer theme; parent_default = parent's theme; tenant = MYIO fallback"
+
     CreateTemplate:
       type: object
       required: [slug, name, type, htmlContent]
@@ -3634,7 +3689,7 @@ components:
           example: Alarm Notification Email
         type:
           type: string
-          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+          enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
         status:
           type: string
           enum: [DRAFT, ACTIVE, ARCHIVED]
@@ -3643,6 +3698,11 @@ components:
           type: string
         description:
           type: string
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Omit or null for tenant default; UUID for customer-specific override"
 
     UpdateTemplate:
       type: object
@@ -8312,7 +8372,7 @@ paths:
           description: Filter by template type
           schema:
             type: string
-            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME]
+            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
         - name: status
           in: query
           description: Filter by status
@@ -8332,6 +8392,145 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/TemplateSummary'
+
+  /templates/render:
+    get:
+      tags: [Templates]
+      summary: Get template HTML merged with customer theme (EMAIL_SENDER M2M)
+      description: >
+        Resolves template and theme using the customer hierarchy.
+        Template resolution: customer → parent chain → tenant default.
+        Theme resolution: customer+type → customer default → parent default → tenant MYIO.
+        Returns HTML with CSS variables injected, ready for {{tag}} substitution by the caller.
+      operationId: renderTemplateGet
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
+        - name: customerId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version
+          in: query
+          required: false
+          description: Specific template version. Omit to use latest ACTIVE.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Template HTML with theme injected
+          headers:
+            X-Template-Version:
+              schema:
+                type: integer
+            X-Template-Source:
+              schema:
+                type: string
+                enum: [customer, parent_customer, tenant]
+            X-Theme-Source:
+              schema:
+                type: string
+                enum: [customer_type, customer_default, parent_default, tenant]
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TemplateRenderResult'
+        '404':
+          description: No ACTIVE template found for type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Templates]
+      summary: Full render — theme injection + data substitution in one call (EMAIL_SENDER)
+      operationId: renderTemplateFull
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, customerId, data]
+              properties:
+                type:
+                  type: string
+                  enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
+                customerId:
+                  type: string
+                  format: uuid
+                version:
+                  type: integer
+                data:
+                  type: object
+                  additionalProperties: true
+                  description: Template variables (follows EMAIL-SENDER-PAYLOAD-CONTRACT per type)
+      responses:
+        '200':
+          description: Fully rendered HTML with data substituted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TemplateRenderResult'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /templates/tag-catalog:
+    get:
+      tags: [Templates]
+      summary: Get tag catalog for a template type (frontend editor)
+      operationId: getTagCatalog
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [EMAIL_ALARM, EMAIL_REPORT, EMAIL_WELCOME, RELEASE_NOTE, NOTIFICATION, INSIGHT]
+      responses:
+        '200':
+          description: Tag catalog with available variables and loops
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            tag:
+                              type: string
+                            label:
+                              type: string
+                            description:
+                              type: string
+                            example:
+                              type: string
 
   /templates/tags/{type}:
     get:

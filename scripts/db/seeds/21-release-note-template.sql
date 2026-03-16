@@ -20,10 +20,11 @@ BEGIN
   END IF;
 
   INSERT INTO templates (
-    slug, tenant_id, name, type, status, description, html_content, created_by
+    slug, tenant_id, customer_id, name, type, status, description, html_content, created_by
   ) VALUES (
     v_slug,
     v_tenant_id,
+    NULL,
     'MYIO Release Note',
     'RELEASE_NOTE',
     'ACTIVE',

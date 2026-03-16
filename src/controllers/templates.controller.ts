@@ -102,6 +102,7 @@ router.post('/render', async (req: Request, res: Response, next: NextFunction) =
     );
 
     res.setHeader('X-Template-Version', String(result.template.version));
+    res.setHeader('X-Template-Source', result.templateSource);
     res.setHeader('X-Theme-Source', result.themeSource);
 
     sendSuccess(res, result, 200, requestId);
@@ -128,6 +129,7 @@ router.get('/render', async (req: Request, res: Response, next: NextFunction) =>
     );
 
     res.setHeader('X-Template-Version', String(result.template.version));
+    res.setHeader('X-Template-Source', result.templateSource);
     res.setHeader('X-Theme-Source', result.themeSource);
 
     sendSuccess(res, result, 200, requestId);

@@ -35,8 +35,9 @@ type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 interface Template {
   id: string;
-  slug: string;           // identificador único por tenant, ex: "alarm-pt-br-v1"
+  slug: string;           // identificador único por (tenant + customer + type)
   tenantId: string;
+  customerId?: string;    // null = template padrão do tenant; preenchido = override do customer
   name: string;
   type: TemplateType;
   status: TemplateStatus;
@@ -56,38 +57,63 @@ type TemplateSummary = Omit<Template, 'htmlContent'>;
 
 ## 2. Banco de Dados
 
-```sql
-CREATE TYPE template_type AS ENUM (
-  'EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME',
-  'RELEASE_NOTE', 'NOTIFICATION', 'INSIGHT'
-);
-CREATE TYPE template_status AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED');
+### `templates`
 
+```sql
 CREATE TABLE templates (
   id           UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
   slug         VARCHAR(255)   NOT NULL,
   tenant_id    UUID           NOT NULL,
+  customer_id  UUID           REFERENCES customers(id) ON DELETE CASCADE,
+  -- NULL = template padrão do tenant; preenchido = override do customer
   name         VARCHAR(500)   NOT NULL,
-  type         template_type  NOT NULL,
-  status       template_status NOT NULL DEFAULT 'DRAFT',
-  html_content TEXT           NOT NULL,    -- TEXT, não jsonb nem varchar
+  type         VARCHAR(50)    NOT NULL,  -- EMAIL_ALARM | EMAIL_REPORT | ...
+  status       VARCHAR(50)    NOT NULL DEFAULT 'DRAFT',
+  html_content TEXT           NOT NULL,
   description  TEXT,
   version      INTEGER        NOT NULL DEFAULT 1,
   created_by   UUID,
   created_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-
-  CONSTRAINT templates_slug_tenant_unique UNIQUE (slug, tenant_id)
+  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
+
+-- Templates de tenant (customer_id IS NULL): um por type por tenant
+CREATE UNIQUE INDEX tmpl_tenant_type_unique
+  ON templates (tenant_id, type)
+  WHERE customer_id IS NULL;
+
+-- Templates de customer: um por type por customer
+CREATE UNIQUE INDEX tmpl_customer_type_unique
+  ON templates (tenant_id, customer_id, type)
+  WHERE customer_id IS NOT NULL;
+
+-- Slug único por (tenant + customer) — NULL tratado como próprio namespace
+CREATE UNIQUE INDEX tmpl_slug_tenant_customer_unique
+  ON templates (slug, tenant_id, customer_id);
 
 CREATE INDEX idx_templates_tenant_type   ON templates (tenant_id, type);
 CREATE INDEX idx_templates_tenant_status ON templates (tenant_id, status);
+```
+
+> **Por que dois índices parciais em vez de UNIQUE (tenant_id, customer_id, type)?**
+> No PostgreSQL, `NULL != NULL` em unique constraints normais — dois registros com `customer_id = NULL` e o mesmo `(tenant_id, type)` passariam sem erro. Os índices parciais resolvem isso corretamente.
+
+### `look_and_feels`
+
+A tabela já tem `customer_id` (FK → customers) e `template_type` (VARCHAR nullable). As regras de unicidade relevantes para resolução de theme:
+
+```
+UNIQUE (tenant_id, customer_id, template_type)  -- um theme por tipo por customer
+-- NULL customer_id = theme padrão do tenant
+-- NULL template_type = theme genérico (não vinculado a tipo específico)
+-- is_default = true → selecionado como fallback quando não há match por tipo
 ```
 
 > **Migrations incrementais:**
 > 1. `html-templates.sql` — cria tabela com 3 tipos iniciais
 > 2. `add-release-note-template-type.sql` — adiciona `RELEASE_NOTE`
 > 3. `add-notification-insight-template-types.sql` — adiciona `NOTIFICATION` e `INSIGHT`
+> 4. **`add-customer-id-to-templates.sql`** — adiciona `customer_id` + recria índices ⏳ A executar
 
 ---
 
@@ -273,8 +299,8 @@ Endpoint exclusivo para o serviço `EMAIL_SENDER`. Retorna o HTML do template at
 | Param | Obrigatório | Descrição |
 |---|---|---|
 | `type` | ✅ | `TemplateType` — ex: `EMAIL_ALARM` |
-| `customerId` | ✅ | UUID do customer |
-| `version` | ❌ | Número de versão específico. Se omitido, usa o `ACTIVE` mais recente. |
+| `customerId` | ✅ | UUID do customer alvo |
+| `version` | ❌ | Versão específica do template. Se omitido, usa o `ACTIVE` mais recente. |
 
 **Exemplos:**
 
@@ -285,25 +311,61 @@ GET /api/v1/templates/render?type=EMAIL_ALARM&customerId=84e0370e-...&version=3
 
 **Auth:** `X-API-Key: gcdr_pk_*` (M2M) ou `Authorization: Bearer <jwt>`
 
-**Lógica interna:**
+---
+
+#### Resolução de Template (ordem de prioridade)
 
 ```
-1. Buscar template:
-   - Se ?version=N → buscar por (tenantId, type, version) — qualquer status
-   - Se sem version → buscar ACTIVE por (tenantId, type)
-   - Fallback: se não encontrar no tenant → buscar template ACTIVE no tenant MYIO padrão
-   - Se ainda não encontrar → 404 com motivo
-
-2. Buscar theme do customer:
-   - GET customer.theme (campo jsonb na tabela customers)
-   - Se customer não tiver theme → usar theme padrão MYIO (hardcoded ou config)
-
-3. Merge do theme no HTML:
-   - Injetar CSS variables no <head> do template
-   - Ex: --color-primary, --color-header-bg, --logo-url
-
-4. Retornar HTML mesclado + metadados do template usado
+1. (tenant_id, customer_id, type, status=ACTIVE)       ← template próprio do customer
+2. (tenant_id, parent_customer_id, type, status=ACTIVE) ← template do customer pai
+   → sobe parent_customer_id até encontrar ou chegar no root
+3. (tenant_id, NULL, type, status=ACTIVE)              ← template padrão do tenant ← SEMPRE EXISTE
 ```
+
+Se `?version=N` informado: busca por `(tenant_id, customer_id, type, version=N)` diretamente, sem fallback hierárquico.
+
+#### Resolução de Theme (ordem de prioridade)
+
+```
+1. look_and_feels WHERE customer_id = $customerId
+                   AND template_type = $type
+                   AND is_default = true              ← theme do customer para o tipo específico
+
+2. look_and_feels WHERE customer_id = $customerId
+                   AND template_type IS NULL
+                   AND is_default = true              ← theme genérico padrão do customer
+
+3. look_and_feels WHERE customer_id = $parentCustomerId
+                   AND template_type IS NULL
+                   AND is_default = true              ← theme padrão do customer pai
+   → sobe parent_customer_id até encontrar ou chegar no root
+
+4. look_and_feels WHERE customer_id IS NULL
+                   AND tenant_id = $tenantId
+                   AND is_default = true              ← theme padrão do tenant ← SEMPRE EXISTE
+```
+
+#### Merge do theme no HTML
+
+O theme é injetado como CSS custom properties no `<head>` do template:
+
+```html
+<style>
+  :root {
+    --color-primary:   #0D47A1;
+    --color-secondary: #1976D2;
+    --color-header-bg: #0D47A1;
+    --color-text:      #212121;
+    --logo-url:        "https://cdn.myio.com.br/logos/mestrealvaro.png";
+    --brand-name:      "Mestre Álvaro Engenharia";
+    --font-family:     "Inter, sans-serif";
+  }
+</style>
+```
+
+Os templates HTML usam essas variáveis diretamente via `var(--color-primary)`.
+
+---
 
 **Response `200`:**
 
@@ -317,24 +379,48 @@ GET /api/v1/templates/render?type=EMAIL_ALARM&customerId=84e0370e-...&version=3
       "slug": "alarm-pt-br-v1",
       "type": "EMAIL_ALARM",
       "version": 3,
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "customerId": null
     },
-    "themeSource": "customer"
+    "theme": {
+      "id": "uuid",
+      "name": "Tema Padrão Mestre Álvaro",
+      "customerId": "84e0370e-..."
+    },
+    "templateSource": "tenant",
+    "themeSource": "customer_default"
   }
 }
 ```
 
-> `themeSource`: `"customer"` se usou o theme do customer, `"default"` se caiu no fallback.
+**`templateSource`:**
+
+| Valor | Significado |
+|---|---|
+| `"customer"` | Template próprio do customer alvo |
+| `"parent_customer"` | Template herdado de um customer pai |
+| `"tenant"` | Template padrão do tenant (fallback final) |
+
+**`themeSource`:**
+
+| Valor | Significado |
+|---|---|
+| `"customer_type"` | Theme do customer vinculado ao tipo específico |
+| `"customer_default"` | Theme genérico padrão do customer |
+| `"parent_default"` | Theme padrão de um customer pai |
+| `"tenant"` | Theme padrão do tenant (fallback final) |
+
+---
 
 **Erros:**
 
 ```json
-// 404 — nenhum template ativo encontrado
+// 404 — nenhum template ativo encontrado (tenant não tem template padrão para o tipo)
 {
   "success": false,
   "error": {
     "code": "TEMPLATE_NOT_FOUND",
-    "message": "No ACTIVE template found for type EMAIL_ALARM in tenant 11111111-... or MYIO default",
+    "message": "No ACTIVE template found for type EMAIL_ALARM",
     "type": "EMAIL_ALARM",
     "customerId": "84e0370e-..."
   }
@@ -354,11 +440,12 @@ GET /api/v1/templates/render?type=EMAIL_ALARM&customerId=84e0370e-...&version=3
 
 **Cache recomendado (responsabilidade do EMAIL_SENDER):**
 
-O EMAIL_SENDER deve cachear a resposta por `(customerId + type)` por X minutos. O header `X-Template-Version` na response facilita invalidação:
+O EMAIL_SENDER deve cachear a resposta por `(customerId + type)` por X minutos. Os headers facilitam invalidação seletiva:
 
 ```
 X-Template-Version: 3
-X-Theme-Source: customer
+X-Template-Source: tenant
+X-Theme-Source: customer_default
 ```
 
 ---
@@ -652,9 +739,10 @@ INSIGHT         → INSIGHT
 | 5 | `GET /templates/tag-catalog?type=X` | 🟡 Importante | ✅ Implementado |
 | 6 | `GET /templates` | 🟡 Importante | ✅ Implementado |
 | 7 | `DELETE /templates/:slug` | 🟢 Normal | ✅ Implementado |
-| 8 | **`GET /templates/render?type=X&customerId=Y`** | 🔴 Crítico | ⏳ **A implementar** |
-| 9 | Seeds para NOTIFICATION e INSIGHT | 🟡 Importante | ✅ Adicionados |
-| 10 | Migration NOTIFICATION + INSIGHT | 🔴 Crítico | ✅ Script criado |
+| 8 | **Migration: `customer_id` em `templates`** | 🔴 Crítico | ⏳ **A implementar** |
+| 9 | **`GET /templates/render?type=X&customerId=Y`** | 🔴 Crítico | ⏳ **A implementar** |
+| 10 | Seeds para NOTIFICATION e INSIGHT | 🟡 Importante | ✅ Adicionados |
+| 11 | Migration NOTIFICATION + INSIGHT | 🔴 Crítico | ✅ Script criado |
 
 ---
 

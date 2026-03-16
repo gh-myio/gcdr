@@ -14,6 +14,8 @@ export const CreateTemplateSchema = z.object({
   status: z.enum(TEMPLATE_STATUSES).default('DRAFT'),
   htmlContent: z.string().min(1),
   description: z.string().max(1000).optional(),
+  /** null or omitted = tenant default; UUID = customer-specific override */
+  customerId: z.string().uuid().optional().nullable(),
 });
 
 export type CreateTemplateDTO = z.infer<typeof CreateTemplateSchema>;

@@ -17,11 +17,12 @@
 -- =========================================================================
 -- 1. EMAIL_ALARM — Notificação de Alarme (ACTIVE)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000001',
     'alarm-notification-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Notificação de Alarme',
     'EMAIL_ALARM',
     'ACTIVE',
@@ -134,11 +135,12 @@ VALUES (
 -- =========================================================================
 -- 2. EMAIL_REPORT — Relatório Periódico (DRAFT)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000002',
     'periodic-report-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Relatório Periódico',
     'EMAIL_REPORT',
     'DRAFT',
@@ -224,11 +226,12 @@ VALUES (
 -- =========================================================================
 -- 3. EMAIL_WELCOME — Boas-vindas (ACTIVE)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000003',
     'welcome-email-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Boas-vindas ao MYIO',
     'EMAIL_WELCOME',
     'ACTIVE',
@@ -325,11 +328,12 @@ VALUES (
 -- =========================================================================
 -- 4. RELEASE_NOTE — Comunicado de Nova Feature (DRAFT)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000004',
     'release-note-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Release Note — Nova Feature',
     'RELEASE_NOTE',
     'DRAFT',
@@ -441,11 +445,12 @@ VALUES (
 -- =========================================================================
 -- 5. NOTIFICATION — Notificação Avulsa de Sistema (DRAFT)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000005',
     'system-notification-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Notificação de Sistema',
     'NOTIFICATION',
     'DRAFT',
@@ -511,11 +516,12 @@ VALUES (
 -- =========================================================================
 -- 6. INSIGHT — Resumo de Insights e Métricas (DRAFT)
 -- =========================================================================
-INSERT INTO templates (id, slug, tenant_id, name, type, status, html_content, description, version, created_by)
+INSERT INTO templates (id, slug, tenant_id, customer_id, name, type, status, html_content, description, version, created_by)
 VALUES (
     'a1b2c3d4-0001-0001-0001-000000000006',
     'insights-summary-v1',
     '11111111-1111-1111-1111-111111111111',
+    NULL,
     'Resumo de Insights',
     'INSIGHT',
     'DRAFT',

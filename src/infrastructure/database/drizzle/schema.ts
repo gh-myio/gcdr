@@ -1294,9 +1294,11 @@ export const templates = pgTable('templates', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: varchar('slug', { length: 255 }).notNull(),
   tenantId: uuid('tenant_id').notNull(),
+  // NULL = tenant default; set = customer override (resolution: customer → parent chain → tenant)
+  customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'cascade' }),
 
   name: varchar('name', { length: 500 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(),     // EMAIL_ALARM | EMAIL_REPORT | EMAIL_WELCOME
+  type: varchar('type', { length: 50 }).notNull(),     // EMAIL_ALARM | EMAIL_REPORT | EMAIL_WELCOME | ...
   status: varchar('status', { length: 50 }).notNull().default('DRAFT'),
 
   // TEXT — not varchar/jsonb — supports 20–50 KB HTML templates
@@ -1309,8 +1311,12 @@ export const templates = pgTable('templates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  slugTenantUnique: uniqueIndex('tmpl_slug_tenant_unique').on(table.slug, table.tenantId),
-  tenantTypeStatusIdx: index('tmpl_tenant_type_status_idx').on(table.tenantId, table.type, table.status),
+  // Partial unique indexes — PostgreSQL NULL != NULL requires separate indexes
+  tenantTypeNullUnique:       uniqueIndex('tmpl_tenant_type_unique').on(table.tenantId, table.type).where(sql`${table.customerId} IS NULL`),
+  customerTypeUnique:         uniqueIndex('tmpl_customer_type_unique').on(table.tenantId, table.customerId, table.type).where(sql`${table.customerId} IS NOT NULL`),
+  slugTenantNullUnique:       uniqueIndex('tmpl_slug_tenant_null_unique').on(table.slug, table.tenantId).where(sql`${table.customerId} IS NULL`),
+  slugTenantCustomerUnique:   uniqueIndex('tmpl_slug_tenant_customer_unique').on(table.slug, table.tenantId, table.customerId).where(sql`${table.customerId} IS NOT NULL`),
+  tenantTypeStatusIdx:        index('tmpl_tenant_type_status_idx').on(table.tenantId, table.type, table.status),
 }));
 
 // =============================================================================

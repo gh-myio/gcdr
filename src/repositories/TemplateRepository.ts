@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Template, TemplateSummary, TemplateType } from '../domain/entities/Template';
 import { CreateTemplateDTO, UpdateTemplateDTO } from '../dto/request/TemplateDTO';
@@ -9,6 +9,7 @@ function mapRow(row: typeof schema.templates.$inferSelect): Template {
     id: row.id,
     slug: row.slug,
     tenantId: row.tenantId,
+    customerId: row.customerId ?? null,
     name: row.name,
     type: row.type as Template['type'],
     status: row.status as Template['status'],
@@ -31,6 +32,7 @@ export class TemplateRepository implements ITemplateRepository {
     const [row] = await db.insert(schema.templates).values({
       slug: data.slug,
       tenantId,
+      customerId: data.customerId ?? null,
       name: data.name,
       type: data.type,
       status: data.status ?? 'DRAFT',
@@ -97,6 +99,23 @@ export class TemplateRepository implements ITemplateRepository {
       .where(
         and(
           eq(schema.templates.tenantId, tenantId),
+          isNull(schema.templates.customerId),
+          eq(schema.templates.type, type),
+          eq(schema.templates.status, 'ACTIVE'),
+        ),
+      )
+      .limit(1);
+    return row ? mapRow(row) : null;
+  }
+
+  async getActiveByTypeForCustomer(tenantId: string, customerId: string, type: TemplateType): Promise<Template | null> {
+    const [row] = await db
+      .select()
+      .from(schema.templates)
+      .where(
+        and(
+          eq(schema.templates.tenantId, tenantId),
+          eq(schema.templates.customerId, customerId),
           eq(schema.templates.type, type),
           eq(schema.templates.status, 'ACTIVE'),
         ),

@@ -5,6 +5,8 @@ export interface Template {
   id: string;
   slug: string;
   tenantId: string;
+  /** null = tenant default template; set = customer-level override */
+  customerId: string | null;
   name: string;
   type: TemplateType;
   status: TemplateStatus;
