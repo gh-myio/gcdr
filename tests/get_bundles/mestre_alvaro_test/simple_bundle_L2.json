@@ -1,15 +1,15 @@
 {
   "success": true,
   "data": {
-    "versionId": "v1-89480e5243e9",
+    "versionId": "v1-2e1f6a4955e5",
     "deviceIndex": {
       "2b526f1f-cab8-445b-a27a-15f8054e8424": {
         "deviceName": "3F ELEV. SCMAL2ACEL2",
         "slaveId": 85,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          { "cccc0001-0001-0001-0001-000000000002", "value": 200,  "valueHigh": null },
-          { "cccc0001-0001-0001-0001-000000000001" , "value": 200,  "valueHigh": null  }
+          "cccc0001-0001-0001-0001-000000000002",
+          "cccc0001-0001-0001-0001-000000000001"
         ]
       },
       "3d09486b-64ee-46d1-a1c2-9ded53c5c988": {
@@ -19,7 +19,7 @@
         "ruleIds": [
           "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
-          "cccc0001-0001-0001-0001-000000000003"
+          "cccc0001-0001-0001-0001-000000000003_3d09486b-64ee-46d1-a1c2-9ded53c5c988"
         ]
       },
       "bbc33685-062e-4e65-84f6-9398ec4db54a": {
@@ -145,6 +145,16 @@
       "73b34695-ae84-4a88-bb58-12a9c89f1900": {
         "deviceName": "3F ESRL. PF-Escada 14",
         "slaveId": 190,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
+          "cccc0001-0001-0001-0001-000000000004",
+          "cccc0001-0001-0001-0001-000000000003"
+        ]
+      },
+      "b02bbab6-585c-4386-b176-c2a65c329449": {
+        "deviceName": "3F ESRL. PF-Escada 15",
+        "slaveId": 191,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
           "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
@@ -427,7 +437,7 @@
         "slaveId": 83,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "cccc0001-0001-0001-0001-000000000002",
+          "cccc0001-0001-0001-0001-000000000002_6857b8cb-34aa-4e2e-9113-8598c2601f31",
           "cccc0001-0001-0001-0001-000000000001"
         ]
       },
@@ -458,6 +468,15 @@
           "cccc0001-0001-0001-0001-000000000001"
         ]
       },
+      "46115826-c5b1-4173-9c20-995535f0edc5": {
+        "deviceName": "3F SCMAL2ACEL6",
+        "slaveId": 84,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "cccc0001-0001-0001-0001-000000000002",
+          "cccc0001-0001-0001-0001-000000000001"
+        ]
+      },
       "36860c96-b2dd-4bb6-858c-f76cc89ce432": {
         "deviceName": "3F SCMAL2ACEL7",
         "slaveId": 86,
@@ -477,9 +496,26 @@
           "885dadf0-5ba0-4845-867c-db079f66dd3a"
         ]
       },
-      "e0bc3fb7-dfd2-4f69-b6e6-9e8d6bb30273": {
-        "deviceName": "HIDR. SCMAL2ACACHIPRNA",
-        "slaveId": 113,
+      "8c2177a8-97fe-4a64-ac18-6f01f9d41400": {
+        "deviceName": "HIDR. SCMAL2ACACHICI",
+        "slaveId": 108,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "20b8ddd1-1936-4b8f-9079-72380dc3baf4",
+          "ad571fcf-a223-4fe4-9c26-f945dc7ef8be",
+          "362516ab-c923-4a86-816f-7341eb623723",
+          "885dadf0-5ba0-4845-867c-db079f66dd3a"
+        ]
+      },
+      "b8abdd64-2690-48f4-86d7-e96aa2e5af66": {
+        "deviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR",
+        "slaveId": 114,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": ["20b8ddd1-1936-4b8f-9079-72380dc3baf4"]
+      },
+      "c90e0163-8833-4315-80bf-48bd77aefee6": {
+        "deviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR_2",
+        "slaveId": 116,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": ["20b8ddd1-1936-4b8f-9079-72380dc3baf4"]
       },
@@ -742,10 +778,9 @@
         "metric": "instantaneous_power",
         "operator": "LT",
         "value": 400,
-        "valueHigh": null,
-        "duration": 1800000,
+        "duration": 0,
         "hysteresis": 0,
-        "aggregation": "AVG",
+        "aggregation": "LAST",
         "startAt": "12:00",
         "endAt": "22:00",
         "daysOfWeek": {
@@ -787,7 +822,7 @@
         "name": "Escada Rolante Ligada Fora do Horário(Seg - Dom)",
         "metric": "instantaneous_power",
         "operator": "GT",
-        "value": 400,
+        "value": 350,
         "valueHigh": null,
         "duration": 0,
         "hysteresis": 0,
@@ -810,8 +845,8 @@
         "name": "Escada Rolante parada (domingo)",
         "metric": "instantaneous_power",
         "operator": "LT",
-        //"value": 350, // REMOVER ESSE TRECHO
-        //"valueHigh": null,  // REMOVER ESSE TRECHO
+        "value": 350,
+        "valueHigh": null,
         "duration": 0,
         "hysteresis": 0,
         "aggregation": "AVG",
@@ -966,11 +1001,34 @@
         },
         "keyMulti": 1,
         "parentRuleId": "cccc0001-0001-0001-0001-000000000003"
+      },
+      "cccc0001-0001-0001-0001-000000000002_6857b8cb-34aa-4e2e-9113-8598c2601f31": {
+        "id": "cccc0001-0001-0001-0001-000000000002_6857b8cb-34aa-4e2e-9113-8598c2601f31",
+        "name": "Elevador parado MA(domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 299,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "LAST",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1,
+        "parentRuleId": "cccc0001-0001-0001-0001-000000000002"
       }
     }
   },
   "meta": {
-    "requestId": "f400fe72-0de2-40d4-a506-fa4698e8709d",
-    "timestamp": "2026-03-12T16:43:50.545Z"
+    "requestId": "5022da66-ca87-4cef-bfce-29bf65526acb",
+    "timestamp": "2026-03-16T23:16:05.832Z"
   }
 }

@@ -23,6 +23,7 @@ import { alarmBundleService } from './AlarmBundleService';
 
 export interface RuleMeta {
   id: string;
+  parentRuleId?: string; // set when id is a synthesized override key (ruleId_deviceId)
   name: string;
   scope: { type: string; entityId?: string };
   metric: string;
@@ -190,20 +191,42 @@ export class CustomerService {
     assetRulesArrays.forEach(addRules);
     deviceRulesArrays.forEach(addRules);
 
-    // Attach ruleIds to each device
+    // Attach ruleIds to each device.
+    // When a rule has scopeEntityOverrides[device.id], use the synthesized key
+    // `${ruleId}_${deviceId}` — matching the bundle format consumed by Node-RED.
+    // Also build override variant entries in rulesDict for those keys.
     devices = devices.map((device, i) => {
-      const effectiveRuleIds = [
-        ...deviceRulesArrays[i].map((r) => r.id),
-        ...(assetRulesMap.get(device.assetId) ?? []).map((r) => r.id),
-        ...customerRules.map((r) => r.id),
+      const allRulesForDevice = [
+        ...deviceRulesArrays[i],
+        ...(assetRulesMap.get(device.assetId) ?? []),
+        ...customerRules,
       ];
-      // deduplicate preserving order
+
       const seen = new Set<string>();
-      const ruleIds = effectiveRuleIds.filter((id) => {
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
+      const ruleIds: string[] = [];
+
+      for (const rule of allRulesForDevice) {
+        const override = rule.scopeEntityOverrides?.[device.id];
+        const effectiveId = override ? `${rule.id}_${device.id}` : rule.id;
+        if (seen.has(effectiveId)) continue;
+        seen.add(effectiveId);
+        ruleIds.push(effectiveId);
+
+        // Register the override variant in rulesDict if not already present
+        if (override && !rulesDict[effectiveId]) {
+          const base = rulesDict[rule.id];
+          if (base) {
+            rulesDict[effectiveId] = {
+              ...base,
+              id: effectiveId,
+              parentRuleId: rule.id,
+              value: override.value ?? base.value,
+              ...(override.valueHigh !== undefined && { valueHigh: override.valueHigh }),
+            };
+          }
+        }
+      }
+
       return { ...device, ruleIds };
     });
 

@@ -2969,7 +2969,7 @@ components:
           type: array
           items:
             type: string
-            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, ALARMS_NOTIFY, ALARMS_REPORT, ALARMS_INSIGHT, WELCOME_USER, RELEASE_NOTE, CUSTOM]
         members:
           type: array
           items:
@@ -3077,7 +3077,7 @@ components:
           type: array
           items:
             type: string
-            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, ALARMS_NOTIFY, ALARMS_REPORT, ALARMS_INSIGHT, WELCOME_USER, RELEASE_NOTE, CUSTOM]
         members:
           type: array
           items:
@@ -3108,7 +3108,7 @@ components:
           type: array
           items:
             type: string
-            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, ALARMS_NOTIFY, ALARMS_REPORT, ALARMS_INSIGHT, WELCOME_USER, RELEASE_NOTE, CUSTOM]
         notificationSettings:
           $ref: '#/components/schemas/GroupNotificationSettings'
         metadata:
@@ -8012,7 +8012,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, ALARMS_NOTIFY, ALARMS_REPORT, ALARMS_INSIGHT, WELCOME_USER, RELEASE_NOTE, CUSTOM]
         - name: isActive
           in: query
           schema:
@@ -8124,7 +8124,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, CUSTOM]
+            enum: [NOTIFICATION, ESCALATION, ACCESS_CONTROL, REPORTING, MAINTENANCE, MONITORING, ALARMS_NOTIFY, ALARMS_REPORT, ALARMS_INSIGHT, WELCOME_USER, RELEASE_NOTE, CUSTOM]
       responses:
         '200':
           description: List of groups for customer

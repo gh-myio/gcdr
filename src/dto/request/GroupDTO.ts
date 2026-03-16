@@ -9,6 +9,11 @@ export const GroupPurposeEnum = z.enum([
   'REPORTING',
   'MAINTENANCE',
   'MONITORING',
+  'ALARMS_NOTIFY',
+  'ALARMS_REPORT',
+  'ALARMS_INSIGHT',
+  'WELCOME_USER',
+  'RELEASE_NOTE',
   'CUSTOM',
 ]);
 

@@ -1,0 +1,212 @@
+<mxfile host="diagrams.net" version="21.0.0">
+  <diagram name="GCDR Dispatch Architecture" id="gcdr-dispatch">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ================================================================ -->
+        <!-- TITLE -->
+        <!-- ================================================================ -->
+        <mxCell id="title" value="GCDR — Arquitetura de Dispatch de Notificações" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- CUSTOMERS -->
+        <!-- ================================================================ -->
+        <mxCell id="customers-header" value="customers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="280" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="customers-body" value="🔑 id uuid PK&#xa;🏢 name varchar&#xa;📂 type: HOLDING|COMPANY|BRANCH|FRANCHISE&#xa;👆 parent_customer_id uuid FK → self&#xa;🌐 tenant_id uuid" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="80" y="116" width="280" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- CUSTOMER_CHANNELS (kill switch + credentials) -->
+        <!-- ================================================================ -->
+        <mxCell id="cc-header" value="customer_channels" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="270" width="280" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="cc-body" value="🔑 id uuid PK&#xa;🏢 customer_id uuid FK → customers&#xa;📡 channel: EMAIL|TELEGRAM|WHATSAPP|SMS|SLACK&#xa;🔴 active boolean  ← kill switch global&#xa;⚙️ config JSONB&#xa;   EMAIL:    smtp_host, smtp_port, from_address&#xa;   TELEGRAM: bot_token&#xa;   WHATSAPP: api_token, phone_number_id&#xa;   SMS:      account_sid, auth_token&#xa;   SLACK:    bot_token, workspace_id&#xa;UNIQUE (tenant_id, customer_id, channel)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="80" y="306" width="280" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- customer → customer_channels -->
+        <mxCell id="e-cust-cc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="customers-header" target="cc-header">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cust-cc-label" value="1 : N" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="e-cust-cc">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- GROUPS -->
+        <!-- ================================================================ -->
+        <mxCell id="groups-header" value="groups" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="440" y="80" width="300" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="groups-body" value="🔑 id uuid PK&#xa;🏢 customer_id uuid FK → customers&#xa;📛 name, display_name, code&#xa;🏷️ type: USER|DEVICE|ASSET|MIXED&#xa;🎯 purposes JSONB[]&#xa;   NOTIFICATION | ESCALATION | ACCESS_CONTROL&#xa;   ALARMS_NOTIFY | ALARMS_REPORT | ALARMS_INSIGHT&#xa;   WELCOME_USER | RELEASE_NOTE | MAINTENANCE | ...&#xa;👥 members JSONB[]  ← { id, type: USER|DEVICE|ASSET }&#xa;⚙️ notification_settings JSONB  ← legado" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="440" y="116" width="300" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- customer → groups -->
+        <mxCell id="e-cust-grp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="customers-header" target="groups-header">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cust-grp-label" value="1 : N" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="e-cust-grp">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- GROUP_DISPATCH_CONFIGS -->
+        <!-- ================================================================ -->
+        <mxCell id="gdc-header" value="group_dispatch_configs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="440" y="360" width="300" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="gdc-body" value="🔑 id uuid PK&#xa;👥 group_id uuid FK → groups&#xa;📡 channel: EMAIL|TELEGRAM|WHATSAPP|SMS|SLACK&#xa;⚡ action: OPEN|ACK|ESCALATE|SNOOZE|CLOSE|STATE_HISTORY&#xa;🔴 active boolean&#xa;📬 delivery_mode: GROUP | INDIVIDUAL&#xa;   GROUP: envia para target (1 mensagem)&#xa;   INDIVIDUAL: 1 por membro via user_contacts&#xa;🎯 target varchar nullable&#xa;   TELEGRAM: chat_id  (-1001234567890)&#xa;   EMAIL:    manut@mestrealvaro.com.br&#xa;   SMS/WHATSAPP: +5531988880000&#xa;   SLACK: channel_id (C0123456789)&#xa;⏱️ escalation_delay_minutes integer&#xa;UNIQUE (tenant_id, group_id, channel, action)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="440" y="396" width="300" height="260" as="geometry" />
+        </mxCell>
+
+        <!-- groups → group_dispatch_configs -->
+        <mxCell id="e-grp-gdc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;strokeWidth=2;" edge="1" parent="1" source="groups-header" target="gdc-header">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-grp-gdc-label" value="1 : N" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="e-grp-gdc">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- USERS -->
+        <!-- ================================================================ -->
+        <mxCell id="users-header" value="users" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="840" y="80" width="260" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="users-body" value="🔑 id uuid PK&#xa;🏢 customer_id uuid FK → customers&#xa;👤 name, email (primary)&#xa;🔐 type: INTERNAL|CUSTOMER|PARTNER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="840" y="116" width="260" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- customer → users -->
+        <mxCell id="e-cust-usr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="customers-header" target="users-header">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="380" y="107" /><mxPoint x="380" y="107" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- USER_CONTACTS (RFC-0025) -->
+        <!-- ================================================================ -->
+        <mxCell id="uc-header" value="user_contacts  (RFC-0025)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="840" y="270" width="260" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-body" value="🔑 id uuid PK&#xa;👤 user_id uuid FK → users&#xa;📡 channel: EMAIL|TELEGRAM|WHATSAPP|SMS|SLACK&#xa;📬 value varchar&#xa;   EMAIL:    rodrigo@myio.com.br&#xa;   TELEGRAM: @handle ou chat_id&#xa;   WHATSAPP/SMS: +5531988880000&#xa;🏷️ label varchar  (work, personal, on-call)&#xa;✅ verified boolean  DEFAULT false&#xa;🔴 active boolean  DEFAULT true&#xa;UNIQUE (tenant_id, user_id, channel, value)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="840" y="306" width="260" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- users → user_contacts -->
+        <mxCell id="e-usr-uc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="users-header" target="uc-header">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-usr-uc-label" value="1 : N" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" connectable="0" vertex="1" parent="e-usr-uc">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- RULES -->
+        <!-- ================================================================ -->
+        <mxCell id="rules-header" value="rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="440" y="720" width="300" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="rules-body" value="🔑 id uuid PK&#xa;🏢 customer_id uuid FK → customers&#xa;📛 name, type: ALARM_THRESHOLD|SLA|ESCALATION|...&#xa;📍 scope: { type: GLOBAL|DEVICE|ASSET, entityIds[] }&#xa;📣 notifications JSONB  ← RFC-0024&#xa;   {&#xa;     &quot;OPEN&quot;:     { recipients: [...] }&#xa;     &quot;ACK&quot;:      { recipients: [...] }&#xa;     &quot;ESCALATE&quot;: { recipients: [...] }&#xa;     &quot;CLOSE&quot;:    { recipients: [...] }&#xa;   }&#xa;&#xa;recipients item:&#xa;   { sourceType: USER,   userId }&#xa;   { sourceType: GROUP,  groupId }&#xa;   { sourceType: MANUAL, channel, contact, name }" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="440" y="756" width="300" height="220" as="geometry" />
+        </mxCell>
+
+        <!-- customer → rules -->
+        <mxCell id="e-cust-rules" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="customers-body" target="rules-header">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="220" y="700" /><mxPoint x="440" y="700" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- ORCHESTRATOR FLOW BOX -->
+        <!-- ================================================================ -->
+        <mxCell id="orch-header" value="Alarm Orchestrator — Fluxo de Dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;align=left;spacingLeft=8;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="80" y="720" width="320" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="orch-body" value="1. Alarme dispara → ação = OPEN&#xa;2. Busca rule.notifications[&quot;OPEN&quot;].recipients&#xa;&#xa;Para cada recipient:&#xa;&#xa;  ▶ sourceType = GROUP&#xa;    → group_dispatch_configs WHERE&#xa;        group_id = recipient.groupId&#xa;        AND action = &quot;OPEN&quot;&#xa;        AND active = true&#xa;    → se delivery_mode = GROUP:&#xa;        envia para target (chat_id / email / phone)&#xa;    → se delivery_mode = INDIVIDUAL:&#xa;        busca members do grupo&#xa;        para cada membro → user_contacts&#xa;           WHERE channel = X AND active = true&#xa;           envia para cada contato&#xa;&#xa;  ▶ sourceType = USER&#xa;    → user_contacts WHERE&#xa;        user_id = X AND channel = Y AND active = true&#xa;&#xa;  ▶ sourceType = MANUAL&#xa;    → envia direto para recipient.contact&#xa;&#xa;3. Credencial do canal:&#xa;    customer_channels WHERE&#xa;        customer_id = X AND channel = Y AND active = true&#xa;    → config.bot_token / smtp_host / etc&#xa;&#xa;4. Se ação = ESCALATE:&#xa;    usa group_dispatch_configs.escalation_delay_minutes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="80" y="756" width="320" height="420" as="geometry" />
+        </mxCell>
+
+        <!-- rules → orchestrator -->
+        <mxCell id="e-rules-orch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;strokeColor=#666666;strokeWidth=2;dashed=1;" edge="1" parent="1" source="rules-header" target="orch-header">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- gdc → user_contacts (INDIVIDUAL mode) -->
+        <!-- ================================================================ -->
+        <mxCell id="e-gdc-uc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;strokeColor=#d79b00;strokeWidth=1;dashed=1;" edge="1" parent="1" source="gdc-header" target="uc-header">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="800" y="378" /><mxPoint x="800" y="440" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-gdc-uc-label" value="INDIVIDUAL mode" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=#ffe6cc;fontSize=10;" connectable="0" vertex="1" parent="e-gdc-uc">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- customer_channels → gdc (credentials lookup) -->
+        <!-- ================================================================ -->
+        <mxCell id="e-cc-gdc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#d6b656;strokeWidth=1;dashed=1;" edge="1" parent="1" source="cc-header" target="gdc-header">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="420" y="288" /><mxPoint x="420" y="378" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-cc-gdc-label" value="credenciais" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=#fff2cc;fontSize=10;" connectable="0" vertex="1" parent="e-cc-gdc">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- LEGEND -->
+        <!-- ================================================================ -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="840" y="560" width="260" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="Legenda" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="855" y="568" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="855" y="594" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l1t" value="Customer / hierarquia" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="882" y="592" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="855" y="614" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l2t" value="Credenciais de canal (RFC-0024)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="882" y="612" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="855" y="634" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l3t" value="Grupos + dispatch config (RFC-0024)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="882" y="632" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="855" y="654" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l4t" value="Rules + notifications (RFC-0024)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="882" y="652" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="855" y="674" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l5t" value="Usuários + contatos (RFC-0025)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="882" y="672" width="200" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- NOTE: pending group_dispatch_configs migration -->
+        <!-- ================================================================ -->
+        <mxCell id="note" value="⚠️  group_dispatch_configs pendente:&#xa;adicionar delivery_mode, target, escalation_delay_minutes" style="text;html=1;strokeColor=#d79b00;fillColor=#ffe6cc;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="440" y="672" width="300" height="40" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

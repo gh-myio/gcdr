@@ -15,6 +15,11 @@ export type GroupPurpose =
   | 'REPORTING'         // For report grouping
   | 'MAINTENANCE'       // For maintenance scheduling
   | 'MONITORING'        // For monitoring dashboards
+  | 'ALARMS_NOTIFY'     // Recebe notificações de alarme (EMAIL_ALARM)
+  | 'ALARMS_REPORT'     // Recebe relatórios de alarme (EMAIL_REPORT)
+  | 'ALARMS_INSIGHT'    // Recebe insights e métricas (INSIGHT)
+  | 'WELCOME_USER'      // Recebe emails de boas-vindas / reset de senha (EMAIL_WELCOME)
+  | 'RELEASE_NOTE'      // Recebe comunicados de nova feature (RELEASE_NOTE)
   | 'CUSTOM';           // Custom purpose
 
 /**

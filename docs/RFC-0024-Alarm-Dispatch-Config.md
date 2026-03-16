@@ -9,27 +9,193 @@
 
 ## Summary
 
-Introduce a two-level alarm dispatch configuration system that controls **which notification channels fire for which alarm lifecycle actions**, with a redesigned `RuleNotifications` model that supports per-action recipient lists and multi-channel contacts (EMAIL, TELEGRAM, WHATSAPP).
-
-The system has two orthogonal layers:
-
-1. **Customer-level channel registry** (`customer_channels`) — defines available channels and their credentials (SMTP relay, bot token, webhook URL) with a global active toggle per channel.
-2. **Group-level dispatch matrix** (`group_dispatch_configs`) — a `(channel × action × active)` matrix that controls which groups receive which channels for which alarm lifecycle actions.
-3. **Rule-level notifications** (existing JSONB, reshaped) — per-action recipient lists within a rule, referencing USERs, GROUPs, or MANUAL contacts with per-recipient channel selection.
+Introduce a three-layer alarm dispatch system that controls **which notification channels fire for which alarm lifecycle actions**, with a redesigned `RuleNotifications` model that supports per-action recipient lists and multi-channel contacts.
 
 ---
 
-## Motivation
+## Architecture Overview
 
-The current `notifications` field on the `rules` table uses three fixed categories (`alarmNotify`, `alarmReport`, `alarmInsight`) and supports only EMAIL as a contact channel per recipient. This is insufficient for the following use cases:
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           GCDR — Alarm Dispatch Stack                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-- **Alarm lifecycle granularity**: operators need to control notification dispatch per alarm action — OPEN, ACK, ESCALATE, SNOOZE, CLOSE, STATE_HISTORY — independently. "Notify group A when an alarm opens, but only notify manager B when it escalates" is not expressible today.
-- **Multi-channel contacts**: recipients may prefer Telegram or WhatsApp instead of email. The current model stores only `email` per recipient with no channel selection.
-- **Customer-level kill switches**: when a channel integration breaks (e.g., SMTP relay goes down), there is no way to disable EMAIL for all groups and rules of a customer at once without touching every rule individually.
-- **Group-level dispatch**: groups already aggregate users and channels. Repeating user lists inside rules creates duplication and drift. A group reference should be sufficient — the group carries its own membership.
-- **Manual contacts**: on-call contractors or external stakeholders may not have GCDR user accounts but must still receive alarm notifications.
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  CUSTOMER  (e.g. Moxuara)                                                │
+  │                                                                          │
+  │  LAYER 1 — customer_channels  (kill switch + credentials)                │
+  │  ┌───────────────┬──────────┬──────────────────────────────────────┐    │
+  │  │ channel       │ active   │ config (credentials)                  │    │
+  │  ├───────────────┼──────────┼──────────────────────────────────────┤    │
+  │  │ EMAIL_RELAY   │ ✅ true  │ { host, port, from, user, pass }     │    │
+  │  │ TELEGRAM      │ ✅ true  │ { botToken: "7123..." }              │    │
+  │  │ WHATSAPP      │ ❌ false │ { apiUrl, token }                    │    │
+  │  │ WEBHOOK       │ ✅ true  │ { url, secret }                      │    │
+  │  └───────────────┴──────────┴──────────────────────────────────────┘    │
+  │                          │                                               │
+  │          ┌───────────────┴───────────────┐                              │
+  │          ▼                               ▼                              │
+  │  ┌───────────────────────┐   ┌───────────────────────┐                 │
+  │  │  GROUP: Operações      │   │  GROUP: Gerência       │                │
+  │  │  purpose: ALARMS_NOTIFY│   │  purpose: ALARMS_NOTIFY│                │
+  │  │                       │   │                        │                 │
+  │  │  LAYER 2 — dispatch    │   │  LAYER 2 — dispatch    │                │
+  │  │  group_dispatch_configs│   │  group_dispatch_configs│                │
+  │  └───────────────────────┘   └───────────────────────┘                 │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  LAYER 3 — rules.notifications  (per-action recipients, JSONB)           │
+  │                                                                          │
+  │  Rule: "Fancoil Ligado"                                                  │
+  │    OPEN     → Group: Operações, User: Ana Lima                           │
+  │    ESCALATE → Group: Gerência, Manual: Carlos (+5531...)                 │
+  │    ACK      → Group: Operações                                           │
+  │    CLOSE    → Group: Operações                                           │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
 
-Without this RFC, every new notification requirement requires modifying individual rules, with no cross-cutting customer-level control.
+---
+
+## Dispatch Resolution Flow
+
+```
+Alarm event fires (action = OPEN, ruleId = X)
+        │
+        ▼
+ ┌──────────────────────────────────┐
+ │  1. Load rule.notifications.OPEN │
+ │     → recipients: [grp-operacoes]│
+ └──────────────┬───────────────────┘
+                │
+                ▼
+ ┌──────────────────────────────────┐
+ │  2. For each GROUP recipient:    │
+ │     Load group_dispatch_configs  │
+ │     WHERE group_id = grp-operacoes│
+ │       AND action = 'OPEN'        │
+ │     → [EMAIL_RELAY, TELEGRAM]    │
+ └──────────────┬───────────────────┘
+                │
+                ▼
+ ┌──────────────────────────────────┐
+ │  3. For each channel:            │
+ │     JOIN customer_channels       │
+ │     WHERE customer_id = moxuara  │
+ │       AND channel = EMAIL_RELAY  │
+ │     → active = true? ✅          │
+ │     → config = { smtp creds }    │
+ └──────────────┬───────────────────┘
+                │
+                ▼
+ ┌──────────────────────────────────────────────────────────┐
+ │  4. Resolve recipients by delivery_mode:                  │
+ │                                                           │
+ │  delivery_mode = GROUP                                    │
+ │    → send to dispatch_config.target (chat_id or email)   │
+ │    → one message to the group destination                 │
+ │                                                           │
+ │  delivery_mode = INDIVIDUAL                               │
+ │    → expand group.members                                 │
+ │    → load user_contacts for each member                   │
+ │    → send one message per person                          │
+ └──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Entity Relationship
+
+```
+CUSTOMER
+  │
+  ├─── customer_channels  (1:N per customer)
+  │      channel: EMAIL_RELAY | TELEGRAM | WHATSAPP | WEBHOOK | SMS
+  │      active:  ✅ / ❌  ← global kill switch
+  │      config:  credentials (SMTP, bot token, API key, etc.)
+  │
+  └─── GROUPS  (N per customer)
+         purpose: ALARMS_NOTIFY | ALARMS_REPORT | ALARMS_INSIGHT | …
+         members: [USER, DEVICE, ASSET]
+         │
+         └─── group_dispatch_configs  (N per group)
+                channel:                  EMAIL_RELAY | TELEGRAM | …
+                action:                   OPEN | ACK | ESCALATE | SNOOZE | CLOSE | STATE_HISTORY
+                active:                   ✅ / ❌
+                delivery_mode:            GROUP | INDIVIDUAL
+                target:                   "-100123456" (chat_id) or "ops@moxuara.com"
+                escalation_delay_minutes: 0 | 5 | 15 | 30 …
+
+
+RULE
+  └─── notifications  (JSONB, keyed by AlarmAction)
+         OPEN:
+           recipients:
+             - { sourceType: GROUP,  groupId: "grp-operacoes" }
+             - { sourceType: USER,   userId:  "usr-ana" }
+             - { sourceType: MANUAL, channel: TELEGRAM, handle: "@carlos" }
+         ESCALATE:
+           recipients:
+             - { sourceType: GROUP, groupId: "grp-gerencia" }
+```
+
+---
+
+## Layer Semantics
+
+| Layer | Table | Owns | Controls |
+|---|---|---|---|
+| 1 | `customer_channels` | Customer | Is the channel available? (credentials + kill switch) |
+| 2 | `group_dispatch_configs` | Group | Which channel × action combos fire? And how? (GROUP vs INDIVIDUAL) |
+| 3 | `rules.notifications` | Rule | Who are the recipients for each action? |
+
+A notification fires **only when all three layers are active**.
+
+---
+
+## `delivery_mode`: GROUP vs INDIVIDUAL
+
+```
+delivery_mode = GROUP
+┌───────────────────────────────────────────┐
+│  Telegram channel, action = OPEN           │
+│  target = "-100123456789" (group chat_id)  │
+│                                            │
+│  → ONE message sent to the Telegram group  │
+│  → All members see it in the chat          │
+└───────────────────────────────────────────┘
+
+delivery_mode = INDIVIDUAL
+┌───────────────────────────────────────────┐
+│  Email channel, action = ESCALATE          │
+│  target = NULL (irrelevant)                │
+│                                            │
+│  → Expand group.members (USERs)            │
+│  → Load user_contacts for each user        │
+│     (from user_contacts table, RFC-0025)   │
+│  → Send one email per person               │
+│     → ana@moxuara.com                      │
+│     → carlos@moxuara.com                   │
+└───────────────────────────────────────────┘
+```
+
+---
+
+## `customer_channels` — credentials matrix
+
+| Channel | Required config keys | Purpose |
+|---|---|---|
+| `EMAIL_RELAY` | `host`, `port`, `secure`, `user`, `pass`, `from` | SMTP relay |
+| `TELEGRAM` | `botToken` | Bot API token, shared across all groups |
+| `WHATSAPP` | `apiUrl`, `apiToken`, `fromNumber` | WhatsApp Business API |
+| `WEBHOOK` | `url`, `method`, `headers`, `secret` | Generic HTTP call |
+| `SMS` | `provider`, `apiKey`, `fromNumber` | SMS gateway |
+| `SLACK` | `webhookUrl` or `botToken`, `defaultChannel` | Slack workspace |
+| `TEAMS` | `webhookUrl` | Microsoft Teams connector |
+
+The customer configures credentials **once**. All groups that use `TELEGRAM` share the same `botToken`. Each group defines its own `target` (chat_id) in `group_dispatch_configs`.
 
 ---
 
@@ -44,131 +210,54 @@ LAYER 1 — Customer Channel Registry
   "Does this customer have EMAIL_RELAY configured and turned on globally?"
 
 LAYER 2 — Group Dispatch Matrix
-  "For Group A, does EMAIL_RELAY fire on OPEN events?"
+  "For Group: Operações, does EMAIL_RELAY fire on OPEN events?
+   And does it send to a group inbox (GROUP) or per-person (INDIVIDUAL)?"
 
 LAYER 3 — Rule Notifications
   "For this specific rule, who are the recipients for OPEN events?"
 ```
 
-A notification is dispatched only when all three layers say yes.
-
-### Customer channels
-
-A customer registers channels once with their credentials. The `active` flag acts as a global kill switch:
+### Example: Moxuara, alarm OPEN
 
 ```
-customer: Moxuara
-  EMAIL_RELAY  active=true   config: { host: smtp.office365.com, port: 587, from: alerts@moxuara.com }
-  TELEGRAM     active=true   config: { botToken: "7123...", defaultChatId: "-100123..." }
-  WHATSAPP     active=false  config: { apiUrl: "...", token: "..." }
-  WEBHOOK      active=true   config: { url: "https://ops.moxuara.com/hooks/gcdr", secret: "..." }
-```
+customer_channels (Moxuara):
+  EMAIL_RELAY → ✅ active, smtp.office365.com
+  TELEGRAM    → ✅ active, botToken: "7123..."
 
-Turning off `TELEGRAM` at the customer level immediately suppresses Telegram notifications across all groups and rules for that customer — no individual rule changes needed.
+Rule "Fancoil Ligado" → notifications.OPEN.recipients:
+  → GROUP: grp-operacoes
 
-### Group dispatch matrix
+group_dispatch_configs (grp-operacoes):
+  ┌──────────────┬──────────┬────────┬───────────────┬───────────────────────────┐
+  │ channel      │ action   │ active │ delivery_mode │ target                    │
+  ├──────────────┼──────────┼────────┼───────────────┼───────────────────────────┤
+  │ EMAIL_RELAY  │ OPEN     │ ✅     │ INDIVIDUAL    │ NULL (per-user contacts)  │
+  │ EMAIL_RELAY  │ ACK      │ ✅     │ INDIVIDUAL    │ NULL                      │
+  │ EMAIL_RELAY  │ ESCALATE │ ✅     │ INDIVIDUAL    │ NULL                      │
+  │ TELEGRAM     │ OPEN     │ ✅     │ GROUP         │ -100123456789             │
+  │ TELEGRAM     │ ESCALATE │ ✅     │ GROUP         │ -100123456789             │
+  └──────────────┴──────────┴────────┴───────────────┴───────────────────────────┘
 
-Groups define which channels trigger for which alarm actions:
-
-```
-Group: Operações (belongs to Moxuara)
-  EMAIL_RELAY  × OPEN          → active
-  EMAIL_RELAY  × ACK           → active
-  EMAIL_RELAY  × ESCALATE      → active
-  EMAIL_RELAY  × SNOOZE        → inactive
-  EMAIL_RELAY  × CLOSE         → active
-  EMAIL_RELAY  × STATE_HISTORY → inactive
-  TELEGRAM     × OPEN          → active
-  TELEGRAM     × ESCALATE      → active
-
-Group: Gerência (belongs to Moxuara)
-  EMAIL_RELAY  × ESCALATE      → active
-  EMAIL_RELAY  × CLOSE         → active
-```
-
-### Rule notifications
-
-Within a rule, notifications are keyed by alarm action. Each action holds a recipient list:
-
-```json
-{
-  "OPEN": {
-    "enabled": true,
-    "recipients": [
-      { "sourceType": "GROUP",  "groupId": "grp-operacoes-uuid" },
-      { "sourceType": "USER",   "userId": "usr-supervisor-uuid" },
-      { "sourceType": "MANUAL", "name": "Carlos Terceirizado",
-        "channel": "WHATSAPP",  "whatsappNumber": "+5531988880000" }
-    ]
-  },
-  "ESCALATE": {
-    "enabled": true,
-    "recipients": [
-      { "sourceType": "GROUP",  "groupId": "grp-gerencia-uuid" },
-      { "sourceType": "MANUAL", "name": "Planta Manager",
-        "channel": "EMAIL",     "email": "manager@moxuara.com" }
-    ]
-  },
-  "ACK":           { "enabled": true,  "recipients": [{ "sourceType": "GROUP", "groupId": "grp-operacoes-uuid" }] },
-  "SNOOZE":        { "enabled": false, "recipients": [] },
-  "CLOSE":         { "enabled": true,  "recipients": [{ "sourceType": "GROUP", "groupId": "grp-operacoes-uuid" }] },
-  "STATE_HISTORY": { "enabled": false, "recipients": [] }
-}
-```
-
-### Frontend UX — Rule Notifications tab
-
-The Notifications tab in a rule detail view renders one section per `AlarmAction`:
-
-```
-OPEN          [● enabled]
-  ├── Grupo: Operações                [×]
-  ├── User:  Ana Lima (ana@moxuara)   [×]
-  └── [+ Add recipient]
-
-ESCALATE      [● enabled]
-  ├── Grupo: Gerência                 [×]
-  ├── Manual: Carlos (+5531988...)    [×]
-  └── [+ Add recipient]
-
-ACK           [● enabled]   SNOOZE [○ disabled]   CLOSE [● enabled]   STATE_HISTORY [○ disabled]
-```
-
-**[+ Add recipient] wizard — 3 steps:**
-
-```
-Step 1 — Recipient type
-  ○ System User    (search from customer user list — data pre-filled)
-  ○ Group          (reference only — group carries members and channels)
-  ○ Manual         (free-form — person outside the system)
-
-Step 2 — Contact details  (only for Manual)
-  Channel:  [EMAIL]  [TELEGRAM]  [WHATSAPP]
-
-  → EMAIL:     Full name  +  email address
-  → TELEGRAM:  Name       +  @handle
-  → WHATSAPP:  Name       +  phone number  (+CC DDD NNNNNNNN)
-
-Step 3 — Summary & confirm
-  Review all fields before saving.
-  (Verification code flow — Phase 2, see Unresolved Questions)
+Effective dispatch on OPEN:
+  • EMAIL_RELAY: expand grp-operacoes members → load user_contacts → send per-person
+  • TELEGRAM:    send one message to chat -100123456789
 ```
 
 ---
 
 ## Reference-Level Explanation
 
-### New table: `customer_channels`
+### Table: `customer_channels`
 
 ```sql
 CREATE TABLE customer_channels (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid        NOT NULL,
   customer_id uuid        NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-  channel     varchar(50) NOT NULL,   -- EMAIL_RELAY | TELEGRAM | WHATSAPP | WEBHOOK | SMS | SLACK | TEAMS | CUSTOM
+  channel     varchar(50) NOT NULL,
+  -- EMAIL_RELAY | TELEGRAM | WHATSAPP | WEBHOOK | SMS | SLACK | TEAMS | CUSTOM
   active      boolean     NOT NULL DEFAULT true,
   config      jsonb       NOT NULL DEFAULT '{}',
-  -- Channel-specific config (never stored in plaintext passwords in logs):
   -- EMAIL_RELAY:  { host, port, secure, user, from, displayName }
   -- TELEGRAM:     { botToken, defaultChatId }
   -- WHATSAPP:     { apiUrl, apiToken, fromNumber }
@@ -179,29 +268,52 @@ CREATE TABLE customer_channels (
   created_by  uuid,
   UNIQUE (tenant_id, customer_id, channel)
 );
-
-CREATE INDEX customer_channels_tenant_customer_idx ON customer_channels (tenant_id, customer_id);
-CREATE INDEX customer_channels_tenant_active_idx   ON customer_channels (tenant_id, active);
 ```
 
-### New table: `group_dispatch_configs`
+### Table: `group_dispatch_configs`
 
 ```sql
 CREATE TYPE alarm_action AS ENUM ('OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY');
+CREATE TYPE delivery_mode AS ENUM ('GROUP', 'INDIVIDUAL');
 
 CREATE TABLE group_dispatch_configs (
-  id        uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid        NOT NULL,
-  group_id  uuid        NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-  channel   varchar(50) NOT NULL,  -- must match a customer_channels.channel for the group's customer
-  action    alarm_action NOT NULL,
-  active    boolean     NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
+  id                       uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                uuid          NOT NULL,
+  group_id                 uuid          NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  channel                  varchar(50)   NOT NULL,
+  action                   alarm_action  NOT NULL,
+  active                   boolean       NOT NULL DEFAULT true,
+  delivery_mode            delivery_mode NOT NULL DEFAULT 'INDIVIDUAL',
+  -- GROUP:      send to `target` (group chat_id, group email alias, etc.)
+  -- INDIVIDUAL: expand members → lookup user_contacts → send per-person
+  target                   text,
+  -- Used when delivery_mode = GROUP:
+  --   TELEGRAM → chat_id (e.g. "-100123456789")
+  --   EMAIL_RELAY → group alias (e.g. "ops@moxuara.com")
+  --   SLACK → channel name (e.g. "#alertas-criticos")
+  --   NULL when delivery_mode = INDIVIDUAL
+  escalation_delay_minutes int           NOT NULL DEFAULT 0,
+  -- Minutes to wait before sending this channel+action combination
+  -- Useful for escalation chains: EMAIL fires at 0min, TELEGRAM at 5min
+  created_at               timestamptz   NOT NULL DEFAULT now(),
+  updated_at               timestamptz   NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, group_id, channel, action)
 );
+```
 
-CREATE INDEX group_dispatch_configs_tenant_group_idx ON group_dispatch_configs (tenant_id, group_id);
+### Escalation delay example
+
+```
+Group: Gerência — action: ESCALATE
+  ┌──────────────┬──────────────────┬──────────────────────────┐
+  │ channel      │ delay (minutes)  │ behavior                 │
+  ├──────────────┼──────────────────┼──────────────────────────┤
+  │ EMAIL_RELAY  │ 0                │ fires immediately        │
+  │ TELEGRAM     │ 5                │ fires after 5 min        │
+  │ SMS          │ 15               │ fires after 15 min       │
+  └──────────────┴──────────────────┴──────────────────────────┘
+
+If alarm is ACKed before the delay elapses → delayed channels are cancelled.
 ```
 
 ### Drizzle schema additions
@@ -212,6 +324,8 @@ CREATE INDEX group_dispatch_configs_tenant_group_idx ON group_dispatch_configs (
 export const alarmActionEnum = pgEnum('alarm_action', [
   'OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY',
 ]);
+
+export const deliveryModeEnum = pgEnum('delivery_mode', ['GROUP', 'INDIVIDUAL']);
 
 export const customerChannels = pgTable('customer_channels', {
   id:         uuid('id').primaryKey().defaultRandom(),
@@ -229,14 +343,17 @@ export const customerChannels = pgTable('customer_channels', {
 }));
 
 export const groupDispatchConfigs = pgTable('group_dispatch_configs', {
-  id:        uuid('id').primaryKey().defaultRandom(),
-  tenantId:  uuid('tenant_id').notNull(),
-  groupId:   uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
-  channel:   varchar('channel', { length: 50 }).notNull(),
-  action:    alarmActionEnum('action').notNull(),
-  active:    boolean('active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  id:                     uuid('id').primaryKey().defaultRandom(),
+  tenantId:               uuid('tenant_id').notNull(),
+  groupId:                uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+  channel:                varchar('channel', { length: 50 }).notNull(),
+  action:                 alarmActionEnum('action').notNull(),
+  active:                 boolean('active').notNull().default(true),
+  deliveryMode:           deliveryModeEnum('delivery_mode').notNull().default('INDIVIDUAL'),
+  target:                 text('target'),
+  escalationDelayMinutes: integer('escalation_delay_minutes').notNull().default(0),
+  createdAt:              timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:              timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tenantGroupChannelActionUnique: uniqueIndex('group_dispatch_configs_unique').on(table.tenantId, table.groupId, table.channel, table.action),
   tenantGroupIdx: index('group_dispatch_configs_tenant_group_idx').on(table.tenantId, table.groupId),
@@ -249,25 +366,19 @@ export const groupDispatchConfigs = pgTable('group_dispatch_configs', {
 // src/domain/entities/Rule.ts
 
 export type AlarmAction = 'OPEN' | 'ACK' | 'ESCALATE' | 'SNOOZE' | 'CLOSE' | 'STATE_HISTORY';
-export type NotificationChannel = 'EMAIL' | 'TELEGRAM' | 'WHATSAPP' | 'WEBHOOK' | 'SMS' | 'SLACK' | 'TEAMS' | 'CUSTOM';
-
+export type NotificationChannel = 'EMAIL_RELAY' | 'TELEGRAM' | 'WHATSAPP' | 'WEBHOOK' | 'SMS' | 'SLACK' | 'TEAMS' | 'CUSTOM';
+export type DeliveryMode = 'GROUP' | 'INDIVIDUAL';
 export type RecipientSourceType = 'USER' | 'GROUP' | 'MANUAL';
 
 export interface NotificationRecipient {
   sourceType: RecipientSourceType;
-
-  // USER — resolved from customer user list
-  userId?:  string;
-
-  // GROUP — reference only; group carries its own members and channel config
-  groupId?: string;
-
-  // MANUAL — free-form contact not in the system
-  name?:            string;
-  channel?:         NotificationChannel;
-  email?:           string;   // EMAIL channel
-  telegramHandle?:  string;   // TELEGRAM channel (@username)
-  whatsappNumber?:  string;   // WHATSAPP channel (+CC DDD NNNNNNNN)
+  userId?:         string;   // USER
+  groupId?:        string;   // GROUP
+  name?:           string;   // MANUAL
+  channel?:        NotificationChannel; // MANUAL
+  email?:          string;   // MANUAL EMAIL
+  telegramHandle?: string;   // MANUAL TELEGRAM
+  whatsappNumber?: string;   // MANUAL WHATSAPP
 }
 
 export interface RuleActionNotification {
@@ -275,47 +386,7 @@ export interface RuleActionNotification {
   recipients: NotificationRecipient[];
 }
 
-// Replaces the old RuleNotifications type
 export type RuleNotifications = Partial<Record<AlarmAction, RuleActionNotification>>;
-```
-
-### Revised Zod schemas (RuleDTO)
-
-```typescript
-// src/dto/request/RuleDTO.ts
-
-const AlarmActionEnum = z.enum(['OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY']);
-
-const NotificationRecipientSchema = z.discriminatedUnion('sourceType', [
-  z.object({
-    sourceType: z.literal('USER'),
-    userId:     z.string().uuid(),
-  }),
-  z.object({
-    sourceType: z.literal('GROUP'),
-    groupId:    z.string().uuid(),
-  }),
-  z.object({
-    sourceType: z.literal('MANUAL'),
-    name:       z.string().min(1).max(255),
-    channel:    z.enum(['EMAIL', 'TELEGRAM', 'WHATSAPP', 'WEBHOOK', 'SMS', 'SLACK', 'TEAMS', 'CUSTOM']),
-    email:           z.string().email().optional(),
-    telegramHandle:  z.string().regex(/^@\w+$/).optional(),
-    whatsappNumber:  z.string().regex(/^\+\d{7,15}$/).optional(),
-  }).refine(d => {
-    if (d.channel === 'EMAIL')    return !!d.email;
-    if (d.channel === 'TELEGRAM') return !!d.telegramHandle;
-    if (d.channel === 'WHATSAPP') return !!d.whatsappNumber;
-    return true;
-  }, { message: 'Contact field required for selected channel' }),
-]);
-
-const RuleActionNotificationSchema = z.object({
-  enabled:    z.boolean(),
-  recipients: z.array(NotificationRecipientSchema).max(100),
-});
-
-const RuleNotificationsSchema = z.record(AlarmActionEnum, RuleActionNotificationSchema).optional();
 ```
 
 ### New API endpoints
@@ -324,105 +395,173 @@ const RuleNotificationsSchema = z.record(AlarmActionEnum, RuleActionNotification
 # Customer Channels
 GET    /api/v1/customers/:customerId/channels
 POST   /api/v1/customers/:customerId/channels
-PATCH  /api/v1/customers/:customerId/channels/:channel       (toggle active, update config)
+PATCH  /api/v1/customers/:customerId/channels/:channel    (toggle active, update config)
 DELETE /api/v1/customers/:customerId/channels/:channel
 
 # Group Dispatch Matrix
 GET    /api/v1/groups/:groupId/dispatch
-PUT    /api/v1/groups/:groupId/dispatch                      (replace full matrix)
-PATCH  /api/v1/groups/:groupId/dispatch/:channel/:action     (toggle single cell)
+PUT    /api/v1/groups/:groupId/dispatch                   (replace full matrix)
+PATCH  /api/v1/groups/:groupId/dispatch/:channel/:action  (toggle single cell)
+
+# Catalog endpoints (static)
+GET    /api/v1/groups/purposes                            (list all GroupPurpose values)
+GET    /api/v1/groups/channels                            (list all supported channel types)
 ```
 
 ### Effective dispatch resolution query
 
 ```sql
--- Resolve active channels for a given group and alarm action
+-- Resolve active dispatch configs for a given group and alarm action,
+-- joined with customer channel credentials and kill switch status.
 SELECT
   cc.channel,
-  cc.config                             AS channel_config,
-  gd.active                             AS group_active,
-  cc.active                             AS customer_active,
-  (cc.active AND gd.active)             AS effective
+  cc.config                           AS channel_config,
+  cc.active                           AS customer_active,
+  gd.active                           AS group_active,
+  gd.delivery_mode,
+  gd.target,
+  gd.escalation_delay_minutes,
+  (cc.active AND gd.active)           AS effective
 FROM group_dispatch_configs gd
-JOIN groups g         ON g.id = gd.group_id
+JOIN groups g          ON g.id = gd.group_id
 JOIN customer_channels cc
   ON  cc.customer_id = g.customer_id
   AND cc.channel     = gd.channel
   AND cc.tenant_id   = gd.tenant_id
 WHERE gd.group_id = :groupId
   AND gd.action   = :action
-ORDER BY cc.channel;
+ORDER BY gd.escalation_delay_minutes, cc.channel;
 ```
 
-### Migration plan
+### Frontend UX — Rule Notifications tab
 
-- **Migration 0014**: Add `customer_channels` table + `alarm_action` enum + `group_dispatch_configs` table.
-- **No data migration needed** for `rules.notifications` — JSONB shape is backwards compatible; old shape keys (`alarmNotify`, `alarmReport`, `alarmInsight`) are silently ignored by the new reader. New shape keys (`OPEN`, `ACK`, etc.) are populated on first edit.
-- **Response DTO fix**: `notifications` field was missing from `RuleResponseDTO` — add it in the same PR.
+```
+OPEN          [● enabled]
+  ├── Grupo: Operações                [×]
+  ├── User:  Ana Lima (ana@moxuara)   [×]
+  └── [+ Add recipient]
+
+ESCALATE      [● enabled]
+  ├── Grupo: Gerência                 [×]
+  ├── Manual: Carlos (+5531988...)    [×]
+  └── [+ Add recipient]
+
+ACK [● enabled]   SNOOZE [○ disabled]   CLOSE [● enabled]   STATE_HISTORY [○ disabled]
+```
+
+**[+ Add recipient] — 3-step wizard:**
+
+```
+Step 1 — Recipient type
+  ○ System User    (search from customer user list)
+  ○ Group          (reference only — group carries members and channel config)
+  ○ Manual         (free-form — person outside the system)
+
+Step 2 — Contact details  (only for Manual)
+  Channel:  [EMAIL_RELAY]  [TELEGRAM]  [WHATSAPP]
+
+  → EMAIL:     Full name + email address
+  → TELEGRAM:  Name + @handle
+  → WHATSAPP:  Name + phone number (+CC DDD NNNNNNNN)
+
+Step 3 — Summary & confirm
+```
+
+### Frontend UX — Group Dispatch Matrix (Settings page)
+
+```
+Group: Operações — Notification Channels
+─────────────────────────────────────────────────────────────
+              │ OPEN │ ACK  │ ESCALATE │ SNOOZE │ CLOSE │ …
+──────────────┼──────┼──────┼──────────┼────────┼───────┤
+EMAIL_RELAY   │  ✅  │  ✅  │    ✅    │   ❌   │  ✅   │
+  mode: INDIVIDUAL                                       │
+  delay: 0min                                            │
+──────────────┼──────┼──────┼──────────┼────────┼───────┤
+TELEGRAM      │  ✅  │  ❌  │    ✅    │   ❌   │  ❌   │
+  mode: GROUP                                            │
+  target: -100123456789                                  │
+  delay: 5min (ESCALATE only)                            │
+─────────────────────────────────────────────────────────
+```
+
+---
+
+## Migration plan
+
+- **Migration 0014** (✅ ran in prod 2026-03-16): `alarm_action` enum + `customer_channels` + `group_dispatch_configs` (original shape, no `delivery_mode`/`target`/`escalation_delay_minutes`)
+- **Migration 0018** (⏳ pending): Add `delivery_mode` enum + add columns `delivery_mode`, `target`, `escalation_delay_minutes` to `group_dispatch_configs`
+
+```sql
+-- migration 0018 (planned)
+CREATE TYPE delivery_mode AS ENUM ('GROUP', 'INDIVIDUAL');
+
+ALTER TABLE group_dispatch_configs
+  ADD COLUMN delivery_mode            delivery_mode NOT NULL DEFAULT 'INDIVIDUAL',
+  ADD COLUMN target                   text,
+  ADD COLUMN escalation_delay_minutes int           NOT NULL DEFAULT 0;
+```
+
+No data migration needed for `rules.notifications` — old JSONB shape keys (`alarmNotify`, `alarmReport`, `alarmInsight`) are silently ignored by the new reader. New keys (`OPEN`, `ACK`, etc.) are populated on first edit.
 
 ---
 
 ## Drawbacks
 
-- **Two new tables** add surface area to the schema. Teams unfamiliar with the hierarchy may not understand why channels are defined at customer level but activated at group level.
-- **Effective-dispatch resolution** requires a JOIN across 3 tables at notification time — the alarm orchestrator must implement this query or call a GCDR endpoint.
-- **Manual contacts with no verification** (Phase 1) means a misconfigured Telegram handle or WhatsApp number silently fails. Phase 2 verification codes are non-trivial to implement for Telegram/WhatsApp.
-- **Group reference only** (no inline users in GROUP recipients) means the alarm orchestrator must expand group membership at dispatch time, adding an extra lookup.
+- Two new tables add surface area. Teams must understand the customer → group → rule hierarchy to configure dispatch correctly.
+- Effective-dispatch resolution requires a JOIN across 3 tables at notification time.
+- `delivery_mode = INDIVIDUAL` requires expanding group membership at dispatch time, adding an extra lookup against `user_contacts`.
+- Manual contacts with no verification (Phase 1) means a misconfigured handle silently fails.
 
 ---
 
 ## Rationale and Alternatives
 
+### Why `delivery_mode` per dispatch config row (not per group)?
+
+Different channels within the same group may have different delivery semantics. Telegram fires to a group chat (`GROUP` mode) while email goes per-person (`INDIVIDUAL` mode). Putting `delivery_mode` at the row level enables this naturally.
+
+### Why `target` per row instead of in `customer_channels.config`?
+
+A customer bot token is shared (`customer_channels.config.botToken`), but each group has a **different** Telegram chat ID (`target`). Separating credentials (customer level) from routing destination (group level) keeps them DRY.
+
+### Why `escalation_delay_minutes` at the dispatch config level?
+
+Delay is a property of the channel × action × group combination — "send SMS 15 minutes after ESCALATE fires for group Gerência." It cannot live at the customer channel level (too broad) or at the rule level (too narrow). The dispatch matrix row is the right owner.
+
 ### Why keyed by `AlarmAction` instead of three fixed categories?
 
-The three-category model (`alarmNotify`, `alarmReport`, `alarmInsight`) conflates **what happened** (alarm fired) with **how to respond** (notify, report, analyze). Alarm lifecycle events (OPEN, ACK, ESCALATE, SNOOZE, CLOSE, STATE_HISTORY) are deterministic, exhaustive, and directly meaningful to operators.
+The three-category model (`alarmNotify`, `alarmReport`, `alarmInsight`) conflates *what happened* with *how to respond*. Alarm lifecycle events are deterministic, exhaustive, and directly meaningful to operators.
 
-### Why a separate `customer_channels` table instead of JSONB on customers?
+### Why a separate `customer_channels` table?
 
-The `customers.config` JSONB field (RFC-0019) could hold channel config, but:
-- Channels need independent `active` flags for SQL-level kill switches.
-- Channel credentials need to be queryable without deserializing the full customer config blob.
-- Adding TELEGRAM, WHATSAPP, WEBHOOK etc. as opaque JSON keys inside `customers.config` would make the schema implicit rather than explicit.
-
-### Why not store channel credentials per-group?
-
-Credentials (SMTP relay, Telegram bot token) belong to the customer's infrastructure, not to individual groups. Duplicating them per-group would create drift when tokens rotate. Centralizing at customer level and referencing by channel name keeps credentials DRY.
-
-### Why `discriminatedUnion` for `NotificationRecipient`?
-
-Three recipient types have mutually exclusive required fields. A flat schema with all fields optional would allow malformed combinations (e.g., a MANUAL recipient with no name, email, handle, or number). Discriminated unions enforce correctness at the DTO layer before any DB write.
+Credentials need independent `active` flags for SQL-level kill switches and must be queryable without deserializing a full customer config blob.
 
 ---
 
 ## Prior Art
 
 - **PagerDuty**: Service-level notification policies with per-severity escalation routes.
-- **OpsGenie**: Team-based on-call routing with multi-channel (email, SMS, push, voice) per alert type.
-- **Grafana Alerting**: Contact points (channels) + notification policies (routing rules) as separate entities — direct inspiration for the customer/group split in this RFC.
+- **OpsGenie**: Team-based on-call routing with multi-channel per alert type.
+- **Grafana Alerting**: Contact points (channels) + notification policies (routing rules) — direct inspiration for the customer/group split.
 
 ---
 
 ## Unresolved Questions
 
-1. **Contact verification (Phase 2)**: Should MANUAL recipients receive a verification code (email link / Telegram message / WhatsApp message) before being activated? What is the UX for re-verification after a contact change?
-
-2. **Orchestrator integration**: The alarm orchestrator needs to call GCDR to resolve effective dispatch at notification time. Should GCDR expose a dedicated resolution endpoint (e.g., `GET /dispatch/resolve?groupId=&action=`) or should the orchestrator perform the JOIN itself against the alarm bundle?
-
-3. **Group membership expansion**: When a `GROUP` recipient is listed in rule notifications, who expands group members at dispatch time — GCDR or the orchestrator? If GCDR, should it be part of the alarm bundle?
-
-4. **Channel enum extensibility**: Is `varchar(50)` on `channel` the right choice, or should it be a `pgEnum` for strict validation? New channels (LINE, Discord, PagerDuty) would require a migration to add enum values. VARCHAR allows adding channels without migrations but loses DB-level validation.
-
-5. **Credential encryption**: Should channel `config` JSONB (which stores SMTP passwords, bot tokens) be encrypted at rest, or is PostgreSQL-level encryption sufficient for the current threat model?
-
-6. **Rule-level vs group-level dispatch conflict**: If a rule's `notifications.OPEN` lists Group A, but Group A's dispatch matrix has `EMAIL_RELAY × OPEN = inactive`, should the rule-level override win or should the group matrix take precedence? Current proposal: **group matrix wins** (customer/group config is the source of truth for channels; rule only controls who, not how).
+1. **Contact verification (Phase 2)**: Should MANUAL recipients receive a verification code before being activated?
+2. **Orchestrator integration**: Should GCDR expose a dedicated resolution endpoint `GET /dispatch/resolve?groupId=&action=` or should the orchestrator JOIN itself via the alarm bundle?
+3. **Group membership expansion**: Who expands group members at dispatch time — GCDR or the orchestrator?
+4. **Channel enum extensibility**: `varchar(50)` vs `pgEnum` — new channels (LINE, Discord) would require a migration to add enum values.
+5. **Credential encryption**: Should `customer_channels.config` (SMTP passwords, bot tokens) be encrypted at rest?
+6. **Rule vs group conflict**: If `notifications.OPEN` lists Group A but Group A has `EMAIL_RELAY × OPEN = inactive`, group matrix wins (current proposal).
 
 ---
 
 ## Future Possibilities
 
-- **Scheduled suppression**: Integrate with `MAINTENANCE_WINDOW` rules to automatically disable dispatch during maintenance without manual toggles.
-- **Per-action templates**: Custom message templates per alarm action and channel (e.g., a rich HTML email for OPEN vs a terse SMS for ACK).
-- **Delivery receipts**: Track whether a notification was delivered, opened, or failed per recipient and channel — stored as a `notification_logs` table.
-- **Recipient groups from LDAP/AD**: Import user groups from Active Directory for MANUAL batch provisioning.
-- **Rate limiting per channel**: Prevent notification flooding for noisy rules (complementing the `cooldown` guard config already on `AlarmThresholdConfig`).
-- **Bundle inclusion**: Include resolved `customerChannels` and `groupDispatchConfigs` in the alarm bundle exported to Node-RED, so the orchestrator can resolve dispatch offline without calling back to GCDR.
+- **Scheduled suppression**: Integrate with `MAINTENANCE_WINDOW` rules to auto-disable dispatch during maintenance.
+- **Per-action templates**: Custom message templates per alarm action and channel.
+- **Delivery receipts**: `notification_logs` table tracking delivered/opened/failed per recipient.
+- **Bundle inclusion**: Include resolved `customerChannels` and `groupDispatchConfigs` in the alarm bundle for offline resolution by Node-RED.
+- **Rate limiting**: Prevent notification flooding for noisy rules (complementing `cooldown` guard config on `AlarmThresholdConfig`).
