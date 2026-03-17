@@ -89,7 +89,8 @@ router.get('/purposes', (_req: Request, res: Response) => {
 router.get('/channels', (_req: Request, res: Response) => {
   sendSuccess(res, {
     items: [
-      { value: 'EMAIL',    label: 'E-mail',            description: 'Envio via SMTP configurado no cliente' },
+      { value: 'EMAIL',       label: 'E-mail',            description: 'Envio via SMTP configurado no cliente' },
+      { value: 'EMAIL_RELAY', label: 'E-mail Relay',      description: 'Envio via servidor relay compartilhado da plataforma' },
       { value: 'TELEGRAM', label: 'Telegram',          description: 'Mensagem para grupo ou usuário via bot Telegram' },
       { value: 'WHATSAPP', label: 'WhatsApp',          description: 'Mensagem via API WhatsApp Business' },
       { value: 'SMS',      label: 'SMS',               description: 'Mensagem de texto para número de telefone' },
@@ -98,7 +99,7 @@ router.get('/channels', (_req: Request, res: Response) => {
       { value: 'WEBHOOK',  label: 'Webhook',           description: 'HTTP POST para URL configurada pelo cliente' },
       { value: 'CUSTOM',   label: 'Personalizado',     description: 'Canal customizado definido pelo cliente' },
     ],
-    count: 8,
+    count: 9,
   }, 200, _req.context?.requestId);
 });
 

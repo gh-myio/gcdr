@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const ChannelTypeSchema = z.enum([
-  'EMAIL', 'TELEGRAM', 'WHATSAPP', 'WEBHOOK', 'SLACK', 'SMS', 'TEAMS', 'CUSTOM',
+  'EMAIL', 'EMAIL_RELAY', 'TELEGRAM', 'WHATSAPP', 'WEBHOOK', 'SLACK', 'SMS', 'TEAMS', 'CUSTOM',
 ]);
 
 export const UpsertGroupChannelSchema = z.object({
