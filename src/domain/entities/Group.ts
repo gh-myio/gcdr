@@ -57,7 +57,7 @@ export interface GroupNotificationSettings {
       days: number[]; // 0-6
     };
   };
-  escalationDelayMinutes?: number;
+  escalationDelayMs?: number;
   digestEnabled?: boolean;
   digestIntervalMinutes?: number;
 }

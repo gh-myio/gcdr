@@ -323,7 +323,7 @@ Quando `purposes` inclui `NOTIFICATION` ou `ESCALATION`:
     },
     businessHoursOnly: false
   },
-  escalationDelayMinutes: 15,
+  escalationDelayMs: 15,
   digestEnabled:          false
 }
 ```
@@ -358,7 +358,7 @@ POST /api/v1/groups
       { "type": "EMAIL", "enabled": true },
       { "type": "SMS",   "enabled": true }
     ],
-    "escalationDelayMinutes": 10
+    "escalationDelayMs": 10
   }
 }
 ```

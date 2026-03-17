@@ -25,6 +25,7 @@ export interface RuleMeta {
   id: string;
   parentRuleId?: string; // set when id is a synthesized override key (ruleId_deviceId)
   name: string;
+  description?: string;
   scope: { type: string; entityId?: string };
   metric: string;
   operator: string;
@@ -71,6 +72,7 @@ export class CustomerService {
       return {
         id: rule.id,
         name: rule.name,
+        ...(rule.description && { description: rule.description }),
         scope: rule.scope,
         metric: '',
         operator: '',
@@ -87,6 +89,7 @@ export class CustomerService {
     return {
       id: rule.id,
       name: rule.name,
+      ...(rule.description && { description: rule.description }),
       scope: rule.scope,
       metric: cfg.metric,
       operator: cfg.operator,

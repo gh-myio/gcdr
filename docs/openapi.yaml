@@ -3034,23 +3034,64 @@ components:
         channels:
           type: array
           items:
-            type: string
-            enum: [EMAIL, SMS, PUSH, WEBHOOK]
-        escalationOrder:
-          type: integer
-        timePreferences:
+            type: object
+            required: [type, enabled]
+            properties:
+              type:
+                type: string
+                enum: [EMAIL, SMS, WEBHOOK, SLACK, TEAMS, TELEGRAM, PUSH]
+              enabled:
+                type: boolean
+              config:
+                type: object
+                additionalProperties:
+                  type: string
+        schedule:
           type: object
           properties:
             timezone:
               type: string
-            quietHoursStart:
-              type: string
-            quietHoursEnd:
-              type: string
-            workingDays:
-              type: array
-              items:
-                type: integer
+              example: 'America/Sao_Paulo'
+            quietHours:
+              type: object
+              properties:
+                start:
+                  type: string
+                  pattern: '^\d{2}:\d{2}$'
+                end:
+                  type: string
+                  pattern: '^\d{2}:\d{2}$'
+                days:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 0
+                    maximum: 6
+            businessHoursOnly:
+              type: boolean
+            businessHours:
+              type: object
+              properties:
+                start:
+                  type: string
+                  pattern: '^\d{2}:\d{2}$'
+                end:
+                  type: string
+                  pattern: '^\d{2}:\d{2}$'
+                days:
+                  type: array
+                  items:
+                    type: integer
+        escalationDelayMs:
+          type: integer
+          minimum: 0
+          description: Delay in milliseconds before escalation triggers
+          example: 5000
+        digestEnabled:
+          type: boolean
+        digestIntervalMinutes:
+          type: integer
+          minimum: 5
 
     CreateGroup:
       type: object
@@ -3764,6 +3805,9 @@ components:
         name:
           type: string
           example: 'Consumo Elevado'
+        description:
+          type: string
+          example: 'Dispara quando o consumo instantâneo superar o limite configurado'
         scope:
           type: object
           properties:

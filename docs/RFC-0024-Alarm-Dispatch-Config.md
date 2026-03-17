@@ -126,7 +126,7 @@ CUSTOMER
                 active:                   ✅ / ❌
                 delivery_mode:            GROUP | INDIVIDUAL
                 target:                   "-100123456" (chat_id) or "ops@moxuara.com"
-                escalation_delay_minutes: 0 | 5 | 15 | 30 …
+                escalation_delay_ms: 0 | 5000 | 15000 | 30000 …
 
 
 RULE
@@ -228,15 +228,15 @@ Rule "Fancoil Ligado" → notifications.OPEN.recipients:
   → GROUP: grp-operacoes
 
 group_dispatch_configs (grp-operacoes):
-  ┌──────────────┬──────────┬────────┬───────────────┬───────────────────────────┐
-  │ channel      │ action   │ active │ delivery_mode │ target                    │
-  ├──────────────┼──────────┼────────┼───────────────┼───────────────────────────┤
-  │ EMAIL_RELAY  │ OPEN     │ ✅     │ INDIVIDUAL    │ NULL (per-user contacts)  │
-  │ EMAIL_RELAY  │ ACK      │ ✅     │ INDIVIDUAL    │ NULL                      │
-  │ EMAIL_RELAY  │ ESCALATE │ ✅     │ INDIVIDUAL    │ NULL                      │
-  │ TELEGRAM     │ OPEN     │ ✅     │ GROUP         │ -100123456789             │
-  │ TELEGRAM     │ ESCALATE │ ✅     │ GROUP         │ -100123456789             │
-  └──────────────┴──────────┴────────┴───────────────┴───────────────────────────┘
+  ┌──────────────┬──────────┬────────┬───────────────┬───────────────────────────┬──────────┐
+  │ channel      │ action   │ active │ delivery_mode │ target                    │ delay ms │
+  ├──────────────┼──────────┼────────┼───────────────┼───────────────────────────┼──────────┤
+  │ EMAIL_RELAY  │ OPEN     │ ✅     │ INDIVIDUAL    │ NULL (per-user contacts)  │ 0        │
+  │ EMAIL_RELAY  │ ACK      │ ✅     │ INDIVIDUAL    │ NULL                      │ 0        │
+  │ EMAIL_RELAY  │ ESCALATE │ ✅     │ INDIVIDUAL    │ NULL                      │ 0        │
+  │ TELEGRAM     │ OPEN     │ ✅     │ GROUP         │ -100123456789             │ 0        │
+  │ TELEGRAM     │ ESCALATE │ ✅     │ GROUP         │ -100123456789             │ 5000     │
+  └──────────────┴──────────┴────────┴───────────────┴───────────────────────────┴──────────┘
 
 Effective dispatch on OPEN:
   • EMAIL_RELAY: expand grp-operacoes members → load user_contacts → send per-person
@@ -292,9 +292,9 @@ CREATE TABLE group_dispatch_configs (
   --   EMAIL_RELAY → group alias (e.g. "ops@moxuara.com")
   --   SLACK → channel name (e.g. "#alertas-criticos")
   --   NULL when delivery_mode = INDIVIDUAL
-  escalation_delay_minutes int           NOT NULL DEFAULT 0,
+  escalation_delay_ms int           NOT NULL DEFAULT 0,
   -- Minutes to wait before sending this channel+action combination
-  -- Useful for escalation chains: EMAIL fires at 0min, TELEGRAM at 5min
+  -- Useful for escalation chains: EMAIL fires at 0ms, TELEGRAM at 5000ms
   created_at               timestamptz   NOT NULL DEFAULT now(),
   updated_at               timestamptz   NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, group_id, channel, action)
@@ -306,11 +306,11 @@ CREATE TABLE group_dispatch_configs (
 ```
 Group: Gerência — action: ESCALATE
   ┌──────────────┬──────────────────┬──────────────────────────┐
-  │ channel      │ delay (minutes)  │ behavior                 │
+  │ channel      │ delay (ms)       │ behavior                 │
   ├──────────────┼──────────────────┼──────────────────────────┤
   │ EMAIL_RELAY  │ 0                │ fires immediately        │
-  │ TELEGRAM     │ 5                │ fires after 5 min        │
-  │ SMS          │ 15               │ fires after 15 min       │
+  │ TELEGRAM     │ 5000             │ fires after 5 000ms (5s)  │
+  │ SMS          │ 15000            │ fires after 15 000ms (15s)│
   └──────────────┴──────────────────┴──────────────────────────┘
 
 If alarm is ACKed before the delay elapses → delayed channels are cancelled.
@@ -351,7 +351,7 @@ export const groupDispatchConfigs = pgTable('group_dispatch_configs', {
   active:                 boolean('active').notNull().default(true),
   deliveryMode:           deliveryModeEnum('delivery_mode').notNull().default('INDIVIDUAL'),
   target:                 text('target'),
-  escalationDelayMinutes: integer('escalation_delay_minutes').notNull().default(0),
+  escalationDelayMs: integer('escalation_delay_ms').notNull().default(0),
   createdAt:              timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:              timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -420,7 +420,7 @@ SELECT
   gd.active                           AS group_active,
   gd.delivery_mode,
   gd.target,
-  gd.escalation_delay_minutes,
+  gd.escalation_delay_ms,
   (cc.active AND gd.active)           AS effective
 FROM group_dispatch_configs gd
 JOIN groups g          ON g.id = gd.group_id
@@ -430,7 +430,7 @@ JOIN customer_channels cc
   AND cc.tenant_id   = gd.tenant_id
 WHERE gd.group_id = :groupId
   AND gd.action   = :action
-ORDER BY gd.escalation_delay_minutes, cc.channel;
+ORDER BY gd.escalation_delay_ms, cc.channel;
 ```
 
 ### Frontend UX — Rule Notifications tab
@@ -476,12 +476,12 @@ Group: Operações — Notification Channels
 ──────────────┼──────┼──────┼──────────┼────────┼───────┤
 EMAIL_RELAY   │  ✅  │  ✅  │    ✅    │   ❌   │  ✅   │
   mode: INDIVIDUAL                                       │
-  delay: 0min                                            │
+  delay: 0ms                                             │
 ──────────────┼──────┼──────┼──────────┼────────┼───────┤
 TELEGRAM      │  ✅  │  ❌  │    ✅    │   ❌   │  ❌   │
   mode: GROUP                                            │
   target: -100123456789                                  │
-  delay: 5min (ESCALATE only)                            │
+  delay: 5000ms (ESCALATE only)                          │
 ─────────────────────────────────────────────────────────
 ```
 
@@ -489,8 +489,8 @@ TELEGRAM      │  ✅  │  ❌  │    ✅    │   ❌   │  ❌   │
 
 ## Migration plan
 
-- **Migration 0014** (✅ ran in prod 2026-03-16): `alarm_action` enum + `customer_channels` + `group_dispatch_configs` (original shape, no `delivery_mode`/`target`/`escalation_delay_minutes`)
-- **Migration 0018** (⏳ pending): Add `delivery_mode` enum + add columns `delivery_mode`, `target`, `escalation_delay_minutes` to `group_dispatch_configs`
+- **Migration 0014** (✅ ran in prod 2026-03-16): `alarm_action` enum + `customer_channels` + `group_dispatch_configs` (original shape, no `delivery_mode`/`target`/`escalation_delay_ms`)
+- **Migration 0018** (⏳ pending): Add `delivery_mode` enum + add columns `delivery_mode`, `target`, `escalation_delay_ms` to `group_dispatch_configs`
 
 ```sql
 -- migration 0018 (planned)
@@ -499,7 +499,7 @@ CREATE TYPE delivery_mode AS ENUM ('GROUP', 'INDIVIDUAL');
 ALTER TABLE group_dispatch_configs
   ADD COLUMN delivery_mode            delivery_mode NOT NULL DEFAULT 'INDIVIDUAL',
   ADD COLUMN target                   text,
-  ADD COLUMN escalation_delay_minutes int           NOT NULL DEFAULT 0;
+  ADD COLUMN escalation_delay_ms int           NOT NULL DEFAULT 0;
 ```
 
 No data migration needed for `rules.notifications` — old JSONB shape keys (`alarmNotify`, `alarmReport`, `alarmInsight`) are silently ignored by the new reader. New keys (`OPEN`, `ACK`, etc.) are populated on first edit.
@@ -525,9 +525,9 @@ Different channels within the same group may have different delivery semantics. 
 
 A customer bot token is shared (`customer_channels.config.botToken`), but each group has a **different** Telegram chat ID (`target`). Separating credentials (customer level) from routing destination (group level) keeps them DRY.
 
-### Why `escalation_delay_minutes` at the dispatch config level?
+### Why `escalation_delay_ms` at the dispatch config level?
 
-Delay is a property of the channel × action × group combination — "send SMS 15 minutes after ESCALATE fires for group Gerência." It cannot live at the customer channel level (too broad) or at the rule level (too narrow). The dispatch matrix row is the right owner.
+Delay is a property of the channel × action × group combination — "send SMS 15 000ms after ESCALATE fires for group Gerência." It cannot live at the customer channel level (too broad) or at the rule level (too narrow). The dispatch matrix row is the right owner.
 
 ### Why keyed by `AlarmAction` instead of three fixed categories?
 

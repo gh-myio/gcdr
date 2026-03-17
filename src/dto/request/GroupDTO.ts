@@ -44,7 +44,7 @@ const ScheduleSchema = z.object({
 const NotificationSettingsSchema = z.object({
   channels: z.array(NotificationChannelSchema),
   schedule: ScheduleSchema.optional(),
-  escalationDelayMinutes: z.number().min(0).optional(),
+  escalationDelayMs: z.number().min(0).optional(),
   digestEnabled: z.boolean().optional(),
   digestIntervalMinutes: z.number().min(5).optional(),
 });
