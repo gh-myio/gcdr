@@ -140,6 +140,26 @@ router.delete('/:id',
 );
 
 /**
+ * GET /groups/:id/members
+ * List members of a group
+ */
+router.get('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ValidationError('Group ID is required');
+    }
+
+    const group = await groupService.getGroup(tenantId, id);
+    sendSuccess(res, { items: group.members, count: group.members.length }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /groups/:id/members
  * Add members to group
  */
