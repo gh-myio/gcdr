@@ -626,10 +626,9 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
 };
 
 /**
- * GET /customers/:customerId/alarm-rules/bundle/verify
+ * GET /customers/:customerId/alarm-rules/bundle/to-verify-service
  * Same as /bundle/simple but enriched with:
- *   - meta.gatewayToken  — customer gateway auth token
- *   - rules[id].notifications — per-category recipients + emailRelay config
+ *   - rules[id].notifications — per-action recipients (GROUP/USER/MANUAL) with resolvedChannels
  */
 export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {

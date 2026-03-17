@@ -24,6 +24,8 @@ import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository'
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { AlarmBundleVersion } from '../domain/entities/AlarmBundleVersion';
 import { NotFoundError } from '../shared/errors/AppError';
+import { GroupChannelRepository } from '../repositories/GroupChannelRepository';
+import { GroupDispatchConfigRepository } from '../repositories/GroupDispatchConfigRepository';
 
 // Default TTL for bundle cache (5 minutes)
 const DEFAULT_TTL_SECONDS = 300;
@@ -215,34 +217,98 @@ export class AlarmBundleService {
   }
 
   /**
-   * Generate a verify bundle — same as simplified bundle but enriched with:
-   *   - rules[id].notifications: per-category recipients + emailRelay config
+   * Generate a bundle for the verify service (bundle/to-verify-service).
+   * Same as /bundle/simple but enriched with:
+   *   - rules[id].notifications — per-action recipients
+   *   - GROUP recipients include resolvedChannels (group_channels × group_dispatch_configs)
+   *     so the verify service receives flat dispatch targets without extra API calls.
    */
   async verifyBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle & {
-    rules: Record<string, SimpleBundleAlarmRule & { notifications?: import('../domain/entities/Rule').RuleNotifications }>;
+    rules: Record<string, SimpleBundleAlarmRule & { notifications?: Record<string, unknown> }>;
   }> {
     const { tenantId, customerId } = params;
 
-    // Generate the base simplified bundle (uses cache)
+    // Base simplified bundle (uses cache)
     const base = await this.generateSimplifiedBundle(params);
 
-    // Fetch full rules to get notifications field
+    // Full rules to access notifications JSONB
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
     const notificationsMap = new Map(allRules.map(r => [r.id, r.notifications]));
 
-    // Enrich each rule entry with its notifications
-    const enrichedRules: Record<string, SimpleBundleAlarmRule & { notifications?: import('../domain/entities/Rule').RuleNotifications }> = {};
-    for (const [ruleId, rule] of Object.entries(base.rules)) {
-      enrichedRules[ruleId] = {
-        ...rule,
-        ...(notificationsMap.get(ruleId) ? { notifications: notificationsMap.get(ruleId) } : {}),
-      };
+    // Collect all unique groupIds referenced across all rules/actions
+    const groupIds = new Set<string>();
+    for (const rule of allRules) {
+      if (!rule.notifications) continue;
+      for (const actionNotif of Object.values(rule.notifications)) {
+        for (const recipient of actionNotif?.recipients ?? []) {
+          if (recipient.sourceType === 'GROUP') groupIds.add(recipient.groupId);
+        }
+      }
     }
 
-    return {
-      ...base,
-      rules: enrichedRules,
+    // Batch-fetch group_channels and group_dispatch_configs for all referenced groups
+    const groupChannelRepo   = new GroupChannelRepository();
+    const groupDispatchRepo  = new GroupDispatchConfigRepository();
+
+    const groupChannelMap  = new Map<string, Awaited<ReturnType<GroupChannelRepository['findByGroup']>>>();
+    const groupDispatchMap = new Map<string, Awaited<ReturnType<GroupDispatchConfigRepository['findByGroup']>>>();
+
+    await Promise.all([...groupIds].map(async (groupId) => {
+      const [channels, dispatch] = await Promise.all([
+        groupChannelRepo.findByGroup(tenantId, groupId),
+        groupDispatchRepo.findByGroup(tenantId, groupId),
+      ]);
+      groupChannelMap.set(groupId, channels.filter(c => c.active));
+      groupDispatchMap.set(groupId, dispatch.filter(d => d.active));
+    }));
+
+    // For a GROUP recipient, resolve active channels that match the given alarm action
+    const resolveGroupChannels = (groupId: string, action: string) => {
+      const channels      = groupChannelMap.get(groupId) ?? [];
+      const dispatchItems = (groupDispatchMap.get(groupId) ?? []).filter(d => d.action === action);
+      return dispatchItems
+        .map(d => {
+          const ch = channels.find(c => c.channel === d.channel);
+          if (!ch) return null;
+          return {
+            channel:           ch.channel,
+            target:            ch.target,
+            config:            ch.config,
+            escalationDelayMs: d.escalationDelayMs,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
     };
+
+    // Enrich each rule with notifications + resolvedChannels on GROUP recipients
+    const enrichedRules: Record<string, SimpleBundleAlarmRule & { notifications?: Record<string, unknown> }> = {};
+
+    for (const [ruleId, rule] of Object.entries(base.rules)) {
+      const notifications = notificationsMap.get(ruleId);
+      if (!notifications) {
+        enrichedRules[ruleId] = rule;
+        continue;
+      }
+
+      const enrichedNotifications: Record<string, unknown> = {};
+      for (const [action, actionNotif] of Object.entries(notifications)) {
+        if (!actionNotif) continue;
+        enrichedNotifications[action] = {
+          ...actionNotif,
+          recipients: actionNotif.recipients.map(r => {
+            if (r.sourceType !== 'GROUP') return r;
+            return {
+              ...r,
+              resolvedChannels: resolveGroupChannels(r.groupId, action),
+            };
+          }),
+        };
+      }
+
+      enrichedRules[ruleId] = { ...rule, notifications: enrichedNotifications };
+    }
+
+    return { ...base, rules: enrichedRules };
   }
 
   /**

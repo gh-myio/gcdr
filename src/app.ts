@@ -157,7 +157,7 @@ apiV1Router.use('/auth', authController);
 // to ensure proper route matching (more specific routes first)
 
 // Bundle Verify — health check for bundle config (no cache, no bundle generated)
-apiV1Router.get('/customers/:customerId/alarm-rules/bundle/verify', authMiddleware, getAlarmBundleVerifyHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/to-verify-service', authMiddleware, getAlarmBundleVerifyHandler);
 
 // Bundle Cache Invalidation (must come before /bundle routes)
 apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware('bundles:read'), invalidateAlarmBundleCacheHandler);
