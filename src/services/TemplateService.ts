@@ -270,8 +270,14 @@ function buildThemeCssVars(theme: LookAndFeel): string {
   if (theme.logo.primaryUrl) lines.push(`  --logo-url: url('${theme.logo.primaryUrl}');`);
   if (theme.logo.iconUrl)    lines.push(`  --logo-icon-url: url('${theme.logo.iconUrl}');`);
 
-  // Brand
-  if (theme.brandName) lines.push(`  --brand-name: "${theme.brandName}";`);
+  // Brand — escape non-ASCII chars as CSS Unicode escapes (e.g. á → \e1 )
+  if (theme.brandName) {
+    const escaped = theme.brandName.replace(
+      /[^\x00-\x7F]/g,
+      (ch) => `\\${ch.codePointAt(0)!.toString(16)} `,
+    );
+    lines.push(`  --brand-name: "${escaped}";`);
+  }
 
   return `:root {\n${lines.join('\n')}\n}`;
 }
