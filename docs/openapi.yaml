@@ -3784,6 +3784,80 @@ components:
           items:
             $ref: '#/components/schemas/TemplateTag'
 
+    GroupChannel:
+      type: object
+      description: Per-group channel routing target. Stores WHERE to send (chat_id, email, URL). Credentials stay in customer_channels.
+      required: [id, tenantId, groupId, channel, active, target]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [EMAIL, TELEGRAM, WHATSAPP, WEBHOOK, SLACK, SMS, TEAMS, CUSTOM]
+        active:
+          type: boolean
+        target:
+          type: string
+          description: |
+            Routing destination for this channel:
+            EMAIL → email address ("ops@company.com")
+            TELEGRAM → chat_id ("-100123456789")
+            WHATSAPP → phone number ("+5531988880000")
+            WEBHOOK → URL ("https://hooks.company.com/gcdr")
+            SLACK → channel name ("#alertas")
+          example: '-100123456789'
+        config:
+          type: object
+          additionalProperties: true
+          description: Optional extra config (e.g. webhook method/headers)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GroupDispatchEntry:
+      type: object
+      description: Single entry in the group dispatch matrix (channel × action × active × delay)
+      required: [id, tenantId, groupId, channel, action, active, escalationDelayMs]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [EMAIL, TELEGRAM, WHATSAPP, WEBHOOK, SLACK, SMS, TEAMS, CUSTOM]
+        action:
+          type: string
+          enum: [OPEN, ACK, ESCALATE, SNOOZE, CLOSE, STATE_HISTORY]
+        active:
+          type: boolean
+        escalationDelayMs:
+          type: integer
+          minimum: 0
+          description: Delay in milliseconds before this channel fires for this action (0 = immediate)
+          example: 5000
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
     RuleMeta:
       type: object
       description: |
@@ -8536,6 +8610,338 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  # Group Channels — per-group routing targets (RFC-0024)
+  /groups/{groupId}/channels:
+    get:
+      tags: [Groups]
+      summary: List group channel targets
+      description: Returns all configured channel targets for a group (chat_id, email, webhook URL, etc.)
+      operationId: listGroupChannels
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Group channels
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GroupChannel'
+                          count:
+                            type: integer
+        '404':
+          description: Group not found
+    put:
+      tags: [Groups]
+      summary: Replace all group channel targets
+      description: Idempotent full replace — deletes all existing channels and inserts the new set.
+      operationId: putGroupChannels
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channels]
+              properties:
+                channels:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [channel, target]
+                    properties:
+                      channel:
+                        type: string
+                        enum: [EMAIL, TELEGRAM, WHATSAPP, WEBHOOK, SLACK, SMS, TEAMS, CUSTOM]
+                      active:
+                        type: boolean
+                        default: true
+                      target:
+                        type: string
+                        example: '-100123456789'
+                      config:
+                        type: object
+                        additionalProperties: true
+            examples:
+              telegram_email:
+                summary: Telegram group + email alias
+                value:
+                  channels:
+                    - channel: TELEGRAM
+                      active: true
+                      target: '-100123456789'
+                    - channel: EMAIL
+                      active: true
+                      target: 'manut-escadas@mestrealvaro.com.br'
+      responses:
+        '200':
+          description: Channels replaced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GroupChannel'
+                          count:
+                            type: integer
+
+  /groups/{groupId}/channels/{channel}:
+    patch:
+      tags: [Groups]
+      summary: Update a single group channel
+      operationId: patchGroupChannel
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+            example: TELEGRAM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                active:
+                  type: boolean
+                target:
+                  type: string
+                config:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Channel updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/GroupChannel'
+        '404':
+          description: Group or channel not found
+    delete:
+      tags: [Groups]
+      summary: Remove a channel from a group
+      operationId: deleteGroupChannel
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Channel removed
+        '404':
+          description: Group or channel not found
+
+  # Group Dispatch Matrix — channel × action × delay (RFC-0024)
+  /groups/{groupId}/dispatch:
+    get:
+      tags: [Groups]
+      summary: Get group dispatch matrix
+      description: Returns all (channel × action) entries configured for a group, including escalation delay.
+      operationId: getGroupDispatch
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dispatch matrix
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GroupDispatchEntry'
+                          count:
+                            type: integer
+    put:
+      tags: [Groups]
+      summary: Replace group dispatch matrix
+      description: Idempotent full replace of all (channel × action) entries.
+      operationId: putGroupDispatch
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [channel, action, active]
+                    properties:
+                      channel:
+                        type: string
+                        enum: [EMAIL, TELEGRAM, WHATSAPP, WEBHOOK, SLACK, SMS, TEAMS, CUSTOM]
+                      action:
+                        type: string
+                        enum: [OPEN, ACK, ESCALATE, SNOOZE, CLOSE, STATE_HISTORY]
+                      active:
+                        type: boolean
+                      escalationDelayMs:
+                        type: integer
+                        minimum: 0
+                        default: 0
+            examples:
+              basic:
+                summary: EMAIL + TELEGRAM for OPEN/CLOSE, TELEGRAM with 5s delay on ESCALATE
+                value:
+                  entries:
+                    - { channel: EMAIL,    action: OPEN,     active: true, escalationDelayMs: 0 }
+                    - { channel: EMAIL,    action: CLOSE,    active: true, escalationDelayMs: 0 }
+                    - { channel: TELEGRAM, action: OPEN,     active: true, escalationDelayMs: 0 }
+                    - { channel: TELEGRAM, action: CLOSE,    active: true, escalationDelayMs: 0 }
+                    - { channel: TELEGRAM, action: ESCALATE, active: true, escalationDelayMs: 5000 }
+      responses:
+        '200':
+          description: Dispatch matrix replaced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GroupDispatchEntry'
+                          count:
+                            type: integer
+    patch:
+      tags: [Groups]
+      summary: Partially update dispatch matrix entries
+      operationId: patchGroupDispatch
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [channel, action, active]
+                    properties:
+                      channel:
+                        type: string
+                      action:
+                        type: string
+                        enum: [OPEN, ACK, ESCALATE, SNOOZE, CLOSE, STATE_HISTORY]
+                      active:
+                        type: boolean
+                      escalationDelayMs:
+                        type: integer
+                        minimum: 0
+                        default: 0
+      responses:
+        '200':
+          description: Updated entries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GroupDispatchEntry'
+                          count:
+                            type: integer
 
   # Templates (RFC-0021)
   /templates:

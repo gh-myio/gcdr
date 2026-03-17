@@ -13,35 +13,31 @@ export class GroupDispatchConfigService {
 
   async put(tenantId: string, groupId: string, data: PutGroupDispatchDTO): Promise<GroupDispatchConfig[]> {
     await this.assertGroupExists(tenantId, groupId);
-
-    // DELETE all existing entries for this group, then insert the new matrix
     await groupDispatchConfigRepository.deleteByGroup(tenantId, groupId);
-
     const entries: UpsertGroupDispatchConfigData[] = data.entries.map(e => ({
       tenantId,
       groupId,
-      channel: e.channel,
-      action:  e.action as AlarmAction,
-      active:  e.active,
+      channel:           e.channel,
+      action:            e.action as AlarmAction,
+      active:            e.active,
+      escalationDelayMs: e.escalationDelayMs,
     }));
-
     return groupDispatchConfigRepository.upsertMany(tenantId, groupId, entries);
   }
 
   async patch(tenantId: string, groupId: string, data: PatchGroupDispatchDTO): Promise<GroupDispatchConfig[]> {
     await this.assertGroupExists(tenantId, groupId);
     return groupDispatchConfigRepository.patch(tenantId, groupId, data.entries.map(e => ({
-      channel: e.channel,
-      action:  e.action as AlarmAction,
-      active:  e.active,
+      channel:           e.channel,
+      action:            e.action as AlarmAction,
+      active:            e.active,
+      escalationDelayMs: e.escalationDelayMs,
     })));
   }
 
   private async assertGroupExists(tenantId: string, groupId: string): Promise<void> {
     const group = await groupRepo.getById(tenantId, groupId);
-    if (!group) {
-      throw new NotFoundError(`Group "${groupId}" not found`);
-    }
+    if (!group) throw new NotFoundError(`Group "${groupId}" not found`);
   }
 }
 

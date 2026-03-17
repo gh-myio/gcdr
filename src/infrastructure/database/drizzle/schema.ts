@@ -1342,17 +1342,33 @@ export const customerChannels = pgTable('customer_channels', {
 }));
 
 export const groupDispatchConfigs = pgTable('group_dispatch_configs', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  groupId:            uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+  channel:            varchar('channel', { length: 50 }).notNull(),
+  action:             alarmActionEnum('action').notNull(),
+  active:             boolean('active').notNull().default(true),
+  escalationDelayMs:  integer('escalation_delay_ms').notNull().default(0),
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantGroupChannelActionUnique: uniqueIndex('group_dispatch_configs_unique').on(table.tenantId, table.groupId, table.channel, table.action),
+  tenantGroupIdx: index('group_dispatch_configs_tenant_group_idx').on(table.tenantId, table.groupId),
+}));
+
+export const groupChannels = pgTable('group_channels', {
   id:        uuid('id').primaryKey().defaultRandom(),
   tenantId:  uuid('tenant_id').notNull(),
   groupId:   uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
   channel:   varchar('channel', { length: 50 }).notNull(),
-  action:    alarmActionEnum('action').notNull(),
   active:    boolean('active').notNull().default(true),
+  target:    text('target').notNull(),
+  config:    jsonb('config').notNull().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  tenantGroupChannelActionUnique: uniqueIndex('group_dispatch_configs_unique').on(table.tenantId, table.groupId, table.channel, table.action),
-  tenantGroupIdx: index('group_dispatch_configs_tenant_group_idx').on(table.tenantId, table.groupId),
+  tenantGroupChannelUnique: uniqueIndex('group_channels_unique').on(table.tenantId, table.groupId, table.channel),
+  tenantGroupIdx: index('group_channels_tenant_group_idx').on(table.tenantId, table.groupId),
 }));
 
 // =============================================================================

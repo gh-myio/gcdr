@@ -3,9 +3,10 @@ import { z } from 'zod';
 export const AlarmActionSchema = z.enum(['OPEN', 'ACK', 'ESCALATE', 'SNOOZE', 'CLOSE', 'STATE_HISTORY']);
 
 const DispatchEntrySchema = z.object({
-  channel: z.string().min(1).max(50),
-  action:  AlarmActionSchema,
-  active:  z.boolean(),
+  channel:           z.string().min(1).max(50),
+  action:            AlarmActionSchema,
+  active:            z.boolean(),
+  escalationDelayMs: z.number().int().min(0).default(0),
 });
 
 export const PutGroupDispatchSchema = z.object({

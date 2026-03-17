@@ -5,28 +5,31 @@ import { eq, and } from 'drizzle-orm';
 export type AlarmAction = 'OPEN' | 'ACK' | 'ESCALATE' | 'SNOOZE' | 'CLOSE' | 'STATE_HISTORY';
 
 export interface GroupDispatchConfig {
-  id: string;
-  tenantId: string;
-  groupId: string;
-  channel: string;
-  action: AlarmAction;
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  id:                string;
+  tenantId:          string;
+  groupId:           string;
+  channel:           string;
+  action:            AlarmAction;
+  active:            boolean;
+  escalationDelayMs: number;
+  createdAt:         Date;
+  updatedAt:         Date;
 }
 
 export interface UpsertGroupDispatchConfigData {
-  tenantId: string;
-  groupId: string;
-  channel: string;
-  action: AlarmAction;
-  active: boolean;
+  tenantId:          string;
+  groupId:           string;
+  channel:           string;
+  action:            AlarmAction;
+  active:            boolean;
+  escalationDelayMs: number;
 }
 
 export interface PatchGroupDispatchConfigData {
-  channel: string;
-  action: AlarmAction;
-  active: boolean;
+  channel:           string;
+  action:            AlarmAction;
+  active:            boolean;
+  escalationDelayMs: number;
 }
 
 export class GroupDispatchConfigRepository {
@@ -35,53 +38,40 @@ export class GroupDispatchConfigRepository {
       .select()
       .from(groupDispatchConfigs)
       .where(and(eq(groupDispatchConfigs.tenantId, tenantId), eq(groupDispatchConfigs.groupId, groupId)));
-
     return rows.map(this.mapRow);
-  }
-
-  async findById(tenantId: string, id: string): Promise<GroupDispatchConfig | null> {
-    const [row] = await db
-      .select()
-      .from(groupDispatchConfigs)
-      .where(and(eq(groupDispatchConfigs.tenantId, tenantId), eq(groupDispatchConfigs.id, id)))
-      .limit(1);
-
-    return row ? this.mapRow(row) : null;
   }
 
   async upsertMany(tenantId: string, groupId: string, entries: UpsertGroupDispatchConfigData[]): Promise<GroupDispatchConfig[]> {
     if (entries.length === 0) return [];
-
     const rows = await db
       .insert(groupDispatchConfigs)
       .values(entries.map(e => ({
-        tenantId: e.tenantId,
-        groupId:  e.groupId,
-        channel:  e.channel,
-        action:   e.action,
-        active:   e.active,
+        tenantId:          e.tenantId,
+        groupId:           e.groupId,
+        channel:           e.channel,
+        action:            e.action,
+        active:            e.active,
+        escalationDelayMs: e.escalationDelayMs,
       })))
       .onConflictDoUpdate({
         target: [groupDispatchConfigs.tenantId, groupDispatchConfigs.groupId, groupDispatchConfigs.channel, groupDispatchConfigs.action],
         set: {
-          active:    groupDispatchConfigs.active,
-          updatedAt: new Date(),
+          active:            groupDispatchConfigs.active,
+          escalationDelayMs: groupDispatchConfigs.escalationDelayMs,
+          updatedAt:         new Date(),
         },
       })
       .returning();
-
     return rows.map(this.mapRow);
   }
 
   async patch(tenantId: string, groupId: string, entries: PatchGroupDispatchConfigData[]): Promise<GroupDispatchConfig[]> {
     if (entries.length === 0) return this.findByGroup(tenantId, groupId);
-
     const results: GroupDispatchConfig[] = [];
-
     for (const entry of entries) {
       const [row] = await db
         .update(groupDispatchConfigs)
-        .set({ active: entry.active, updatedAt: new Date() })
+        .set({ active: entry.active, escalationDelayMs: entry.escalationDelayMs, updatedAt: new Date() })
         .where(and(
           eq(groupDispatchConfigs.tenantId, tenantId),
           eq(groupDispatchConfigs.groupId, groupId),
@@ -89,10 +79,8 @@ export class GroupDispatchConfigRepository {
           eq(groupDispatchConfigs.action, entry.action),
         ))
         .returning();
-
       if (row) results.push(this.mapRow(row));
     }
-
     return results;
   }
 
@@ -104,14 +92,15 @@ export class GroupDispatchConfigRepository {
 
   private mapRow(row: typeof groupDispatchConfigs.$inferSelect): GroupDispatchConfig {
     return {
-      id:        row.id,
-      tenantId:  row.tenantId,
-      groupId:   row.groupId,
-      channel:   row.channel,
-      action:    row.action as AlarmAction,
-      active:    row.active,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      id:                row.id,
+      tenantId:          row.tenantId,
+      groupId:           row.groupId,
+      channel:           row.channel,
+      action:            row.action as AlarmAction,
+      active:            row.active,
+      escalationDelayMs: row.escalationDelayMs,
+      createdAt:         row.createdAt,
+      updatedAt:         row.updatedAt,
     };
   }
 }

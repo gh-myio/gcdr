@@ -46,4 +46,5 @@ export { default as deviceSyncJobsController } from './device-sync-jobs.controll
 // RFC-0024: Alarm Dispatch Configuration
 export { default as customerChannelsController } from './customer-channels.controller';
 export { default as groupDispatchController } from './group-dispatch.controller';
+export { default as groupChannelsController } from './group-channels.controller';
 export { default as userContactsController } from './user-contacts.controller';

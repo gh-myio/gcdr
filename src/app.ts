@@ -64,6 +64,7 @@ import {
   // RFC-0024: Alarm Dispatch Configuration
   customerChannelsController,
   groupDispatchController,
+  groupChannelsController,
   userContactsController,
 } from './controllers';
 
@@ -242,6 +243,9 @@ apiV1Router.use('/partners', authMiddleware, partnersController);
 
 // RFC-0024: Group dispatch matrix (nested — must come before general /groups router)
 apiV1Router.use('/groups/:groupId/dispatch', authMiddleware, groupDispatchController);
+
+// RFC-0024: Group channel targets (nested — must come before general /groups router)
+apiV1Router.use('/groups/:groupId/channels', authMiddleware, groupChannelsController);
 
 // Groups
 apiV1Router.use('/groups', authMiddleware, groupsController);
