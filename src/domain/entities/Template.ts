@@ -1,4 +1,16 @@
-export type TemplateType = 'EMAIL_ALARM' | 'EMAIL_REPORT' | 'EMAIL_WELCOME' | 'RELEASE_NOTE' | 'NOTIFICATION' | 'INSIGHT';
+export type TemplateType =
+  | 'EMAIL_ALARM'
+  | 'EMAIL_REPORT'
+  | 'EMAIL_WELCOME'
+  | 'RELEASE_NOTE'
+  | 'NOTIFICATION'
+  | 'INSIGHT'
+  | 'TELEGRAM_ALARM_OPENED'
+  | 'TELEGRAM_ALARM_CLOSED'
+  | 'TELEGRAM_ALARM_ESCALATED'
+  | 'TELEGRAM_ALARM_ACKNOWLEDGED'
+  | 'TELEGRAM_ALARM_SNOOZED'
+  | 'TELEGRAM_ALARM_DIGEST';
 export type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export interface Template {

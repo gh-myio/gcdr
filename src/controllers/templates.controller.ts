@@ -68,6 +68,8 @@ router.get('/tag-catalog', (req: Request, res: Response, next: NextFunction) => 
 
     const validTypes: TemplateType[] = [
       'EMAIL_ALARM', 'EMAIL_REPORT', 'EMAIL_WELCOME', 'RELEASE_NOTE', 'NOTIFICATION', 'INSIGHT',
+      'TELEGRAM_ALARM_OPENED', 'TELEGRAM_ALARM_CLOSED', 'TELEGRAM_ALARM_ESCALATED',
+      'TELEGRAM_ALARM_ACKNOWLEDGED', 'TELEGRAM_ALARM_SNOOZED', 'TELEGRAM_ALARM_DIGEST',
     ];
     if (!type || !validTypes.includes(type as TemplateType)) {
       throw new ValidationError(
