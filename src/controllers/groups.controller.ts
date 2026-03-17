@@ -59,6 +59,50 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /groups/purposes
+ * Catalog of valid group purposes with label and description
+ */
+router.get('/purposes', (_req: Request, res: Response) => {
+  sendSuccess(res, {
+    items: [
+      { value: 'ALARMS_NOTIFY',  label: 'Alarmes - Notificação',          description: 'Recebe notificações em tempo real quando alarmes abrem ou fecham' },
+      { value: 'ALARMS_REPORT',  label: 'Alarmes - Relatório',            description: 'Recebe relatórios periódicos consolidados de alarmes' },
+      { value: 'ALARMS_INSIGHT', label: 'Alarmes - Insights',             description: 'Recebe métricas e análises sobre padrões de alarmes' },
+      { value: 'WELCOME_USER',   label: 'Boas-vindas / Reset de Senha',   description: 'Recebe e-mails de boas-vindas e recuperação de acesso' },
+      { value: 'RELEASE_NOTE',   label: 'Comunicado de Nova Feature',     description: 'Recebe comunicados sobre novas funcionalidades do sistema' },
+      { value: 'NOTIFICATION',   label: 'Notificação',                    description: 'Grupo genérico para envio de notificações operacionais' },
+      { value: 'ESCALATION',     label: 'Escalonamento',                  description: 'Cadeia de escalonamento para alarmes não reconhecidos' },
+      { value: 'ACCESS_CONTROL', label: 'Controle de Acesso',             description: 'Gerenciamento de permissões e acessos' },
+      { value: 'REPORTING',      label: 'Relatórios',                     description: 'Agrupamento para geração de relatórios' },
+      { value: 'MAINTENANCE',    label: 'Manutenção',                     description: 'Equipes e responsáveis por manutenção programada' },
+      { value: 'MONITORING',     label: 'Monitoramento',                  description: 'Painéis e dashboards de monitoramento' },
+      { value: 'CUSTOM',         label: 'Personalizado',                  description: 'Finalidade livre definida pelo cliente' },
+    ],
+    count: 12,
+  }, 200, _req.context?.requestId);
+});
+
+/**
+ * GET /groups/channels
+ * Catalog of valid notification channel types with label and description
+ */
+router.get('/channels', (_req: Request, res: Response) => {
+  sendSuccess(res, {
+    items: [
+      { value: 'EMAIL',    label: 'E-mail',            description: 'Envio via SMTP configurado no cliente' },
+      { value: 'TELEGRAM', label: 'Telegram',          description: 'Mensagem para grupo ou usuário via bot Telegram' },
+      { value: 'WHATSAPP', label: 'WhatsApp',          description: 'Mensagem via API WhatsApp Business' },
+      { value: 'SMS',      label: 'SMS',               description: 'Mensagem de texto para número de telefone' },
+      { value: 'SLACK',    label: 'Slack',             description: 'Mensagem para canal ou usuário via webhook Slack' },
+      { value: 'TEAMS',    label: 'Microsoft Teams',   description: 'Mensagem para canal via webhook Teams' },
+      { value: 'WEBHOOK',  label: 'Webhook',           description: 'HTTP POST para URL configurada pelo cliente' },
+      { value: 'CUSTOM',   label: 'Personalizado',     description: 'Canal customizado definido pelo cliente' },
+    ],
+    count: 8,
+  }, 200, _req.context?.requestId);
+});
+
+/**
  * GET /groups/:id
  * Get group by ID
  */
