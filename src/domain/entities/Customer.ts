@@ -59,8 +59,6 @@ export interface CustomerBundleConfig {
 
 export interface CustomerConfig {
   bundle?: CustomerBundleConfig;
-  // Token used by gateways/centrals to authenticate against the GCDR platform
-  gatewayToken?: string;
 }
 
 export function createDefaultCustomerSettings(): CustomerSettings {

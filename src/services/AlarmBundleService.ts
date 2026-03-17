@@ -216,20 +216,15 @@ export class AlarmBundleService {
 
   /**
    * Generate a verify bundle — same as simplified bundle but enriched with:
-   *   - meta.gatewayToken: customer's gateway authentication token
    *   - rules[id].notifications: per-category recipients + emailRelay config
    */
   async verifyBundle(params: GenerateBundleParams): Promise<SimpleAlarmRulesBundle & {
-    meta: { gatewayToken?: string };
     rules: Record<string, SimpleBundleAlarmRule & { notifications?: import('../domain/entities/Rule').RuleNotifications }>;
   }> {
     const { tenantId, customerId } = params;
 
     // Generate the base simplified bundle (uses cache)
     const base = await this.generateSimplifiedBundle(params);
-
-    // Fetch customer for gatewayToken
-    const customer = await this.customerRepository.getById(tenantId, customerId);
 
     // Fetch full rules to get notifications field
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
@@ -246,10 +241,6 @@ export class AlarmBundleService {
 
     return {
       ...base,
-      meta: {
-        ...base.meta,
-        gatewayToken: customer?.config?.gatewayToken,
-      },
       rules: enrichedRules,
     };
   }

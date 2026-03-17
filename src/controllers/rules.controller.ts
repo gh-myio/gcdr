@@ -3,7 +3,6 @@ import { ruleService } from '../services/RuleService';
 import { alarmBundleService } from '../services/AlarmBundleService';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import { CentralRepository } from '../repositories/CentralRepository';
-import { CustomerRepository } from '../repositories/CustomerRepository';
 import {
   CreateRuleSchema,
   UpdateRuleSchema,
@@ -217,12 +216,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     const rule = await ruleService.getById(tenantId, id);
 
-    // Enrich with gatewayToken from customer config
-    const customerRepo = new CustomerRepository();
-    const customer = await customerRepo.getById(tenantId, rule.customerId);
-    const gatewayToken = customer?.config?.gatewayToken;
-
-    sendSuccess(res, { ...rule, ...(gatewayToken ? { gatewayToken } : {}) }, 200, requestId);
+    sendSuccess(res, rule, 200, requestId);
   } catch (err) {
     next(err);
   }
@@ -659,7 +653,6 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
 
     sendSuccess(res, {
       versionId: bundle.meta.version,
-      gatewayToken: bundle.meta.gatewayToken,
       deviceIndex: bundle.deviceIndex,
       rules: bundle.rules,
     }, 200, requestId);
