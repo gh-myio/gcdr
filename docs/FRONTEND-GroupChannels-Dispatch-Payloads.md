@@ -1,46 +1,136 @@
-# Group Channels & Dispatch — Payloads de Exemplo
+# RFC-0024 — Frontend Alignment Guide
 
-> **RFC-0024 — Alarm Dispatch Configuration**
-> Contexto de exemplo: Grupo *Manutenção Escadas Rolantes* do cliente Mestre Álvaro.
->
+> Contexto de exemplo: Grupo *Manutenção Escadas Rolantes* — Mestre Álvaro
 > - `group_id`: `eeee0001-0001-0001-0001-000000000010`
 > - Base URL: `/api/v1`
 > - Headers obrigatórios: `Authorization: Bearer <jwt>`, `X-Tenant-Id: <tenantId>`
 
 ---
 
-## 1. Group Channels — configurar WHERE enviar por canal
+## Breaking Changes
 
-Cada grupo tem seus próprios **targets** (chat_id do Telegram, e-mail destino, webhook URL…).
-As **credenciais** (bot token, credenciais SMTP) ficam em `customer_channels` — o grupo só guarda o destino.
+### 1. `escalationDelayMinutes` → `escalationDelayMs`
+
+Campo renomeado e unidade alterada para **milissegundos** em `GroupNotificationSettings`.
+
+```diff
+- "escalationDelayMinutes": 5
++ "escalationDelayMs": 300000
+```
+
+### 2. `gatewayToken` removido
+
+Não existe mais em nenhuma response da API. Era `customer.config.gatewayToken` — agora as credenciais do canal EMAIL_RELAY vivem em `customer_channels`.
+
+Afeta:
+- `GET /rules/:id` — campo removido da response
+- `GET /customers/:id/alarm-rules/bundle/verify` — `meta.gatewayToken` removido
 
 ---
 
-### `PUT /groups/:groupId/channels` — substituição completa
+## Novos Valores de Enum
 
-Substitui todos os canais do grupo de uma vez (idempotente).
+### `GroupPurpose` — 5 novos valores
 
-**Request body**
+| Valor | Label |
+|-------|-------|
+| `ALARMS_NOTIFY` | Alarmes - Notificação |
+| `ALARMS_REPORT` | Alarmes - Relatório |
+| `ALARMS_INSIGHT` | Alarmes - Insights |
+| `WELCOME_USER` | Boas-vindas / Reset de Senha |
+| `RELEASE_NOTE` | Comunicado de Nova Feature |
+
+### Canal `EMAIL_RELAY` adicionado
+
+Válido em todos os endpoints de channels: `EMAIL`, `EMAIL_RELAY`, `TELEGRAM`, `WHATSAPP`, `WEBHOOK`, `SLACK`, `SMS`, `TEAMS`, `CUSTOM`.
+
+---
+
+## Novos Endpoints — Catálogos
+
+### `GET /groups/purposes`
 
 ```json
 {
+  "data": {
+    "count": 12,
+    "items": [
+      { "value": "ALARMS_NOTIFY",  "label": "Alarmes - Notificação",        "description": "Recebe notificações em tempo real quando alarmes abrem ou fecham" },
+      { "value": "ALARMS_REPORT",  "label": "Alarmes - Relatório",          "description": "Recebe relatórios periódicos consolidados de alarmes" },
+      { "value": "ALARMS_INSIGHT", "label": "Alarmes - Insights",           "description": "Recebe métricas e análises sobre padrões de alarmes" },
+      { "value": "WELCOME_USER",   "label": "Boas-vindas / Reset de Senha", "description": "Recebe e-mails de boas-vindas e recuperação de acesso" },
+      { "value": "RELEASE_NOTE",   "label": "Comunicado de Nova Feature",   "description": "Recebe comunicados sobre novas funcionalidades do sistema" },
+      { "value": "NOTIFICATION",   "label": "Notificação",                  "description": "Grupo genérico para envio de notificações operacionais" },
+      { "value": "ESCALATION",     "label": "Escalonamento",                "description": "Cadeia de escalonamento para alarmes não reconhecidos" },
+      { "value": "ACCESS_CONTROL", "label": "Controle de Acesso",           "description": "Gerenciamento de permissões e acessos" },
+      { "value": "REPORTING",      "label": "Relatórios",                   "description": "Agrupamento para geração de relatórios" },
+      { "value": "MAINTENANCE",    "label": "Manutenção",                   "description": "Equipes e responsáveis por manutenção programada" },
+      { "value": "MONITORING",     "label": "Monitoramento",                "description": "Painéis e dashboards de monitoramento" },
+      { "value": "CUSTOM",         "label": "Personalizado",                "description": "Finalidade livre definida pelo cliente" }
+    ]
+  }
+}
+```
+
+### `GET /groups/channels`
+
+```json
+{
+  "data": {
+    "count": 9,
+    "items": [
+      { "value": "EMAIL",       "label": "E-mail",           "description": "Envio via SMTP configurado no cliente" },
+      { "value": "EMAIL_RELAY", "label": "E-mail Relay",     "description": "Envio via servidor relay compartilhado da plataforma" },
+      { "value": "TELEGRAM",    "label": "Telegram",         "description": "Mensagem para grupo ou usuário via bot Telegram" },
+      { "value": "WHATSAPP",    "label": "WhatsApp",         "description": "Mensagem via API WhatsApp Business" },
+      { "value": "SMS",         "label": "SMS",              "description": "Mensagem de texto para número de telefone" },
+      { "value": "SLACK",       "label": "Slack",            "description": "Mensagem para canal ou usuário via webhook Slack" },
+      { "value": "TEAMS",       "label": "Microsoft Teams",  "description": "Mensagem para canal via webhook Teams" },
+      { "value": "WEBHOOK",     "label": "Webhook",          "description": "HTTP POST para URL configurada pelo cliente" },
+      { "value": "CUSTOM",      "label": "Personalizado",    "description": "Canal customizado definido pelo cliente" }
+    ]
+  }
+}
+```
+
+---
+
+## Novos Endpoints — Group Members
+
+### `GET /groups/:groupId/members`
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 2,
+    "items": [
+      { "id": "eeee0001-0001-0001-0001-000000000001", "type": "USER", "name": "João Silva",  "addedAt": "2026-03-16T00:00:00.000Z" },
+      { "id": "eeee0001-0001-0001-0001-000000000002", "type": "USER", "name": "Maria Souza", "addedAt": "2026-03-16T00:00:00.000Z" }
+    ]
+  }
+}
+```
+
+---
+
+## Novos Endpoints — Group Channels
+
+Arquitetura: o **grupo** guarda o **destino** (chat_id, e-mail, URL). As **credenciais** (bot token, SMTP) ficam em `customer_channels`.
+
+### `PUT /groups/:groupId/channels` — substituição completa
+
+**Request**
+```json
+{
   "channels": [
-    {
-      "channel": "TELEGRAM",
-      "active": true,
-      "target": "-100123456789"
-    },
-    {
-      "channel": "EMAIL",
-      "active": true,
-      "target": "manut-escadas@mestrealvaro.com.br"
-    }
+    { "channel": "TELEGRAM", "active": true, "target": "-100123456789" },
+    { "channel": "EMAIL",    "active": true, "target": "manut-escadas@mestrealvaro.com.br" }
   ]
 }
 ```
 
 **Response `200 OK`**
-
 ```json
 {
   "success": true,
@@ -49,7 +139,6 @@ Substitui todos os canais do grupo de uma vez (idempotente).
     "items": [
       {
         "id": "a1b2c3d4-0001-0001-0001-000000000001",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
         "groupId": "eeee0001-0001-0001-0001-000000000010",
         "channel": "TELEGRAM",
         "active": true,
@@ -60,7 +149,6 @@ Substitui todos os canais do grupo de uma vez (idempotente).
       },
       {
         "id": "a1b2c3d4-0001-0001-0001-000000000002",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
         "groupId": "eeee0001-0001-0001-0001-000000000010",
         "channel": "EMAIL",
         "active": true,
@@ -70,81 +158,32 @@ Substitui todos os canais do grupo de uma vez (idempotente).
         "updatedAt": "2026-03-16T00:00:00.000Z"
       }
     ]
-  },
-  "requestId": "req_abc123"
+  }
 }
 ```
 
----
+### `GET /groups/:groupId/channels`
 
-### `GET /groups/:groupId/channels` — listar canais configurados
-
-**Response `200 OK`**
-
-```json
-{
-  "success": true,
-  "data": {
-    "count": 2,
-    "items": [
-      {
-        "id": "a1b2c3d4-0001-0001-0001-000000000001",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "TELEGRAM",
-        "active": true,
-        "target": "-100123456789",
-        "config": {},
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      },
-      {
-        "id": "a1b2c3d4-0001-0001-0001-000000000002",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "EMAIL",
-        "active": true,
-        "target": "manut-escadas@mestrealvaro.com.br",
-        "config": {},
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      }
-    ]
-  },
-  "requestId": "req_abc124"
-}
-```
-
----
+Mesma estrutura da response do PUT acima.
 
 ### `PATCH /groups/:groupId/channels/:channel` — atualizar canal individual
 
-Atualiza apenas os campos enviados. `channel` no path é o canal a editar (ex: `TELEGRAM`).
-
-**Request body — trocar chat_id**
-
+**Trocar target**
 ```json
-{
-  "target": "-100987654321"
-}
+{ "target": "-100987654321" }
 ```
 
-**Request body — desativar canal sem remover**
-
+**Desativar sem remover**
 ```json
-{
-  "active": false
-}
+{ "active": false }
 ```
 
 **Response `200 OK`**
-
 ```json
 {
   "success": true,
   "data": {
     "id": "a1b2c3d4-0001-0001-0001-000000000001",
-    "tenantId": "11111111-1111-1111-1111-111111111111",
     "groupId": "eeee0001-0001-0001-0001-000000000010",
     "channel": "TELEGRAM",
     "active": true,
@@ -152,50 +191,37 @@ Atualiza apenas os campos enviados. `channel` no path é o canal a editar (ex: `
     "config": {},
     "createdAt": "2026-03-16T00:00:00.000Z",
     "updatedAt": "2026-03-16T12:30:00.000Z"
-  },
-  "requestId": "req_abc125"
+  }
 }
 ```
 
----
-
-### `DELETE /groups/:groupId/channels/:channel` — remover canal
+### `DELETE /groups/:groupId/channels/:channel`
 
 **Response `200 OK`**
-
 ```json
 {
   "success": true,
-  "data": {
-    "deleted": true,
-    "channel": "TELEGRAM"
-  },
-  "requestId": "req_abc126"
+  "data": { "deleted": true, "channel": "TELEGRAM" }
 }
 ```
 
 ---
 
-## 2. Group Dispatch — configurar QUAIS ações disparam em qual canal
+## Novos Endpoints — Group Dispatch
 
 Matriz `canal × ação → active + escalationDelayMs`.
 
-| canal     | ação     | significado                                            |
-|-----------|----------|--------------------------------------------------------|
-| EMAIL     | OPEN     | Envia e-mail quando alarme ABRE                       |
-| EMAIL     | CLOSE    | Envia e-mail quando alarme FECHA                      |
-| TELEGRAM  | OPEN     | Envia msg Telegram quando alarme ABRE                 |
-| TELEGRAM  | CLOSE    | Envia msg Telegram quando alarme FECHA                |
-| TELEGRAM  | ESCALATE | Re-envia no Telegram após `escalationDelayMs` ms sem ACK |
+| Canal | Ação | Significado |
+|-------|------|-------------|
+| EMAIL / qualquer | `OPEN` | Dispara quando alarme **abre** |
+| EMAIL / qualquer | `CLOSE` | Dispara quando alarme **fecha** |
+| TELEGRAM / qualquer | `ESCALATE` | Re-dispara após `escalationDelayMs` ms sem ACK |
 
-`escalationDelayMs: 0` = sem delay / não aplicável (campo obrigatório, default 0).
+`escalationDelayMs: 0` = sem delay (campo obrigatório, default 0).
 
----
+### `PUT /groups/:groupId/dispatch` — substituição completa
 
-### `PUT /groups/:groupId/dispatch` — substituição completa da matriz
-
-**Request body**
-
+**Request**
 ```json
 {
   "entries": [
@@ -209,88 +235,31 @@ Matriz `canal × ação → active + escalationDelayMs`.
 ```
 
 **Response `200 OK`**
-
 ```json
 {
   "success": true,
   "data": {
     "count": 5,
     "items": [
-      {
-        "id": "b2c3d4e5-0001-0001-0001-000000000001",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "EMAIL",
-        "action": "OPEN",
-        "active": true,
-        "escalationDelayMs": 0,
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      },
-      {
-        "id": "b2c3d4e5-0001-0001-0001-000000000002",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "EMAIL",
-        "action": "CLOSE",
-        "active": true,
-        "escalationDelayMs": 0,
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      },
-      {
-        "id": "b2c3d4e5-0001-0001-0001-000000000003",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "TELEGRAM",
-        "action": "OPEN",
-        "active": true,
-        "escalationDelayMs": 0,
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      },
-      {
-        "id": "b2c3d4e5-0001-0001-0001-000000000004",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "TELEGRAM",
-        "action": "CLOSE",
-        "active": true,
-        "escalationDelayMs": 0,
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      },
-      {
-        "id": "b2c3d4e5-0001-0001-0001-000000000005",
-        "tenantId": "11111111-1111-1111-1111-111111111111",
-        "groupId": "eeee0001-0001-0001-0001-000000000010",
-        "channel": "TELEGRAM",
-        "action": "ESCALATE",
-        "active": true,
-        "escalationDelayMs": 5000,
-        "createdAt": "2026-03-16T00:00:00.000Z",
-        "updatedAt": "2026-03-16T00:00:00.000Z"
-      }
+      { "channel": "EMAIL",    "action": "OPEN",     "active": true,  "escalationDelayMs": 0    },
+      { "channel": "EMAIL",    "action": "CLOSE",    "active": true,  "escalationDelayMs": 0    },
+      { "channel": "TELEGRAM", "action": "OPEN",     "active": true,  "escalationDelayMs": 0    },
+      { "channel": "TELEGRAM", "action": "CLOSE",    "active": true,  "escalationDelayMs": 0    },
+      { "channel": "TELEGRAM", "action": "ESCALATE", "active": true,  "escalationDelayMs": 5000 }
     ]
-  },
-  "requestId": "req_abc127"
+  }
 }
 ```
 
----
+### `GET /groups/:groupId/dispatch`
 
-### `GET /groups/:groupId/dispatch` — listar matriz configurada
-
-**Response `200 OK`** — mesmo formato do PUT acima.
-
----
+Mesma estrutura da response do PUT acima.
 
 ### `PATCH /groups/:groupId/dispatch` — atualizar entradas parcialmente
 
-Atualiza apenas as entradas enviadas (upsert por `canal × ação`). Útil para toggle de `active` ou ajuste de delay sem reescrever a matriz inteira.
+Upsert por `canal × ação`. Útil para toggle ou ajuste de delay sem reescrever tudo.
 
-**Request body — desativar EMAIL × CLOSE**
-
+**Desativar EMAIL × CLOSE**
 ```json
 {
   "entries": [
@@ -299,8 +268,7 @@ Atualiza apenas as entradas enviadas (upsert por `canal × ação`). Útil para 
 }
 ```
 
-**Request body — aumentar delay de escalação para 30s**
-
+**Aumentar delay de escalação para 30s**
 ```json
 {
   "entries": [
@@ -309,74 +277,66 @@ Atualiza apenas as entradas enviadas (upsert por `canal × ação`). Útil para 
 }
 ```
 
-**Response `200 OK`** — retorna a lista completa atualizada (mesmo formato do PUT).
-
----
-
-## 3. Estado final esperado (após todos os exemplos acima)
-
-### `group_channels`
-
-| channel  | active | target                              |
-|----------|--------|-------------------------------------|
-| TELEGRAM | true   | -100987654321 *(atualizado no PATCH)* |
-| EMAIL    | true   | manut-escadas@mestrealvaro.com.br   |
-
-### `group_dispatch_configs`
-
-| channel  | action   | active | escalationDelayMs |
-|----------|----------|--------|-------------------|
-| EMAIL    | OPEN     | true   | 0                 |
-| EMAIL    | CLOSE    | false  | 0 *(desativado no PATCH)* |
-| TELEGRAM | OPEN     | true   | 0                 |
-| TELEGRAM | CLOSE    | true   | 0                 |
-| TELEGRAM | ESCALATE | true   | 5000              |
-
----
-
-## 4. Erros comuns
-
-**`404 Not Found`** — grupo não existe ou pertence a outro tenant
-
+**Response `200 OK`** — lista completa atualizada
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Group not found"
-  },
-  "requestId": "req_abc128"
+  "success": true,
+  "data": {
+    "count": 5,
+    "items": [
+      { "channel": "EMAIL",    "action": "OPEN",     "active": true,  "escalationDelayMs": 0     },
+      { "channel": "EMAIL",    "action": "CLOSE",    "active": false, "escalationDelayMs": 0     },
+      { "channel": "TELEGRAM", "action": "OPEN",     "active": true,  "escalationDelayMs": 0     },
+      { "channel": "TELEGRAM", "action": "CLOSE",    "active": true,  "escalationDelayMs": 0     },
+      { "channel": "TELEGRAM", "action": "ESCALATE", "active": true,  "escalationDelayMs": 30000 }
+    ]
+  }
 }
 ```
 
-**`400 Bad Request`** — body inválido (ex: `channel` não reconhecido)
+---
 
+## RuleMeta — Campos Adicionados
+
+`GET /customers/external/:externalId?deep=1` agora retorna em cada rule dentro de `rulesMeta`:
+
+```json
+{
+  "id": "rule-uuid",
+  "name": "Temperatura Alta",
+  "description": "Dispara quando temperatura ultrapassa limite",
+  "parentRuleId": null
+}
+```
+
+Para devices com **override de valor específico**, o `id` da rule é sintetizado como `{ruleId}_{deviceId}` e `parentRuleId` aponta para a rule base:
+
+```json
+{
+  "id": "rule-uuid_device-uuid",
+  "name": "Temperatura Alta",
+  "description": "Dispara quando temperatura ultrapassa limite",
+  "parentRuleId": "rule-uuid"
+}
+```
+
+---
+
+## Erros Comuns
+
+**`404`** — grupo não encontrado
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "Group not found" } }
+```
+
+**`400`** — canal inválido
 ```json
 {
   "success": false,
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Validation failed",
-    "details": [
-      {
-        "field": "channels[0].channel",
-        "message": "Invalid enum value. Expected 'EMAIL' | 'TELEGRAM' | 'SMS' | 'PUSH' | 'WEBHOOK'"
-      }
-    ]
-  },
-  "requestId": "req_abc129"
-}
-```
-
-**`409 Conflict`** — tentativa de inserir canal duplicado (não deve ocorrer com PUT, apenas se usar rota incorreta)
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "CONFLICT",
-    "message": "Channel TELEGRAM already configured for this group"
-  },
-  "requestId": "req_abc130"
+    "details": [{ "field": "channels[0].channel", "message": "Invalid enum value. Expected 'EMAIL' | 'EMAIL_RELAY' | 'TELEGRAM' | ..." }]
+  }
 }
 ```

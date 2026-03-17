@@ -1,4 +1,4 @@
-import { eq, and, ilike, or, sql } from 'drizzle-orm';
+import { eq, and, ilike, or, sql, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   User,
@@ -306,6 +306,15 @@ export class UserRepository implements IUserRepository {
       .limit(1);
 
     return result ? this.mapToEntity(result) : null;
+  }
+
+  async getByIds(tenantId: string, ids: string[]): Promise<{ id: string; email: string; profile: User['profile'] }[]> {
+    if (ids.length === 0) return [];
+    const results = await db
+      .select({ id: users.id, email: users.email, profile: users.profile })
+      .from(users)
+      .where(and(eq(users.tenantId, tenantId), inArray(users.id, ids)));
+    return results.map(r => ({ id: r.id, email: r.email, profile: r.profile as User['profile'] }));
   }
 
   async getByEmail(tenantId: string, email: string): Promise<User | null> {

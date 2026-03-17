@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { groupService } from '../services/GroupService';
+import { UserRepository } from '../repositories/UserRepository';
 import {
   CreateGroupSchema,
   UpdateGroupSchema,
@@ -186,7 +187,8 @@ router.delete('/:id',
 
 /**
  * GET /groups/:id/members
- * List members of a group
+ * List members of a group, enriched with user data (name, email) from DB.
+ * Only the member id is trusted from the group JSONB — name/email come from users table.
  */
 router.get('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -198,7 +200,29 @@ router.get('/:id/members', async (req: Request, res: Response, next: NextFunctio
     }
 
     const group = await groupService.getGroup(tenantId, id);
-    sendSuccess(res, { items: group.members, count: group.members.length }, 200, requestId);
+
+    // Enrich USER members with data from the users table
+    const userMemberIds = group.members
+      .filter(m => m.type === 'USER')
+      .map(m => m.id);
+
+    const userRepo = new UserRepository();
+    const userDetails = await userRepo.getByIds(tenantId, userMemberIds);
+    const userMap = new Map(userDetails.map(u => [u.id, u]));
+
+    const items = group.members.map(m => {
+      if (m.type !== 'USER') return { id: m.id, type: m.type, addedAt: m.addedAt };
+      const u = userMap.get(m.id);
+      return {
+        id: m.id,
+        type: m.type,
+        addedAt: m.addedAt,
+        name: u?.profile?.displayName ?? `${u?.profile?.firstName ?? ''} ${u?.profile?.lastName ?? ''}`.trim() ?? null,
+        email: u?.email ?? null,
+      };
+    });
+
+    sendSuccess(res, { items, count: items.length }, 200, requestId);
   } catch (err) {
     next(err);
   }

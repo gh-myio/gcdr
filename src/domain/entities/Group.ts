@@ -28,7 +28,6 @@ export type GroupPurpose =
 export interface GroupMember {
   id: string;
   type: 'USER' | 'DEVICE' | 'ASSET';
-  name?: string;           // Denormalized for display
   addedAt: string;
   addedBy?: string;
   metadata?: Record<string, unknown>;
