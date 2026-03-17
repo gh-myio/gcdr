@@ -233,7 +233,7 @@ function camelToKebab(str: string): string {
   return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
 }
 
-function buildThemeCssVars(theme: LookAndFeel): string {
+export function buildThemeCssVars(theme: LookAndFeel): string {
   const lines: string[] = [];
 
   // Colors — iterate known ColorPalette fields

@@ -21,6 +21,8 @@ echo "========================================"
 echo ""
 echo "[1/1] POST /templates/render"
 
+# Nota: caracteres não-ASCII escritos como JSON Unicode escapes para evitar
+# problemas de encoding no bash/Windows ao enviar via curl.
 PAYLOAD='{
   "type": "EMAIL_ALARM",
   "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",
@@ -38,7 +40,7 @@ PAYLOAD='{
     },
     "rules": [
       {
-        "name": "Temperatura Elevada — Sala de Máquinas",
+        "name": "Temperatura Elevada \u2014 Sala de M\u00e1quinas",
         "description": "Temperatura acima do limite operacional",
         "condition": "Valor > 75",
         "emails": "operacao@moxuara.com.br, rodrigo@myio.com.br",
@@ -48,8 +50,8 @@ PAYLOAD='{
         ]
       },
       {
-        "name": "Pressão Fora do Range — Linha Hidráulica",
-        "description": "Pressão abaixo do mínimo seguro",
+        "name": "Press\u00e3o Fora do Range \u2014 Linha Hidr\u00e1ulica",
+        "description": "Press\u00e3o abaixo do m\u00ednimo seguro",
         "condition": "Valor < 2.5",
         "emails": "operacao@moxuara.com.br",
         "devices": [

@@ -4,6 +4,7 @@ import {
   CreateLookAndFeelSchema,
   UpdateLookAndFeelSchema,
 } from '../dto/request/LookAndFeelDTO';
+import { buildThemeCssVars } from '../services/TemplateService';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
 import { EventType } from '../shared/types';
@@ -57,6 +58,30 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       templateType: templateType as string | undefined,
     });
     sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /themes/:id/css
+ * Returns the compiled CSS variables for the theme (used by frontend to apply theme at runtime)
+ * Content-Type: text/css
+ */
+router.get('/:id/css', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.context;
+    const { id } = req.params;
+
+    const theme = await lookAndFeelRepository.getById(tenantId, id);
+    if (!theme) {
+      throw new ValidationError('Theme not found');
+    }
+
+    const css = `:root {\n${buildThemeCssVars(theme)}\n}`;
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.status(200).send(css);
   } catch (err) {
     next(err);
   }
