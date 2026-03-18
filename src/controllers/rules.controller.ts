@@ -405,6 +405,34 @@ router.post('/:id/toggle',
 );
 
 /**
+ * POST /rules/:id/trigger
+ * Record a rule trigger event (called by alarm-orchestrator when rule fires).
+ * Atomically increments triggerCount and sets lastTriggeredAt.
+ */
+router.post('/:id/trigger',
+  logEvent({
+    eventType: EventType.RULE_TRIGGERED,
+    description: (req) => `Rule ${req.params.id} triggered`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Rule ID is required');
+      }
+
+      const result = await ruleService.recordTrigger(tenantId, id);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /customers/:customerId/rules
  * List rules by customer (mounted in app.ts)
  */

@@ -6537,6 +6537,44 @@ paths:
                       data:
                         $ref: '#/components/schemas/Rule'
 
+  /rules/{id}/trigger:
+    post:
+      tags: [Rules]
+      summary: Record a rule trigger event
+      description: |
+        Called by the alarm-orchestrator when a rule fires (`triggered=true`).
+        Atomically increments `triggerCount` and sets `lastTriggeredAt` to the current timestamp.
+
+        **Note:** use the `parentRuleId` (real UUID) when the rule is a composite variant
+        (`ruleId_deviceId`) from the bundle — composite IDs are not database records.
+      operationId: triggerRule
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: Trigger recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          lastTriggeredAt:
+                            type: string
+                            format: date-time
+                          triggerCount:
+                            type: integer
+                            example: 43
+        '404':
+          description: Rule not found
+
   /rules/{id}/devices:
     get:
       tags: [Rules]
