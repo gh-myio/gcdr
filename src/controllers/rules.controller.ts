@@ -6,6 +6,7 @@ import { CentralRepository } from '../repositories/CentralRepository';
 import {
   CreateRuleSchema,
   UpdateRuleSchema,
+  TriggerRuleSchema,
   ToggleRuleSchema,
   EvaluateRuleSchema,
   ListRulesParamsSchema,
@@ -424,7 +425,8 @@ router.post('/:id/trigger',
         throw new ValidationError('Rule ID is required');
       }
 
-      const result = await ruleService.recordTrigger(tenantId, id);
+      const { count, triggeredAt } = TriggerRuleSchema.parse(req.body ?? {});
+      const result = await ruleService.recordTrigger(tenantId, id, count, triggeredAt);
       sendSuccess(res, result, 200, requestId);
     } catch (err) {
       next(err);

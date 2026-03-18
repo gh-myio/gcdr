@@ -22,7 +22,7 @@ export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, Update
   getEnabledRules(tenantId: string): Promise<Rule[]>;
   getByScope(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]>;
   getApplicableForDevice(tenantId: string, deviceId: string, customerId: string, assetId?: string): Promise<Rule[]>;
-  incrementTriggerCount(tenantId: string, ruleId: string): Promise<void>;
+  incrementTriggerCount(tenantId: string, ruleId: string, count?: number, triggeredAt?: Date): Promise<void>;
   updateLastTriggered(tenantId: string, ruleId: string): Promise<void>;
   setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride): Promise<Rule>;
   removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string): Promise<Rule>;

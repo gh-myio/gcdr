@@ -6551,6 +6551,30 @@ paths:
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                  default: 1
+                  description: Number of trigger events to record (default 1). Use for backfill.
+                triggeredAt:
+                  type: string
+                  format: date-time
+                  description: Timestamp of the trigger event (default now). Use for backfill with historical date.
+            examples:
+              realtime:
+                summary: Real-time trigger (orchestrator)
+                value: {}
+              backfill:
+                summary: Backfill 300 events
+                value: { "count": 300, "triggeredAt": "2026-01-15T10:00:00Z" }
       responses:
         '200':
           description: Trigger recorded

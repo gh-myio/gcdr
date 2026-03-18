@@ -308,12 +308,12 @@ export class RuleRepository implements IRuleRepository {
     return results.map(this.mapToEntity);
   }
 
-  async incrementTriggerCount(tenantId: string, ruleId: string): Promise<void> {
+  async incrementTriggerCount(tenantId: string, ruleId: string, count: number = 1, triggeredAt: Date = new Date()): Promise<void> {
     await db
       .update(rules)
       .set({
-        triggerCount: sql`${rules.triggerCount} + 1`,
-        lastTriggeredAt: new Date(),
+        triggerCount: sql`${rules.triggerCount} + ${count}`,
+        lastTriggeredAt: triggeredAt,
       })
       .where(and(eq(rules.tenantId, tenantId), eq(rules.id, ruleId)));
   }

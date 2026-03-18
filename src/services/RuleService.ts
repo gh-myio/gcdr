@@ -155,9 +155,10 @@ export class RuleService {
     return updatedRule;
   }
 
-  async recordTrigger(tenantId: string, ruleId: string): Promise<Pick<Rule, 'id' | 'lastTriggeredAt' | 'triggerCount'>> {
+  async recordTrigger(tenantId: string, ruleId: string, count: number = 1, triggeredAt?: string): Promise<Pick<Rule, 'id' | 'lastTriggeredAt' | 'triggerCount'>> {
     const rule = await this.getById(tenantId, ruleId);
-    await this.repository.incrementTriggerCount(tenantId, ruleId);
+    const triggeredAtDate = triggeredAt ? new Date(triggeredAt) : new Date();
+    await this.repository.incrementTriggerCount(tenantId, ruleId, count, triggeredAtDate);
     const updated = await this.repository.getById(tenantId, ruleId);
     return {
       id: rule.id,

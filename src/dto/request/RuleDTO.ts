@@ -272,6 +272,13 @@ export const EvaluateRuleSchema = z.object({
 export type EvaluateRuleDTO = z.infer<typeof EvaluateRuleSchema>;
 
 // Activate/Deactivate Rule DTO
+export const TriggerRuleSchema = z.object({
+  count: z.number().int().min(1).max(10000).default(1),
+  triggeredAt: z.string().datetime().optional(),
+});
+
+export type TriggerRuleDTO = z.infer<typeof TriggerRuleSchema>;
+
 export const ToggleRuleSchema = z.object({
   enabled: z.boolean(),
   reason: z.string().max(500).optional(),
