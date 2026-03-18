@@ -1204,7 +1204,7 @@ components:
           type: string
         type:
           type: string
-          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, OTHER]
+          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, LOCATION, OTHER]
         status:
           type: string
           enum: [ACTIVE, INACTIVE, MAINTENANCE, DECOMMISSIONED]
@@ -1290,7 +1290,7 @@ components:
           maxLength: 255
         type:
           type: string
-          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, OTHER]
+          enum: [SITE, BUILDING, FLOOR, ROOM, AREA, ZONE, EQUIPMENT, LOCATION, OTHER]
         parentAssetId:
           type: string
           format: uuid

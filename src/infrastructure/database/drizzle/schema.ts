@@ -40,7 +40,7 @@ export const userStatusEnum = pgEnum('user_status', [
 
 export const userTypeEnum = pgEnum('user_type', ['INTERNAL', 'CUSTOMER', 'PARTNER', 'SERVICE_ACCOUNT']);
 
-export const assetTypeEnum = pgEnum('asset_type', ['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']);
+export const assetTypeEnum = pgEnum('asset_type', ['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'LOCATION', 'OTHER']);
 
 export const deviceTypeEnum = pgEnum('device_type', ['SENSOR', 'ACTUATOR', 'GATEWAY', 'CONTROLLER', 'METER', 'CAMERA', 'OUTLET', 'INFRARED', 'OTHER']);
 

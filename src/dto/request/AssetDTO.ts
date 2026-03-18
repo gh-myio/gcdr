@@ -37,7 +37,7 @@ export const CreateAssetSchema = z.object({
   name: z.string().min(1).max(255),
   displayName: z.string().max(255).optional(),
   code: z.string().max(50).optional(),
-  type: z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']),
+  type: z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'LOCATION', 'OTHER']),
   description: z.string().max(1000).optional(),
   location: AssetLocationSchema,
   specs: AssetSpecsSchema,
@@ -54,10 +54,10 @@ export const UpdateAssetSchema = z.object({
   code: z.string().max(50).optional(),
   type: z.preprocess(
     (v) => {
-      const valid = ['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER'];
+      const valid = ['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'LOCATION', 'OTHER'];
       return valid.includes(v as string) ? v : undefined;
     },
-    z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'OTHER']).optional(),
+    z.enum(['SITE', 'BUILDING', 'FLOOR', 'ROOM', 'EQUIPMENT', 'ZONE', 'LOCATION', 'OTHER']).optional(),
   ),
   description: z.string().max(1000).optional(),
   location: AssetLocationSchema,

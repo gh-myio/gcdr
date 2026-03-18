@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type AssetType = 'SITE' | 'BUILDING' | 'FLOOR' | 'ROOM' | 'EQUIPMENT' | 'ZONE' | 'OTHER';
+export type AssetType = 'SITE' | 'BUILDING' | 'FLOOR' | 'ROOM' | 'EQUIPMENT' | 'ZONE' | 'LOCATION' | 'OTHER';
 
 export interface AssetLocation {
   address?: string;
