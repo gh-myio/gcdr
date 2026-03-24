@@ -39,6 +39,7 @@ export class RuleRepository implements IRuleRepository {
       tags: data.tags || [],
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
+      internalRule: data.internalRule ?? false,
       triggerCount: 0,
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),
@@ -76,6 +77,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
+    if (data.internalRule !== undefined) updateData.internalRule = data.internalRule;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
     if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
@@ -179,6 +181,10 @@ export class RuleRepository implements IRuleRepository {
 
     if (params.search) {
       conditions.push(sql`(${rules.name} ILIKE ${`%${params.search}%`})`);
+    }
+
+    if (params.internalRule !== undefined) {
+      conditions.push(eq(rules.internalRule, params.internalRule));
     }
 
     const [results, total] = await Promise.all([
@@ -395,6 +401,7 @@ export class RuleRepository implements IRuleRepository {
       tags: row.tags as string[],
       status: row.status,
       enabled: row.enabled,
+      internalRule: row.internalRule,
       lastTriggeredAt: row.lastTriggeredAt?.toISOString(),
       triggerCount: row.triggerCount,
       createdAt: row.createdAt.toISOString(),

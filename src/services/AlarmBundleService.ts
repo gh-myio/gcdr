@@ -182,8 +182,8 @@ export class AlarmBundleService {
     // Get all alarm rules for this customer
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
 
-    // Filter to only ALARM_THRESHOLD rules
-    let alarmRules = allRules.filter(isAlarmRule);
+    // Filter to only ALARM_THRESHOLD rules, excluding internal rules
+    let alarmRules = allRules.filter(r => isAlarmRule(r) && !r.internalRule);
 
     // Optionally filter disabled rules
     if (!includeDisabled) {

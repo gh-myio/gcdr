@@ -50,7 +50,7 @@ export const connectivityStatusEnum = pgEnum('connectivity_status', ['ONLINE', '
 
 export const partnerStatusEnum = pgEnum('partner_status', ['PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED', 'REJECTED']);
 
-export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW']);
+export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE']);
 
 export const rulePriorityEnum = pgEnum('rule_priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
@@ -581,6 +581,10 @@ export const rules = pgTable('rules', {
   // Metadata
   lastTriggeredAt: timestamp('last_triggered_at', { withTimezone: true }),
   triggerCount: integer('trigger_count').notNull().default(0),
+
+  // Internal rules are excluded from /alarm-rules/bundle/simple.
+  // Consumed exclusively by internal services (e.g. alarm orchestrator).
+  internalRule: boolean('internal_rule').notNull().default(false),
 
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -1,7 +1,7 @@
 {
   "success": true,
   "data": {
-    "versionId": "v1-2e1f6a4955e5",
+    "versionId": "v1-0c7755dec672",
     "deviceIndex": {
       "2b526f1f-cab8-445b-a27a-15f8054e8424": {
         "deviceName": "3F ELEV. SCMAL2ACEL2",
@@ -17,7 +17,6 @@
         "slaveId": 90,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003_3d09486b-64ee-46d1-a1c2-9ded53c5c988"
         ]
@@ -27,7 +26,6 @@
         "slaveId": 187,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -37,7 +35,6 @@
         "slaveId": 92,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -57,7 +54,6 @@
         "slaveId": 94,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -67,7 +63,6 @@
         "slaveId": 95,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -77,7 +72,6 @@
         "slaveId": 96,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -97,7 +91,6 @@
         "slaveId": 131,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -107,7 +100,6 @@
         "slaveId": 132,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -117,7 +109,6 @@
         "slaveId": 133,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
         "ruleIds": [
-          "dc3911ce-081c-490a-b8fe-87fcdeac75c4",
           "cccc0001-0001-0001-0001-000000000004",
           "cccc0001-0001-0001-0001-000000000003"
         ]
@@ -432,6 +423,16 @@
           "f52399ac-300b-4451-af0b-1c371a6f670f"
         ]
       },
+      "ce241d4a-1da9-4d26-968f-d7f70a19fa09": {
+        "deviceName": "3F SCMAL2ACCAGC2",
+        "slaveId": 119,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "75f40dfe-0860-49f2-8ae1-2b28873846ed",
+          "0638f55c-468a-419e-9fcb-b5519666146f",
+          "f52399ac-300b-4451-af0b-1c371a6f670f"
+        ]
+      },
       "6857b8cb-34aa-4e2e-9113-8598c2601f31": {
         "deviceName": "3F SCMAL2ACEL1",
         "slaveId": 83,
@@ -500,12 +501,7 @@
         "deviceName": "HIDR. SCMAL2ACACHICI",
         "slaveId": 108,
         "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
-        "ruleIds": [
-          "20b8ddd1-1936-4b8f-9079-72380dc3baf4",
-          "ad571fcf-a223-4fe4-9c26-f945dc7ef8be",
-          "362516ab-c923-4a86-816f-7341eb623723",
-          "885dadf0-5ba0-4845-867c-db079f66dd3a"
-        ]
+        "ruleIds": ["20b8ddd1-1936-4b8f-9079-72380dc3baf4"]
       },
       "b8abdd64-2690-48f4-86d7-e96aa2e5af66": {
         "deviceName": "HIDR. SCMAL2ACACHIPUÁGCOUR",
@@ -778,6 +774,7 @@
         "metric": "instantaneous_power",
         "operator": "LT",
         "value": 400,
+        "valueHigh": null,
         "duration": 0,
         "hysteresis": 0,
         "aggregation": "LAST",
@@ -891,7 +888,7 @@
         "name": "Fancoil Desligado (Dom)",
         "metric": "instantaneous_power",
         "operator": "LT",
-        "value": 400,
+        "value": 399,
         "valueHigh": null,
         "duration": 300000,
         "hysteresis": 0,
@@ -1008,6 +1005,7 @@
         "metric": "instantaneous_power",
         "operator": "LT",
         "value": 299,
+        "valueHigh": null,
         "duration": 0,
         "hysteresis": 0,
         "aggregation": "LAST",
@@ -1028,7 +1026,7 @@
     }
   },
   "meta": {
-    "requestId": "5022da66-ca87-4cef-bfce-29bf65526acb",
-    "timestamp": "2026-03-16T23:16:05.832Z"
+    "requestId": "51195b1c-1572-488c-a4aa-c509938df13e",
+    "timestamp": "2026-03-24T19:23:23.138Z"
   }
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Enums
-const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW']);
+const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE']);
 const RulePrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 const ComparisonOperatorSchema = z.enum(['GT', 'GTE', 'LT', 'LTE', 'EQ', 'NEQ', 'BETWEEN', 'OUTSIDE']);
 const ScopTypeSchema = z.enum(['GLOBAL', 'CUSTOMER', 'ASSET', 'DEVICE']);
@@ -209,6 +209,7 @@ export const CreateRuleSchema = z.object({
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
+  internalRule: z.boolean().default(false),
 }).refine(
   (data) => {
     // Ensure the correct config is provided based on type
@@ -221,6 +222,8 @@ export const CreateRuleSchema = z.object({
         return !!data.escalationConfig;
       case 'MAINTENANCE_WINDOW':
         return !!data.maintenanceConfig;
+      case 'DEVICE_OFFLINE':
+        return !!data.alarmConfig; // alarmConfig carries schedule + centralId
       default:
         return false;
     }
@@ -245,6 +248,7 @@ export const UpdateRuleSchema = z.object({
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
   tags: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
+  internalRule: z.boolean().optional(),
 });
 
 export type UpdateRuleDTO = z.infer<typeof UpdateRuleSchema>;
@@ -259,6 +263,7 @@ export const ListRulesParamsSchema = z.object({
   enabled: z.coerce.boolean().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
   search: z.string().optional(),
+  internalRule: z.coerce.boolean().optional(),
 });
 
 export type ListRulesParams = z.infer<typeof ListRulesParamsSchema>;

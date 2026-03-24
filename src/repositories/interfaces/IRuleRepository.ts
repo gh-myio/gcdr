@@ -12,6 +12,7 @@ export interface ListRulesParams {
   enabled?: boolean;
   status?: string;
   search?: string;
+  internalRule?: boolean;
 }
 
 export interface IRuleRepository extends IRepository<Rule, CreateRuleDTO, UpdateRuleDTO> {

@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW';
+export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW' | 'DEVICE_OFFLINE';
 export type RulePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComparisonOperator = 'GT' | 'GTE' | 'LT' | 'LTE' | 'EQ' | 'NEQ' | 'BETWEEN' | 'OUTSIDE' | 'UNCHANGED';
 export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
@@ -270,6 +270,10 @@ export interface Rule extends BaseEntity {
   // Metadata
   lastTriggeredAt?: string;
   triggerCount?: number;
+
+  // Internal rules are excluded from the /alarm-rules/bundle/simple endpoint.
+  // They are consumed exclusively by internal services (e.g. alarm orchestrator).
+  internalRule?: boolean;
 }
 
 // Helper type guards
