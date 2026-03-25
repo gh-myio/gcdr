@@ -447,8 +447,9 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
       throw new ValidationError('Customer ID is required');
     }
 
-    const rules = await ruleService.getByCustomerId(tenantId, customerId);
-    sendSuccess(res, { items: rules, count: rules.length }, 200, requestId);
+    const params = ListRulesParamsSchema.parse({ ...req.query, customerId });
+    const result = await ruleService.list(tenantId, params);
+    sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
   }
