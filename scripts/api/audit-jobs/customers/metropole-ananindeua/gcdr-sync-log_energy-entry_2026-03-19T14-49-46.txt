@@ -1,0 +1,34 @@
+═══════════════════════════════════════════════════════════════════
+  GCDR DEVICE SYNC JOB — Relatório Completo
+═══════════════════════════════════════════════════════════════════
+  Arquivo  : energy-entry
+  Customer : c4030d78-1cf4-4bf6-8eed-c12b4e7c281a
+  Job ID   : 47d0ec92-ebbe-4f80-a5e1-1ea9485b878a
+  Status   : PARTIAL
+  DryRun   : false
+  Iniciado : 2026-03-19T14:49:10.412Z
+  Duração  : 0.0s
+
+── DEVICE-MAP ENVIADO ──────────────────────────────────────────────
+tbId|deviceName|label|identifier|deviceType|deviceProfile|slaveId|centralId|gcdrCustomerId|gcdrAssetId|gcdrDeviceId|gcdrSyncAt
+3f003280-f3f5-11f0-998e-25174baff087|3F ENTRADA SCMPAC-Entrada Geral 126A|Entrada Geral 126A|ENTRADA|ENTRADA|ENTRADA|238|7ac0ac44-e631-4b64-ac1d-e9e93fe61e0a||||
+43d4d170-f2f7-11f0-998e-25174baff087|3F SCMT208D|Medição CAG.|ENTRADA|ENTRADA|ENTRADA|356|7ac0ac44-e631-4b64-ac1d-e9e93fe61e0a||||
+
+── RESUMO ──────────────────────────────────────────────────────────
+  CHECK              conformant=0  divergent=0  notLinked=2
+  ACTION_PLAN        create=2  update=0  skip=0
+  DETECT_RELOCATIONS relocate=0  genuineCreates=2
+  RELOCATE           ok=0  fail=0
+  APPLY_UPDATES      ok=0  fail=0
+  CONSOLIDATE        ok=0  fail=2
+
+── LOG DE OPERAÇÕES ────────────────────────────────────────────────
+  [14:49:10.731] [INFO ] [CHECK                 ] Parsed 2 device rows from 1 file(s)
+  [14:49:10.733] [INFO ] [CHECK                 ] energy-entry: 0 CONFORMANT, 0 DIVERGENT, 2 NOT_LINKED
+  [14:49:10.735] [INFO ] [ACTION_PLAN           ] Classified: 2 CREATE, 0 UPDATE, 0 UPDATE_IDENTIFIER, 0 SKIP
+  [14:49:10.745] [INFO ] [DETECT_RELOCATIONS    ] 0 device(s) to relocate, 2 genuine create(s)
+  [14:49:10.752] [FAIL ] [CONSOLIDATE_CREATES   ] 3F ENTRADA SCMPAC-Entrada Geral 126A — no assetId available (set defaultAssetId)
+  [14:49:10.752] [FAIL ] [CONSOLIDATE_CREATES   ] 3F SCMT208D — no assetId available (set defaultAssetId)
+  [14:49:10.752] [INFO ] [DONE                  ] Job complete — 0 OK, 2 FAIL
+
+═══════════════════════════════════════════════════════════════════

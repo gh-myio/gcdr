@@ -1,1 +1,11 @@
-{"success":true,"data":{"items":[],"pagination":{"total":0,"totalPages":0,"hasMore":false}},"meta":{"requestId":"90b4d692-f548-487e-a959-edd8a62d2a7d","timestamp":"2026-03-25T00:47:47.922Z"}}
+{
+  "success": true,
+  "data": {
+    "items": [],
+    "pagination": { "total": 0, "totalPages": 0, "hasMore": false }
+  },
+  "meta": {
+    "requestId": "90b4d692-f548-487e-a959-edd8a62d2a7d",
+    "timestamp": "2026-03-25T00:47:47.922Z"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-19T14:58:01Z",
+    "apiUrl": "https://gcdr-api.a.myio-bas.com",
+    "customer": {
+      "id": "c4030d78-1cf4-4bf6-8eed-c12b4e7c281a",
+      "name": "metropole-ananindeua"
+    },
+    "statusFilter": "all",
+    "totals": {
+      "total": 2,
+      "DONE": 0,
+      "PARTIAL": 2,
+      "FAILED": 0,
+      "RUNNING": 0,
+      "QUEUED": 0
+    }
+  },
+  "jobs": [
+    {
+      "id": "47d0ec92-ebbe-4f80-a5e1-1ea9485b878a",
+      "tenantId": "11111111-1111-1111-1111-111111111111",
+      "customerId": "c4030d78-1cf4-4bf6-8eed-c12b4e7c281a",
+      "status": "PARTIAL",
+      "currentPhase": "DONE",
+      "dryRun": false,
+      "inputConfig": {},
+      "phasesSummary": {
+        "check": {
+          "divergent": 0,
+          "notLinked": 2,
+          "conformant": 0
+        },
+        "relocate": {
+          "ok": 0,
+          "fail": 0
+        },
+        "actionPlan": {
+          "skip": 0,
+          "create": 2,
+          "update": 0,
+          "updateIdentifier": 0
+        },
+        "applyUpdates": {
+          "ok": 0,
+          "fail": 0
+        },
+        "detectRelocations": {
+          "relocate": 0,
+          "genuineCreates": 2
+        },
+        "consolidateCreates": {
+          "ok": 0,
+          "fail": 2
+        }
+      },
+      "errorMessage": null,
+      "createdAt": "2026-03-19T14:49:10.723Z",
+      "updatedAt": "2026-03-19T14:49:10.752Z",
+      "completedAt": "2026-03-19T14:49:10.752Z"
+    },
+    {
+      "id": "6c2a4ec3-666c-4bf7-a42c-1b44fbe7a6dc",
+      "tenantId": "11111111-1111-1111-1111-111111111111",
+      "customerId": "c4030d78-1cf4-4bf6-8eed-c12b4e7c281a",
+      "status": "PARTIAL",
+      "currentPhase": "DONE",
+      "dryRun": false,
+      "inputConfig": {},
+      "phasesSummary": {
+        "check": {
+          "divergent": 0,
+          "notLinked": 2,
+          "conformant": 0
+        },
+        "relocate": {
+          "ok": 0,
+          "fail": 0
+        },
+        "actionPlan": {
+          "skip": 0,
+          "create": 2,
+          "update": 0,
+          "updateIdentifier": 0
+        },
+        "applyUpdates": {
+          "ok": 0,
+          "fail": 0
+        },
+        "detectRelocations": {
+          "relocate": 0,
+          "genuineCreates": 2
+        },
+        "consolidateCreates": {
+          "ok": 0,
+          "fail": 2
+        }
+      },
+      "errorMessage": null,
+      "createdAt": "2026-03-19T14:00:48.110Z",
+      "updatedAt": "2026-03-19T14:00:48.141Z",
+      "completedAt": "2026-03-19T14:00:48.141Z"
+    }
+  ]
+}
