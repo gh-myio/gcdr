@@ -14,7 +14,7 @@ const { centrals } = schema;
 export class CentralRepository implements ICentralRepository {
 
   async create(tenantId: string, data: CreateCentralDTO, createdBy: string): Promise<Central> {
-    const id = generateId();
+    const id = data.id || generateId();
     const timestamp = now();
 
     const [result] = await db.insert(centrals).values({

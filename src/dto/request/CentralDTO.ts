@@ -28,6 +28,7 @@ const LocationSchema = z.object({
 
 // Create Central DTO
 export const CreateCentralSchema = z.object({
+  id: z.string().uuid().optional(),
   customerId: z.string().uuid(),
   assetId: z.string().uuid(),
   name: z.string().min(1).max(255),
