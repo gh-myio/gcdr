@@ -14,7 +14,7 @@ const { customers } = schema;
 export class CustomerRepository implements ICustomerRepository {
 
   async create(tenantId: string, data: CreateCustomerDTO, createdBy: string): Promise<Customer> {
-    const id = generateId();
+    const id = data.id || generateId();
     const timestamp = now();
 
     // Calculate path and depth based on parent

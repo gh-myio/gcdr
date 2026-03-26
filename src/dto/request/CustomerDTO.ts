@@ -3,6 +3,7 @@ import { CustomerType } from '../../shared/types';
 
 // Create Customer DTO
 export const CreateCustomerSchema = z.object({
+  id: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
   displayName: z.string().min(1).max(255).optional(),
   code: z.string().min(1).max(50).optional(),
