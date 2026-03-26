@@ -8,7 +8,7 @@
 API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="4fd8700d-7a86-438b-9d45-5c05b97b2a88"
 API_KEY="gcdr_alarm_integration_key_2026"
-CENTRAL_ID="5f8b32a0-8430-11f0-a06d-e9509531b1d5"
+CENTRAL_ID="adb43bf6-6107-44fa-b786-6e88c150d779"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

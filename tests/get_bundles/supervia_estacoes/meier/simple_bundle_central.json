@@ -1,0 +1,143 @@
+{
+  "success": true,
+  "data": {
+    "versionId": "v1-bea04226e73e",
+    "deviceIndex": {
+      "dab88153-b126-4e11-bdd0-a4fb710b7611": {
+        "deviceName": "Escada 11 (Supervia Meier)",
+        "slaveId": 4,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      },
+      "c5aab476-2374-4af2-b67d-9e91ab8009aa": {
+        "deviceName": "Escada 12 (Supervia Meier)",
+        "slaveId": 7,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      },
+      "f292da87-2420-4192-a666-2bc1c7506536": {
+        "deviceName": "Escada 13 (Supervia Meier)",
+        "slaveId": 6,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      },
+      "ae2238a2-81ce-47c4-9425-55f7dde95887": {
+        "deviceName": "Escada 14 (Supervia Meier)",
+        "slaveId": 3,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      },
+      "86ff1cf9-a6aa-4814-be9a-caef8f856daf": {
+        "deviceName": "Escada 15 (Supervia Meier)",
+        "slaveId": 2,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      },
+      "530b0ae6-fd8e-47c9-957c-4e945ca2cca3": {
+        "deviceName": "Escada 16 (Supervia Meier)",
+        "slaveId": 5,
+        "offset": { "temp": 0, "hum": 0, "pot": 0, "water_level": 0 },
+        "ruleIds": [
+          "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+          "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+          "dbd78bf3-394e-49ec-8817-3e3043ca7e25"
+        ]
+      }
+    },
+    "rules": {
+      "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d": {
+        "id": "e3d4d667-aaf1-4964-b08e-8ceb1a18f49d",
+        "name": "Escada Rolante Ligada Fora do Horário(Seg - Dom)",
+        "metric": "instantaneous_power",
+        "operator": "GT",
+        "value": 350,
+        "valueHigh": null,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "00:00",
+        "endAt": "06:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      },
+      "dcf90dda-fb2d-4d27-83aa-da3910cb49c3": {
+        "id": "dcf90dda-fb2d-4d27-83aa-da3910cb49c3",
+        "name": "Escada Rolante parada (domingo)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 350,
+        "valueHigh": null,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "12:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": true,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": false
+        },
+        "keyMulti": 1
+      },
+      "dbd78bf3-394e-49ec-8817-3e3043ca7e25": {
+        "id": "dbd78bf3-394e-49ec-8817-3e3043ca7e25",
+        "name": "Escada Rolante parada (seg-sáb)",
+        "metric": "instantaneous_power",
+        "operator": "LT",
+        "value": 350,
+        "valueHigh": null,
+        "duration": 0,
+        "hysteresis": 0,
+        "aggregation": "AVG",
+        "startAt": "10:00",
+        "endAt": "22:00",
+        "daysOfWeek": {
+          "0": false,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true
+        },
+        "keyMulti": 1
+      }
+    }
+  },
+  "meta": {
+    "requestId": "4cebbddc-74e0-4d6c-923e-4518f967ea30",
+    "timestamp": "2026-03-26T04:51:18.633Z"
+  }
+}

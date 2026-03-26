@@ -1,13 +1,13 @@
 #!/bin/bash
 # Fetch simplified alarm bundle — Supervia DEODORO / Central
 # Customer: Supervia DEODORO (4fd8700d-7a86-438b-9d45-5c05b97b2a88)
-# Central:  5f8b32a0-8430-11f0-a06d-e9509531b1d5
+# Central:  adb43bf6-6107-44fa-b786-6e88c150d779
 
 #API_URL="http://localhost:3015"
 API_URL="https://gcdr-api.a.myio-bas.com"
 CUSTOMER_ID="4fd8700d-7a86-438b-9d45-5c05b97b2a88"
 API_KEY="gcdr_alarm_integration_key_2026"
-CENTRAL_ID="5f8b32a0-8430-11f0-a06d-e9509531b1d5"
+CENTRAL_ID="adb43bf6-6107-44fa-b786-6e88c150d779"
 OUTPUT_FILE="$(dirname "$0")/simple_bundle_central.json"
 
 echo "Fetching simplified bundle — Supervia DEODORO (central)..."
