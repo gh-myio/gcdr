@@ -8,6 +8,8 @@ import { ApiKeyScope } from '../domain/entities/CustomerApiKey';
 const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
 
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
+const MASTER_USER_ID = '00000000-0000-0000-0000-000000000002';
+
 function bypassAuth(req: Request, next: NextFunction): void {
   req.context.tenantId = process.env.DEFAULT_TENANT_ID || '11111111-1111-1111-1111-111111111111';
   req.context.userId = DEV_USER_ID;
@@ -16,10 +18,47 @@ function bypassAuth(req: Request, next: NextFunction): void {
 }
 
 /**
- * Authentication middleware - requires valid JWT token
+ * Checks if the request carries a valid master API key.
+ * The master key (GCDR_MASTER_API_KEY env var) grants full tenant access.
+ * Requires X-Tenant-Id header to identify the target tenant.
+ * Returns true and populates req context/user if valid; returns false otherwise.
+ */
+function tryMasterApiKey(req: Request): boolean {
+  const masterKey = process.env.GCDR_MASTER_API_KEY;
+  if (!masterKey) return false;
+
+  const providedKey = req.headers['x-api-key'] as string | undefined;
+  if (!providedKey || providedKey !== masterKey) return false;
+
+  const tenantId = (req.headers['x-tenant-id'] as string | undefined)
+    || process.env.DEFAULT_TENANT_ID
+    || '11111111-1111-1111-1111-111111111111';
+
+  req.context.tenantId = tenantId;
+  req.context.userId = MASTER_USER_ID;
+  req.context.apiKeyHierarchyAccess = 'TENANT';
+  req.user = {
+    sub: MASTER_USER_ID,
+    email: 'master-api-key@system',
+    tenant_id: tenantId,
+    type: 'SERVICE_ACCOUNT',
+    roles: ['*'],
+  };
+  return true;
+}
+
+/**
+ * Authentication middleware - requires valid JWT token or master API key
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (AUTH_DISABLED) return bypassAuth(req, next);
+
+  // Master API key grants full access
+  if (tryMasterApiKey(req)) {
+    next();
+    return;
+  }
+
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -84,17 +123,25 @@ export function requireRoles(...roles: string[]) {
 }
 
 /**
- * Hybrid authentication middleware - supports both JWT Bearer token and API Key
+ * Hybrid authentication middleware - supports JWT Bearer token, customer API Key, or master API key
  *
  * Priority:
- * 1. Bearer token (Authorization header)
- * 2. API Key (X-API-Key header) - X-Tenant-Id is optional (auto-discovered from key)
+ * 1. Master API key (GCDR_MASTER_API_KEY env var) — full tenant access
+ * 2. Bearer token (Authorization header)
+ * 3. Customer API Key (X-API-Key header) - X-Tenant-Id is optional (auto-discovered from key)
  *
- * @param requiredScope - Optional scope required for API Key authentication
+ * @param requiredScope - Optional scope required for customer API Key authentication (ignored for master key)
  */
 export function hybridAuthMiddleware(requiredScope?: ApiKeyScope | ApiKeyScope[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (AUTH_DISABLED) return bypassAuth(req, next);
+
+    // Master API key — full access, no scope check needed
+    if (tryMasterApiKey(req)) {
+      next();
+      return;
+    }
+
     const authHeader = req.headers['authorization'];
     const apiKey = req.headers['x-api-key'] as string | undefined;
 
