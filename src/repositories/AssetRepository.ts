@@ -14,7 +14,7 @@ const { assets } = schema;
 export class AssetRepository implements IAssetRepository {
 
   async create(tenantId: string, data: CreateAssetDTO, createdBy: string): Promise<Asset> {
-    const id = generateId();
+    const id = data.id || generateId();
     const timestamp = now();
 
     // Calculate path and depth based on parent

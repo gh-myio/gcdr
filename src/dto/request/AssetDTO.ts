@@ -32,6 +32,7 @@ const AssetSpecsSchema = z.object({
 
 // Create Asset Schema
 export const CreateAssetSchema = z.object({
+  id: z.string().uuid().optional(),
   customerId: z.string().uuid(),
   parentAssetId: z.preprocess(v => (v === '' ? null : v), z.string().uuid().optional().nullable()),
   name: z.string().min(1).max(255),
