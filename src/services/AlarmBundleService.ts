@@ -168,7 +168,7 @@ export class AlarmBundleService {
       return cached.bundle;
     }
 
-    const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false } = params;
+    const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false, deep = false } = params;
 
     // Validate customer exists
     const customer = await this.customerRepository.getById(tenantId, customerId);
@@ -176,11 +176,24 @@ export class AlarmBundleService {
       throw new NotFoundError(`Customer ${customerId} not found`);
     }
 
-    // Get all devices for this customer (optionally filtered by centralId)
-    const devices = await this.getDevicesByCustomer(tenantId, customerId, centralId, domain, deviceType);
+    // Collect customer IDs to aggregate (self + descendants when deep=true)
+    let customerIds = [customerId];
+    if (deep) {
+      const descendants = await this.customerRepository.getDescendants(tenantId, customerId);
+      customerIds = [customerId, ...descendants.map(d => d.id)];
+    }
 
-    // Get all alarm rules for this customer
-    const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
+    // Get all devices for the target customers (optionally filtered by centralId)
+    const devicesPerCustomer = await Promise.all(
+      customerIds.map(cid => this.getDevicesByCustomer(tenantId, cid, centralId, domain, deviceType))
+    );
+    const devices = devicesPerCustomer.flat();
+
+    // Get all alarm rules for the target customers
+    const rulesPerCustomer = await Promise.all(
+      customerIds.map(cid => this.ruleRepository.getByCustomerId(tenantId, cid))
+    );
+    const allRules = rulesPerCustomer.flat();
 
     // Filter to only ALARM_THRESHOLD rules, excluding internal rules
     let alarmRules = allRules.filter(r => isAlarmRule(r) && !r.internalRule);

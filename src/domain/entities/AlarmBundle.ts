@@ -98,6 +98,8 @@ export interface GenerateBundleParams {
   domain?: string;
   deviceType?: string;
   includeDisabled?: boolean;
+  /** When true, aggregates devices and rules from all descendant customers */
+  deep?: boolean;
 }
 
 // =============================================================================

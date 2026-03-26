@@ -551,7 +551,8 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
-    const { domain, deviceType, includeDisabled } = req.query;
+    const { domain, deviceType, includeDisabled, deep } = req.query;
+    const isDeep = deep === 'true';
 
     // Optional X-Central-Id header to filter devices by central
     const centralId = req.headers['x-central-id'] as string | undefined;
@@ -579,7 +580,7 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
         });
       }
 
-      if (central.customerId !== customerId) {
+      if (!isDeep && central.customerId !== customerId) {
         return res.status(403).json({
           success: false,
           error: {
@@ -598,6 +599,7 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
       domain: domain as string | undefined,
       deviceType: deviceType as string | undefined,
       includeDisabled: includeDisabled === 'true',
+      deep: isDeep,
     };
 
     // Check for conditional request (If-None-Match header - standard HTTP)
