@@ -1,5 +1,11 @@
 # RFC-0026: Device Availability Tracking
 
+> **Status: SUPERSEDED**
+>
+> Este RFC foi superseded pela Alarms API Backend, que já implementa o cômputo de disponibilidade de dispositivos a partir dos alarmes `DEVICE_OFFLINE` existentes. O endpoint `GET /alarms/stats/availability` cobre availability %, MTBF, MTTR, failure count, status por device e agregado de frota — sem necessidade de nova tabela de eventos em GCDR nem de calls extras no orquestrador.
+>
+> Não há plano de implementação deste RFC.
+
 - **Feature Name**: `device-availability-tracking`
 - **Start Date**: 2026-03-25
 - **RFC PR**: (pending)
