@@ -167,6 +167,7 @@ scripts/api/**/device-registry-*.txt
 # Temporary documentation files
 docs/toCheck*.txt
 docs/*.png
+docs/jobs/
 
 # Windows artifacts
 nul
