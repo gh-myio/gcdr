@@ -46,6 +46,7 @@ export interface EnrichedCustomer {
   assets: Asset[];
   devices: (Device & { ruleIds?: string[] })[];
   rules?: Record<string, RuleMeta>;
+  children?: EnrichedCustomer[];
 }
 
 export class CustomerService {
@@ -154,6 +155,26 @@ export class CustomerService {
       return { customer, assets: [], devices: [] };
     }
 
+    // Check if this customer has children — if so, return parent + enriched children list
+    const children = await this.repository.getChildren(tenantId, customer.id);
+    if (children.length > 0) {
+      const enrichedChildren = await Promise.all(
+        children.map((child) =>
+          this.enrichCustomer(tenantId, child, allRules, filterOnlyDevicesWithRules),
+        ),
+      );
+      return { customer, assets: [], devices: [], children: enrichedChildren };
+    }
+
+    return this.enrichCustomer(tenantId, customer, allRules, filterOnlyDevicesWithRules);
+  }
+
+  private async enrichCustomer(
+    tenantId: string,
+    customer: Customer,
+    allRules: boolean,
+    filterOnlyDevicesWithRules: boolean,
+  ): Promise<EnrichedCustomer> {
     const [assetsResult, devicesResult] = await Promise.all([
       this.assetRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
       this.deviceRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
