@@ -210,6 +210,7 @@ export const CreateRuleSchema = z.object({
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
   internalRule: z.boolean().default(false),
+  isInternalSupportRule: z.boolean().default(true),
 }).refine(
   (data) => {
     // Ensure the correct config is provided based on type
@@ -249,6 +250,7 @@ export const UpdateRuleSchema = z.object({
   tags: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
   internalRule: z.boolean().optional(),
+  isInternalSupportRule: z.boolean().optional(),
 });
 
 export type UpdateRuleDTO = z.infer<typeof UpdateRuleSchema>;
@@ -264,6 +266,7 @@ export const ListRulesParamsSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
   search: z.string().optional(),
   internalRule: z.coerce.boolean().optional(),
+  includeInternalSupportRule: z.coerce.boolean().optional(),
 });
 
 export type ListRulesParams = z.infer<typeof ListRulesParamsSchema>;

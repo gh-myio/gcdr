@@ -586,6 +586,10 @@ export const rules = pgTable('rules', {
   // Consumed exclusively by internal services (e.g. alarm orchestrator).
   internalRule: boolean('internal_rule').notNull().default(false),
 
+  // Internal support rules are included in all endpoints by default.
+  // Pass includeInternalSupportRule=false to exclude them.
+  isInternalSupportRule: boolean('is_internal_support_rule').notNull().default(true),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

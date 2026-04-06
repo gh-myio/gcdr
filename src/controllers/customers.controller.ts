@@ -73,16 +73,17 @@ router.get('/external/:externalId', async (req: Request, res: Response, next: Ne
   try {
     const { tenantId, requestId } = req.context;
     const { externalId } = req.params;
-    const deep                    = req.query.deep === '1';
-    const allRules                = req.query.allRules === '1';
+    const deep                       = req.query.deep === '1';
+    const allRules                   = req.query.allRules === '1';
     const filterOnlyDevicesWithRules = req.query.filterOnlyDevicesWithRules === '1';
+    const includeInternalSupportRule = req.query.includeInternalSupportRule !== 'false';
 
     if (!externalId) {
       throw new ValidationError('External ID is required');
     }
 
     const result = await customerService.getEnrichedByExternalId(
-      tenantId, externalId, deep, allRules, filterOnlyDevicesWithRules,
+      tenantId, externalId, deep, allRules, filterOnlyDevicesWithRules, includeInternalSupportRule,
     );
 
     sendSuccess(res, deep ? result : result.customer, 200, requestId);

@@ -71,6 +71,7 @@ export class AlarmBundleService {
       params.domain || '',
       params.deviceType || '',
       String(params.includeDisabled || false),
+      String(params.includeInternalSupportRule ?? true),
     ].join(':');
   }
 
@@ -168,7 +169,7 @@ export class AlarmBundleService {
       return cached.bundle;
     }
 
-    const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false, deep = false } = params;
+    const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false, deep = false, includeInternalSupportRule = true } = params;
 
     // Validate customer exists
     const customer = await this.customerRepository.getById(tenantId, customerId);
@@ -197,6 +198,11 @@ export class AlarmBundleService {
 
     // Filter to only ALARM_THRESHOLD rules, excluding internal rules
     let alarmRules = allRules.filter(r => isAlarmRule(r) && !r.internalRule);
+
+    // Optionally exclude internal support rules
+    if (!includeInternalSupportRule) {
+      alarmRules = alarmRules.filter(r => !r.isInternalSupportRule);
+    }
 
     // Optionally filter disabled rules
     if (!includeDisabled) {

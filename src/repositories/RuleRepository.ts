@@ -40,6 +40,7 @@ export class RuleRepository implements IRuleRepository {
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
       internalRule: data.internalRule ?? false,
+      isInternalSupportRule: data.isInternalSupportRule ?? true,
       triggerCount: 0,
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),
@@ -78,6 +79,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
     if (data.internalRule !== undefined) updateData.internalRule = data.internalRule;
+    if (data.isInternalSupportRule !== undefined) updateData.isInternalSupportRule = data.isInternalSupportRule;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
     if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
@@ -185,6 +187,10 @@ export class RuleRepository implements IRuleRepository {
 
     if (params.internalRule !== undefined) {
       conditions.push(eq(rules.internalRule, params.internalRule));
+    }
+
+    if (params.includeInternalSupportRule === false) {
+      conditions.push(eq(rules.isInternalSupportRule, false));
     }
 
     const [results, total] = await Promise.all([
@@ -402,6 +408,7 @@ export class RuleRepository implements IRuleRepository {
       status: row.status,
       enabled: row.enabled,
       internalRule: row.internalRule,
+      isInternalSupportRule: row.isInternalSupportRule,
       lastTriggeredAt: row.lastTriggeredAt?.toISOString(),
       triggerCount: row.triggerCount,
       createdAt: row.createdAt.toISOString(),

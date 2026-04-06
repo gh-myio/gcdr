@@ -274,6 +274,10 @@ export interface Rule extends BaseEntity {
   // Internal rules are excluded from the /alarm-rules/bundle/simple endpoint.
   // They are consumed exclusively by internal services (e.g. alarm orchestrator).
   internalRule?: boolean;
+
+  // Internal support rules are included in all endpoints by default.
+  // Pass includeInternalSupportRule=false to exclude them.
+  isInternalSupportRule: boolean;
 }
 
 // Helper type guards

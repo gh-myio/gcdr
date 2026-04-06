@@ -100,6 +100,8 @@ export interface GenerateBundleParams {
   includeDisabled?: boolean;
   /** When true, aggregates devices and rules from all descendant customers */
   deep?: boolean;
+  /** When false, excludes rules where isInternalSupportRule=true. Default: true (include) */
+  includeInternalSupportRule?: boolean;
 }
 
 // =============================================================================

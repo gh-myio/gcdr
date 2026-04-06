@@ -148,6 +148,7 @@ export class CustomerService {
     deep: boolean,
     allRules: boolean,
     filterOnlyDevicesWithRules: boolean,
+    includeInternalSupportRule: boolean = true,
   ): Promise<EnrichedCustomer> {
     const customer = await this.getByExternalId(tenantId, externalId);
 
@@ -160,13 +161,13 @@ export class CustomerService {
     if (children.length > 0) {
       const enrichedChildren = await Promise.all(
         children.map((child) =>
-          this.enrichCustomer(tenantId, child, allRules, filterOnlyDevicesWithRules),
+          this.enrichCustomer(tenantId, child, allRules, filterOnlyDevicesWithRules, includeInternalSupportRule),
         ),
       );
       return { customer, assets: [], devices: [], children: enrichedChildren };
     }
 
-    return this.enrichCustomer(tenantId, customer, allRules, filterOnlyDevicesWithRules);
+    return this.enrichCustomer(tenantId, customer, allRules, filterOnlyDevicesWithRules, includeInternalSupportRule);
   }
 
   private async enrichCustomer(
@@ -174,6 +175,7 @@ export class CustomerService {
     customer: Customer,
     allRules: boolean,
     filterOnlyDevicesWithRules: boolean,
+    includeInternalSupportRule: boolean = true,
   ): Promise<EnrichedCustomer> {
     const [assetsResult, devicesResult] = await Promise.all([
       this.assetRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
@@ -207,6 +209,7 @@ export class CustomerService {
     const rulesDict: Record<string, RuleMeta> = {};
     const addRules = (ruleList: Rule[]) => {
       ruleList.forEach((r) => {
+        if (!includeInternalSupportRule && r.isInternalSupportRule) return;
         if (!rulesDict[r.id]) rulesDict[r.id] = this.buildRuleMeta(r);
       });
     };
@@ -230,6 +233,7 @@ export class CustomerService {
       const ruleIds: string[] = [];
 
       for (const rule of allRulesForDevice) {
+        if (!includeInternalSupportRule && rule.isInternalSupportRule) continue;
         const override = rule.scopeEntityOverrides?.[device.id];
         const effectiveId = override ? `${rule.id}_${device.id}` : rule.id;
         if (seen.has(effectiveId)) continue;
