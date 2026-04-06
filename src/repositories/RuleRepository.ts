@@ -40,7 +40,7 @@ export class RuleRepository implements IRuleRepository {
       status: 'ACTIVE',
       enabled: data.enabled ?? true,
       internalRule: data.internalRule ?? false,
-      isInternalSupportRule: data.isInternalSupportRule ?? true,
+      isInternalSupportRule: data.isInternalSupportRule ?? false,
       triggerCount: 0,
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),

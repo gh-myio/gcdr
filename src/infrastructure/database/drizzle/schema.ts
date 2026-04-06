@@ -588,7 +588,7 @@ export const rules = pgTable('rules', {
 
   // Internal support rules are included in all endpoints by default.
   // Pass includeInternalSupportRule=false to exclude them.
-  isInternalSupportRule: boolean('is_internal_support_rule').notNull().default(true),
+  isInternalSupportRule: boolean('is_internal_support_rule').notNull().default(false),
 
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

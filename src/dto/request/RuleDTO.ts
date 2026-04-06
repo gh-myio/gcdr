@@ -210,7 +210,7 @@ export const CreateRuleSchema = z.object({
   tags: z.array(z.string()).default([]),
   enabled: z.boolean().default(true),
   internalRule: z.boolean().default(false),
-  isInternalSupportRule: z.boolean().default(true),
+  isInternalSupportRule: z.boolean().default(false),
 }).refine(
   (data) => {
     // Ensure the correct config is provided based on type

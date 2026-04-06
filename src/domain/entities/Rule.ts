@@ -275,8 +275,8 @@ export interface Rule extends BaseEntity {
   // They are consumed exclusively by internal services (e.g. alarm orchestrator).
   internalRule?: boolean;
 
-  // Internal support rules are included in all endpoints by default.
-  // Pass includeInternalSupportRule=false to exclude them.
+  // When true, rule is an internal support rule.
+  // Pass includeInternalSupportRule=false to exclude them from endpoints.
   isInternalSupportRule: boolean;
 }
 
