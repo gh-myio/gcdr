@@ -189,7 +189,9 @@ export class RuleRepository implements IRuleRepository {
       conditions.push(eq(rules.internalRule, params.internalRule));
     }
 
-    if (params.includeInternalSupportRule === false) {
+    if (params.isInternalSupportRule !== undefined) {
+      conditions.push(eq(rules.isInternalSupportRule, params.isInternalSupportRule));
+    } else if (params.includeInternalSupportRule === false) {
       conditions.push(eq(rules.isInternalSupportRule, false));
     }
 

@@ -37,6 +37,7 @@ import {
   getAlarmBundleVersionsHandler,
   invalidateAlarmBundleCacheHandler,
   getAlarmBundleVerifyHandler,
+  listInternalSupportRulesHandler,
   integrationsController,
   customerApiKeysController,
   auditLogsController,
@@ -183,6 +184,7 @@ apiV1Router.get('/customers/:customerId/devices', authMiddleware, devicesListByC
 
 // Customer Rules (nested route)
 apiV1Router.get('/customers/:customerId/rules', hybridAuthMiddleware('customers:read'), rulesListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/internal-support-rules', hybridAuthMiddleware('customers:read'), listInternalSupportRulesHandler);
 apiV1Router.delete('/customers/:customerId/rules/devices', authMiddleware, clearCustomerRuleDevicesHandler);
 
 // Customer Centrals (nested route)

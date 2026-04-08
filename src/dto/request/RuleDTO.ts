@@ -266,6 +266,7 @@ export const ListRulesParamsSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
   search: z.string().optional(),
   internalRule: z.coerce.boolean().optional(),
+  isInternalSupportRule: z.coerce.boolean().optional(),
   includeInternalSupportRule: z.coerce.boolean().optional(),
 });
 

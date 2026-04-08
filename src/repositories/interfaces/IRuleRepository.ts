@@ -13,6 +13,8 @@ export interface ListRulesParams {
   status?: string;
   search?: string;
   internalRule?: boolean;
+  /** When true/false, filters rules by isInternalSupportRule exact match */
+  isInternalSupportRule?: boolean;
   /** When false, excludes rules where isInternalSupportRule=true. Default: include all */
   includeInternalSupportRule?: boolean;
 }

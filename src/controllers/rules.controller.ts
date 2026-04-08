@@ -456,6 +456,34 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
 };
 
 /**
+ * GET /customers/:customerId/internal-support-rules
+ * Returns exclusively rules where internalRule=true AND isInternalSupportRule=true.
+ * Dedicated endpoint for the alarm backend to fetch internal support monitoring rules
+ * without going through the bundle (which has the !internalRule filter bug — RFC-0027).
+ */
+export const listInternalSupportRulesHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+
+    const result = await ruleService.list(tenantId, {
+      customerId,
+      internalRule: true,
+      isInternalSupportRule: true,
+      status: 'ACTIVE',
+    });
+
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * DELETE /customers/:customerId/rules/devices
  * Remove all device associations from every DEVICE-scoped rule of a customer.
  * Affected rules: scope_type → GLOBAL, scope_entity_ids → [], enabled → false.
