@@ -241,7 +241,59 @@ function findFirstEachBlock(template: string): {
   return null;
 }
 
-/** Replace all {{variable}} placeholders (does NOT touch {{#each}} or {{/each}}) */
+/**
+ * Finds the FIRST {{#if path}} block in template, correctly handling nested {{#if}}.
+ * Returns split parts or null if no {{#if}} found.
+ */
+function findFirstIfBlock(template: string): {
+  before: string;
+  path: string;
+  body: string;
+  after: string;
+} | null {
+  const OPEN = '{{#if ';
+  const CLOSE = '{{/if}}';
+
+  const startIdx = template.indexOf(OPEN);
+  if (startIdx === -1) return null;
+
+  const tagClose = template.indexOf('}}', startIdx);
+  if (tagClose === -1) return null;
+
+  const path = template.slice(startIdx + OPEN.length, tagClose).trim();
+  const bodyStart = tagClose + 2;
+
+  // Walk forward tracking nesting depth to find the matching {{/if}}
+  let depth = 1;
+  let pos = bodyStart;
+
+  while (depth > 0 && pos < template.length) {
+    const nextOpen = template.indexOf(OPEN, pos);
+    const nextClose = template.indexOf(CLOSE, pos);
+
+    if (nextClose === -1) return null; // malformed
+
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      depth++;
+      pos = nextOpen + OPEN.length;
+    } else {
+      depth--;
+      if (depth === 0) {
+        return {
+          before: template.slice(0, startIdx),
+          path,
+          body: template.slice(bodyStart, nextClose),
+          after: template.slice(nextClose + CLOSE.length),
+        };
+      }
+      pos = nextClose + CLOSE.length;
+    }
+  }
+
+  return null;
+}
+
+/** Replace all {{variable}} placeholders (does NOT touch block tags like {{#each}} or {{#if}}) */
 function renderVariables(template: string, ctx: Record<string, unknown>): string {
   return template.replace(/\{\{(?!#|\/)([\w.]+)\}\}/g, (_, path) => {
     const value = resolvePath(ctx, path);
@@ -250,34 +302,64 @@ function renderVariables(template: string, ctx: Record<string, unknown>): string
   });
 }
 
+/** Returns true if a value is truthy for {{#if}} purposes */
+function isTruthy(value: unknown): boolean {
+  if (value === null || value === undefined || value === false || value === '' || value === 0) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
 /**
  * Recursively renders a template with data.
- * Handles {{variable}}, {{#each list}}...{{/each}} (arbitrary nesting).
+ * Handles {{variable}}, {{#each list}}...{{/each}}, {{#if path}}...{{/if}} (arbitrary nesting).
+ * Processes blocks in document order — whichever block tag appears first is handled first.
  */
 function renderBlock(template: string, ctx: Record<string, unknown>): string {
-  const eachBlock = findFirstEachBlock(template);
-
-  if (!eachBlock) {
+  const firstBlock = template.indexOf('{{#');
+  if (firstBlock === -1) {
     return renderVariables(template, ctx);
   }
 
-  const { before, collectionPath, body, after } = eachBlock;
+  // Determine which block type comes first
+  const isEach = template.indexOf('{{#each ', firstBlock) === firstBlock;
+  const isIf   = template.indexOf('{{#if ',   firstBlock) === firstBlock;
 
-  const items = resolvePath(ctx, collectionPath);
-  const singular = getSingularName(collectionPath);
+  if (isEach) {
+    const block = findFirstEachBlock(template);
+    if (!block) return renderVariables(template, ctx);
 
-  const renderedBefore = renderVariables(before, ctx);
+    const { before, collectionPath, body, after } = block;
+    const items = resolvePath(ctx, collectionPath);
+    const singular = getSingularName(collectionPath);
 
-  const renderedItems = Array.isArray(items)
-    ? items.map((item) => {
-        const itemCtx = { ...ctx, [singular]: item };
-        return renderBlock(body, itemCtx);
-      }).join('')
-    : '';
+    const renderedBefore = renderBlock(before, ctx);
+    const renderedItems = Array.isArray(items)
+      ? items.map((item) => {
+          const itemCtx = { ...ctx, [singular]: item };
+          return renderBlock(body, itemCtx);
+        }).join('')
+      : '';
+    const renderedAfter = renderBlock(after, ctx);
 
-  const renderedAfter = renderBlock(after, ctx);
+    return renderedBefore + renderedItems + renderedAfter;
+  }
 
-  return renderedBefore + renderedItems + renderedAfter;
+  if (isIf) {
+    const block = findFirstIfBlock(template);
+    if (!block) return renderVariables(template, ctx);
+
+    const { before, path, body, after } = block;
+    const value = resolvePath(ctx, path);
+
+    const renderedBefore = renderBlock(before, ctx);
+    const renderedBody   = isTruthy(value) ? renderBlock(body, ctx) : '';
+    const renderedAfter  = renderBlock(after, ctx);
+
+    return renderedBefore + renderedBody + renderedAfter;
+  }
+
+  // Unknown block tag — render variables only
+  return renderVariables(template, ctx);
 }
 
 export function renderTemplate(htmlContent: string, data: Record<string, unknown>): string {
