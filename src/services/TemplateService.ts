@@ -423,9 +423,21 @@ export function buildThemeCssVars(theme: LookAndFeel): string {
   return `:root {\n${lines.join('\n')}\n}`;
 }
 
+const NUNITO_FONT_LINK = [
+  '<link rel="preconnect" href="https://fonts.googleapis.com">',
+  '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+  '<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">',
+].join('\n');
+
 function injectThemeIntoHtml(html: string, theme: LookAndFeel): string {
   const cssVars = buildThemeCssVars(theme);
-  const styleBlock = `<style data-gcdr-theme="${theme.id}">\n${cssVars}\n</style>`;
+  const styleBlock = [
+    NUNITO_FONT_LINK,
+    `<style data-gcdr-theme="${theme.id}">`,
+    cssVars,
+    `body, table, td, th, p, h1, h2, h3, h4, h5, h6, a, span, div { font-family: 'Nunito', sans-serif !important; }`,
+    `</style>`,
+  ].join('\n');
 
   // Inject before </head> if present, otherwise prepend
   if (html.includes('</head>')) {

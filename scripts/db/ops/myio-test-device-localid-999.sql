@@ -53,7 +53,7 @@ BEGIN
     type, serial_number,
     specs, connectivity_status,
     tags, metadata, attributes,
-    slave_id,
+    slave_id, central_id,
     status, version
   )
   VALUES (
@@ -72,6 +72,7 @@ BEGIN
     '{}',
     '{}',
     999,
+    '4dbfb385-5925-4a6f-9748-af2460c95207',
     'ACTIVE',
     1
   );
