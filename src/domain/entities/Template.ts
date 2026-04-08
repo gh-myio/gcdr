@@ -10,7 +10,8 @@ export type TemplateType =
   | 'TELEGRAM_ALARM_ESCALATED'
   | 'TELEGRAM_ALARM_ACKNOWLEDGED'
   | 'TELEGRAM_ALARM_SNOOZED'
-  | 'TELEGRAM_ALARM_DIGEST';
+  | 'TELEGRAM_ALARM_DIGEST'
+  | 'TELEGRAM_DAILY_SUMMARY';
 export type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export interface Template {
