@@ -590,6 +590,9 @@ export const rules = pgTable('rules', {
   // Pass includeInternalSupportRule=false to exclude them.
   isInternalSupportRule: boolean('is_internal_support_rule').notNull().default(false),
 
+  // How many days back the alarm backend should look when evaluating this rule.
+  lookbackDays: integer('lookback_days').notNull().default(0),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

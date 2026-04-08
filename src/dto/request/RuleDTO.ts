@@ -211,6 +211,7 @@ export const CreateRuleSchema = z.object({
   enabled: z.boolean().default(true),
   internalRule: z.boolean().default(false),
   isInternalSupportRule: z.boolean().default(false),
+  lookbackDays: z.number().int().positive().optional(),
 }).refine(
   (data) => {
     // Ensure the correct config is provided based on type
@@ -251,6 +252,7 @@ export const UpdateRuleSchema = z.object({
   enabled: z.boolean().optional(),
   internalRule: z.boolean().optional(),
   isInternalSupportRule: z.boolean().optional(),
+  lookbackDays: z.number().int().positive().optional(),
 });
 
 export type UpdateRuleDTO = z.infer<typeof UpdateRuleSchema>;

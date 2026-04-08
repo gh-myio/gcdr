@@ -41,6 +41,7 @@ export class RuleRepository implements IRuleRepository {
       enabled: data.enabled ?? true,
       internalRule: data.internalRule ?? false,
       isInternalSupportRule: data.isInternalSupportRule ?? false,
+      lookbackDays: data.lookbackDays ?? 0,
       triggerCount: 0,
       createdAt: new Date(timestamp),
       updatedAt: new Date(timestamp),
@@ -80,6 +81,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
     if (data.internalRule !== undefined) updateData.internalRule = data.internalRule;
     if (data.isInternalSupportRule !== undefined) updateData.isInternalSupportRule = data.isInternalSupportRule;
+    if (data.lookbackDays !== undefined) updateData.lookbackDays = data.lookbackDays ?? null;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
     if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
@@ -411,6 +413,7 @@ export class RuleRepository implements IRuleRepository {
       enabled: row.enabled,
       internalRule: row.internalRule,
       isInternalSupportRule: row.isInternalSupportRule,
+      lookbackDays: row.lookbackDays ?? 0,
       lastTriggeredAt: row.lastTriggeredAt?.toISOString(),
       triggerCount: row.triggerCount,
       createdAt: row.createdAt.toISOString(),

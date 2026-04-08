@@ -278,6 +278,10 @@ export interface Rule extends BaseEntity {
   // When true, rule is an internal support rule.
   // Pass includeInternalSupportRule=false to exclude them from endpoints.
   isInternalSupportRule: boolean;
+
+  // How many days back the alarm backend should look when evaluating this rule.
+  // 0 = no lookback constraint. Used by periodic/scheduled rules.
+  lookbackDays: number;
 }
 
 // Helper type guards
