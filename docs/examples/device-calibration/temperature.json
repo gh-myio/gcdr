@@ -1,0 +1,87 @@
+{
+  "version": 3,
+  "createdAt": "2026-04-09T10:00:00Z",
+  "updatedAt": "2026-04-09T14:32:00Z",
+  "changelog": [
+    {
+      "version": 1,
+      "at": "2026-04-09T10:00:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Initial setup — offset -2 active Sunday through Wednesday"
+    },
+    {
+      "version": 2,
+      "at": "2026-04-09T12:15:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Added offset -1 for complementary windows on Sunday, Monday and Thursday"
+    },
+    {
+      "version": 3,
+      "at": "2026-04-09T14:32:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Added offset +1 active on Friday with overnight window 21:00 -> 06:00"
+    }
+  ],
+  "offsets": [
+    {
+      "domain": "temperature",
+      "value": -2,
+      "type": "SUM",
+      "schedule": {
+        "0": [
+          { "start": "03:00", "end": "06:00", "overlap": false },
+          { "start": "12:00", "end": "15:00", "overlap": false },
+          { "start": "18:00", "end": "20:00", "overlap": false }
+        ],
+        "1": [
+          { "start": "09:00", "end": "18:00", "overlap": false },
+          { "start": "23:00", "end": "05:00", "overlap": true }
+        ],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": null,
+        "5": null,
+        "6": null
+      }
+    },
+    {
+      "domain": "temperature",
+      "value": -1,
+      "type": "SUM",
+      "schedule": {
+        "0": [
+          { "start": "00:00", "end": "02:00", "overlap": false },
+          { "start": "15:01", "end": "17:00", "overlap": false },
+          { "start": "21:00", "end": "22:00", "overlap": false }
+        ],
+        "1": [
+          { "start": "03:00", "end": "08:00", "overlap": false },
+          { "start": "18:00", "end": "23:00", "overlap": false }
+        ],
+        "2": null,
+        "3": null,
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": null,
+        "6": null
+      }
+    },
+    {
+      "domain": "temperature",
+      "value": 1,
+      "type": "SUM",
+      "schedule": {
+        "0": null,
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": [
+          { "start": "00:00", "end": "02:00", "overlap": false },
+          { "start": "15:00", "end": "17:00", "overlap": false },
+          { "start": "21:00", "end": "06:00", "overlap": true }
+        ],
+        "6": null
+      }
+    }
+  ]
+}

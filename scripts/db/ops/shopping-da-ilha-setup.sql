@@ -3,7 +3,7 @@
 -- =============================================================================
 --
 -- Central:
---   ID            : c455ac60-b685-11f0-9898-a53e89467408
+--   ID            : cb318f02-1020-4f99-857f-d44d001d939b
 --   Name          : Central Shopping da Ilha
 --   Customer ID   : f1fcf434-532b-428a-a5e1-0b68e8ae1056
 --   Asset ID      : ab734ecc-6d47-4e3c-8897-2027af2c61f3  (Central Shopping da Ilha - Asset)
@@ -39,7 +39,7 @@ INSERT INTO centrals (
     metadata,
     version
 ) VALUES (
-    'c455ac60-b685-11f0-9898-a53e89467408',
+    'cb318f02-1020-4f99-857f-d44d001d939b',
     '11111111-1111-1111-1111-111111111111',
     'f1fcf434-532b-428a-a5e1-0b68e8ae1056',   -- Shopping da Ilha
     'ab734ecc-6d47-4e3c-8897-2027af2c61f3',   -- Central Shopping da Ilha - Asset
@@ -99,7 +99,7 @@ ON CONFLICT DO NOTHING;
 -- ----------------------------------------------------------------
 SELECT id, name, serial_number, type, status, connection_status
 FROM centrals
-WHERE id = 'c455ac60-b685-11f0-9898-a53e89467408';
+WHERE id = 'cb318f02-1020-4f99-857f-d44d001d939b';
 
 SELECT
     k.id,
