@@ -1,18 +1,5 @@
 import { z } from 'zod';
 
-// External Link Schema
-export const ExternalLinkSchema = z.object({
-  system: z.string().min(1).max(100),
-  externalId: z.string().min(1).max(255),
-  status: z.enum(['synced', 'pending', 'error', 'disconnected']).default('pending'),
-  syncedAt: z.string().datetime().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  version: z.number().int().nonnegative().optional(),
-});
-
-export type ExternalLinkDTO = z.infer<typeof ExternalLinkSchema>;
-
 // Profile Schema
 const UserProfileSchema = z.object({
   firstName: z.string().min(1).max(100),
@@ -55,7 +42,6 @@ export const CreateUserSchema = z.object({
   preferences: UserPreferencesSchema.optional(),
   tags: z.array(z.string().max(50)).max(20).default([]),
   metadata: z.record(z.unknown()).default({}),
-  externalLinks: z.array(ExternalLinkSchema).default([]),
   sendInvitation: z.boolean().default(true),
 });
 
@@ -68,7 +54,6 @@ export const UpdateUserSchema = z.object({
   preferences: UserPreferencesSchema.partial().optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   metadata: z.record(z.unknown()).optional(),
-  externalLinks: z.array(ExternalLinkSchema).optional(),
 });
 
 export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>;

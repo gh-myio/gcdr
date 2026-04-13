@@ -210,6 +210,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull(),
   emailVerified: boolean('email_verified').notNull().default(false),
   username: varchar('username', { length: 100 }),
+  externalId: varchar('external_id', { length: 255 }),
 
   // Type and Status
   type: userTypeEnum('type').notNull().default('CUSTOMER'),
@@ -231,9 +232,6 @@ export const users = pgTable('users', {
   // Tags and metadata
   tags: jsonb('tags').notNull().default([]),
   metadata: jsonb('metadata').notNull().default({}),
-
-  // External integrations (ThingsBoard, Freshdesk, App, OS, etc.)
-  externalLinks: jsonb('external_links').notNull().default([]),
 
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -2660,46 +2660,6 @@ components:
           enum: [light, dark, system]
 
     # User Schemas
-    ExternalLink:
-      type: object
-      required:
-        - system
-        - externalId
-        - status
-        - createdAt
-        - updatedAt
-      properties:
-        system:
-          type: string
-          minLength: 1
-          maxLength: 100
-          description: 'Free-form identifier for the external system (e.g. thingsboard, freshdesk, app, os)'
-          example: thingsboard
-        externalId:
-          type: string
-          minLength: 1
-          maxLength: 255
-          description: ID of the entity in the external system
-          example: 'a1b2c3d4-0000-0000-0000-000000000001'
-        status:
-          type: string
-          enum: [synced, pending, error, disconnected]
-          default: pending
-        syncedAt:
-          type: string
-          format: date-time
-          description: Timestamp of the last successful sync
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        version:
-          type: integer
-          minimum: 0
-          description: Version of the record in the external system (for conflict detection)
-
     User:
       type: object
       properties:
@@ -2725,7 +2685,7 @@ components:
           enum: [INTERNAL, CUSTOMER, PARTNER, SERVICE_ACCOUNT]
         status:
           type: string
-          enum: [UNVERIFIED, PENDING_APPROVAL, ACTIVE, INACTIVE, LOCKED]
+          enum: [ACTIVE, INACTIVE, SUSPENDED, PENDING_VERIFICATION, LOCKED]
         profile:
           $ref: '#/components/schemas/UserProfile'
         preferences:
@@ -2736,16 +2696,10 @@ components:
           type: boolean
         tags:
           type: array
-          maxItems: 20
           items:
             type: string
-            maxLength: 50
         metadata:
           type: object
-        externalLinks:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalLink'
         lastLoginAt:
           type: string
           format: date-time
@@ -2758,36 +2712,24 @@ components:
 
     UserProfile:
       type: object
-      required:
-        - firstName
-        - lastName
       properties:
         firstName:
           type: string
-          minLength: 1
-          maxLength: 100
         lastName:
           type: string
-          minLength: 1
-          maxLength: 100
         displayName:
           type: string
-          maxLength: 200
         avatarUrl:
           type: string
           format: uri
         phone:
           type: string
-          maxLength: 20
         department:
           type: string
-          maxLength: 100
         jobTitle:
           type: string
-          maxLength: 100
         bio:
           type: string
-          maxLength: 500
 
     UserPreferences:
       type: object
@@ -2855,16 +2797,10 @@ components:
           $ref: '#/components/schemas/UserPreferences'
         tags:
           type: array
-          maxItems: 20
           items:
             type: string
-            maxLength: 50
         metadata:
           type: object
-        externalLinks:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalLink'
         sendInvitation:
           type: boolean
           default: true
@@ -2882,16 +2818,10 @@ components:
           $ref: '#/components/schemas/UserPreferences'
         tags:
           type: array
-          maxItems: 20
           items:
             type: string
-            maxLength: 50
         metadata:
           type: object
-        externalLinks:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalLink'
 
     UpdateUserStatus:
       type: object
@@ -2900,7 +2830,7 @@ components:
       properties:
         status:
           type: string
-          enum: [UNVERIFIED, PENDING_APPROVAL, ACTIVE, INACTIVE, LOCKED]
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
         reason:
           type: string
           maxLength: 500
