@@ -278,7 +278,7 @@ export type CalibrationDaySchedule = {
 
 export interface DeviceOffset {
   domain: CalibrationDomain;
-  metric?: string;               // sub-metric: "power" | "current" | "voltage" | ...
+  metric?: EnergyMetric;         // required when domain === "energy"
   value: number;
   type: CalibrationOffsetType;
   schedule: CalibrationDaySchedule;
@@ -292,8 +292,16 @@ export interface CalibrationPeriod {
   offsets: DeviceOffset[];
 }
 
-// Energy sub-metric (typed enum for domain: "energy")
-export type EnergyMetric = 'power' | 'current' | 'voltage';
+// Energy sub-metric (typed enum for domain: "energy") — see Power Triangle section below.
+// NOTE: power_factor is dimensionless [0..1] and must NOT use MULTIPLIER or DIVIDER offsets
+// (a CT ratio multiplies P, Q, and S linearly, but never cos(φ)).
+export type EnergyMetric =
+  | 'active_power'      // P — real work delivered (W, kW)
+  | 'reactive_power'    // Q — oscillating energy, not consumed as work (VAr, kVAr)
+  | 'apparent_power'    // S — total demand on the generator/transformer (VA, kVA)
+  | 'power_factor'      // cos(φ) — ratio P/S, dimensionless [0..1]; SUM only
+  | 'current'           // I — ampere (A)
+  | 'voltage';          // V — volt (V)
 
 export interface CalibrationChangelogEntry {
   version: number;
@@ -311,6 +319,66 @@ export interface DeviceCalibration {
   periods?: CalibrationPeriod[];            // optional date-range overrides
 }
 ```
+
+### The power triangle and energy calibration
+
+Real-world energy meters measure electrical quantities that are geometrically related.
+Understanding this relationship is essential for choosing the correct `metric` and
+`type` for a `domain: "energy"` offset.
+
+```
+        |S| (VA)
+       /|
+      / |
+     /  | Q (VAr)
+    /   | reactive
+   / φ  |
+  ──────────── P (W)
+     active
+```
+
+| Symbol | Metric | Unit | Description |
+|--------|--------|------|-------------|
+| **P** | `active_power` | W, kW | Real work — heat, motion, light |
+| **Q** | `reactive_power` | VAr, kVAr | Oscillating energy — demanded but not consumed |
+| **S** | `apparent_power` | VA, kVA | Total output required from the generator/transformer |
+| **cos(φ)** | `power_factor` | — (0–1) | Ratio P/S; angle between voltage and current |
+| **I** | `current` | A | Line current |
+| **V** | `voltage` | V | Line voltage |
+
+**Key formulas:**
+
+```
+S² = P² + Q²
+P  = S × cos(φ)
+Q  = S × sin(φ)
+cos(φ) = P / S
+```
+
+#### CT ratio and the power triangle
+
+A current transformer (CT) rated at 600A/1A means the meter's raw reading must be
+multiplied by 600 to obtain the real current. Because P, Q, and S are all linear in I,
+the **same multiplier applies to all three power quantities**:
+
+```
+I_real = I_raw × 600          → MULTIPLIER: 600, metric: "current"
+P_real = P_raw × 600          → MULTIPLIER: 600, metric: "active_power"
+Q_real = Q_raw × 600          → MULTIPLIER: 600, metric: "reactive_power"
+S_real = S_raw × 600          → MULTIPLIER: 600, metric: "apparent_power"
+```
+
+`power_factor` (cos φ) is **dimensionless** and is not affected by the CT ratio —
+a `MULTIPLIER` or `DIVIDER` offset on `power_factor` is rejected by the API with
+`400 CALIBRATION_INVALID_METRIC_TYPE`.
+
+#### Practical examples
+
+| Sensor | What it reports | Offset needed | RFC fields |
+|--------|----------------|---------------|------------|
+| CT 600A/1A reporting raw current | `I_raw` (A) | × 600 | `domain: "energy"`, `metric: "current"`, `type: "MULTIPLIER"`, `value: 600` |
+| CT 600A/1A reporting active power | `P_raw` (W) | × 600 | `domain: "energy"`, `metric: "active_power"`, `type: "MULTIPLIER"`, `value: 600` |
+| Meter with factory offset on power factor | `cos(φ)_raw` | + 0.02 | `domain: "energy"`, `metric: "power_factor"`, `type: "SUM"`, `value: 0.02` |
 
 ### Full example — temperature device with a February period override
 
@@ -508,6 +576,284 @@ Example evaluation — what offset applies on 2026-03-10 at 14:00 (Tuesday)?
           raw = 28.0 °C → calibrated = 26.0 °C
 ```
 
+---
+
+### Full example — 3F SCSDIAC-TrafoCAG (three-phase, transformer site: ×1380 power, ×40 current, ×36.31 voltage)
+
+This device is a three-phase energy meter installed downstream of a medium-voltage
+transformer. The meter reports raw secondary-side values; three independent multipliers
+convert them to real primary-side quantities:
+
+- **×1380** — combined CT × PT constant applied to all power quantities (P, Q, S)
+- **×40** — CT ratio for line current (e.g. 200A/5A = 40:1)
+- **×36.31** — PT ratio for line voltage (e.g. 13.8kV / 380V ≈ 36.31)
+
+Because P, Q, and S are all linear in both I and V, the same power multiplier (1380)
+applies to `active_power`, `reactive_power`, and `apparent_power`. `power_factor`
+(cos φ) is dimensionless and requires no calibration here.
+
+All offsets are always-on (no time-windowing) — the CT and PT ratios are physical
+constants that do not vary by time of day.
+
+```json
+{
+  "version": 1,
+  "createdAt": "2026-04-14T10:00:00Z",
+  "updatedAt": "2026-04-14T10:00:00Z",
+  "changelog": [
+    {
+      "version": 1,
+      "at": "2026-04-14T10:00:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Initial setup — 3F SCSDIAC-TrafoCAG: power ×1380 (CT×PT), current ×40 (200A/5A CT), voltage ×36.31 (13.8kV/380V PT)"
+    }
+  ],
+  "offsets": [
+    {
+      "domain": "energy",
+      "metric": "active_power",
+      "value": 1380,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "reactive_power",
+      "value": 1380,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "apparent_power",
+      "value": 1380,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "current",
+      "value": 40,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "voltage",
+      "value": 36.31,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    }
+  ]
+}
+```
+
+```
+Evaluation example — 2026-04-14 at 09:30 (Tuesday):
+
+  Step 1: no periods defined → use root offsets
+  Step 2: domain=energy, metric=active_power, schedule["2"] = [00:00–23:59] → MATCH
+
+  Result: calibrated_active_power  = raw_active_power  × 1380
+          calibrated_current       = raw_current       × 40
+          calibrated_voltage       = raw_voltage       × 36.31
+
+  Consistency check (power triangle):
+    S_cal = V_cal × I_cal = (V_raw × 36.31) × (I_raw × 40) = V_raw × I_raw × 1452
+    P_cal = S_cal × cos(φ)
+
+  Note: 1380 ≠ 40 × 36.31 (= 1452). If the meter reports power and current/voltage
+  independently, the two multipliers may differ because the meter's internal arithmetic
+  already applies partial scaling. Always confirm which quantities the meter reports
+  raw vs. pre-scaled before setting calibration offsets.
+```
+
+---
+
+### Full example — 3F SCSDI309C (three-phase, direct CT: ×16 power, ×16 current)
+
+Simpler setup: the meter is on a low-voltage panel with a single CT ratio of 16:1.
+Because the meter reports power already derived from the CT secondary, both the power
+quantities and the current share the same multiplier of 16. No PT is involved —
+voltage is measured directly (no calibration needed).
+
+```json
+{
+  "version": 1,
+  "createdAt": "2026-04-14T10:00:00Z",
+  "updatedAt": "2026-04-14T10:00:00Z",
+  "changelog": [
+    {
+      "version": 1,
+      "at": "2026-04-14T10:00:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Initial setup — 3F SCSDI309C: power ×16 and current ×16 (CT 16:1, direct voltage)"
+    }
+  ],
+  "offsets": [
+    {
+      "domain": "energy",
+      "metric": "active_power",
+      "value": 16,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "reactive_power",
+      "value": 16,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "apparent_power",
+      "value": 16,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    },
+    {
+      "domain": "energy",
+      "metric": "current",
+      "value": 16,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Full example — HIDR. SCMOXUARAQ214L2 (hydrometer pulse meter: ×10 L/pulse)
+
+A pulse-output water meter where each pulse emitted to the IoT central represents
+**10 litres**. The meter reports a raw pulse count; the calibration converts it to
+the real volume in litres.
+
+```
+raw reading:  1 pulse
+real volume:  1 × 10 = 10 L
+```
+
+No time-windowing — the conversion factor is a physical constant of the meter model.
+
+```json
+{
+  "version": 1,
+  "createdAt": "2026-04-14T10:00:00Z",
+  "updatedAt": "2026-04-14T10:00:00Z",
+  "changelog": [
+    {
+      "version": 1,
+      "at": "2026-04-14T10:00:00Z",
+      "by": "3f9d29a0-b293-4da9-83e4-0e2bc38566c7",
+      "note": "Initial setup — HIDR. SCMOXUARAQ214L2: 1 pulse = 10 litres (meter model Q214L2)"
+    }
+  ],
+  "offsets": [
+    {
+      "domain": "water_flow",
+      "value": 10,
+      "type": "MULTIPLIER",
+      "schedule": {
+        "0": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "1": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "2": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "3": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "4": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "5": [{ "start": "00:00", "end": "23:59", "overlap": false }],
+        "6": [{ "start": "00:00", "end": "23:59", "overlap": false }]
+      }
+    }
+  ]
+}
+```
+
+```
+Evaluation example — any day, any time:
+
+  Step 1: no periods → root offsets
+  Step 2: domain=water_flow, schedule[*] = [00:00–23:59] → always MATCH
+
+  Result: calibrated_volume = raw_pulses × 10
+          raw = 47 pulses → calibrated = 470 L
+```
+
+---
+
 ### Validation rules
 
 1. **No overlapping intervals within the same offset and day.**
@@ -522,6 +868,12 @@ Example evaluation — what offset applies on 2026-03-10 at 14:00 (Tuesday)?
    is removed. The envelope `version` counter is never reset.
 8. **At most one open-ended period** (`validUntil: null`) per domain+metric.
    The rules below govern conflicts between periods and open-ended periods.
+9. **`power_factor` only accepts `SUM` offsets.** `MULTIPLIER` and `DIVIDER` are
+   rejected with `400 CALIBRATION_INVALID_METRIC_TYPE` because `cos(φ)` is
+   dimensionless — a CT ratio scales P, Q, and S linearly but never the ratio itself.
+10. **`metric` is required when `domain` is `"energy"`** and must be a valid
+    `EnergyMetric` value. Omitting `metric` on an energy offset is rejected with
+    `400 CALIBRATION_MISSING_METRIC`.
 
 #### Open-ended period conflict rules
 
@@ -651,7 +1003,7 @@ or multi-version snapshots are required.
 |----------|----------|
 | Cross-offset non-overlap enforcement | **Hard business rule — API rejects with `400 CALIBRATION_INTERVAL_OVERLAP`.** No ambiguous state is ever persisted. |
 | Timezone handling | **All timestamps stored in UTC.** The alarm backend is responsible for converting UTC to the customer's local timezone when resolving day-of-week and HH:mm boundaries. |
-| Energy sub-metrics typing | **Typed enum** `EnergyMetric = 'power' \| 'current' \| 'voltage'`. New values require an explicit RFC update. |
+| Energy sub-metrics typing | **Typed enum** `EnergyMetric = 'active_power' \| 'reactive_power' \| 'apparent_power' \| 'power_factor' \| 'current' \| 'voltage'`. `power` was intentionally split into three distinct quantities (P, Q, S) derived from the power triangle. `power_factor` is restricted to `SUM` only — `MULTIPLIER`/`DIVIDER` on a dimensionless ratio is rejected (`400 CALIBRATION_INVALID_METRIC_TYPE`). New values require an explicit RFC update. |
 | `validUntil: null` (open-ended periods) | **Supported.** At most one open-ended period per domain+metric. Conflicts resolved via `409 OPEN_PERIOD_CONFLICT` with optional `autoCloseExisting=true` flag. |
 
 ## Unresolved questions
@@ -671,9 +1023,192 @@ or multi-version snapshots are required.
 2. **TypeScript types** — `DeviceCalibration`, `DeviceOffset`, `CalibrationPeriod`,
    `CalibrationInterval`, `CalibrationChangelogEntry` in `src/domain/entities/Device.ts`
 3. **Zod schema** — `CalibrationSchema` in `src/dto/request/DeviceDTO.ts` with
-   validation rules 1–7 enforced; changelog capped at 20 on write
+   validation rules 1–10 enforced; changelog capped at 20 on write
 4. **Repository** — `calibration` field in `DeviceRepository` create/update/map;
    changelog append logic with cap enforcement
-5. **Alarm backend guide** — document period precedence evaluation algorithm
-6. **Example files** — `docs/examples/device-calibration/` (temperature, energy,
+5. **Response DTO** — `calibration?: DeviceCalibration` in `DeviceResponseDTO` and
+   mapped in `toDeviceResponse()`
+6. **Alarm backend guide** — document period precedence evaluation algorithm
+7. **Example files** — `docs/examples/device-calibration/` (temperature, energy,
    water-flow-hydrometer JSON examples)
+
+### API surface — read endpoints
+
+`calibration` is a standard field on the device object. It is returned by both read
+endpoints without any additional query parameter:
+
+```
+GET /api/v1/devices?customerId=<id>&limit=100&cursor=100
+GET /api/v1/devices/:id
+```
+
+Both endpoints share the same `mapToEntity()` → `toDeviceResponse()` pipeline in
+`DeviceRepository` and `DeviceResponseDTO`. Adding `calibration` to those two
+functions is sufficient to expose it everywhere devices are listed or fetched.
+
+When a device has no calibration configured, the field is omitted from the response
+(`undefined` / not serialized). When configured, the full envelope is returned:
+
+```json
+{
+  "id": "fdee257f-f11d-4293-9abd-9dcdf8b30416",
+  "name": "SCSDIAC-TrafoCAG",
+  ...
+  "calibration": {
+    "version": 1,
+    "createdAt": "2026-04-14T10:00:00Z",
+    "updatedAt": "2026-04-14T10:00:00Z",
+    "changelog": [...],
+    "offsets": [...],
+    "periods": [...]
+  }
+}
+```
+
+### API surface — write
+
+**Open question:** whether calibration is written via the general device update
+(`PATCH /devices/:id` with `calibration` in the body) or via a dedicated endpoint
+(`PUT /devices/:id/calibration`).
+
+The general update is simpler for clients but requires the changelog append logic,
+cap enforcement, period conflict detection, and `autoCloseExisting` flag to live
+inside `DeviceService.update()`.
+
+A dedicated endpoint isolates all calibration business rules in a focused handler
+and allows the `autoCloseExisting` flag to be a natural query/body parameter
+without polluting the general update schema.
+
+Decision deferred pending frontend integration design.
+
+---
+
+## Calibration bundle endpoint
+
+Inspired by `GET /customers/:customerId/alarm-rules/bundle/simple`, this endpoint
+gives the alarm backend a single, cacheable payload with all calibration data it
+needs to apply corrections at read time — without querying devices individually.
+
+### URL
+
+```
+GET /customers/:customerId/calibration/bundle
+```
+
+Auth: Customer API Key M2M (`X-API-Key: gcdr_cust_*`) — same auth as the alarm bundle.
+
+### Request headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `X-Central-Id` | optional | Return only devices belonging to this central |
+| `X-Version-Id` | optional | If provided and matches current version → `304 Not Modified` (no body) |
+
+### Behaviour
+
+1. Load all devices for the customer (filtered by `X-Central-Id` if present).
+2. **Exclude devices without a `calibration` field** — only calibrated devices appear.
+3. Strip `changelog` from each calibration envelope — changelog is audit data, not
+   needed by the alarm backend at runtime. Only `version`, `offsets`, and `periods`
+   are included.
+4. Compute a SHA-256 version hash from the full bundle content (deterministic —
+   same calibrations always produce the same hash).
+5. If `X-Version-Id` matches the hash → return `304 Not Modified`.
+6. Cache result in-memory for 5 minutes (TTL invalidated when any device calibration
+   is updated).
+7. Sign the bundle with HMAC-SHA256 (same mechanism as alarm bundle).
+
+### Response shape
+
+```json
+{
+  "meta": {
+    "version": "v1-3f9a12bc7e04",
+    "generatedAt": "2026-04-14T10:00:00Z",
+    "customerId": "a4c64215-f7eb-4102-80b5-e10b98e2f94e",
+    "customerName": "Shopping Moxuara",
+    "tenantId": "11111111-1111-1111-1111-111111111111",
+    "devicesCount": 3,
+    "signature": "hmac-sha256-hex...",
+    "algorithm": "HMAC-SHA256",
+    "ttlSeconds": 300
+  },
+  "devices": {
+    "fdee257f-f11d-4293-9abd-9dcdf8b30416": {
+      "name": "SCSDIAC-TrafoCAG",
+      "centralId": "e982edf9-edb1-4aa6-8a14-4782465ae5a3",
+      "slaveId": 5,
+      "calibration": {
+        "version": 1,
+        "offsets": [
+          { "domain": "energy", "metric": "active_power",   "value": 1380, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "reactive_power", "value": 1380, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "apparent_power", "value": 1380, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "current",        "value": 40,   "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "voltage",        "value": 36.31,"type": "MULTIPLIER", "schedule": { ... } }
+        ],
+        "periods": []
+      }
+    },
+    "b1c2d3e4-f5a6-7890-bcde-f01234567890": {
+      "name": "SCSDI309C",
+      "centralId": "e982edf9-edb1-4aa6-8a14-4782465ae5a3",
+      "slaveId": 12,
+      "calibration": {
+        "version": 1,
+        "offsets": [
+          { "domain": "energy", "metric": "active_power",   "value": 16, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "reactive_power", "value": 16, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "apparent_power", "value": 16, "type": "MULTIPLIER", "schedule": { ... } },
+          { "domain": "energy", "metric": "current",        "value": 16, "type": "MULTIPLIER", "schedule": { ... } }
+        ],
+        "periods": []
+      }
+    },
+    "c2d3e4f5-a6b7-8901-cdef-012345678901": {
+      "name": "SCMOXUARAQ214L2",
+      "centralId": "e982edf9-edb1-4aa6-8a14-4782465ae5a3",
+      "slaveId": 22,
+      "calibration": {
+        "version": 1,
+        "offsets": [
+          { "domain": "water_flow", "value": 10, "type": "MULTIPLIER", "schedule": { ... } }
+        ],
+        "periods": []
+      }
+    }
+  }
+}
+```
+
+### Differences from `/alarm-rules/bundle/simple`
+
+| Aspect | `/alarm-rules/bundle/simple` | `/calibration/bundle` |
+|--------|------------------------------|----------------------|
+| Primary data | `rules` catalog + `deviceIndex` with ruleIds | `devices` with inline calibration |
+| Devices included | only devices with ≥1 applicable rule | only devices with `calibration != null` |
+| Changelog | n/a | stripped — runtime consumers don't need it |
+| `ruleIds` | yes | no |
+| `deep` param | yes (aggregates descendants) | yes (same pattern) |
+| Cache TTL | 5 min, invalidated on rule/device change | 5 min, invalidated on device calibration change |
+| 304 caching | `X-Version-Id` | `X-Version-Id` (same) |
+| Auth | `gcdr_cust_*` | `gcdr_cust_*` (same) |
+
+### Alarm backend usage
+
+```
+1. On startup: fetch /calibration/bundle, store version in X-Version-Id
+2. On each poll (every N minutes): send X-Version-Id → 304 if unchanged
+3. On 200: replace local calibration map, update stored version
+4. On telemetry reading:
+   a. look up device.id in calibration map
+   b. if not found → no calibration, use raw value
+   c. if found → run period precedence algorithm (see Reference section)
+   d. apply matching offset → calibrated value
+```
+
+### Cache invalidation
+
+When any device's `calibration` field is written (create or update), the calibration
+bundle cache for that customer is invalidated — same pattern as alarm bundle
+invalidation on rule or device changes.
