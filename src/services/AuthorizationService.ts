@@ -12,6 +12,7 @@ import {
 import { RoleRepository } from '../repositories/RoleRepository';
 import { PolicyRepository } from '../repositories/PolicyRepository';
 import { RoleAssignmentRepository } from '../repositories/RoleAssignmentRepository';
+import { UserRepository } from '../repositories/UserRepository';
 import { IRoleRepository, ListRolesParams } from '../repositories/interfaces/IRoleRepository';
 import { IPolicyRepository, ListPoliciesParams, UpdatePolicyDTO } from '../repositories/interfaces/IPolicyRepository';
 import { IRoleAssignmentRepository, UpdateRoleAssignmentDTO } from '../repositories/interfaces/IRoleAssignmentRepository';
@@ -45,6 +46,7 @@ export class AuthorizationService {
   private roleRepository: IRoleRepository;
   private policyRepository: IPolicyRepository;
   private roleAssignmentRepository: IRoleAssignmentRepository;
+  private userRepository: UserRepository;
 
   constructor(
     roleRepository?: IRoleRepository,
@@ -54,6 +56,7 @@ export class AuthorizationService {
     this.roleRepository = roleRepository || new RoleRepository();
     this.policyRepository = policyRepository || new PolicyRepository();
     this.roleAssignmentRepository = roleAssignmentRepository || new RoleAssignmentRepository();
+    this.userRepository = new UserRepository();
   }
 
   // ==================== Role Management ====================
@@ -204,6 +207,12 @@ export class AuthorizationService {
   // ==================== Role Assignment ====================
 
   async assignRole(tenantId: string, data: AssignRoleDTO, grantedBy: string): Promise<RoleAssignment> {
+    // Validate user exists
+    const user = await this.userRepository.getById(tenantId, data.userId);
+    if (!user) {
+      throw new NotFoundError(`User '${data.userId}' not found`);
+    }
+
     // Validate role exists
     const role = await this.roleRepository.getByKey(tenantId, data.roleKey);
     if (!role) {

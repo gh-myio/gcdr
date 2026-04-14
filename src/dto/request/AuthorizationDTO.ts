@@ -67,8 +67,8 @@ export const AssignRoleSchema = z.object({
   userId: z.string().min(1),
   roleKey: z.string().min(1),
   scope: z.string().min(1),
-  expiresAt: z.string().datetime().optional(),
-  reason: z.string().max(500).optional(),
+  expiresAt: z.string().datetime().nullish(),
+  reason: z.string().max(500).nullish(),
 });
 
 export type AssignRoleDTO = z.infer<typeof AssignRoleSchema>;
