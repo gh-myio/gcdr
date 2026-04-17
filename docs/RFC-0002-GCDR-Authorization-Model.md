@@ -4,10 +4,18 @@
 - **Start Date:** 2026-01-12
 - **RFC PR:** (leave this empty until the PR is created)
 - **Tracking Issue:** (leave this empty until an issue is created)
-- **Status:** Draft
+- **Status:** Draft (base path updated 2026-04-16)
 - **Authors:** MYIO Platform Team
 - **Related RFCs:** [RFC-0001](./RFC-0001-GCDR-MYIO-Integration-Marketplace.md) (GCDR Core & Marketplace)
 - **Stakeholders:** Platform, Security, Operations, Ingestion, ThingsBoard, NodeHub
+
+> ⚠️ **Doc drift notice (2026-04-16)**
+> The endpoint base path in this RFC was originally drafted as `/api/v1/authz/*`
+> but the shipped implementation uses `/api/v1/authorization/*` and the
+> evaluation routes are `POST /authorization/check` and
+> `POST /authorization/check/batch` (not `/evaluate`/`/evaluate-batch`).
+> For the canonical, code-verified reference, see
+> [`docs/GCDR-USER.md`](./GCDR-USER.md).
 
 ---
 
@@ -574,7 +582,7 @@ function matchesPermission(patterns: string[], permission: string): boolean {
 #### Evaluate Permission
 
 ```http
-POST /api/v1/authz/evaluate
+POST /api/v1/authorization/check
 Content-Type: application/json
 Authorization: Bearer {token}
 
@@ -611,7 +619,7 @@ Authorization: Bearer {token}
 #### Batch Evaluate
 
 ```http
-POST /api/v1/authz/evaluate-batch
+POST /api/v1/authorization/check/batch
 Content-Type: application/json
 
 {
@@ -643,7 +651,7 @@ Content-Type: application/json
 #### Get User Effective Permissions
 
 ```http
-GET /api/v1/authz/users/{userId}/permissions?scope=customer:customer-123
+GET /api/v1/authorization/users/{userId}/permissions?scope=customer:customer-123
 ```
 
 **Response:**

@@ -1,5 +1,12 @@
 # GCDR Authorization Model
 
+> ⚠️ **Doc drift notice (2026-04-16)**
+> Endpoint paths were corrected: evaluation routes are `POST /authorization/check`
+> and `POST /authorization/check/batch` (not `/evaluate`/`/evaluate-batch`);
+> revoke is `DELETE /authorization/assignments/:assignmentId` (not `POST .../revoke`).
+> For the canonical, code-verified reference, see
+> [`docs/GCDR-USER.md`](./GCDR-USER.md).
+
 This document describes the authorization model implemented in GCDR, covering the relationship between Users, Roles, Policies, Permissions, and Scopes.
 
 ## Table of Contents
@@ -504,16 +511,17 @@ function permissionMatches(patterns: string[], target: string): boolean {
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/authorization/evaluate` | Evaluate single permission |
-| `POST` | `/authorization/evaluate-batch` | Evaluate multiple permissions |
+| `POST` | `/authorization/check` | Evaluate single permission |
+| `POST` | `/authorization/check/batch` | Evaluate multiple permissions (≤100) |
 | `GET` | `/authorization/users/:userId/permissions` | Get effective permissions |
+| `GET` | `/authorization/users/:userId/roles` | Get user's roles + effective perms |
 
 ### Example Requests
 
 #### Evaluate Permission
 
 ```http
-POST /authorization/evaluate
+POST /authorization/check
 Content-Type: application/json
 Authorization: Bearer {token}
 X-Tenant-Id: {tenantId}
@@ -556,7 +564,7 @@ X-Tenant-Id: {tenantId}
 #### Batch Evaluation
 
 ```http
-POST /authorization/evaluate-batch
+POST /authorization/check/batch
 Content-Type: application/json
 
 {

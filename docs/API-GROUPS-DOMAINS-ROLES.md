@@ -1,5 +1,17 @@
 # API Reference: Groups, Domains & Roles
 
+> ⚠️ **Doc drift notice (2026-04-16)**
+> Parts of this document predate RFC-0002 and still use the older
+> `permissions[]` format on roles. The shipped implementation uses
+> **policies[]** on roles (roles reference policy keys) and the canonical
+> permission format is `resource.action.target` (3 segments, lowercase).
+> The group **purposes** catalog grew in 2026-03 — the current values are:
+> `ALARMS_NOTIFY`, `ALARMS_REPORT`, `ALARMS_INSIGHT`, `WELCOME_USER`,
+> `RELEASE_NOTE`, `NOTIFICATION`, `ESCALATION`, `ACCESS_CONTROL`, `REPORTING`,
+> `MAINTENANCE`, `MONITORING`, `CUSTOM`.
+> For the canonical, code-verified reference, see
+> [`docs/GCDR-USER.md`](./GCDR-USER.md).
+
 ## Domains API (Metrics for Rules)
 
 Base URL: `/domains`

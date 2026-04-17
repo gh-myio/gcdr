@@ -61,6 +61,14 @@ tags:
     description: HTML template engine for email notifications with preview and tag catalog (RFC-0021)
   - name: Device Sync Jobs
     description: Async device synchronization pipeline TB→GCDR (RFC-0023). Creates background jobs that run CHECK → ACTION_PLAN → DETECT_RELOCATIONS → RELOCATE → APPLY_UPDATES → CONSOLIDATE_CREATES phases with structured logs.
+  - name: Access Bundle
+    description: User access profile bundle + domain permissions registry (RFC-0013). Hierarchical `domain.equipment.location:action` permissions with TTL cache.
+  - name: Maintenance Groups
+    description: User maintenance teams (RFC-0013). FK-backed junction with per-member expiration.
+  - name: User Contacts
+    description: Per-user notification contacts (RFC-0024/0025). Channels used by dispatch resolution.
+  - name: Customer Channels
+    description: Customer-scoped dispatch channel credentials (RFC-0024).
 
 security:
   - bearerAuth: []
@@ -2808,6 +2816,15 @@ components:
           $ref: '#/components/schemas/NotificationPreferences'
         dashboardLayout:
           type: object
+        defaultCustomerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Default customer scope for this user. When set, the backend uses it as
+            fallback when a request does not specify a customer. The service validates
+            that the user has an active role assignment matching `customer:<uuid>` or `*`.
+            Set/cleared via `PUT /users/{id}/default-customer`.
 
     NotificationPreferences:
       type: object
@@ -2820,6 +2837,389 @@ components:
           type: boolean
         inApp:
           type: boolean
+
+    SetDefaultCustomerRequest:
+      type: object
+      required: [customerId]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Customer UUID to set as default, or `null` to clear.
+
+    EnrichedPolicy:
+      type: object
+      properties:
+        key:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        allow:
+          type: array
+          items: { type: string }
+        deny:
+          type: array
+          items: { type: string }
+        conditions:
+          type: object
+          nullable: true
+          properties:
+            requiresMFA: { type: boolean }
+            onlyBusinessHours: { type: boolean }
+            allowedDeviceTypes:
+              type: array
+              items: { type: string }
+            ipAllowlist:
+              type: array
+              items: { type: string }
+            maxSessionDuration: { type: number }
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+
+    EnrichedRole:
+      type: object
+      properties:
+        key:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+        isSystem:
+          type: boolean
+        policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichedPolicy'
+
+    EnrichedAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          description: |
+            Scope string like `customer:<uuid>`, `asset:<uuid>`, or `*` for global.
+        status:
+          type: string
+          enum: [active, inactive, expired]
+        grantedAt:
+          type: string
+          format: date-time
+        grantedBy:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        role:
+          nullable: true
+          description: |
+            Null when the assignment's `roleKey` no longer resolves to a role
+            (orphan assignment — can happen if a role was deleted).
+          $ref: '#/components/schemas/EnrichedRole'
+
+    AuthMeResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichedAssignment'
+        effectivePermissions:
+          type: array
+          items: { type: string }
+          description: Flat list of permission strings this user effectively has (allow minus deny).
+        deniedPatterns:
+          type: array
+          items: { type: string }
+          description: Permission patterns explicitly denied (deny-wins).
+
+    # ========================================================================
+    # Access Bundle (RFC-0013)
+    # ========================================================================
+
+    BundleProfile:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        userEmail: { type: string, format: email }
+        customerId: { type: string, format: uuid, nullable: true }
+        customerName: { type: string, nullable: true }
+        maintenanceGroup:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            key: { type: string }
+            name: { type: string }
+
+    BundleMetadata:
+      type: object
+      properties:
+        generatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        ttlSeconds: { type: integer }
+        scope: { type: string }
+        sourceRoles:
+          type: array
+          items: { type: string }
+        sourcePolicies:
+          type: array
+          items: { type: string }
+        checksum: { type: string }
+
+    UserAccessBundle:
+      type: object
+      properties:
+        version: { type: string, enum: ['1.0'] }
+        profile:
+          $ref: '#/components/schemas/BundleProfile'
+        domainPolicies:
+          type: object
+          description: |
+            Hierarchical `domain → equipment → location → { actions[], conditions? }`.
+        featurePolicies:
+          type: object
+          description: |
+            `featureKey → { access: guaranteed|granted|conditional|denied|not_granted, conditions?, expiresAt? }`.
+        permissions:
+          type: object
+          properties:
+            allowed:
+              type: array
+              items: { type: string }
+            denied:
+              type: array
+              items: { type: string }
+        metadata:
+          $ref: '#/components/schemas/BundleMetadata'
+
+    DomainPermission:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid, nullable: true }
+        domain: { type: string }
+        equipment: { type: string }
+        location: { type: string }
+        action: { type: string }
+        displayName: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        riskLevel: { type: string, enum: [low, medium, high, critical] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateDomainPermission:
+      type: object
+      required: [domain, equipment, location, action]
+      properties:
+        domain: { type: string, minLength: 2, maxLength: 50, pattern: '^[a-z][a-z0-9_]*$' }
+        equipment: { type: string, minLength: 2, maxLength: 50, pattern: '^[a-z][a-z0-9_]*$' }
+        location: { type: string, minLength: 2, maxLength: 50, pattern: '^[a-z][a-z0-9_]*$' }
+        action: { type: string, minLength: 2, maxLength: 50, pattern: '^[a-z][a-z0-9_]*$' }
+        displayName: { type: string, maxLength: 255 }
+        description: { type: string, maxLength: 1000 }
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          default: low
+
+    UpdateDomainPermission:
+      type: object
+      properties:
+        displayName: { type: string, maxLength: 255, nullable: true }
+        description: { type: string, maxLength: 1000, nullable: true }
+        riskLevel: { type: string, enum: [low, medium, high, critical] }
+        isActive: { type: boolean }
+
+    CheckDomainPermissionRequest:
+      type: object
+      required: [domain, equipment, location, action]
+      properties:
+        domain: { type: string }
+        equipment: { type: string }
+        location: { type: string }
+        action: { type: string }
+
+    CheckMultipleDomainPermissionsRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CheckDomainPermissionRequest'
+
+    # ========================================================================
+    # Maintenance Groups (RFC-0013)
+    # ========================================================================
+
+    MaintenanceGroup:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        customerId: { type: string, format: uuid, nullable: true }
+        memberCount: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MaintenanceGroupMember:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        assignedAt: { type: string, format: date-time }
+        assignedBy: { type: string, format: uuid, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+
+    CreateMaintenanceGroup:
+      type: object
+      required: [key, name]
+      properties:
+        key: { type: string, minLength: 3, maxLength: 100, pattern: '^[a-z][a-z0-9_:-]*$' }
+        name: { type: string, minLength: 2, maxLength: 255 }
+        description: { type: string, maxLength: 1000 }
+        customerId: { type: string, format: uuid }
+
+    UpdateMaintenanceGroup:
+      type: object
+      properties:
+        name: { type: string, minLength: 2, maxLength: 255 }
+        description: { type: string, maxLength: 1000, nullable: true }
+        customerId: { type: string, format: uuid, nullable: true }
+        isActive: { type: boolean }
+
+    AddMaintenanceGroupMember:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    AddMaintenanceGroupMembers:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    RemoveMaintenanceGroupMembers:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, format: uuid }
+
+    # ========================================================================
+    # User Contacts (RFC-0024/0025)
+    # ========================================================================
+
+    ContactChannelType:
+      type: string
+      description: Notification channel type.
+      enum: [EMAIL, SMS, TELEGRAM, WHATSAPP, SLACK, TEAMS, WEBHOOK, EMAIL_RELAY, CUSTOM]
+
+    UserContact:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        channel:
+          $ref: '#/components/schemas/ContactChannelType'
+        value: { type: string, description: 'email, chat_id, E.164 phone, URL, etc.' }
+        label: { type: string, nullable: true }
+        verified: { type: boolean }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateUserContact:
+      type: object
+      required: [channel, value]
+      properties:
+        channel: { type: string, minLength: 1, maxLength: 50 }
+        value: { type: string, minLength: 1, maxLength: 500 }
+        label: { type: string, maxLength: 100 }
+        active: { type: boolean, default: true }
+
+    UpdateUserContact:
+      type: object
+      properties:
+        value: { type: string, minLength: 1, maxLength: 500 }
+        label: { type: string, maxLength: 100 }
+        active: { type: boolean }
+
+    # ========================================================================
+    # Customer Channels (RFC-0024)
+    # ========================================================================
+
+    CustomerChannelType:
+      type: string
+      enum: [EMAIL_RELAY, TELEGRAM, WHATSAPP, WEBHOOK, SMS, SLACK, TEAMS, CUSTOM]
+
+    CustomerChannel:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        channel:
+          $ref: '#/components/schemas/CustomerChannelType'
+        active: { type: boolean }
+        config:
+          type: object
+          description: Channel-specific credentials/config (opaque to clients that only list).
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateCustomerChannel:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          $ref: '#/components/schemas/CustomerChannelType'
+        active: { type: boolean, default: true }
+        config:
+          type: object
+          default: {}
+
+    UpdateCustomerChannel:
+      type: object
+      properties:
+        active: { type: boolean }
+        config:
+          type: object
 
     CreateUser:
       type: object
@@ -4157,6 +4557,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessMessageResponse'
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get enriched authz snapshot for the authenticated user
+      description: |
+        Single hydrate endpoint intended to replace the chain
+        `/users/me` + `/authorization/users/:id/roles` + policy lookups.
+
+        Returns the authenticated user plus every **active** role assignment
+        with the role expanded and each role's policies fully loaded
+        (`allow`, `deny`, `conditions`), plus the flat `effectivePermissions`
+        and `deniedPatterns` views.
+
+        Input: `Authorization: Bearer <jwt>` only. `tenantId` and `userId` are
+        extracted from the JWT claims.
+
+        Cost on the backend: 3 queries (assignments, roles by keys,
+        policies by keys).
+
+        Orphan assignments (when the referenced role was deleted) surface
+        with `role: null` instead of erroring out.
+      operationId: authMe
+      responses:
+        '200':
+          description: Enriched snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/password/forgot:
     post:
@@ -8383,6 +8824,54 @@ paths:
                       data:
                         $ref: '#/components/schemas/User'
 
+  /users/{id}/default-customer:
+    put:
+      tags: [Users]
+      summary: Set or clear the user's default customer scope
+      description: |
+        Writes `preferences.defaultCustomerId`. Validates that the customer
+        exists **and** that the user has an active role assignment with
+        scope `customer:<customerId>` or `*`. Pass `{ "customerId": null }`
+        to clear.
+
+        Cleanup hooks keep this field from becoming dangling:
+          - When a customer is deleted, every user pointing to it is cleared.
+          - When a user's last assignment for a customer is revoked, the
+            field is cleared if it still pointed to that customer.
+      operationId: setUserDefaultCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDefaultCustomerRequest'
+      responses:
+        '200':
+          description: Default customer updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: User has no active assignment for the given customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User or customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # Groups
   /groups:
     post:
@@ -9662,3 +10151,1004 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # =============================================================================
+  # Access Bundle (RFC-0013)
+  # =============================================================================
+
+  /access-bundle/me:
+    get:
+      tags: [Access Bundle]
+      summary: Get access bundle for the authenticated user
+      description: |
+        Returns the hierarchical permission bundle for the caller.
+        Uses cache by default; pass `useCache=false` to regenerate.
+      operationId: getAccessBundleMe
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string, default: '*' }
+        - in: query
+          name: includeFeatures
+          schema: { type: boolean, default: true }
+        - in: query
+          name: includeDomains
+          schema: { type: boolean, default: true }
+        - in: query
+          name: includeFlat
+          schema: { type: boolean, default: true }
+        - in: query
+          name: ttl
+          schema: { type: integer, minimum: 60, maximum: 86400, default: 3600 }
+        - in: query
+          name: useCache
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: User access bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserAccessBundle' }
+
+  /access-bundle/users/{targetUserId}:
+    get:
+      tags: [Access Bundle]
+      summary: Get access bundle for a specific user (admin)
+      operationId: getAccessBundleForUser
+      parameters:
+        - in: path
+          name: targetUserId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: scope
+          schema: { type: string, default: '*' }
+        - in: query
+          name: useCache
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: User access bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserAccessBundle' }
+
+  /access-bundle/me/refresh:
+    post:
+      tags: [Access Bundle]
+      summary: Force-refresh the caller's bundle (invalidates cache and regenerates)
+      operationId: refreshAccessBundleMe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Regenerated bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserAccessBundle' }
+
+  /access-bundle/users/{targetUserId}/refresh:
+    post:
+      tags: [Access Bundle]
+      summary: Force-refresh a specific user's bundle (admin)
+      operationId: refreshAccessBundleForUser
+      parameters:
+        - in: path
+          name: targetUserId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Regenerated bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserAccessBundle' }
+
+  /access-bundle/users/{targetUserId}/cache:
+    delete:
+      tags: [Access Bundle]
+      summary: Invalidate a user's cached bundle (admin)
+      operationId: invalidateAccessBundleCache
+      parameters:
+        - in: path
+          name: targetUserId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 255 }
+                scope: { type: string }
+      responses:
+        '204':
+          description: Cache invalidated
+
+  /access-bundle/check:
+    post:
+      tags: [Access Bundle]
+      summary: Check a single domain permission for the authenticated user
+      operationId: checkAccessBundlePermission
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckDomainPermissionRequest' }
+      responses:
+        '200':
+          description: Check result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          allowed: { type: boolean }
+                          permission:
+                            $ref: '#/components/schemas/CheckDomainPermissionRequest'
+
+  /access-bundle/check-batch:
+    post:
+      tags: [Access Bundle]
+      summary: Check multiple domain permissions at once
+      description: |
+        Note: path uses a hyphen (`check-batch`), **not** `/check/batch`.
+      operationId: checkAccessBundlePermissionsBatch
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckMultipleDomainPermissionsRequest' }
+      responses:
+        '200':
+          description: Batch check result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          results:
+                            type: object
+                            description: |
+                              Map keyed by `domain.equipment.location:action` with boolean values.
+                          summary:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              allowed: { type: integer }
+                              denied: { type: integer }
+
+  /access-bundle/check-feature:
+    post:
+      tags: [Access Bundle]
+      summary: Check feature-level access for the authenticated user
+      operationId: checkAccessBundleFeature
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [featureKey]
+              properties:
+                featureKey: { type: string }
+      responses:
+        '200':
+          description: Feature check result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          featureKey: { type: string }
+                          allowed: { type: boolean }
+                          access:
+                            type: string
+                            enum: [guaranteed, granted, conditional, denied, not_granted]
+
+  /access-bundle/domain-permissions:
+    get:
+      tags: [Access Bundle]
+      summary: List domain permissions (registry)
+      operationId: listDomainPermissions
+      parameters:
+        - in: query
+          name: domain
+          schema: { type: string }
+        - in: query
+          name: equipment
+          schema: { type: string }
+        - in: query
+          name: location
+          schema: { type: string }
+        - in: query
+          name: action
+          schema: { type: string }
+        - in: query
+          name: isActive
+          schema: { type: boolean }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: List of domain permissions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/DomainPermission' }
+                          total: { type: integer }
+    post:
+      tags: [Access Bundle]
+      summary: Create a domain permission (admin)
+      operationId: createDomainPermission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDomainPermission' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DomainPermission' }
+
+  /access-bundle/domain-permissions/bulk:
+    post:
+      tags: [Access Bundle]
+      summary: Create multiple domain permissions at once (admin)
+      operationId: bulkCreateDomainPermissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/CreateDomainPermission' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          created: { type: integer }
+                          permissions:
+                            type: array
+                            items: { $ref: '#/components/schemas/DomainPermission' }
+
+  /access-bundle/domain-permissions/{permissionId}:
+    put:
+      tags: [Access Bundle]
+      summary: Update a domain permission (admin)
+      operationId: updateDomainPermission
+      parameters:
+        - in: path
+          name: permissionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDomainPermission' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DomainPermission' }
+    delete:
+      tags: [Access Bundle]
+      summary: Delete a domain permission (admin)
+      operationId: deleteDomainPermission
+      parameters:
+        - in: path
+          name: permissionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Deleted
+
+  /access-bundle/domain-permissions/domains:
+    get:
+      tags: [Access Bundle]
+      summary: List available domain slugs
+      operationId: listDomainPermissionDomains
+      responses:
+        '200':
+          description: Domains list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          domains:
+                            type: array
+                            items: { type: string }
+
+  /access-bundle/domain-permissions/domains/{domain}/equipments:
+    get:
+      tags: [Access Bundle]
+      summary: List equipments under a domain
+      operationId: listDomainPermissionEquipments
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Equipments list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          domain: { type: string }
+                          equipments:
+                            type: array
+                            items: { type: string }
+
+  /access-bundle/domain-permissions/domains/{domain}/equipments/{equipment}/locations:
+    get:
+      tags: [Access Bundle]
+      summary: List locations for an equipment under a domain
+      operationId: listDomainPermissionLocations
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema: { type: string }
+        - in: path
+          name: equipment
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Locations list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          domain: { type: string }
+                          equipment: { type: string }
+                          locations:
+                            type: array
+                            items: { type: string }
+
+  # =============================================================================
+  # Maintenance Groups (RFC-0013)
+  # =============================================================================
+
+  /maintenance-groups:
+    post:
+      tags: [Maintenance Groups]
+      summary: Create a maintenance group
+      operationId: createMaintenanceGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMaintenanceGroup' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/MaintenanceGroup' }
+    get:
+      tags: [Maintenance Groups]
+      summary: List maintenance groups
+      operationId: listMaintenanceGroups
+      parameters:
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: isActive
+          schema: { type: boolean }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Maintenance groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/MaintenanceGroup' }
+                          total: { type: integer }
+
+  /maintenance-groups/{groupId}:
+    get:
+      tags: [Maintenance Groups]
+      summary: Get a maintenance group by id
+      operationId: getMaintenanceGroup
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Maintenance group
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/MaintenanceGroup' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [Maintenance Groups]
+      summary: Update a maintenance group
+      operationId: updateMaintenanceGroup
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMaintenanceGroup' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/MaintenanceGroup' }
+    patch:
+      tags: [Maintenance Groups]
+      summary: Partial-update a maintenance group (alias of PUT)
+      operationId: patchMaintenanceGroup
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMaintenanceGroup' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/MaintenanceGroup' }
+    delete:
+      tags: [Maintenance Groups]
+      summary: Delete a maintenance group
+      operationId: deleteMaintenanceGroup
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Deleted
+
+  /maintenance-groups/{groupId}/details:
+    get:
+      tags: [Maintenance Groups]
+      summary: Get a maintenance group with its members
+      operationId: getMaintenanceGroupWithMembers
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Group + members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/MaintenanceGroup'
+                          - type: object
+                            properties:
+                              members:
+                                type: array
+                                items: { $ref: '#/components/schemas/MaintenanceGroupMember' }
+
+  /maintenance-groups/key/{key}:
+    get:
+      tags: [Maintenance Groups]
+      summary: Get a maintenance group by key
+      operationId: getMaintenanceGroupByKey
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Maintenance group
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/MaintenanceGroup' }
+
+  /maintenance-groups/{groupId}/members:
+    get:
+      tags: [Maintenance Groups]
+      summary: List group members
+      operationId: listMaintenanceGroupMembers
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeExpired
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          members:
+                            type: array
+                            items: { $ref: '#/components/schemas/MaintenanceGroupMember' }
+    post:
+      tags: [Maintenance Groups]
+      summary: Add one member to the group
+      operationId: addMaintenanceGroupMember
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddMaintenanceGroupMember' }
+      responses:
+        '200':
+          description: Member added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessMessageResponse' }
+
+  /maintenance-groups/{groupId}/members/bulk:
+    post:
+      tags: [Maintenance Groups]
+      summary: Add multiple members to the group
+      operationId: addMaintenanceGroupMembersBulk
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddMaintenanceGroupMembers' }
+      responses:
+        '200':
+          description: Members added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessMessageResponse' }
+
+  /maintenance-groups/{groupId}/members/{memberId}:
+    delete:
+      tags: [Maintenance Groups]
+      summary: Remove one member from the group
+      operationId: removeMaintenanceGroupMember
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: memberId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Member removed
+
+  /maintenance-groups/{groupId}/members/remove:
+    post:
+      tags: [Maintenance Groups]
+      summary: Remove multiple members from the group
+      operationId: removeMaintenanceGroupMembersBulk
+      parameters:
+        - in: path
+          name: groupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RemoveMaintenanceGroupMembers' }
+      responses:
+        '200':
+          description: Members removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessMessageResponse' }
+
+  /maintenance-groups/user/{userId}:
+    get:
+      tags: [Maintenance Groups]
+      summary: List maintenance groups a user belongs to
+      operationId: listMaintenanceGroupsForUser
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeExpired
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          groups:
+                            type: array
+                            items: { $ref: '#/components/schemas/MaintenanceGroup' }
+
+  # =============================================================================
+  # User Contacts (RFC-0024/0025)
+  # =============================================================================
+
+  /users/{userId}/contacts:
+    get:
+      tags: [User Contacts]
+      summary: List notification contacts for a user
+      operationId: listUserContacts
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/UserContact' }
+                          count: { type: integer }
+    post:
+      tags: [User Contacts]
+      summary: Add a notification contact to a user
+      operationId: createUserContact
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserContact' }
+      responses:
+        '201':
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserContact' }
+
+  /users/{userId}/contacts/{contactId}:
+    patch:
+      tags: [User Contacts]
+      summary: Update a user contact (value, label, active)
+      operationId: updateUserContact
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: contactId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserContact' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserContact' }
+    delete:
+      tags: [User Contacts]
+      summary: Remove a notification contact
+      operationId: deleteUserContact
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: contactId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Deleted
+
+  # =============================================================================
+  # Customer Channels (RFC-0024)
+  # =============================================================================
+
+  /customers/{customerId}/channels:
+    get:
+      tags: [Customer Channels]
+      summary: List dispatch channels configured for a customer
+      operationId: listCustomerChannels
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Channels
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/CustomerChannel' }
+                          count: { type: integer }
+    post:
+      tags: [Customer Channels]
+      summary: Add a dispatch channel to a customer
+      operationId: createCustomerChannel
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCustomerChannel' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerChannel' }
+
+  /customers/{customerId}/channels/{channelId}:
+    patch:
+      tags: [Customer Channels]
+      summary: Update a customer channel (active flag or config)
+      operationId: updateCustomerChannel
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: channelId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCustomerChannel' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerChannel' }
+    delete:
+      tags: [Customer Channels]
+      summary: Remove a customer channel
+      operationId: deleteCustomerChannel
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: channelId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Deleted
