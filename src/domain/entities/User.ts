@@ -17,6 +17,7 @@ export interface UserPreferences {
     inApp: boolean;
   };
   dashboardLayout?: Record<string, unknown>;
+  defaultCustomerId?: string | null;
 }
 
 export interface UserProfile {

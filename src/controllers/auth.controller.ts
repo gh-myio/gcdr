@@ -11,12 +11,15 @@ import {
   VerifyEmailRequestSchema,
   ResendVerificationRequestSchema,
 } from '../dto/request/AuthDTO';
-import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
+import { sendSuccess, sendCreated, sendNoContent, logEvent, authMiddleware } from '../middleware';
 import { ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT } from '../middleware/context';
 import { registrationService } from '../services/RegistrationService';
 import { EventType } from '../shared/types';
 import { customerApiKeyService } from '../services/CustomerApiKeyService';
+import { userService } from '../services/UserService';
+import { authorizationService } from '../services/AuthorizationService';
+import { toUserDetailDTO } from '../dto/response/UserResponseDTO';
 
 const router = Router();
 
@@ -285,6 +288,38 @@ router.post('/reset-password', async (req: Request, res: Response, next: NextFun
     const response = await registrationService.resetPassword(tenantId, email, code, newPassword);
 
     sendSuccess(res, response, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /auth/me
+ * Returns the authenticated user enriched with every active role assignment,
+ * the role expanded with its policies (allow/deny/conditions), and the flat
+ * effective-permissions / denied-patterns view.
+ *
+ * Input: Authorization: Bearer <jwt> only. tenantId + userId come from JWT claims.
+ *
+ * Designed as the single hydrate call the frontend makes after login so it
+ * does not need to chain /users/me + /authorization/users/:id/roles + policy
+ * lookups.
+ */
+router.get('/me', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+
+    const [user, authz] = await Promise.all([
+      userService.getById(tenantId, userId),
+      authorizationService.getUserFullAuthz(tenantId, userId),
+    ]);
+
+    sendSuccess(res, {
+      user: toUserDetailDTO(user),
+      assignments: authz.assignments,
+      effectivePermissions: authz.effectivePermissions,
+      deniedPatterns: authz.deniedPatterns,
+    }, 200, requestId);
   } catch (err) {
     next(err);
   }

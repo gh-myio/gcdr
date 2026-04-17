@@ -20,6 +20,7 @@ import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
+import { userService } from './UserService';
 
 export interface RuleMeta {
   id: string;
@@ -308,6 +309,9 @@ export class CustomerService {
     }
 
     await this.repository.delete(tenantId, id);
+
+    // Clear any user.preferences.defaultCustomerId still pointing here.
+    await userService.clearDefaultCustomerForAll(tenantId, id, userId);
 
     alarmBundleService.invalidateCache(tenantId, id, {
       reason: 'customer_deleted', entityType: 'customer', entityId: id, userId,

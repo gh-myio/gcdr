@@ -18,6 +18,7 @@ import { IPolicyRepository, ListPoliciesParams, UpdatePolicyDTO } from '../repos
 import { IRoleAssignmentRepository, UpdateRoleAssignmentDTO } from '../repositories/interfaces/IRoleAssignmentRepository';
 import { PaginatedResult, RiskLevel } from '../shared/types';
 import { NotFoundError, ForbiddenError, ConflictError } from '../shared/errors/AppError';
+import { userService } from './UserService';
 
 export interface PermissionEvaluationResult {
   allowed: boolean;
@@ -40,6 +41,47 @@ export interface BatchEvaluationResult {
     allowed: number;
     denied: number;
   };
+}
+
+export interface EnrichedPolicy {
+  key: string;
+  displayName: string;
+  description: string;
+  allow: string[];
+  deny: string[];
+  conditions?: PolicyConditions;
+  riskLevel: RiskLevel;
+}
+
+export interface EnrichedRole {
+  key: string;
+  displayName: string;
+  description: string;
+  riskLevel: RiskLevel;
+  isSystem: boolean;
+  policies: EnrichedPolicy[];
+}
+
+export interface EnrichedAssignment {
+  id: string;
+  scope: string;
+  status: string;
+  grantedAt: string;
+  grantedBy: string;
+  expiresAt?: string;
+  reason?: string;
+  role: EnrichedRole | null;
+}
+
+export interface UserFullAuthz {
+  assignments: EnrichedAssignment[];
+  effectivePermissions: string[];
+  deniedPatterns: string[];
+}
+
+function parseCustomerScope(scope: string): string | null {
+  const match = /^customer:([0-9a-f-]{36})$/i.exec(scope);
+  return match ? match[1]! : null;
 }
 
 export class AuthorizationService {
@@ -236,6 +278,19 @@ export class AuthorizationService {
       revokedBy
     );
 
+    // If that was the user's last active path to a customer scope, clear any
+    // matching preferences.defaultCustomerId so it cannot become a dangling pointer.
+    const customerId = parseCustomerScope(assignment.scope);
+    if (customerId) {
+      const remaining = await this.roleAssignmentRepository.getActiveByUserId(tenantId, assignment.userId);
+      const stillHasAccess = remaining.some(
+        (a) => a.scope === '*' || a.scope === `customer:${customerId}`
+      );
+      if (!stillHasAccess) {
+        await userService.clearDefaultCustomerIfMatches(tenantId, assignment.userId, customerId, revokedBy);
+      }
+    }
+
     return updated;
   }
 
@@ -345,6 +400,81 @@ export class AuthorizationService {
     }
 
     return Array.from(permissionsMap.values());
+  }
+
+  /**
+   * Returns the full authorization snapshot for a user: every active assignment
+   * with its role expanded and each role's policies fully loaded (allow, deny,
+   * conditions), plus the flat effective-permissions view.
+   *
+   * Designed to be the one-shot backing endpoint for `GET /auth/me`.
+   * Cost: 3 queries total (assignments, roles by keys, policies by keys).
+   */
+  async getUserFullAuthz(tenantId: string, userId: string): Promise<UserFullAuthz> {
+    const assignments = await this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
+
+    const roleKeys = [...new Set(assignments.map((a) => a.roleKey))];
+    const roles = roleKeys.length > 0 ? await this.roleRepository.getByKeys(tenantId, roleKeys) : [];
+    const rolesByKey = new Map(roles.map((r) => [r.key, r]));
+
+    const policyKeys = [...new Set(roles.flatMap((r) => r.policies))];
+    const policies = policyKeys.length > 0 ? await this.policyRepository.getByKeys(tenantId, policyKeys) : [];
+    const policiesByKey = new Map(policies.map((p) => [p.key, p]));
+
+    const toEnrichedPolicy = (p: Policy): EnrichedPolicy => ({
+      key: p.key,
+      displayName: p.displayName,
+      description: p.description,
+      allow: p.allow,
+      deny: p.deny,
+      conditions: p.conditions,
+      riskLevel: p.riskLevel,
+    });
+
+    const toEnrichedRole = (r: Role): EnrichedRole => ({
+      key: r.key,
+      displayName: r.displayName,
+      description: r.description,
+      riskLevel: r.riskLevel,
+      isSystem: r.isSystem,
+      policies: r.policies
+        .map((pk) => policiesByKey.get(pk))
+        .filter((p): p is Policy => p !== undefined)
+        .map(toEnrichedPolicy),
+    });
+
+    const enrichedAssignments: EnrichedAssignment[] = assignments.map((a) => {
+      const role = rolesByKey.get(a.roleKey);
+      return {
+        id: a.id,
+        scope: a.scope,
+        status: a.status,
+        grantedAt: a.grantedAt,
+        grantedBy: a.grantedBy,
+        expiresAt: a.expiresAt,
+        reason: a.reason,
+        role: role ? toEnrichedRole(role) : null,
+      };
+    });
+
+    // Compute effective/denied from the already-loaded policies (no extra queries).
+    const effectiveMap = new Map<string, boolean>();
+    for (const policy of policies) {
+      for (const perm of policy.allow) {
+        if (!effectiveMap.has(perm)) effectiveMap.set(perm, true);
+      }
+      for (const perm of policy.deny) {
+        effectiveMap.set(perm, false);
+      }
+    }
+
+    const effectivePermissions: string[] = [];
+    const deniedPatterns: string[] = [];
+    for (const [perm, allowed] of effectiveMap) {
+      (allowed ? effectivePermissions : deniedPatterns).push(perm);
+    }
+
+    return { assignments: enrichedAssignments, effectivePermissions, deniedPatterns };
   }
 
   // ==================== Private Helpers ====================

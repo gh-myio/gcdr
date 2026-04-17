@@ -41,7 +41,14 @@ const UserPreferencesSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   notifications: NotificationPreferencesSchema.optional(),
   dashboardLayout: z.record(z.unknown()).optional(),
+  defaultCustomerId: z.string().uuid().nullish(),
 });
+
+export const SetDefaultCustomerSchema = z.object({
+  customerId: z.string().uuid().nullable(),
+});
+
+export type SetDefaultCustomerDTO = z.infer<typeof SetDefaultCustomerSchema>;
 
 // Create User DTO
 export const CreateUserSchema = z.object({

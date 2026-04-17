@@ -9,7 +9,8 @@ import {
   InviteUserSchema,
   ChangePasswordSchema,
   EnableMfaSchema,
-  UpdatePreferencesSchema
+  UpdatePreferencesSchema,
+  SetDefaultCustomerSchema
 } from '../dto/request/UserDTO';
 import { toUserDetailDTO, toUserSummaryDTO } from '../dto/response/UserResponseDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
@@ -380,6 +381,39 @@ router.patch('/:id/preferences', async (req: Request, res: Response, next: NextF
     next(err);
   }
 });
+
+/**
+ * PUT /users/:id/default-customer
+ * Set (or clear with { customerId: null }) the user's default customer scope.
+ * Validates that the user has an active role assignment for that customer.
+ */
+router.put('/:id/default-customer',
+  logEvent({
+    eventType: EventType.USER_UPDATED,
+    description: (req) =>
+      req.body.customerId
+        ? `Default customer set to ${req.body.customerId} for user ${req.params.id}`
+        : `Default customer cleared for user ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+    getMetadata: (req) => ({ defaultCustomerId: req.body.customerId ?? null }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId: actingUserId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('User ID is required');
+      }
+
+      const { customerId } = SetDefaultCustomerSchema.parse(req.body);
+      const user = await userService.setDefaultCustomer(tenantId, id, customerId, actingUserId);
+      sendSuccess(res, toUserDetailDTO(user), 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * GET /customers/:customerId/users

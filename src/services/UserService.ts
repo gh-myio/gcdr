@@ -11,6 +11,10 @@ import {
 import { MfaSetupDTO } from '../dto/response/UserResponseDTO';
 import { UserRepository } from '../repositories/UserRepository';
 import { IUserRepository } from '../repositories/interfaces/IUserRepository';
+import { CustomerRepository } from '../repositories/CustomerRepository';
+import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { RoleAssignmentRepository } from '../repositories/RoleAssignmentRepository';
+import { IRoleAssignmentRepository } from '../repositories/interfaces/IRoleAssignmentRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 
@@ -35,11 +39,19 @@ function generateBackupCodes(count: number = 10): string[] {
 
 export class UserService {
   private repository: IUserRepository;
+  private customerRepository: ICustomerRepository;
+  private roleAssignmentRepository: IRoleAssignmentRepository;
   private maxFailedAttempts = 5;
   private lockDurationMinutes = 30;
 
-  constructor(repository?: IUserRepository) {
+  constructor(
+    repository?: IUserRepository,
+    customerRepository?: ICustomerRepository,
+    roleAssignmentRepository?: IRoleAssignmentRepository,
+  ) {
     this.repository = repository || new UserRepository();
+    this.customerRepository = customerRepository || new CustomerRepository();
+    this.roleAssignmentRepository = roleAssignmentRepository || new RoleAssignmentRepository();
   }
 
   async create(tenantId: string, data: CreateUserDTO, createdBy: string): Promise<User> {
@@ -93,6 +105,7 @@ export class UserService {
         sendInvitation: true,
         tags: [],
         metadata: {},
+        externalLinks: [],
       },
       invitedBy
     );
@@ -328,6 +341,103 @@ export class UserService {
     preferences: UpdatePreferencesDTO
   ): Promise<User> {
     return this.repository.update(tenantId, id, { preferences }, id);
+  }
+
+  /**
+   * Set (or clear) the user's default customer scope.
+   *
+   * When set, `customerId` must:
+   *  - exist under the tenant, AND
+   *  - match an active role assignment scope for the user (either `*` for
+   *    global-scoped roles or `customer:<customerId>`).
+   *
+   * Pass `null` to clear the default.
+   */
+  async setDefaultCustomer(
+    tenantId: string,
+    userId: string,
+    customerId: string | null,
+    updatedBy: string
+  ): Promise<User> {
+    const user = await this.getById(tenantId, userId);
+
+    if (customerId !== null) {
+      const customer = await this.customerRepository.getById(tenantId, customerId);
+      if (!customer) {
+        throw new NotFoundError(`Customer ${customerId} not found`);
+      }
+
+      const assignments = await this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
+      const hasAccess = assignments.some(
+        (a) => a.scope === '*' || a.scope === `customer:${customerId}`
+      );
+      if (!hasAccess) {
+        throw new ValidationError(
+          `User ${userId} has no active role assignment for customer ${customerId}`
+        );
+      }
+    }
+
+    const nextPreferences: UpdatePreferencesDTO = {
+      ...user.preferences,
+      defaultCustomerId: customerId,
+    };
+
+    return this.repository.update(tenantId, userId, { preferences: nextPreferences }, updatedBy);
+  }
+
+  /**
+   * Clear `preferences.defaultCustomerId` for every user that points to the
+   * given customer. Used when a customer is deleted or when the user's last
+   * assignment on that customer is revoked.
+   */
+  async clearDefaultCustomerForAll(
+    tenantId: string,
+    customerId: string,
+    updatedBy: string
+  ): Promise<number> {
+    let cleared = 0;
+    // list is paginated; the expected population of "users with this default"
+    // is small, so a simple scan is acceptable.
+    let cursor: string | undefined;
+    do {
+      const page = await this.repository.list(tenantId, { limit: 100, cursor });
+      for (const u of page.items) {
+        if (u.preferences.defaultCustomerId === customerId) {
+          await this.repository.update(
+            tenantId,
+            u.id,
+            { preferences: { ...u.preferences, defaultCustomerId: null } },
+            updatedBy
+          );
+          cleared += 1;
+        }
+      }
+      cursor = page.pagination.nextCursor;
+    } while (cursor);
+    return cleared;
+  }
+
+  /**
+   * Clear the default customer for a single user if it matches `customerId`.
+   * Used after revoking the user's last assignment on that customer.
+   */
+  async clearDefaultCustomerIfMatches(
+    tenantId: string,
+    userId: string,
+    customerId: string,
+    updatedBy: string
+  ): Promise<boolean> {
+    const user = await this.repository.getById(tenantId, userId);
+    if (!user) return false;
+    if (user.preferences.defaultCustomerId !== customerId) return false;
+    await this.repository.update(
+      tenantId,
+      userId,
+      { preferences: { ...user.preferences, defaultCustomerId: null } },
+      updatedBy
+    );
+    return true;
   }
 
   async acceptInvitation(
