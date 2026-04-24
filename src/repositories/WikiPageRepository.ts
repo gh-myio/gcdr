@@ -73,15 +73,25 @@ function mapRevision(row: RevisionRow): WikiPageRevision {
 }
 
 /**
- * Array-overlap condition: `wiki_pages.visibility && ARRAY[...]::text[]`.
- * Drizzle doesn't have a first-class `&&` helper for text arrays, so raw SQL.
+ * Array-overlap condition: `wiki_pages.visibility && ARRAY[$n, $n+1, ...]::text[]`.
+ *
+ * Drizzle doesn't have a first-class `&&` helper for text arrays. Using
+ * `sql\`${arr}::text[]\`` does NOT work with postgres-js — the JS array is
+ * bound as a scalar string instead of a Postgres array literal. We expand
+ * each element as its own parameter via `sql.join` so the server sees
+ * `ARRAY[$n, $n+1]::text[]`, which is the idiomatic and portable form.
  */
+function textArrayLiteral(values: string[]): SQL {
+  const parts = sql.join(values.map((v) => sql`${v}`), sql`, `);
+  return sql`ARRAY[${parts}]::text[]`;
+}
+
 function visibilityOverlap(tags: WikiAudience[]): SQL {
   if (tags.length === 0) {
     // No audiences → match nothing.
     return sql`false`;
   }
-  return sql`${wikiPages.visibility} && ${tags}::text[]`;
+  return sql`${wikiPages.visibility} && ${textArrayLiteral(tags)}`;
 }
 
 // =============================================================================
@@ -650,7 +660,7 @@ export class WikiSearchRepository implements IWikiSearchRepository {
 
     if (params.namespace) conditions.push(eq(wikiPages.namespace, params.namespace));
     if (params.tags && params.tags.length > 0) {
-      conditions.push(sql`${wikiPages.tags} && ${params.tags}::text[]`);
+      conditions.push(sql`${wikiPages.tags} && ${textArrayLiteral(params.tags)}`);
     }
 
     const rankExpr = sql<number>`ts_rank_cd(${wikiPageRevisions.searchTsv}, plainto_tsquery('simple', ${params.q}))`;
