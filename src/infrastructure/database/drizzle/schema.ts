@@ -1437,3 +1437,86 @@ export const userContacts = pgTable('user_contacts', {
   tenantUserIdx:    index('user_contacts_tenant_user_idx').on(table.tenantId, table.userId),
   tenantChannelIdx: index('user_contacts_tenant_channel_idx').on(table.tenantId, table.channel),
 }));
+
+// =============================================================================
+// RFC-0030: MYIO Wiki (Knowledge Base Module)
+// =============================================================================
+
+export const wikiNamespaces = pgTable('wiki_namespaces', {
+  tenantId:        uuid('tenant_id').notNull(),
+  name:            text('name').notNull(),
+  description:     text('description'),
+  reviewRequired:  boolean('review_required').notNull().default(false),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: uniqueIndex('wiki_namespaces_pk').on(table.tenantId, table.name),
+  nameShape: check(
+    'wiki_namespaces_name_shape',
+    sql`${table.name} ~ '^[A-Za-z][A-Za-z0-9_-]{0,31}$'`
+  ),
+}));
+
+export const wikiPages = pgTable('wiki_pages', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  tenantId:          uuid('tenant_id').notNull(),
+  namespace:         text('namespace').notNull(),
+  slug:              text('slug').notNull(),
+  title:             text('title').notNull(),
+  status:            text('status').notNull().default('DRAFT'),
+  // FK to wiki_page_revisions.id declared at the DB level (deferrable) —
+  // not modeled with `.references()` here to avoid Drizzle forcing the
+  // revisions table to exist before pages at compile time.
+  currentRevisionId: uuid('current_revision_id'),
+  tags:              text('tags').array().notNull().default(sql`'{}'::text[]`),
+  visibility:        text('visibility').array().notNull().default(sql`ARRAY['TENANT_PRIVATE']::text[]`),
+  frontmatter:       jsonb('frontmatter').notNull().default({}),
+  createdBy:         uuid('created_by').notNull(),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:         timestamp('deleted_at', { withTimezone: true }),
+  version:           integer('version').notNull().default(1),
+}, (table) => ({
+  tenantNsSlugUnique: uniqueIndex('wiki_pages_tenant_ns_slug_unique').on(table.tenantId, table.namespace, table.slug),
+  tenantNsIdx:        index('idx_wiki_pages_tenant_ns').on(table.tenantId, table.namespace),
+  tenantStatusIdx:    index('idx_wiki_pages_tenant_status').on(table.tenantId, table.status),
+  statusCheck: check(
+    'wiki_pages_status_check',
+    sql`${table.status} IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED')`
+  ),
+  slugShape: check(
+    'wiki_pages_slug_shape',
+    sql`${table.slug} ~ '^[a-z0-9][a-z0-9/_-]{0,127}$'`
+  ),
+  visibilityNonEmpty: check(
+    'wiki_pages_visibility_nonempty',
+    sql`array_length(${table.visibility}, 1) >= 1`
+  ),
+  visibilityTagsValid: check(
+    'wiki_pages_visibility_tags_valid',
+    sql`${table.visibility} <@ ARRAY[
+      'PUBLIC','MYIO_INTERNAL','PARTNERS',
+      'HOLDING_CUSTOMERS','NON_HOLDING_CUSTOMERS','TENANT_PRIVATE'
+    ]::text[]`
+  ),
+}));
+
+export const wikiPageRevisions = pgTable('wiki_page_revisions', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  pageId:         uuid('page_id').notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
+  revisionNumber: integer('revision_number').notNull(),
+  title:          text('title').notNull(),
+  body:           text('body').notNull(),
+  bodyHtml:       text('body_html').notNull(),
+  frontmatter:    jsonb('frontmatter').notNull().default({}),
+  changeNote:     text('change_note'),
+  authorId:       uuid('author_id').notNull(),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // search_tsv is managed by a DB-level trigger — not written from app code.
+}, (table) => ({
+  pageRevUnique: uniqueIndex('wiki_page_revisions_page_rev_unique').on(table.pageId, table.revisionNumber),
+  pageRevIdx:    index('idx_wiki_revisions_page_rev').on(table.pageId, table.revisionNumber),
+  revNumPositive: check(
+    'wiki_page_revisions_revnum_positive',
+    sql`${table.revisionNumber} >= 1`
+  ),
+}));

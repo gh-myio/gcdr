@@ -67,6 +67,8 @@ import {
   groupDispatchController,
   groupChannelsController,
   userContactsController,
+  // RFC-0030: MYIO Wiki (Knowledge Base Module)
+  wikiController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -277,6 +279,9 @@ apiV1Router.use('/dashboard', authMiddleware, dashboardController);
 
 // RFC-0023: Device Sync Jobs (hybridAuth — API Key with devices:write scope)
 apiV1Router.use('/device-sync/jobs', hybridAuthByMethod('devices:read', 'devices:write'), deviceSyncJobsController);
+
+// RFC-0030: MYIO Wiki (Knowledge Base Module)
+apiV1Router.use('/wiki', authMiddleware, wikiController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);

@@ -80,3 +80,13 @@ export type NewPublicSingleApp = typeof schema.publicSingleApps.$inferInsert;
 
 export type PublicSingleAppResponse = typeof schema.publicSingleAppResponses.$inferSelect;
 export type NewPublicSingleAppResponse = typeof schema.publicSingleAppResponses.$inferInsert;
+
+// RFC-0030: Wiki
+export type WikiPageRow = typeof schema.wikiPages.$inferSelect;
+export type NewWikiPageRow = typeof schema.wikiPages.$inferInsert;
+
+export type WikiPageRevisionRow = typeof schema.wikiPageRevisions.$inferSelect;
+export type NewWikiPageRevisionRow = typeof schema.wikiPageRevisions.$inferInsert;
+
+export type WikiNamespaceRow = typeof schema.wikiNamespaces.$inferSelect;
+export type NewWikiNamespaceRow = typeof schema.wikiNamespaces.$inferInsert;

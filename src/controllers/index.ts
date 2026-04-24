@@ -40,6 +40,9 @@ export { default as templateTypesController } from './template-types.controller'
 // Dashboard
 export { dashboardController } from './dashboard.controller';
 
+// RFC-0030: MYIO Wiki (Knowledge Base Module)
+export { default as wikiController } from './wiki.controller';
+
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';
 

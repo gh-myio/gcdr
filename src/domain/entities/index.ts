@@ -12,3 +12,6 @@ export * from './Simulator';
 export * from './MaintenanceGroup';
 export * from './DomainPermission';
 export * from './UserAccessBundle';
+
+// RFC-0030: MYIO Wiki (Knowledge Base Module)
+export * from './WikiPage';
