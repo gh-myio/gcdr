@@ -90,3 +90,6 @@ export type NewWikiPageRevisionRow = typeof schema.wikiPageRevisions.$inferInser
 
 export type WikiNamespaceRow = typeof schema.wikiNamespaces.$inferSelect;
 export type NewWikiNamespaceRow = typeof schema.wikiNamespaces.$inferInsert;
+
+export type WikiPageLinkRow = typeof schema.wikiPageLinks.$inferSelect;
+export type NewWikiPageLinkRow = typeof schema.wikiPageLinks.$inferInsert;

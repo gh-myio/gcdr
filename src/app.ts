@@ -69,6 +69,7 @@ import {
   userContactsController,
   // RFC-0030: MYIO Wiki (Knowledge Base Module)
   wikiController,
+  wikiPublicController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -280,7 +281,12 @@ apiV1Router.use('/dashboard', authMiddleware, dashboardController);
 // RFC-0023: Device Sync Jobs (hybridAuth — API Key with devices:write scope)
 apiV1Router.use('/device-sync/jobs', hybridAuthByMethod('devices:read', 'devices:write'), deviceSyncJobsController);
 
-// RFC-0030: MYIO Wiki (Knowledge Base Module)
+// RFC-0030: Public Wiki (anonymous, forces PUBLIC audience + PUBLISHED status).
+// Mounted BEFORE the authenticated /wiki router so express's ordering gives it
+// priority for /public/wiki/* paths.
+apiV1Router.use('/public/wiki', wikiPublicController);
+
+// RFC-0030: MYIO Wiki (Knowledge Base Module) — authenticated
 apiV1Router.use('/wiki', authMiddleware, wikiController);
 
 // Mount API v1 router

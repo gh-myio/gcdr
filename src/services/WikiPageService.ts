@@ -1,17 +1,29 @@
 import {
   wikiPageRepository,
   wikiRevisionRepository,
+  wikiPageLinkRepository,
+  wikiSearchRepository,
 } from '../repositories/WikiPageRepository';
 import {
   IWikiPageRepository,
   IWikiRevisionRepository,
+  IWikiPageLinkRepository,
+  IWikiSearchRepository,
   ListWikiPagesParams,
+  SearchWikiParams,
+  BacklinksParams,
 } from '../repositories/interfaces/IWikiRepository';
 import {
   WikiPage,
   WikiPageRevision,
+  WikiPageWithRevision,
   WikiAudience,
   WikiPageStatus,
+  WikiEntityType,
+  WikiPageLink,
+  WikiBacklink,
+  WikiSearchHit,
+  ALL_WIKI_ENTITY_TYPES,
 } from '../domain/entities/WikiPage';
 import {
   CreatePageDTO,
@@ -48,6 +60,50 @@ function renderMarkdownPlaceholder(body: string): string {
 }
 
 // =============================================================================
+// Unified diff (line-based, LCS) — no npm dep.
+// Returns a GNU-style unified diff with simple hunk formatting.
+// Adequate for wiki-page bodies; Phase 3+ can replace with `diff` package.
+// =============================================================================
+export function unifiedDiff(a: string, b: string, aLabel = 'a', bLabel = 'b'): string {
+  const aLines = a.split(/\r?\n/);
+  const bLines = b.split(/\r?\n/);
+  const m = aLines.length;
+  const n = bLines.length;
+
+  // LCS length matrix.
+  const lcs: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      lcs[i][j] = aLines[i] === bLines[j]
+        ? lcs[i + 1][j + 1] + 1
+        : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+
+  const ops: Array<{ op: ' ' | '+' | '-'; line: string }> = [];
+  let i = 0; let j = 0;
+  while (i < m && j < n) {
+    if (aLines[i] === bLines[j]) {
+      ops.push({ op: ' ', line: aLines[i] });
+      i++; j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      ops.push({ op: '-', line: aLines[i] });
+      i++;
+    } else {
+      ops.push({ op: '+', line: bLines[j] });
+      j++;
+    }
+  }
+  while (i < m) ops.push({ op: '-', line: aLines[i++] });
+  while (j < n) ops.push({ op: '+', line: bLines[j++] });
+
+  // Header + single hunk covering the whole diff (simple — no grouped hunks).
+  const header = `--- ${aLabel}\n+++ ${bLabel}\n@@ -1,${m} +1,${n} @@\n`;
+  const body   = ops.map((o) => `${o.op}${o.line}`).join('\n');
+  return header + body + (body.endsWith('\n') ? '' : '\n');
+}
+
+// =============================================================================
 // Service
 // =============================================================================
 
@@ -62,11 +118,34 @@ export interface GetPageContext {
   userId: string;
 }
 
+/**
+ * Extract `@<type>:<id>` tokens from Markdown body.
+ * Accepts UUID-shaped ids for all types except `rfc`, which uses a numeric id.
+ * Duplicates inside the body are deduplicated by the repo.
+ */
+const ENTITY_TOKEN_RE =
+  /@(device|customer|rule|asset|central|group|user|rfc):([A-Za-z0-9_-]+)/g;
+
+export function extractEntityLinks(
+  body: string,
+): Array<{ entityType: WikiEntityType; entityId: string }> {
+  const out: Array<{ entityType: WikiEntityType; entityId: string }> = [];
+  for (const match of body.matchAll(ENTITY_TOKEN_RE)) {
+    const [, type, id] = match;
+    if (ALL_WIKI_ENTITY_TYPES.includes(type as WikiEntityType)) {
+      out.push({ entityType: type as WikiEntityType, entityId: id });
+    }
+  }
+  return out;
+}
+
 export class WikiPageService {
   constructor(
     private readonly pageRepo: IWikiPageRepository = wikiPageRepository,
     private readonly revisionRepo: IWikiRevisionRepository = wikiRevisionRepository,
     private readonly audiences: WikiAudienceResolver = wikiAudienceResolver,
+    private readonly linkRepo: IWikiPageLinkRepository = wikiPageLinkRepository,
+    private readonly searchRepo: IWikiSearchRepository = wikiSearchRepository,
   ) {}
 
   // ----- Read operations (audience-filtered) --------------------------------
@@ -76,24 +155,34 @@ export class WikiPageService {
     return this.pageRepo.list(ctx.tenantId, { effectiveAudiences: audiences }, ctx.params);
   }
 
-  async getPageById(ctx: GetPageContext, id: string): Promise<WikiPage> {
+  async getPageById(ctx: GetPageContext, id: string): Promise<WikiPageWithRevision> {
     const page = await this.pageRepo.getById(ctx.tenantId, id);
     if (!page) throw new NotFoundError(`Wiki page ${id} not found`);
     await this.assertReadable(ctx.tenantId, ctx.userId, page);
-    return page;
+    return this.attachRevision(page);
   }
 
-  async getPageBySlug(ctx: GetPageContext, namespace: string, slug: string): Promise<WikiPage> {
+  async getPageBySlug(
+    ctx: GetPageContext,
+    namespace: string,
+    slug: string,
+  ): Promise<WikiPageWithRevision> {
     const page = await this.pageRepo.getBySlug(ctx.tenantId, namespace, slug);
     if (!page) throw new NotFoundError(`Wiki page ${namespace}/${slug} not found`);
     await this.assertReadable(ctx.tenantId, ctx.userId, page);
-    return page;
+    return this.attachRevision(page);
   }
 
   async getCurrentRevision(ctx: GetPageContext, pageId: string): Promise<WikiPageRevision | null> {
     const page = await this.getPageById(ctx, pageId);
     if (!page.currentRevisionId) return null;
     return this.revisionRepo.getById(page.currentRevisionId);
+  }
+
+  private async attachRevision(page: WikiPage): Promise<WikiPageWithRevision> {
+    if (!page.currentRevisionId) return { ...page, currentRevision: null };
+    const rev = await this.revisionRepo.getById(page.currentRevisionId);
+    return { ...page, currentRevision: rev };
   }
 
   async listRevisions(
@@ -140,7 +229,7 @@ export class WikiPageService {
 
     const bodyHtml = renderMarkdownPlaceholder(data.body);
 
-    return this.pageRepo.createWithFirstRevision(
+    const result = await this.pageRepo.createWithFirstRevision(
       {
         tenantId: ctx.tenantId,
         namespace: data.namespace,
@@ -161,6 +250,9 @@ export class WikiPageService {
         authorId: ctx.userId,
       },
     );
+
+    await this.linkRepo.replaceLinks(result.page.id, extractEntityLinks(data.body));
+    return result;
   }
 
   async updatePage(
@@ -182,7 +274,7 @@ export class WikiPageService {
     const newTitle = data.title ?? existing.title;
     const bodyHtml = renderMarkdownPlaceholder(data.body);
 
-    return this.pageRepo.saveRevision(
+    const result = await this.pageRepo.saveRevision(
       ctx.tenantId,
       id,
       {
@@ -200,6 +292,9 @@ export class WikiPageService {
         authorId: ctx.userId,
       },
     );
+
+    await this.linkRepo.replaceLinks(id, extractEntityLinks(data.body));
+    return result;
   }
 
   async movePage(
@@ -259,6 +354,134 @@ export class WikiPageService {
     id: string,
   ): Promise<void> {
     await this.pageRepo.softDelete(ctx.tenantId, id);
+  }
+
+  // ----- Search --------------------------------------------------------------
+
+  async search(
+    ctx: { tenantId: string; userId: string },
+    params: SearchWikiParams,
+  ) {
+    const { audiences } = await this.audiences.resolveForUser(ctx.tenantId, ctx.userId);
+    return this.searchRepo.search(ctx.tenantId, { effectiveAudiences: audiences }, params);
+  }
+
+  async backlinks(
+    ctx: { tenantId: string; userId: string },
+    params: BacklinksParams,
+  ) {
+    const { audiences } = await this.audiences.resolveForUser(ctx.tenantId, ctx.userId);
+    return this.linkRepo.listBacklinks(ctx.tenantId, { effectiveAudiences: audiences }, params);
+  }
+
+  // ----- Diff & rollback -----------------------------------------------------
+
+  async getRevisionDiff(
+    ctx: GetPageContext,
+    pageId: string,
+    a: number,
+    b: number,
+  ): Promise<{ diff: string; a: number; b: number }> {
+    const [revA, revB] = await Promise.all([
+      this.revisionRepo.getByNumber(ctx.tenantId, pageId, a),
+      this.revisionRepo.getByNumber(ctx.tenantId, pageId, b),
+    ]);
+    if (!revA) throw new NotFoundError(`Revision ${a} of page ${pageId} not found`);
+    if (!revB) throw new NotFoundError(`Revision ${b} of page ${pageId} not found`);
+    // Read check via the page
+    await this.getPageById(ctx, pageId);
+    return { diff: unifiedDiff(revA.body, revB.body, `r${a}`, `r${b}`), a, b };
+  }
+
+  async rollback(
+    ctx: { tenantId: string; userId: string },
+    pageId: string,
+    targetRevision: number,
+    changeNote?: string,
+  ): Promise<{ page: WikiPage; revision: WikiPageRevision }> {
+    const existing = await this.pageRepo.getById(ctx.tenantId, pageId);
+    if (!existing) throw new NotFoundError(`Wiki page ${pageId} not found`);
+
+    const target = await this.revisionRepo.getByNumber(ctx.tenantId, pageId, targetRevision);
+    if (!target) {
+      throw new NotFoundError(`Revision ${targetRevision} of page ${pageId} not found`);
+    }
+
+    const result = await this.pageRepo.saveRevision(
+      ctx.tenantId,
+      pageId,
+      { title: target.title, frontmatter: target.frontmatter },
+      {
+        title: target.title,
+        body: target.body,
+        bodyHtml: renderMarkdownPlaceholder(target.body),
+        frontmatter: target.frontmatter,
+        changeNote: changeNote ?? `rollback to revision ${targetRevision}`,
+        authorId: ctx.userId,
+      },
+    );
+
+    await this.linkRepo.replaceLinks(pageId, extractEntityLinks(target.body));
+    return result;
+  }
+
+  // ----- Public (anonymous) variants ----------------------------------------
+  // These force the audience filter to ['PUBLIC'] and status to 'PUBLISHED'.
+  // The user does not need to be authenticated.
+
+  async listPublic(
+    tenantId: string,
+    params: Omit<ListWikiPagesParams, 'status' | 'includeDeleted'> = {},
+  ) {
+    return this.pageRepo.list(
+      tenantId,
+      { effectiveAudiences: ['PUBLIC'] },
+      { ...params, status: 'PUBLISHED' },
+    );
+  }
+
+  async getPublicPageBySlug(
+    tenantId: string,
+    namespace: string,
+    slug: string,
+  ): Promise<WikiPageWithRevision> {
+    const page = await this.pageRepo.getBySlug(tenantId, namespace, slug);
+    if (!page) throw new NotFoundError(`Wiki page ${namespace}/${slug} not found`);
+    if (!page.visibility.includes('PUBLIC') || page.status !== 'PUBLISHED') {
+      throw new NotFoundError(`Wiki page ${namespace}/${slug} not found`);
+    }
+    return this.attachRevision(page);
+  }
+
+  async getPublicPageById(
+    tenantId: string,
+    id: string,
+  ): Promise<WikiPageWithRevision> {
+    const page = await this.pageRepo.getById(tenantId, id);
+    if (!page) throw new NotFoundError(`Wiki page ${id} not found`);
+    if (!page.visibility.includes('PUBLIC') || page.status !== 'PUBLISHED') {
+      throw new NotFoundError(`Wiki page ${id} not found`);
+    }
+    return this.attachRevision(page);
+  }
+
+  async searchPublic(
+    tenantId: string,
+    params: SearchWikiParams,
+  ) {
+    return this.searchRepo.search(
+      tenantId,
+      { effectiveAudiences: ['PUBLIC'] },
+      { ...params, status: 'PUBLISHED' },
+    );
+  }
+
+  async backlinksPublic(tenantId: string, params: BacklinksParams) {
+    return this.linkRepo.listBacklinks(
+      tenantId,
+      { effectiveAudiences: ['PUBLIC'] },
+      params,
+    );
   }
 
   // ----- Helpers -------------------------------------------------------------

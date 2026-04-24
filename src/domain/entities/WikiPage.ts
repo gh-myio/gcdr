@@ -70,3 +70,57 @@ export interface WikiVisibilityPreset {
   label: string;
   tags: WikiAudience[];
 }
+
+/**
+ * Entity types that can be referenced from a wiki page body via
+ * `@<type>:<id>` tokens. Kept in sync with the CHECK constraint on
+ * `wiki_page_links.entity_type`.
+ */
+export type WikiEntityType =
+  | 'device'
+  | 'customer'
+  | 'rule'
+  | 'asset'
+  | 'central'
+  | 'group'
+  | 'user'
+  | 'rfc';
+
+export const ALL_WIKI_ENTITY_TYPES: readonly WikiEntityType[] = [
+  'device', 'customer', 'rule', 'asset',
+  'central', 'group', 'user', 'rfc',
+] as const;
+
+export interface WikiPageLink {
+  pageId: string;
+  entityType: WikiEntityType;
+  entityId: string;
+}
+
+/**
+ * A page augmented with its current revision. Returned by page-get endpoints
+ * so the frontend can render immediately without a second roundtrip.
+ */
+export interface WikiPageWithRevision extends WikiPage {
+  currentRevision: WikiPageRevision | null;
+}
+
+export interface WikiBacklink {
+  pageId: string;
+  namespace: string;
+  slug: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface WikiSearchHit {
+  pageId: string;
+  namespace: string;
+  slug: string;
+  title: string;
+  snippet?: string;
+  rank: number;
+  updatedAt: string;
+  visibility: WikiAudience[];
+  tags: string[];
+}

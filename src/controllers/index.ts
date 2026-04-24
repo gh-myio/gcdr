@@ -42,6 +42,7 @@ export { dashboardController } from './dashboard.controller';
 
 // RFC-0030: MYIO Wiki (Knowledge Base Module)
 export { default as wikiController } from './wiki.controller';
+export { default as wikiPublicController } from './wiki-public.controller';
 
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';

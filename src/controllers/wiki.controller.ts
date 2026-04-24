@@ -319,4 +319,118 @@ router.get('/pages/:id/revisions/:revisionNumber', async (req: Request, res: Res
   }
 });
 
+/**
+ * GET /wiki/pages/:id/revisions/:a/diff/:b
+ * Unified diff between two revisions.
+ */
+router.get('/pages/:id/revisions/:a/diff/:b', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const a = parseInt(req.params.a, 10);
+    const b = parseInt(req.params.b, 10);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 1 || b < 1) {
+      throw new NotFoundError(`Invalid revision number`);
+    }
+    const result = await wikiPageService.getRevisionDiff(
+      { tenantId, userId },
+      req.params.id,
+      a,
+      b,
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /wiki/pages/:id/revisions/:revisionNumber/rollback
+ * Create a new revision that copies the body/title/frontmatter of an older one.
+ */
+router.post('/pages/:id/revisions/:revisionNumber/rollback', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const revisionNumber = parseInt(req.params.revisionNumber, 10);
+    if (!Number.isFinite(revisionNumber) || revisionNumber < 1) {
+      throw new NotFoundError(`Invalid revision number`);
+    }
+    const note = typeof req.body?.changeNote === 'string' ? req.body.changeNote : undefined;
+    const result = await wikiPageService.rollback(
+      { tenantId, userId },
+      req.params.id,
+      revisionNumber,
+      note,
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Search
+// -----------------------------------------------------------------------------
+
+router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const q = (req.query.q as string | undefined)?.trim();
+    if (!q) {
+      sendSuccess(res, { items: [], pagination: { total: 0, totalPages: 0, hasMore: false } }, 200, requestId);
+      return;
+    }
+
+    const { limit, cursor } = parsePagination(req);
+    const StatusSchema = z.enum(['DRAFT', 'REVIEW', 'PUBLISHED', 'ARCHIVED']).optional();
+
+    const tagsRaw = req.query.tags;
+    const tags = Array.isArray(tagsRaw)
+      ? (tagsRaw as string[])
+      : typeof tagsRaw === 'string' ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
+
+    const result = await wikiPageService.search(
+      { tenantId, userId },
+      {
+        q,
+        namespace: req.query.namespace as string | undefined,
+        tags,
+        status: StatusSchema.parse(req.query.status),
+        limit,
+        cursor,
+      },
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Backlinks
+// -----------------------------------------------------------------------------
+
+router.get('/backlinks', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const entity = req.query.entity as string | undefined;
+    if (!entity || !entity.includes(':')) {
+      throw new NotFoundError(`Invalid entity reference (expected 'type:id')`);
+    }
+    const [entityType, entityId] = entity.split(':', 2);
+    const EntityTypeSchema = z.enum([
+      'device','customer','rule','asset','central','group','user','rfc',
+    ]);
+    const parsedType = EntityTypeSchema.parse(entityType);
+
+    const { limit, cursor } = parsePagination(req);
+    const result = await wikiPageService.backlinks(
+      { tenantId, userId },
+      { entityType: parsedType, entityId, limit, cursor },
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

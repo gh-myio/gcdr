@@ -1,26 +1,34 @@
-import { eq, and, sql, desc, isNull, SQL } from 'drizzle-orm';
+import { eq, and, sql, desc, isNull, SQL, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   WikiPage,
   WikiPageRevision,
   WikiAudience,
   WikiPageStatus,
+  WikiEntityType,
+  WikiPageLink,
+  WikiBacklink,
+  WikiSearchHit,
 } from '../domain/entities/WikiPage';
 import { PaginatedResult, PaginationParams } from '../shared/types';
 import {
   IWikiPageRepository,
   IWikiRevisionRepository,
   IWikiNamespaceRepository,
+  IWikiPageLinkRepository,
+  IWikiSearchRepository,
   ListWikiPagesParams,
   WikiVisibilityFilter,
   CreatePageInput,
   CreateRevisionInput,
   UpdatePageMetaInput,
+  SearchWikiParams,
+  BacklinksParams,
 } from './interfaces/IWikiRepository';
 import { countWhere } from './helpers/countQuery';
 import { NotFoundError } from '../shared/errors/AppError';
 
-const { wikiPages, wikiPageRevisions, wikiNamespaces } = schema;
+const { wikiPages, wikiPageRevisions, wikiNamespaces, wikiPageLinks } = schema;
 
 // =============================================================================
 // Helpers
@@ -525,6 +533,175 @@ export class WikiNamespaceRepository implements IWikiNamespaceRepository {
   }
 }
 
+// =============================================================================
+// WikiPageLinkRepository — @type:uuid backlinks
+// =============================================================================
+
+export class WikiPageLinkRepository implements IWikiPageLinkRepository {
+
+  async replaceLinks(
+    pageId: string,
+    links: Array<{ entityType: WikiEntityType; entityId: string }>,
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(wikiPageLinks).where(eq(wikiPageLinks.pageId, pageId));
+      if (links.length === 0) return;
+
+      // De-duplicate in memory (the body might contain the same token twice).
+      const seen = new Set<string>();
+      const values = links
+        .filter((l) => {
+          const key = `${l.entityType}|${l.entityId}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((l) => ({ pageId, entityType: l.entityType, entityId: l.entityId }));
+
+      if (values.length > 0) {
+        await tx.insert(wikiPageLinks).values(values).onConflictDoNothing();
+      }
+    });
+  }
+
+  async listByPage(pageId: string): Promise<WikiPageLink[]> {
+    const rows = await db.select().from(wikiPageLinks).where(eq(wikiPageLinks.pageId, pageId));
+    return rows.map((r) => ({
+      pageId: r.pageId,
+      entityType: r.entityType as WikiEntityType,
+      entityId: r.entityId,
+    }));
+  }
+
+  async listBacklinks(
+    tenantId: string,
+    filter: WikiVisibilityFilter,
+    params: BacklinksParams,
+  ): Promise<PaginatedResult<WikiBacklink>> {
+    const limit = params.limit ?? 20;
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions: SQL[] = [
+      eq(wikiPages.tenantId, tenantId),
+      isNull(wikiPages.deletedAt),
+      eq(wikiPageLinks.entityType, params.entityType),
+      eq(wikiPageLinks.entityId, params.entityId),
+      visibilityOverlap(filter.effectiveAudiences),
+      sql`${wikiPages.status} = 'PUBLISHED'`,
+    ];
+
+    const [rows, [{ count: total }]] = await Promise.all([
+      db.select({
+        pageId:    wikiPages.id,
+        namespace: wikiPages.namespace,
+        slug:      wikiPages.slug,
+        title:     wikiPages.title,
+        updatedAt: wikiPages.updatedAt,
+      })
+        .from(wikiPageLinks)
+        .innerJoin(wikiPages, eq(wikiPages.id, wikiPageLinks.pageId))
+        .where(and(...conditions))
+        .orderBy(desc(wikiPages.updatedAt))
+        .limit(limit + 1)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(wikiPageLinks)
+        .innerJoin(wikiPages, eq(wikiPages.id, wikiPageLinks.pageId))
+        .where(and(...conditions)),
+    ]);
+
+    const hasMore = rows.length > limit;
+    const items: WikiBacklink[] = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
+      pageId:    r.pageId,
+      namespace: r.namespace,
+      slug:      r.slug,
+      title:     r.title,
+      updatedAt: r.updatedAt.toISOString(),
+    }));
+    const nextCursor = hasMore ? String(offset + limit) : undefined;
+    const totalPages = Math.ceil(total / limit);
+
+    return { items, pagination: { total, totalPages, hasMore, nextCursor } };
+  }
+}
+
+// =============================================================================
+// WikiSearchRepository — tsvector-ranked full-text search
+// =============================================================================
+
+export class WikiSearchRepository implements IWikiSearchRepository {
+
+  async search(
+    tenantId: string,
+    filter: WikiVisibilityFilter,
+    params: SearchWikiParams,
+  ): Promise<PaginatedResult<WikiSearchHit>> {
+    const limit  = params.limit ?? 20;
+    const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions: SQL[] = [
+      eq(wikiPages.tenantId, tenantId),
+      isNull(wikiPages.deletedAt),
+      visibilityOverlap(filter.effectiveAudiences),
+      sql`${wikiPages.status} = ${params.status ?? 'PUBLISHED'}`,
+      sql`${wikiPages.currentRevisionId} IS NOT NULL`,
+      sql`${wikiPageRevisions.searchTsv} @@ plainto_tsquery('simple', ${params.q})`,
+    ];
+
+    if (params.namespace) conditions.push(eq(wikiPages.namespace, params.namespace));
+    if (params.tags && params.tags.length > 0) {
+      conditions.push(sql`${wikiPages.tags} && ${params.tags}::text[]`);
+    }
+
+    const rankExpr = sql<number>`ts_rank_cd(${wikiPageRevisions.searchTsv}, plainto_tsquery('simple', ${params.q}))`;
+    const snippetExpr = sql<string>`ts_headline('simple', ${wikiPageRevisions.body}, plainto_tsquery('simple', ${params.q}), 'MaxWords=25,MinWords=10,MaxFragments=1')`;
+
+    const [rows, totalResult] = await Promise.all([
+      db.select({
+        pageId:     wikiPages.id,
+        namespace:  wikiPages.namespace,
+        slug:       wikiPages.slug,
+        title:      wikiPages.title,
+        updatedAt:  wikiPages.updatedAt,
+        visibility: wikiPages.visibility,
+        tags:       wikiPages.tags,
+        rank:       rankExpr,
+        snippet:    snippetExpr,
+      })
+        .from(wikiPages)
+        .innerJoin(wikiPageRevisions, eq(wikiPageRevisions.id, wikiPages.currentRevisionId))
+        .where(and(...conditions))
+        .orderBy(desc(rankExpr), desc(wikiPages.updatedAt))
+        .limit(limit + 1)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(wikiPages)
+        .innerJoin(wikiPageRevisions, eq(wikiPageRevisions.id, wikiPages.currentRevisionId))
+        .where(and(...conditions)),
+    ]);
+
+    const total = totalResult[0]?.count ?? 0;
+    const hasMore = rows.length > limit;
+    const items: WikiSearchHit[] = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
+      pageId:     r.pageId,
+      namespace:  r.namespace,
+      slug:       r.slug,
+      title:      r.title,
+      snippet:    r.snippet ?? undefined,
+      rank:       Number(r.rank ?? 0),
+      updatedAt:  r.updatedAt.toISOString(),
+      visibility: (r.visibility ?? []) as WikiAudience[],
+      tags:       r.tags ?? [],
+    }));
+    const nextCursor = hasMore ? String(offset + limit) : undefined;
+    const totalPages = Math.ceil(total / limit);
+
+    return { items, pagination: { total, totalPages, hasMore, nextCursor } };
+  }
+}
+
 export const wikiPageRepository = new WikiPageRepository();
 export const wikiRevisionRepository = new WikiRevisionRepository();
 export const wikiNamespaceRepository = new WikiNamespaceRepository();
+export const wikiPageLinkRepository = new WikiPageLinkRepository();
+export const wikiSearchRepository = new WikiSearchRepository();

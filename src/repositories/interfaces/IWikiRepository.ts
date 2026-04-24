@@ -4,6 +4,10 @@ import {
   WikiNamespace,
   WikiAudience,
   WikiPageStatus,
+  WikiEntityType,
+  WikiPageLink,
+  WikiBacklink,
+  WikiSearchHit,
 } from '../../domain/entities/WikiPage';
 import { PaginatedResult, PaginationParams } from '../../shared/types';
 
@@ -104,6 +108,36 @@ export interface IWikiRevisionRepository {
     revisionNumber: number
   ): Promise<WikiPageRevision | null>;
   getById(id: string): Promise<WikiPageRevision | null>;
+}
+
+export interface SearchWikiParams extends PaginationParams {
+  q: string;
+  namespace?: string;
+  tags?: string[];
+  status?: WikiPageStatus;
+}
+
+export interface BacklinksParams extends PaginationParams {
+  entityType: WikiEntityType;
+  entityId: string;
+}
+
+export interface IWikiPageLinkRepository {
+  replaceLinks(pageId: string, links: Array<{ entityType: WikiEntityType; entityId: string }>): Promise<void>;
+  listByPage(pageId: string): Promise<WikiPageLink[]>;
+  listBacklinks(
+    tenantId: string,
+    filter: WikiVisibilityFilter,
+    params: BacklinksParams,
+  ): Promise<PaginatedResult<WikiBacklink>>;
+}
+
+export interface IWikiSearchRepository {
+  search(
+    tenantId: string,
+    filter: WikiVisibilityFilter,
+    params: SearchWikiParams,
+  ): Promise<PaginatedResult<WikiSearchHit>>;
 }
 
 export interface IWikiNamespaceRepository {

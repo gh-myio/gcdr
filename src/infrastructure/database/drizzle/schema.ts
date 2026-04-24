@@ -1500,6 +1500,20 @@ export const wikiPages = pgTable('wiki_pages', {
   ),
 }));
 
+export const wikiPageLinks = pgTable('wiki_page_links', {
+  pageId:     uuid('page_id').notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
+  entityType: text('entity_type').notNull(),
+  entityId:   text('entity_id').notNull(),
+}, (table) => ({
+  pk: uniqueIndex('wiki_page_links_pk').on(table.pageId, table.entityType, table.entityId),
+  entityIdx: index('idx_wiki_page_links_entity').on(table.entityType, table.entityId),
+  pageIdx:   index('idx_wiki_page_links_page').on(table.pageId),
+  entityTypeCheck: check(
+    'wiki_page_links_entity_type_check',
+    sql`${table.entityType} IN ('device','customer','rule','asset','central','group','user','rfc')`
+  ),
+}));
+
 export const wikiPageRevisions = pgTable('wiki_page_revisions', {
   id:             uuid('id').primaryKey().defaultRandom(),
   pageId:         uuid('page_id').notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
@@ -1512,6 +1526,8 @@ export const wikiPageRevisions = pgTable('wiki_page_revisions', {
   authorId:       uuid('author_id').notNull(),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   // search_tsv is managed by a DB-level trigger — not written from app code.
+  // Declared as text so it's queryable via `sql\`...\`` expressions.
+  searchTsv:      text('search_tsv'),
 }, (table) => ({
   pageRevUnique: uniqueIndex('wiki_page_revisions_page_rev_unique').on(table.pageId, table.revisionNumber),
   pageRevIdx:    index('idx_wiki_revisions_page_rev').on(table.pageId, table.revisionNumber),
