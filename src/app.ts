@@ -291,8 +291,11 @@ apiV1Router.use('/public/wiki', wikiPublicController);
 // RFC-0030: MYIO Wiki (Knowledge Base Module) — authenticated
 apiV1Router.use('/wiki', authMiddleware, wikiController);
 
-// Generic file/asset storage (S3-backed)
-apiV1Router.use('/assets', authMiddleware, fileAssetsController);
+// Generic file/asset storage (S3-backed). Mounted at /files because /assets
+// is already taken by the IoT asset hierarchy (SITE/BUILDING/FLOOR/EQUIPMENT)
+// in src/controllers/assets.controller.ts and Express's first-match routing
+// would never reach this handler if both shared the path.
+apiV1Router.use('/files', authMiddleware, fileAssetsController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
