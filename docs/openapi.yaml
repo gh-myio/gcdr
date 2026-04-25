@@ -69,6 +69,12 @@ tags:
     description: Per-user notification contacts (RFC-0024/0025). Channels used by dispatch resolution.
   - name: Customer Channels
     description: Customer-scoped dispatch channel credentials (RFC-0024).
+  - name: Wiki
+    description: MYIO Wiki — pages, revisions, search, backlinks, namespaces, and visibility resolution (RFC-0030 Phase 1+2). Authenticated.
+  - name: Wiki Public
+    description: Anonymous-friendly read endpoints for wiki pages with `visibility ⊇ PUBLIC` and `status = PUBLISHED` (RFC-0030 Phase 2). No auth required.
+  - name: File Assets
+    description: Generic S3-backed file storage. Polymorphic (owner_type, owner_id) so any feature can register binaries — wiki attachments, PDF artefacts, future avatars/logos/manuals (RFC-0030 / RFC-0031).
 
 security:
   - bearerAuth: []
@@ -4414,6 +4420,254 @@ components:
         valueHigh:
           type: number
           description: Override upper bound for BETWEEN/OUTSIDE operators
+
+    # =========================================================================
+    # Wiki schemas (RFC-0030)
+    # =========================================================================
+
+    WikiAudience:
+      type: string
+      enum: [PUBLIC, MYIO_INTERNAL, PARTNERS, HOLDING_CUSTOMERS, NON_HOLDING_CUSTOMERS, TENANT_PRIVATE]
+      description: |
+        Audience tag controlling who can read a wiki page.
+        Read access is granted when `page.visibility` overlaps the user's effectiveAudiences set.
+
+    WikiPageStatus:
+      type: string
+      enum: [DRAFT, REVIEW, PUBLISHED, ARCHIVED]
+
+    WikiEntityType:
+      type: string
+      enum: [device, customer, rule, asset, central, group, user, rfc]
+      description: Entity type referenced from page bodies via `@type:id` tokens.
+
+    WikiPage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        namespace: { type: string, example: "Runbooks" }
+        slug: { type: string, example: "chiller-overheating" }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/WikiPageStatus' }
+        currentRevisionId: { type: string, format: uuid, nullable: true }
+        tags: { type: array, items: { type: string } }
+        visibility: { type: array, items: { $ref: '#/components/schemas/WikiAudience' }, minItems: 1 }
+        frontmatter: { type: object, additionalProperties: true }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        version: { type: integer }
+      required: [id, tenantId, namespace, slug, title, status, tags, visibility, frontmatter, createdBy, createdAt, updatedAt]
+
+    WikiPageRevision:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        title: { type: string }
+        body: { type: string, description: "Markdown source" }
+        bodyHtml: { type: string, description: "Server-rendered HTML (DOMPurify-sanitised)" }
+        frontmatter: { type: object, additionalProperties: true }
+        changeNote: { type: string, nullable: true }
+        authorId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+      required: [id, pageId, revisionNumber, title, body, bodyHtml, authorId, createdAt]
+
+    WikiPageWithRevision:
+      allOf:
+        - $ref: '#/components/schemas/WikiPage'
+        - type: object
+          properties:
+            currentRevision: { $ref: '#/components/schemas/WikiPageRevision', nullable: true }
+
+    WikiNamespace:
+      type: object
+      properties:
+        tenantId: { type: string, format: uuid }
+        name: { type: string, example: "Runbooks" }
+        description: { type: string, nullable: true }
+        reviewRequired: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [tenantId, name, reviewRequired, createdAt]
+
+    WikiSearchHit:
+      type: object
+      properties:
+        pageId: { type: string, format: uuid }
+        namespace: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        snippet: { type: string, description: "ts_headline excerpt with <b>...</b> highlights" }
+        rank: { type: number, format: float }
+        updatedAt: { type: string, format: date-time }
+        visibility: { type: array, items: { $ref: '#/components/schemas/WikiAudience' } }
+        tags: { type: array, items: { type: string } }
+      required: [pageId, namespace, slug, title, rank, updatedAt, visibility, tags]
+
+    WikiBacklink:
+      type: object
+      properties:
+        pageId: { type: string, format: uuid }
+        namespace: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        updatedAt: { type: string, format: date-time }
+      required: [pageId, namespace, slug, title, updatedAt]
+
+    WikiVisibilityPreset:
+      type: object
+      properties:
+        id: { type: string, example: "private" }
+        label: { type: string, example: "Privado (apenas minha organização)" }
+        tags: { type: array, items: { $ref: '#/components/schemas/WikiAudience' } }
+      required: [id, label, tags]
+
+    WikiVisibilityOptions:
+      type: object
+      properties:
+        allowedTags: { type: array, items: { $ref: '#/components/schemas/WikiAudience' } }
+        presets: { type: array, items: { $ref: '#/components/schemas/WikiVisibilityPreset' } }
+      required: [allowedTags, presets]
+
+    WikiEffectiveAudiences:
+      type: object
+      properties:
+        audiences: { type: array, items: { $ref: '#/components/schemas/WikiAudience' } }
+        reasons: { type: array, items: { type: string } }
+      required: [audiences, reasons]
+
+    WikiRevisionDiff:
+      type: object
+      properties:
+        diff: { type: string, description: "Unified-diff text (LCS-based)" }
+        a: { type: integer }
+        b: { type: integer }
+      required: [diff, a, b]
+
+    WikiPageWriteResult:
+      type: object
+      description: Returned by create / update / rollback — both the page and the revision they produced.
+      properties:
+        page: { $ref: '#/components/schemas/WikiPage' }
+        revision: { $ref: '#/components/schemas/WikiPageRevision' }
+      required: [page, revision]
+
+    CreateWikiPageRequest:
+      type: object
+      properties:
+        namespace: { type: string, pattern: "^[A-Za-z][A-Za-z0-9_-]{0,31}$" }
+        slug:      { type: string, pattern: "^[a-z0-9][a-z0-9/_-]{0,127}$" }
+        title:     { type: string, minLength: 1, maxLength: 200 }
+        body:      { type: string, maxLength: 524288 }
+        tags:      { type: array, items: { type: string }, maxItems: 20 }
+        visibility: { type: array, items: { $ref: '#/components/schemas/WikiAudience' }, minItems: 1 }
+        frontmatter: { type: object, additionalProperties: true }
+        status:    { type: string, enum: [DRAFT, PUBLISHED] }
+        changeNote: { type: string, maxLength: 500 }
+      required: [namespace, slug, title, body]
+
+    UpdateWikiPageRequest:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, maxLength: 524288 }
+        tags: { type: array, items: { type: string }, maxItems: 20 }
+        visibility: { type: array, items: { $ref: '#/components/schemas/WikiAudience' }, minItems: 1 }
+        frontmatter: { type: object, additionalProperties: true }
+        changeNote: { type: string, maxLength: 500 }
+      required: [body]
+
+    MoveWikiPageRequest:
+      type: object
+      properties:
+        namespace: { type: string }
+        slug: { type: string }
+      description: At least one of `namespace` or `slug` must be provided.
+
+    PublishWikiPageRequest:
+      type: object
+      properties:
+        changeNote: { type: string, maxLength: 500 }
+
+    CreateWikiNamespaceRequest:
+      type: object
+      properties:
+        name: { type: string, pattern: "^[A-Za-z][A-Za-z0-9_-]{0,31}$" }
+        description: { type: string, maxLength: 500 }
+        reviewRequired: { type: boolean, default: false }
+      required: [name]
+
+    UpdateWikiNamespaceRequest:
+      type: object
+      properties:
+        description: { type: string, maxLength: 500 }
+        reviewRequired: { type: boolean }
+
+    # =========================================================================
+    # File Assets schemas (RFC-0030 Phase 4 / RFC-0031)
+    # =========================================================================
+
+    FileAssetOwnerType:
+      type: string
+      enum: [wiki_page, wiki_pdf, free]
+
+    FileAssetStatus:
+      type: string
+      enum: [PENDING_UPLOAD, ACTIVE, QUARANTINED, DELETED]
+
+    FileAssetScanStatus:
+      type: string
+      enum: [PENDING, CLEAN, INFECTED, SKIPPED]
+
+    FileAssetStorageProvider:
+      type: string
+      enum: [S3, MINIO, LOCAL]
+
+    FileAsset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid, nullable: true }
+        ownerType: { $ref: '#/components/schemas/FileAssetOwnerType' }
+        ownerId: { type: string, nullable: true }
+        filename: { type: string }
+        contentType: { type: string, example: "image/png" }
+        byteSize: { type: integer, format: int64, minimum: 0 }
+        sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        storageProvider: { $ref: '#/components/schemas/FileAssetStorageProvider' }
+        storageBucket: { type: string }
+        storageKey: { type: string }
+        status: { $ref: '#/components/schemas/FileAssetStatus' }
+        scanStatus: { $ref: '#/components/schemas/FileAssetScanStatus' }
+        uploadedBy: { type: string, format: uuid }
+        uploadedAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        metadata: { type: object, additionalProperties: true }
+      required: [id, tenantId, ownerType, filename, contentType, byteSize, sha256, storageProvider, storageBucket, storageKey, status, scanStatus, uploadedBy, uploadedAt, metadata]
+
+    FileAssetWithDownloadUrl:
+      allOf:
+        - $ref: '#/components/schemas/FileAsset'
+        - type: object
+          properties:
+            downloadUrl:
+              type: string
+              format: uri
+              description: Presigned S3 URL valid for 5 minutes.
+          required: [downloadUrl]
+
+    FileAssetDownloadResponse:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        expiresInSeconds: { type: integer, minimum: 30, maximum: 3600 }
+        filename: { type: string }
+        contentType: { type: string }
+      required: [url, expiresInSeconds, filename, contentType]
 
 paths:
   # Health
@@ -11152,3 +11406,913 @@ paths:
       responses:
         '204':
           description: Deleted
+
+  # ===========================================================================
+  # Wiki — Authenticated (RFC-0030 Phase 1+2)
+  # ===========================================================================
+
+  /api/v1/wiki/visibility/options:
+    get:
+      tags: [Wiki]
+      summary: List visibility tags + presets the current user is allowed to assign
+      operationId: getWikiVisibilityOptions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiVisibilityOptions' }
+
+  /api/v1/wiki/visibility/me:
+    get:
+      tags: [Wiki]
+      summary: Current user's effective audience set (debug / UI hints)
+      operationId: getWikiEffectiveAudiences
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiEffectiveAudiences' }
+
+  /api/v1/wiki/namespaces:
+    get:
+      tags: [Wiki]
+      summary: List wiki namespaces in this tenant
+      operationId: listWikiNamespaces
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WikiNamespace' }
+                      total: { type: integer }
+    post:
+      tags: [Wiki]
+      summary: Create a new namespace in this tenant
+      operationId: createWikiNamespace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWikiNamespaceRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiNamespace' }
+        '409':
+          description: Namespace already exists
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/wiki/namespaces/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Wiki]
+      summary: Update a namespace's description / reviewRequired
+      operationId: updateWikiNamespace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWikiNamespaceRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiNamespace' }
+    delete:
+      tags: [Wiki]
+      summary: Delete a namespace (only if it contains zero pages)
+      operationId: deleteWikiNamespace
+      responses:
+        '204': { description: Deleted }
+        '409':
+          description: Namespace still contains pages
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/wiki/pages:
+    get:
+      tags: [Wiki]
+      summary: List wiki pages (filtered by user's effective audiences)
+      operationId: listWikiPages
+      parameters:
+        - in: query
+          name: namespace
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/WikiPageStatus' }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string, description: "Title prefix (full-text is /search)" }
+        - in: query
+          name: includeDeleted
+          schema: { type: boolean, default: false }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiPage' }
+    post:
+      tags: [Wiki]
+      summary: Create a new page (revision #1 persisted atomically)
+      operationId: createWikiPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWikiPageRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/WikiPage'
+                          - type: object
+                            properties:
+                              extractedLinks:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    entityType: { $ref: '#/components/schemas/WikiEntityType' }
+                                    entityId: { type: string }
+        '403':
+          description: Caller cannot assign the requested visibility
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: A page with the same (namespace, slug) already exists
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/wiki/pages/by-slug/{namespace}/{slug}:
+    get:
+      tags: [Wiki]
+      summary: Lookup a page by canonical (namespace, slug). Returns currentRevision inline.
+      operationId: getWikiPageBySlug
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema: { type: string }
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWithRevision' }
+        '404':
+          description: Not found OR caller has no read overlap
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/wiki/pages/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Wiki]
+      summary: Get a page by id with currentRevision inline
+      operationId: getWikiPageById
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWithRevision' }
+    put:
+      tags: [Wiki]
+      summary: Append a new revision and update page metadata atomically
+      operationId: updateWikiPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWikiPageRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWriteResult' }
+    delete:
+      tags: [Wiki]
+      summary: Soft-delete the page
+      operationId: deleteWikiPage
+      responses:
+        '204': { description: Deleted }
+
+  /api/v1/wiki/pages/{id}/move:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Wiki]
+      summary: Rename namespace and/or slug
+      operationId: moveWikiPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoveWikiPageRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPage' }
+        '409':
+          description: Target slug already exists
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/wiki/pages/{id}/publish:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Wiki]
+      summary: Transition DRAFT/REVIEW → PUBLISHED
+      operationId: publishWikiPage
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublishWikiPageRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPage' }
+
+  /api/v1/wiki/pages/{id}/archive:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Wiki]
+      summary: Transition to ARCHIVED (page stays readable to existing audiences)
+      operationId: archiveWikiPage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPage' }
+
+  /api/v1/wiki/pages/{id}/revisions:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Wiki]
+      summary: List revisions of a page (newest first)
+      operationId: listWikiPageRevisions
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiPageRevision' }
+
+  /api/v1/wiki/pages/{id}/revisions/{revisionNumber}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: revisionNumber
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [Wiki]
+      summary: Get a specific revision
+      operationId: getWikiPageRevision
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageRevision' }
+
+  /api/v1/wiki/pages/{id}/revisions/{a}/diff/{b}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: a
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - in: path
+        name: b
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [Wiki]
+      summary: Unified diff between two revisions
+      operationId: diffWikiPageRevisions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiRevisionDiff' }
+
+  /api/v1/wiki/pages/{id}/revisions/{revisionNumber}/rollback:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: revisionNumber
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [Wiki]
+      summary: Roll back to an older revision (creates a new revision copying the old one)
+      operationId: rollbackWikiPage
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                changeNote: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWriteResult' }
+
+  /api/v1/wiki/search:
+    get:
+      tags: [Wiki]
+      summary: Full-text search over current revisions (tsvector + ts_rank_cd)
+      operationId: searchWikiPages
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 1 }
+        - in: query
+          name: namespace
+          schema: { type: string }
+        - in: query
+          name: tags
+          schema: { type: string, description: "Comma-separated list" }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/WikiPageStatus' }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiSearchHit' }
+
+  /api/v1/wiki/backlinks:
+    get:
+      tags: [Wiki]
+      summary: Pages that link to a given entity via @type:id tokens
+      operationId: getWikiBacklinks
+      parameters:
+        - in: query
+          name: entity
+          required: true
+          schema: { type: string, pattern: "^(device|customer|rule|asset|central|group|user|rfc):.+$" }
+          example: "device:f8117e90-c4da-4e47-bbc8-1e04dbe43331"
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiBacklink' }
+
+  # ===========================================================================
+  # Wiki Public — anonymous (RFC-0030 Phase 2)
+  # Forces visibility ⊇ PUBLIC and status = PUBLISHED. No auth required.
+  # ===========================================================================
+
+  /api/v1/public/wiki/namespaces:
+    get:
+      tags: [Wiki Public]
+      summary: List namespaces (anonymous-friendly)
+      operationId: listPublicWikiNamespaces
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WikiNamespace' }
+                      total: { type: integer }
+
+  /api/v1/public/wiki/pages:
+    get:
+      tags: [Wiki Public]
+      summary: List PUBLIC PUBLISHED pages
+      operationId: listPublicWikiPages
+      security: []
+      parameters:
+        - in: query
+          name: namespace
+          schema: { type: string }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiPage' }
+
+  /api/v1/public/wiki/pages/by-slug/{namespace}/{slug}:
+    get:
+      tags: [Wiki Public]
+      summary: Lookup a PUBLIC page by canonical slug
+      operationId: getPublicWikiPageBySlug
+      security: []
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema: { type: string }
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWithRevision' }
+        '404':
+          description: Not found, not PUBLIC, or not PUBLISHED
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/public/wiki/pages/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Wiki Public]
+      summary: Lookup a PUBLIC page by id
+      operationId: getPublicWikiPageById
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WikiPageWithRevision' }
+
+  /api/v1/public/wiki/search:
+    get:
+      tags: [Wiki Public]
+      summary: Full-text search restricted to PUBLIC PUBLISHED pages
+      operationId: searchPublicWikiPages
+      security: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 1 }
+        - in: query
+          name: namespace
+          schema: { type: string }
+        - in: query
+          name: tags
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiSearchHit' }
+
+  /api/v1/public/wiki/backlinks:
+    get:
+      tags: [Wiki Public]
+      summary: Public backlinks lookup
+      operationId: getPublicWikiBacklinks
+      security: []
+      parameters:
+        - in: query
+          name: entity
+          required: true
+          schema: { type: string, pattern: "^(device|customer|rule|asset|central|group|user|rfc):.+$" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/WikiBacklink' }
+
+  # ===========================================================================
+  # File Assets (RFC-0030 Phase 4 / RFC-0031)
+  # ===========================================================================
+
+  /api/v1/files:
+    post:
+      tags: [File Assets]
+      summary: Upload a file (multipart/form-data, field name "file")
+      operationId: uploadFileAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                ownerType:
+                  $ref: '#/components/schemas/FileAssetOwnerType'
+                ownerId:
+                  type: string
+                  description: Required when ownerType ≠ 'free'
+                customerId:
+                  type: string
+                  format: uuid
+                metadata:
+                  type: string
+                  description: JSON-encoded object (free-form key/value)
+              required: [file, ownerType]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileAssetWithDownloadUrl' }
+        '400':
+          description: Validation error (missing file, oversized, MIME not allowed, invalid metadata, ownerId required, ...)
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    get:
+      tags: [File Assets]
+      summary: List files with filters
+      operationId: listFileAssets
+      parameters:
+        - in: query
+          name: ownerType
+          schema: { $ref: '#/components/schemas/FileAssetOwnerType' }
+        - in: query
+          name: ownerId
+          schema: { type: string }
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/FileAssetStatus' }
+        - in: query
+          name: scanStatus
+          schema: { $ref: '#/components/schemas/FileAssetScanStatus' }
+        - in: query
+          name: includeDeleted
+          schema: { type: boolean, default: false }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/FileAsset' }
+
+  /api/v1/files/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [File Assets]
+      summary: Get file metadata
+      operationId: getFileAsset
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileAsset' }
+    delete:
+      tags: [File Assets]
+      summary: Soft-delete a file (S3 binary purged by lifecycle rule after 30 days)
+      operationId: deleteFileAsset
+      responses:
+        '204': { description: Deleted }
+
+  /api/v1/files/{id}/download:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [File Assets]
+      summary: Mint a presigned download URL (or 302 redirect)
+      operationId: getFileAssetDownloadUrl
+      parameters:
+        - in: query
+          name: disposition
+          schema: { type: string, enum: [inline, attachment], default: inline }
+        - in: query
+          name: expiresInSeconds
+          schema: { type: integer, minimum: 30, maximum: 3600, default: 300 }
+        - in: query
+          name: filename
+          schema: { type: string }
+        - in: query
+          name: redirect
+          schema: { type: boolean, default: false }
+          description: When true, the API returns a 302 redirect to the signed URL.
+      responses:
+        '200':
+          description: Signed URL (default JSON mode)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileAssetDownloadResponse' }
+        '302':
+          description: Redirect to signed S3 URL (when ?redirect=true)
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '400':
+          description: Asset is QUARANTINED — downloads blocked
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '404':
+          description: Asset not found or soft-deleted
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
