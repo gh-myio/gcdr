@@ -93,3 +93,7 @@ export type NewWikiNamespaceRow = typeof schema.wikiNamespaces.$inferInsert;
 
 export type WikiPageLinkRow = typeof schema.wikiPageLinks.$inferSelect;
 export type NewWikiPageLinkRow = typeof schema.wikiPageLinks.$inferInsert;
+
+// File Assets (generic file storage)
+export type FileAssetRow = typeof schema.fileAssets.$inferSelect;
+export type NewFileAssetRow = typeof schema.fileAssets.$inferInsert;

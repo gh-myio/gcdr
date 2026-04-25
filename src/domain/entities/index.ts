@@ -15,3 +15,6 @@ export * from './UserAccessBundle';
 
 // RFC-0030: MYIO Wiki (Knowledge Base Module)
 export * from './WikiPage';
+
+// Generic file/asset storage (S3-backed)
+export * from './FileAsset';

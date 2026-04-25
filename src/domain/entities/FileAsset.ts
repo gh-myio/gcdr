@@ -1,0 +1,59 @@
+// Generic file/asset storage entity. Backs S3-compatible object storage and
+// is intentionally polymorphic so any GCDR feature (wiki, PDF export, future
+// avatars, customer logos, device manuals) can register a file without a
+// per-feature table.
+//
+// Companion: docs/RFC-0030-S3-Bucket-Setup.md (bucket, IAM, key layout).
+
+export type FileAssetOwnerType =
+  | 'wiki_page'    // attachment of a wiki page (image, doc, etc.)
+  | 'wiki_pdf'    // rendered PDF artefact of a wiki page revision
+  | 'free';       // uploaded but not yet attached to anything
+
+export const ALL_FILE_ASSET_OWNER_TYPES: readonly FileAssetOwnerType[] = [
+  'wiki_page', 'wiki_pdf', 'free',
+] as const;
+
+export type FileAssetStatus =
+  | 'PENDING_UPLOAD'   // metadata row created, S3 PUT not yet confirmed
+  | 'ACTIVE'           // available for download
+  | 'QUARANTINED'      // AV scan flagged it; download blocked
+  | 'DELETED';         // soft delete; S3 lifecycle rule purges binary later
+
+export type FileAssetScanStatus =
+  | 'PENDING'          // not yet scanned
+  | 'CLEAN'
+  | 'INFECTED'         // moves status → QUARANTINED
+  | 'SKIPPED';         // scan disabled or unsupported MIME
+
+export type FileAssetStorageProvider = 'S3' | 'MINIO' | 'LOCAL';
+
+export interface FileAsset {
+  id: string;
+  tenantId: string;
+  customerId: string | null;
+
+  ownerType: FileAssetOwnerType;
+  /** Required for everything except `owner_type = 'free'`. UUID for most types; `text` for non-UUID owners (e.g. RFC numbers). */
+  ownerId: string | null;
+
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  /** Hex-encoded SHA-256 of the binary content (64 chars). */
+  sha256: string;
+
+  storageProvider: FileAssetStorageProvider;
+  storageBucket: string;
+  storageKey: string;
+
+  status: FileAssetStatus;
+  scanStatus: FileAssetScanStatus;
+
+  uploadedBy: string;
+  uploadedAt: string;     // ISO 8601
+  deletedAt: string | null;
+
+  /** Free-form: image dimensions, video duration, EXIF, page count, etc. */
+  metadata: Record<string, unknown>;
+}

@@ -12,6 +12,7 @@ import {
   varchar,
   integer,
   smallint,
+  bigint,
   boolean,
   timestamp,
   jsonb,
@@ -1511,6 +1512,70 @@ export const wikiPageLinks = pgTable('wiki_page_links', {
   entityTypeCheck: check(
     'wiki_page_links_entity_type_check',
     sql`${table.entityType} IN ('device','customer','rule','asset','central','group','user','rfc')`
+  ),
+}));
+
+// =============================================================================
+// File Assets — generic file storage (RFC-0030 attachments, RFC-0031 PDFs,
+// future avatars/logos/manuals). Polymorphic via (owner_type, owner_id).
+// =============================================================================
+
+export const fileAssets = pgTable('file_assets', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  customerId:       uuid('customer_id').references(() => customers.id),
+
+  ownerType:        text('owner_type').notNull(),
+  ownerId:          text('owner_id'),
+
+  filename:         text('filename').notNull(),
+  contentType:      text('content_type').notNull(),
+  byteSize:         bigint('byte_size', { mode: 'number' }).notNull(),
+  sha256:           text('sha256').notNull(),
+
+  storageProvider:  text('storage_provider').notNull().default('S3'),
+  storageBucket:    text('storage_bucket').notNull(),
+  storageKey:       text('storage_key').notNull(),
+
+  status:           text('status').notNull().default('ACTIVE'),
+  scanStatus:       text('scan_status').notNull().default('PENDING'),
+
+  uploadedBy:       uuid('uploaded_by').notNull(),
+  uploadedAt:       timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:        timestamp('deleted_at', { withTimezone: true }),
+
+  metadata:         jsonb('metadata').notNull().default({}),
+}, (table) => ({
+  tenantOwnerIdx:    index('idx_file_assets_tenant_owner').on(table.tenantId, table.ownerType, table.ownerId),
+  tenantSha256Idx:   index('idx_file_assets_tenant_sha256').on(table.tenantId, table.sha256),
+
+  ownerTypeCheck: check(
+    'file_assets_owner_type_check',
+    sql`${table.ownerType} IN ('wiki_page','wiki_pdf','free')`
+  ),
+  statusCheck: check(
+    'file_assets_status_check',
+    sql`${table.status} IN ('PENDING_UPLOAD','ACTIVE','QUARANTINED','DELETED')`
+  ),
+  scanStatusCheck: check(
+    'file_assets_scan_status_check',
+    sql`${table.scanStatus} IN ('PENDING','CLEAN','INFECTED','SKIPPED')`
+  ),
+  storageProviderCheck: check(
+    'file_assets_storage_provider_check',
+    sql`${table.storageProvider} IN ('S3','MINIO','LOCAL')`
+  ),
+  byteSizePositive: check(
+    'file_assets_byte_size_positive',
+    sql`${table.byteSize} >= 0`
+  ),
+  sha256Format: check(
+    'file_assets_sha256_format',
+    sql`${table.sha256} ~ '^[a-f0-9]{64}$'`
+  ),
+  ownerIdRequired: check(
+    'file_assets_owner_id_when_typed',
+    sql`${table.ownerType} = 'free' OR ${table.ownerId} IS NOT NULL`
   ),
 }));
 

@@ -44,6 +44,9 @@ export { dashboardController } from './dashboard.controller';
 export { default as wikiController } from './wiki.controller';
 export { default as wikiPublicController } from './wiki-public.controller';
 
+// Generic file/asset storage (S3-backed) — RFC-0030 / RFC-0031
+export { default as fileAssetsController } from './file-assets.controller';
+
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';
 

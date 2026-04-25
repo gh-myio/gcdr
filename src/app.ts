@@ -70,6 +70,8 @@ import {
   // RFC-0030: MYIO Wiki (Knowledge Base Module)
   wikiController,
   wikiPublicController,
+  // Generic file/asset storage (S3)
+  fileAssetsController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -288,6 +290,9 @@ apiV1Router.use('/public/wiki', wikiPublicController);
 
 // RFC-0030: MYIO Wiki (Knowledge Base Module) — authenticated
 apiV1Router.use('/wiki', authMiddleware, wikiController);
+
+// Generic file/asset storage (S3-backed)
+apiV1Router.use('/assets', authMiddleware, fileAssetsController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
