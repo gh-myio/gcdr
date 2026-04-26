@@ -52,6 +52,19 @@ export function permissionForAudience(tag: WikiAudience): string {
   return `wiki.visibility.${kebab}`;
 }
 
+/**
+ * When AUTH_DISABLED bypass is on, the request is authenticated as the
+ * synthetic DEV_USER_ID which has no role assignments in the DB. The
+ * bypass already grants `roles: ['*']` on the JWT-like object, so RBAC
+ * checks here should mirror that and short-circuit to "allowed".
+ *
+ * This is a development convenience — production must run with
+ * DISABLE_AUTH unset and real users with wiki.visibility.* permissions
+ * granted via policy:wiki-myio-admin (or partner-admin / tenant-admin
+ * for narrower visibility scopes).
+ */
+const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
+
 export class WikiAudienceResolver {
 
   /**
@@ -124,6 +137,12 @@ export class WikiAudienceResolver {
     tenantId: string,
     userId: string,
   ): Promise<{ allowedTags: WikiAudience[]; presets: WikiVisibilityPreset[] }> {
+    // Bypass mode: dev/test environment grants every tag.
+    if (AUTH_DISABLED) {
+      const allowedTags = [...ALL_WIKI_AUDIENCES];
+      return { allowedTags, presets: ALL_PRESETS };
+    }
+
     const allowedTags: WikiAudience[] = [];
     for (const tag of ALL_WIKI_AUDIENCES) {
       const res = await authorizationService.evaluatePermission(tenantId, {
@@ -151,6 +170,11 @@ export class WikiAudienceResolver {
     userId: string,
     visibility: WikiAudience[],
   ): Promise<{ allowed: boolean; deniedTags: WikiAudience[] }> {
+    // Bypass mode: dev/test environment grants every tag.
+    if (AUTH_DISABLED) {
+      return { allowed: true, deniedTags: [] };
+    }
+
     const deniedTags: WikiAudience[] = [];
     for (const tag of visibility) {
       const res = await authorizationService.evaluatePermission(tenantId, {
