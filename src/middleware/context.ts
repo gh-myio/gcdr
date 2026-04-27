@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { ValidationError } from '../shared/errors/AppError';
 
 export interface RequestContext {
   tenantId: string;
@@ -32,14 +33,44 @@ declare global {
   }
 }
 
-const DEFAULT_TENANT_ID = 'tenant-default';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Env-driven default tenant for unauthenticated requests (e.g. public endpoints
+// hit directly from a browser without X-Tenant-Id). Must be a real UUID — the
+// previous string literal `'tenant-default'` exploded with cast errors against
+// any tenant_id::uuid column. Falls back to the seed tenant if env is unset.
+const FALLBACK_TENANT_UUID = '11111111-1111-1111-1111-111111111111';
+const ENV_DEFAULT_TENANT = process.env.DEFAULT_TENANT_ID;
+const DEFAULT_TENANT_ID =
+  ENV_DEFAULT_TENANT && UUID_REGEX.test(ENV_DEFAULT_TENANT)
+    ? ENV_DEFAULT_TENANT
+    : FALLBACK_TENANT_UUID;
+
 const DEFAULT_USER_ID = 'system';
 
 /**
  * Middleware to extract and attach request context
+ *
+ * Tenant resolution rules:
+ *   - X-Tenant-Id absent / empty → DEFAULT_TENANT_ID (real UUID)
+ *   - X-Tenant-Id present and a valid UUID → used as-is
+ *   - X-Tenant-Id present but not a UUID → 400 ValidationError (loud,
+ *     prevents downstream PostgreSQL cast errors that surface as 500)
  */
 export function contextMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const tenantId = (req.headers['x-tenant-id'] as string) || DEFAULT_TENANT_ID;
+  const headerTenant = req.headers['x-tenant-id'];
+  let tenantId: string;
+  if (headerTenant === undefined || headerTenant === '') {
+    tenantId = DEFAULT_TENANT_ID;
+  } else if (typeof headerTenant !== 'string' || !UUID_REGEX.test(headerTenant)) {
+    next(new ValidationError(
+      `X-Tenant-Id header must be a UUID (got '${String(headerTenant)}')`
+    ));
+    return;
+  } else {
+    tenantId = headerTenant;
+  }
+
   const userId = (req.headers['x-user-id'] as string) || DEFAULT_USER_ID;
   const requestId = (req.headers['x-request-id'] as string) || uuidv4();
   const ip = getClientIp(req);
