@@ -55,13 +55,15 @@ downloads — see "Future" below.)
 
 Base URL: `/api/v1/files` (production: `https://gcdr-api.a.myio-bas.com/api/v1/files`)
 
-| Method   | Path                       | Purpose                                                   |
-|----------|----------------------------|-----------------------------------------------------------|
-| `POST`   | `/files`                   | Upload a file (multipart/form-data, field name `file`)    |
-| `GET`    | `/files`                   | List files with filters and pagination                    |
-| `GET`    | `/files/:id`               | Get a single file's metadata                              |
-| `GET`    | `/files/:id/download`      | Get a fresh presigned download URL                        |
-| `DELETE` | `/files/:id`               | Soft delete (binary purged by S3 lifecycle after 30 days) |
+| Method   | Path                       | Auth        | Purpose                                                   |
+|----------|----------------------------|-------------|-----------------------------------------------------------|
+| `POST`   | `/files`                   | required    | Upload a file (multipart/form-data, field name `file`). Optionally include `publicSlug` to immediately make it available at `/public/files/by-slug/...`. |
+| `GET`    | `/files`                   | required    | List files with filters and pagination                    |
+| `GET`    | `/files/:id`               | required    | Get a single file's metadata                              |
+| `GET`    | `/files/:id/download`      | required    | Get a fresh presigned download URL                        |
+| `DELETE` | `/files/:id`               | required    | Soft delete (binary purged by S3 lifecycle after 30 days) |
+| `PATCH`  | `/files/:id/public-slug`   | required    | Set, replace, or clear (`null`) the file's public slug    |
+| `GET`    | `/public/files/by-slug/:slug` | **none** | Stable, brand-friendly public URL for assets with a slug. 302-redirect-capable. |
 
 ---
 
@@ -78,6 +80,7 @@ Base URL: `/api/v1/files` (production: `https://gcdr-api.a.myio-bas.com/api/v1/f
 | `ownerId`    | string  | required when `ownerType ≠ free`  | UUID of the owning entity (page/pdf), or any text identifier for `wiki_pdf`. |
 | `customerId` | string  | optional                          | UUID. Optional customer scope; defaults to null. |
 | `metadata`   | string  | optional                          | JSON-encoded object. Free-form key/value (image dimensions, video duration, EXIF, page count, etc.). |
+| `publicSlug` | string  | optional                          | Human-readable slug (e.g. `device-icons/escada-rolante`). Format `^[a-z0-9][a-z0-9/_-]{0,127}$`. Unique per tenant — `409` if already taken. Once set, the asset is reachable at `/api/v1/public/files/by-slug/<publicSlug>` without auth. |
 
 #### Example — uploading an image attached to a wiki page
 
@@ -343,6 +346,14 @@ export interface FileAsset {
   deletedAt: string | null;
 
   metadata: Record<string, unknown>;
+
+  /**
+   * Optional human-readable slug for stable public URLs:
+   *   GET /api/v1/public/files/by-slug/<publicSlug>
+   * Unique per tenant among non-deleted rows. Pattern:
+   *   ^[a-z0-9][a-z0-9/_-]{0,127}$
+   */
+  publicSlug: string | null;
 }
 
 /** Returned by POST /files only. The list/get endpoints omit it. */
@@ -355,6 +366,12 @@ export interface CreateFileAssetForm {
   ownerId?: string;
   customerId?: string;
   metadata?: Record<string, unknown>;
+  publicSlug?: string;
+}
+
+export interface SetPublicSlugRequest {
+  /** `null` clears the slug, removing the file from /public/files/by-slug/. */
+  publicSlug: string | null;
 }
 
 export interface FileAssetDownloadOptions {
@@ -721,6 +738,98 @@ const { items } = useFileList({
   status: 'ACTIVE',
 });
 const images = items.filter((a) => a.contentType.startsWith('image/'));
+```
+
+---
+
+## Public URLs (stable named slugs)
+
+For assets that need brand-friendly, permanent URLs — device icons, customer
+logos, marketing images shared in emails, anything you'd otherwise hardcode
+into the frontend or external systems — assign a `publicSlug`. The asset
+becomes reachable via:
+
+```
+GET /api/v1/public/files/by-slug/<publicSlug>           → JSON with signed URL
+GET /api/v1/public/files/by-slug/<publicSlug>?redirect=true   → 302 to signed URL
+```
+
+No auth, no JWT, no S3 hostname leaked, no UUID in the path.
+
+### Example — device-icons catalog
+
+```typescript
+// Upload at create time
+const { asset } = (await fileAssetService.upload(file, {
+  ownerType: 'free',
+  publicSlug: 'device-icons/escada-rolante',
+  metadata: { deviceProfile: 'ESCADA_ROLANTE' },
+})).data!;
+
+// Frontend usage — fully cacheable, no per-request signing roundtrip
+<img src="/api/v1/public/files/by-slug/device-icons/escada-rolante?redirect=true" />
+```
+
+The browser hits the API, the API redirects to a fresh 5-min signed URL,
+and the browser follows. The visible URL never changes — even after
+re-upload (if you later assign the slug to a new asset) or revision rotation.
+
+### Example — set/change/clear a slug after upload
+
+```typescript
+// Promote an existing asset to a public slug
+await fileAssetService.setPublicSlug(asset.id, {
+  publicSlug: 'customer-logos/acme',
+});
+
+// Move the slug to a different (newer) asset — old asset keeps its slot but
+// loses the slug. Useful for "publish a new version" workflows.
+await fileAssetService.setPublicSlug(oldAsset.id, { publicSlug: null });
+await fileAssetService.setPublicSlug(newAsset.id, { publicSlug: 'customer-logos/acme' });
+
+// Clear a slug entirely (asset still exists, just no longer public-by-slug)
+await fileAssetService.setPublicSlug(asset.id, { publicSlug: null });
+```
+
+### Slug format
+
+- Pattern: `^[a-z0-9][a-z0-9/_-]{0,127}$`
+- Lowercase only, must start with `[a-z0-9]`
+- May contain `/`, `_`, `-`
+- Recommended convention: namespace by category (e.g. `device-icons/`,
+  `customer-logos/`, `marketing/`) so different feature groups don't collide.
+
+### Slug rules
+
+- **Unique per tenant** — assigning a slug already held by another live row in the same tenant returns `409 CONFLICT`.
+- **Soft-deleted rows release their slug** — deleting an asset with a slug frees that slug for re-assignment. Use this for "publish a new version" flows.
+- **Slug is opt-in for public exposure.** Files without a slug are never reachable via `/public/files/by-slug/`, even by ID. Setting a slug is the single act of opting an asset into public visibility.
+- **Quarantined slugs return 404** — even though the slug is set, an `INFECTED` scanStatus blocks public lookup.
+
+### Service implementation snippet
+
+```typescript
+class FileAssetService extends BaseService {
+  // ... existing methods ...
+
+  /** Set, replace, or clear the public slug. Pass `null` to clear. */
+  async setPublicSlug(
+    id: string,
+    body: { publicSlug: string | null },
+  ): Promise<ApiResponse<FileAsset>> {
+    return this.apiPatch<FileAsset>(`/files/${id}/public-slug`, body);
+  }
+}
+```
+
+The public lookup endpoint requires no auth, so the frontend can also embed
+it in `<a href>` / `<img src>` directly — no fetch involved:
+
+```html
+<img src="https://gcdr-api.a.myio-bas.com/api/v1/public/files/by-slug/device-icons/escada-rolante?redirect=true" />
+<a href="/api/v1/public/files/by-slug/marketing/datasheet?redirect=true&disposition=attachment&filename=datasheet.pdf">
+  Download datasheet
+</a>
 ```
 
 ---

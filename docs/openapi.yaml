@@ -4647,7 +4647,25 @@ components:
         uploadedAt: { type: string, format: date-time }
         deletedAt: { type: string, format: date-time, nullable: true }
         metadata: { type: object, additionalProperties: true }
+        publicSlug:
+          type: string
+          nullable: true
+          pattern: "^[a-z0-9][a-z0-9/_-]{0,127}$"
+          description: |
+            Optional human-readable slug for stable public URLs:
+              GET /api/v1/public/files/by-slug/<publicSlug>
+            Unique per tenant among non-deleted rows.
       required: [id, tenantId, ownerType, filename, contentType, byteSize, sha256, storageProvider, storageBucket, storageKey, status, scanStatus, uploadedBy, uploadedAt, metadata]
+
+    SetPublicSlugRequest:
+      type: object
+      properties:
+        publicSlug:
+          type: string
+          nullable: true
+          pattern: "^[a-z0-9][a-z0-9/_-]{0,127}$"
+          description: Pass `null` to clear the slug.
+      required: [publicSlug]
 
     FileAssetWithDownloadUrl:
       allOf:
@@ -12181,6 +12199,10 @@ paths:
                 metadata:
                   type: string
                   description: JSON-encoded object (free-form key/value)
+                publicSlug:
+                  type: string
+                  pattern: "^[a-z0-9][a-z0-9/_-]{0,127}$"
+                  description: Optional. If set, the asset becomes reachable at /api/v1/public/files/by-slug/<publicSlug>. Returns 409 if slug already taken in the tenant.
               required: [file, ownerType]
       responses:
         '201':
@@ -12315,4 +12337,86 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '404':
           description: Asset not found or soft-deleted
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/files/{id}/public-slug:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [File Assets]
+      summary: Set, replace, or clear (`null`) the file's public slug
+      operationId: setFileAssetPublicSlug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetPublicSlugRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileAsset' }
+        '404':
+          description: Asset not found
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: Slug already taken by another live asset in this tenant
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /api/v1/public/files/by-slug/{slug}:
+    parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9/_-]{0,127}$"
+        description: Slug may contain `/` (e.g. `device-icons/escada-rolante`)
+    get:
+      tags: [File Assets]
+      summary: Resolve a publicly-named file by its slug — anonymous-friendly
+      operationId: getPublicFileBySlug
+      security: []
+      parameters:
+        - in: query
+          name: disposition
+          schema: { type: string, enum: [inline, attachment], default: inline }
+        - in: query
+          name: expiresInSeconds
+          schema: { type: integer, minimum: 30, maximum: 3600, default: 300 }
+        - in: query
+          name: filename
+          schema: { type: string, maxLength: 256 }
+          description: Override the response Content-Disposition filename
+        - in: query
+          name: redirect
+          schema: { type: boolean, default: false }
+          description: When true, the API returns a 302 redirect to the signed URL — ideal for `<img src>` and `<a href>`.
+      responses:
+        '200':
+          description: Signed URL JSON (default mode)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileAssetDownloadResponse' }
+        '302':
+          description: Redirect to signed S3 URL (when ?redirect=true)
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '404':
+          description: Slug not registered, asset soft-deleted, or asset QUARANTINED — semantics intentional, no existence leak
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
