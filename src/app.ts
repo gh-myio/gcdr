@@ -72,6 +72,7 @@ import {
   wikiPublicController,
   // Generic file/asset storage (S3)
   fileAssetsController,
+  fileAssetsPublicController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -290,6 +291,10 @@ apiV1Router.use('/public/wiki', wikiPublicController);
 
 // RFC-0030: MYIO Wiki (Knowledge Base Module) — authenticated
 apiV1Router.use('/wiki', authMiddleware, wikiController);
+
+// Public file-assets — mounted BEFORE the authenticated /files router so the
+// path /api/v1/public/files/by-slug/... is reachable without auth.
+apiV1Router.use('/public/files', fileAssetsPublicController);
 
 // Generic file/asset storage (S3-backed). Mounted at /files because /assets
 // is already taken by the IoT asset hierarchy (SITE/BUILDING/FLOOR/EQUIPMENT)

@@ -21,6 +21,7 @@ import {
 import {
   NotFoundError,
   ValidationError,
+  ConflictError,
 } from '../shared/errors/AppError';
 
 // =============================================================================
@@ -44,6 +45,12 @@ export interface UploadInput {
   contentType: string;
   body: Buffer;
   metadata?: Record<string, unknown>;
+  /**
+   * Optional human-readable slug for stable public URLs. If provided, the
+   * service performs a conflict check against existing live rows in the
+   * tenant before insert.
+   */
+  publicSlug?: string | null;
 }
 
 export interface DownloadUrlOptions {
@@ -106,6 +113,16 @@ export class FileAssetService {
       throw new ValidationError(`ownerId is required when ownerType is "${input.ownerType}"`);
     }
 
+    // Slug uniqueness check before allocating S3 + DB resources.
+    if (input.publicSlug) {
+      const existing = await this.repo.getByPublicSlug(input.tenantId, input.publicSlug);
+      if (existing) {
+        throw new ConflictError(
+          `publicSlug '${input.publicSlug}' is already taken by file asset ${existing.id}`
+        );
+      }
+    }
+
     const id = randomUUID();
     const ext = extOf(input.filename);
 
@@ -149,6 +166,7 @@ export class FileAssetService {
       scanStatus: 'PENDING',
       uploadedBy: input.userId,
       metadata: input.metadata ?? {},
+      publicSlug: input.publicSlug ?? null,
     };
 
     let asset: FileAsset;
@@ -240,6 +258,79 @@ export class FileAssetService {
         ? { scanStatus, status: 'QUARANTINED' as const }
         : { scanStatus };
     return this.repo.update(tenantId, id, patch);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public slug (stable named URLs)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Set, replace, or clear the publicSlug on an asset.
+   * - Pass `null` to clear.
+   * - Throws CONFLICT if another live row in the tenant already holds the slug.
+   */
+  async setPublicSlug(
+    tenantId: string,
+    id: string,
+    publicSlug: string | null,
+  ): Promise<FileAsset> {
+    const existing = await this.repo.getById(tenantId, id);
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError(`File asset ${id} not found`);
+    }
+    if (existing.publicSlug === publicSlug) {
+      return existing; // no-op
+    }
+    if (publicSlug !== null) {
+      const conflict = await this.repo.getByPublicSlug(tenantId, publicSlug);
+      if (conflict && conflict.id !== id) {
+        throw new ConflictError(
+          `publicSlug '${publicSlug}' is already taken by file asset ${conflict.id}`
+        );
+      }
+    }
+    return this.repo.update(tenantId, id, { publicSlug });
+  }
+
+  /**
+   * Public-facing lookup. Returns the asset only if it has a slug (gating
+   * "public-by-slug" semantics) and is in ACTIVE status. Quarantined and
+   * soft-deleted assets behave like "not found" to anonymous callers.
+   */
+  async getByPublicSlug(tenantId: string, slug: string): Promise<FileAsset> {
+    const asset = await this.repo.getByPublicSlug(tenantId, slug);
+    if (!asset || asset.publicSlug !== slug || asset.deletedAt) {
+      throw new NotFoundError(`File slug '${slug}' not found`);
+    }
+    if (asset.status !== 'ACTIVE') {
+      throw new NotFoundError(`File slug '${slug}' not available`);
+    }
+    return asset;
+  }
+
+  /**
+   * Mint a fresh signed URL for a public-by-slug asset.
+   * Used by the public controller, which 302-redirects the client to it.
+   */
+  async getPublicDownloadUrlBySlug(
+    tenantId: string,
+    slug: string,
+    options: DownloadUrlOptions = {},
+  ): Promise<DownloadUrlResult> {
+    const asset = await this.getByPublicSlug(tenantId, slug);
+    const expires = Math.min(
+      Math.max(options.expiresInSeconds ?? 300, 30),
+      MAX_PRESIGN_EXPIRES_SECONDS,
+    );
+    const disposition = options.disposition ?? 'inline';
+    const filename = options.filenameOverride ?? asset.filename;
+    const url = await this.storage.getPresignedDownloadUrl({
+      key: asset.storageKey,
+      expiresInSeconds: expires,
+      responseContentDisposition: buildContentDisposition(asset, disposition, filename),
+      responseContentType: asset.contentType,
+    });
+    return { url, expiresInSeconds: expires, filename, contentType: asset.contentType };
   }
 }
 

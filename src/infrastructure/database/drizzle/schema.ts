@@ -1545,6 +1545,10 @@ export const fileAssets = pgTable('file_assets', {
   deletedAt:        timestamp('deleted_at', { withTimezone: true }),
 
   metadata:         jsonb('metadata').notNull().default({}),
+
+  // Optional human-readable slug for stable public URLs.
+  // Unique per tenant via partial index; CHECK enforces shape.
+  publicSlug:       text('public_slug'),
 }, (table) => ({
   tenantOwnerIdx:    index('idx_file_assets_tenant_owner').on(table.tenantId, table.ownerType, table.ownerId),
   tenantSha256Idx:   index('idx_file_assets_tenant_sha256').on(table.tenantId, table.sha256),
@@ -1576,6 +1580,10 @@ export const fileAssets = pgTable('file_assets', {
   ownerIdRequired: check(
     'file_assets_owner_id_when_typed',
     sql`${table.ownerType} = 'free' OR ${table.ownerId} IS NOT NULL`
+  ),
+  publicSlugShape: check(
+    'file_assets_public_slug_shape',
+    sql`${table.publicSlug} IS NULL OR ${table.publicSlug} ~ '^[a-z0-9][a-z0-9/_-]{0,127}$'`
   ),
 }));
 

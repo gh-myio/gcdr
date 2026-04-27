@@ -31,6 +31,9 @@ export interface CreateFileAssetInput {
 
   uploadedBy: string;
   metadata?: Record<string, unknown>;
+
+  /** Optional human-readable public slug (unique per tenant). */
+  publicSlug?: string | null;
 }
 
 export interface UpdateFileAssetInput {
@@ -39,12 +42,19 @@ export interface UpdateFileAssetInput {
   status?: FileAssetStatus;
   scanStatus?: FileAssetScanStatus;
   metadata?: Record<string, unknown>;
+  /** Pass `null` to clear the slug. */
+  publicSlug?: string | null;
 }
 
 export interface IFileAssetRepository {
   create(input: CreateFileAssetInput): Promise<FileAsset>;
   getById(tenantId: string, id: string): Promise<FileAsset | null>;
   getBySha256(tenantId: string, sha256: string): Promise<FileAsset | null>;
+  /**
+   * Lookup by tenant + slug, excluding soft-deleted rows.
+   * Returns null if no live row holds that slug.
+   */
+  getByPublicSlug(tenantId: string, slug: string): Promise<FileAsset | null>;
   list(tenantId: string, params?: ListFileAssetsParams): Promise<PaginatedResult<FileAsset>>;
   update(tenantId: string, id: string, patch: UpdateFileAssetInput): Promise<FileAsset>;
   softDelete(tenantId: string, id: string): Promise<void>;

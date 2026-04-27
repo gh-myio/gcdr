@@ -56,4 +56,13 @@ export interface FileAsset {
 
   /** Free-form: image dimensions, video duration, EXIF, page count, etc. */
   metadata: Record<string, unknown>;
+
+  /**
+   * Optional human-readable slug enabling stable, brand-friendly public URLs:
+   *   GET /api/v1/public/files/by-slug/<publicSlug>
+   * Unique per tenant among non-deleted rows. Format: same as wiki page slug
+   * (`^[a-z0-9][a-z0-9/_-]{0,127}$`). Useful for catalog assets like icons,
+   * logos, and reference images that need consistent URLs over time.
+   */
+  publicSlug: string | null;
 }

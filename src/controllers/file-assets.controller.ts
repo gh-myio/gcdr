@@ -4,6 +4,7 @@ import { fileAssetService } from '../services/FileAssetService';
 import {
   CreateFileAssetSchema,
   ListFileAssetsParams,
+  SetPublicSlugSchema,
 } from '../dto/request/FileAssetDTO';
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
 import { uploadSingleFile, multerErrorAdapter } from '../middleware/upload';
@@ -63,6 +64,7 @@ router.post('/',
         ownerId:    req.body.ownerId,
         customerId: req.body.customerId,
         metadata:   req.body.metadata,
+        publicSlug: req.body.publicSlug,
       });
 
       const metadata = parseMetadata(data.metadata);
@@ -77,6 +79,7 @@ router.post('/',
         contentType: req.file.mimetype,
         body: req.file.buffer,
         metadata,
+        publicSlug: data.publicSlug ?? null,
       });
 
       sendCreated(res, { ...asset, downloadUrl }, requestId);
@@ -165,6 +168,21 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { tenantId } = req.context;
     await fileAssetService.delete(tenantId, req.params.id);
     sendNoContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// PATCH /:id/public-slug   — set / replace / clear the slug
+// Body: { "publicSlug": "device-icons/escada-rolante" } or { "publicSlug": null }
+// -----------------------------------------------------------------------------
+router.patch('/:id/public-slug', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const data = SetPublicSlugSchema.parse(req.body ?? {});
+    const asset = await fileAssetService.setPublicSlug(tenantId, req.params.id, data.publicSlug);
+    sendSuccess(res, asset, 200, requestId);
   } catch (err) {
     next(err);
   }

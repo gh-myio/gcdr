@@ -41,6 +41,7 @@ function mapRow(row: Row): FileAsset {
     uploadedAt: row.uploadedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    publicSlug: row.publicSlug ?? null,
   };
 }
 
@@ -64,9 +65,23 @@ export class FileAssetRepository implements IFileAssetRepository {
       scanStatus: input.scanStatus ?? 'PENDING',
       uploadedBy: input.uploadedBy,
       metadata: input.metadata ?? {},
+      publicSlug: input.publicSlug ?? null,
     }).returning();
 
     return mapRow(row);
+  }
+
+  async getByPublicSlug(tenantId: string, slug: string): Promise<FileAsset | null> {
+    const [row] = await db
+      .select()
+      .from(fileAssets)
+      .where(and(
+        eq(fileAssets.tenantId, tenantId),
+        eq(fileAssets.publicSlug, slug),
+        isNull(fileAssets.deletedAt),
+      ))
+      .limit(1);
+    return row ? mapRow(row) : null;
   }
 
   async getById(tenantId: string, id: string): Promise<FileAsset | null> {
@@ -152,6 +167,7 @@ export class FileAssetRepository implements IFileAssetRepository {
     if (patch.status    !== undefined)  updates.status     = patch.status;
     if (patch.scanStatus !== undefined) updates.scanStatus = patch.scanStatus;
     if (patch.metadata  !== undefined)  updates.metadata   = patch.metadata;
+    if (patch.publicSlug !== undefined) updates.publicSlug = patch.publicSlug;
 
     if (Object.keys(updates).length === 0) {
       const existing = await this.getById(tenantId, id);
