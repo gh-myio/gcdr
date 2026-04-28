@@ -16,6 +16,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  numeric,
   index,
   uniqueIndex,
   check,
@@ -236,6 +237,12 @@ export const users = pgTable('users', {
   // External integrations (ThingsBoard, Freshdesk, App, OS, etc.)
   externalLinks: jsonb('external_links').notNull().default([]),
 
+  // RFC-0032: QR Checker field-operator PIN credentials.
+  // qrcFieldPinLookup = HMAC-SHA256(QRC_PIN_PEPPER, tenantId + ':' + pin) — deterministic, fast lookup.
+  // qrcFieldPinHash   = bcrypt(pin) — slow verify.
+  qrcFieldPinLookup: text('qrc_field_pin_lookup'),
+  qrcFieldPinHash:   text('qrc_field_pin_hash'),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -362,6 +369,14 @@ export const devices = pgTable('devices', {
   lastActivityTime: timestamp('last_activity_time', { withTimezone: true }),  // Last telemetry received
   lastAlarmTime: timestamp('last_alarm_time', { withTimezone: true }),  // Last alarm triggered
 
+  // RFC-0032: QR Checker addressing fields populated by the field app
+  // when scanning QR codes. Distinct from RFC-0008's slaveId/centralId
+  // (those are Modbus addresses on the central; these come from the QR
+  // payload encoded on the physical device sticker).
+  qrcAddrLow:    smallint('qrc_addr_low'),
+  qrcAddrHigh:   smallint('qrc_addr_high'),
+  qrcIdentifier: text('qrc_identifier'),
+
 }, (table) => ({
   // Existing indexes
   tenantSerialUnique: uniqueIndex('devices_tenant_serial_unique').on(table.tenantId, table.serialNumber),
@@ -389,6 +404,11 @@ export const devices = pgTable('devices', {
 
   // Check constraint for valid slave_id (1-999; Modbus RTU max 247, other protocols up to 999)
   validSlaveId: check('valid_slave_id', sql`${table.slaveId} IS NULL OR (${table.slaveId} >= 1 AND ${table.slaveId} <= 999)`),
+
+  // RFC-0032: index keyed on (tenant_id, qrc_addr_low, qrc_addr_high) — used by
+  // POST /api/v1/qrc/install when the field client passes addr_low/high
+  // from the QR payload but no explicit device_id.
+  qrcAddrIdx: index('idx_devices_qrc_addr').on(table.tenantId, table.qrcAddrLow, table.qrcAddrHigh),
 }));
 
 // =============================================================================
@@ -1608,4 +1628,232 @@ export const wikiPageRevisions = pgTable('wiki_page_revisions', {
     'wiki_page_revisions_revnum_positive',
     sql`${table.revisionNumber} >= 1`
   ),
+}));
+
+// =============================================================================
+// RFC-0032: QR Checker module — backend, data, MCP migration from
+// qrcode-check.git (Next.js + SQLite) into the GCDR platform.
+//
+// Reuses the existing `customers`, `users`, `devices`, and `file_assets`
+// tables. The qrc_* prefix marks tables that genuinely live only in the
+// QR Checker domain.
+// =============================================================================
+
+// Opt-in extension that marks a customer as "QR-enabled".
+export const qrcCustomerSettings = pgTable('qrc_customer_settings', {
+  customerId:         uuid('customer_id').primaryKey().references(() => customers.id, { onDelete: 'cascade' }),
+  tenantId:           uuid('tenant_id').notNull(),
+  viewerPasswordHash: text('viewer_password_hash'),
+  defaultCentralId:   uuid('default_central_id'),
+  qrcMetadata:        jsonb('qrc_metadata').notNull().default({}),
+  createdBy:          uuid('created_by').notNull(),
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantIdx: index('idx_qrc_cust_settings_tenant').on(table.tenantId),
+}));
+
+export const qrcInstallations = pgTable('qrc_installations', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  deviceId:           uuid('device_id').notNull().references(() => devices.id, { onDelete: 'restrict' }),
+  customerId:         uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
+  position:           text('position').notNull(),
+  tcType:             text('tc_type'),
+  impedimentoText:    text('impedimento_text').notNull().default('instalado'),
+  obs:                text('obs'),
+  currentMultiplier:  numeric('current_multiplier'),
+  voltageMultiplier:  numeric('voltage_multiplier'),
+  installedBy:        uuid('installed_by').notNull(),
+  installedAt:        timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:          timestamp('deleted_at', { withTimezone: true }),
+}, (table) => ({
+  deviceUnique: uniqueIndex('qrc_installations_device_unique').on(table.tenantId, table.deviceId),
+  tenantCustomerIdx: index('idx_qrc_installations_tenant_customer').on(table.tenantId, table.customerId),
+  statusIdx:    index('idx_qrc_installations_status').on(table.tenantId, table.impedimentoText),
+  deviceIdx:    index('idx_qrc_installations_device').on(table.deviceId),
+  statusCheck: check(
+    'qrc_installations_status_check',
+    sql`${table.impedimentoText} IN ('instalado','impedimento','removido','defeito')`
+  ),
+  tcTypeCheck: check(
+    'qrc_installations_tc_type_check',
+    sql`${table.tcType} IS NULL OR ${table.tcType} IN ('50A','100A','400A','1000A','2000A')`
+  ),
+}));
+
+export const qrcInstallationImages = pgTable('qrc_installation_images', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull(),
+  installationId: uuid('installation_id').notNull().references(() => qrcInstallations.id, { onDelete: 'cascade' }),
+  fileAssetId:    uuid('file_asset_id').notNull(),
+  imageOrder:     integer('image_order').notNull().default(0),
+  caption:        text('caption'),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  installImageUnique: uniqueIndex('qrc_installation_images_unique').on(table.installationId, table.fileAssetId),
+  installIdx: index('idx_qrc_installation_images_install').on(table.installationId, table.imageOrder),
+  orderRange: check(
+    'qrc_installation_images_order_range',
+    sql`${table.imageOrder} >= 0 AND ${table.imageOrder} < 20`
+  ),
+}));
+
+export const qrcInstallationAudit = pgTable('qrc_installation_audit', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  installationId:     uuid('installation_id').notNull().references(() => qrcInstallations.id, { onDelete: 'cascade' }),
+  revision:           integer('revision').notNull(),
+  changeType:         text('change_type').notNull(),
+  changeDescription:  text('change_description'),
+  oldValue:           jsonb('old_value'),
+  newValue:           jsonb('new_value'),
+  changedBy:          uuid('changed_by').notNull(),
+  changedAt:          timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  revisionUnique: uniqueIndex('qrc_installation_audit_revision_unique').on(table.installationId, table.revision),
+  chronoIdx:      index('idx_qrc_installation_audit_chrono').on(table.installationId, table.changedAt),
+  changeTypeCheck: check(
+    'qrc_installation_audit_change_type_check',
+    sql`${table.changeType} IN ('created','updated','deleted','image_added','image_removed','task_created','task_completed')`
+  ),
+}));
+
+export const qrcMaintenanceTasks = pgTable('qrc_maintenance_tasks', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  installationId:   uuid('installation_id').notNull().references(() => qrcInstallations.id, { onDelete: 'cascade' }),
+  description:      text('description').notNull(),
+  status:           text('status').notNull().default('pending'),
+  createdBy:        uuid('created_by').notNull(),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completedBy:      uuid('completed_by'),
+  completedAt:      timestamp('completed_at', { withTimezone: true }),
+  completedNotes:   text('completed_notes'),
+  reviewedBy:       uuid('reviewed_by'),
+  reviewedAt:       timestamp('reviewed_at', { withTimezone: true }),
+}, (table) => ({
+  tenantStatusIdx: index('idx_qrc_maintenance_tenant_status').on(table.tenantId, table.status),
+  installIdx:      index('idx_qrc_maintenance_install').on(table.installationId, table.createdAt),
+  statusCheck: check(
+    'qrc_maintenance_status_check',
+    sql`${table.status} IN ('pending','pending_review','resolved','removido')`
+  ),
+}));
+
+export const qrcCustomerObservations = pgTable('qrc_customer_observations', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  customerId:   uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+  observation:  text('observation').notNull(),
+  fileAssetId:  uuid('file_asset_id'),
+  createdBy:    uuid('created_by').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  chronoIdx: index('idx_qrc_cust_obs_chrono').on(table.customerId, table.createdAt),
+}));
+
+export const qrcVisitasTecnicas = pgTable('qrc_visitas_tecnicas', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  customerId:   uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  name:         text('name').notNull(),
+  observation:  text('observation'),
+  status:       text('status').notNull().default('pending'),
+  createdBy:    uuid('created_by').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
+}, (table) => ({
+  tenantStatusIdx: index('idx_qrc_visitas_tenant_status').on(table.tenantId, table.status),
+  customerIdx:     index('idx_qrc_visitas_customer').on(table.customerId),
+  statusCheck: check(
+    'qrc_visitas_status_check',
+    sql`${table.status} IN ('pending','in_progress','done')`
+  ),
+}));
+
+export const qrcVisitaAmbientes = pgTable('qrc_visita_ambientes', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  visitaId:         uuid('visita_id').notNull().references(() => qrcVisitasTecnicas.id, { onDelete: 'cascade' }),
+  name:             text('name').notNull(),
+  observation:      text('observation'),
+  acQuantity:       integer('ac_quantity'),
+  productQuantity:  integer('product_quantity'),
+  productType:      text('product_type'),
+  createdBy:        uuid('created_by').notNull(),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  visitaIdx: index('idx_qrc_visita_ambientes_visita').on(table.visitaId, table.createdAt),
+}));
+
+export const qrcVisitaAmbienteImages = pgTable('qrc_visita_ambiente_images', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  ambienteId:   uuid('ambiente_id').notNull().references(() => qrcVisitaAmbientes.id, { onDelete: 'cascade' }),
+  fileAssetId:  uuid('file_asset_id').notNull(),
+  imageOrder:   integer('image_order').notNull().default(0),
+  caption:      text('caption'),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ambienteIdx: index('idx_qrc_visita_ambiente_images_amb').on(table.ambienteId, table.imageOrder),
+}));
+
+export const qrcVisitaProducts = pgTable('qrc_visita_products', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  ambienteId:   uuid('ambiente_id').notNull().references(() => qrcVisitaAmbientes.id, { onDelete: 'cascade' }),
+  productType:  text('product_type').notNull(),
+  description:  text('description'),
+  quantity:     integer('quantity').notNull().default(1),
+  createdBy:    uuid('created_by').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ambienteIdx: index('idx_qrc_visita_products_amb').on(table.ambienteId),
+  quantityPositive: check(
+    'qrc_visita_products_quantity_positive',
+    sql`${table.quantity} > 0`
+  ),
+}));
+
+export const qrcVisitaProductImages = pgTable('qrc_visita_product_images', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  productId:    uuid('product_id').notNull().references(() => qrcVisitaProducts.id, { onDelete: 'cascade' }),
+  fileAssetId:  uuid('file_asset_id').notNull(),
+  imageOrder:   integer('image_order').notNull().default(0),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  productIdx: index('idx_qrc_visita_product_images_prod').on(table.productId, table.imageOrder),
+}));
+
+export const qrcVisitaObservations = pgTable('qrc_visita_observations', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  visitaId:     uuid('visita_id').notNull().references(() => qrcVisitasTecnicas.id, { onDelete: 'cascade' }),
+  observation:  text('observation').notNull(),
+  fileAssetId:  uuid('file_asset_id'),
+  createdBy:    uuid('created_by').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  chronoIdx: index('idx_qrc_visita_obs_chrono').on(table.visitaId, table.createdAt),
+}));
+
+export const qrcVisitaAudit = pgTable('qrc_visita_audit', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  visitaId:           uuid('visita_id').notNull().references(() => qrcVisitasTecnicas.id, { onDelete: 'cascade' }),
+  ambienteId:         uuid('ambiente_id'),
+  revision:           integer('revision').notNull(),
+  changeType:         text('change_type').notNull(),
+  changeDescription:  text('change_description'),
+  oldValue:           jsonb('old_value'),
+  newValue:           jsonb('new_value'),
+  changedBy:          uuid('changed_by').notNull(),
+  changedAt:          timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  chronoIdx: index('idx_qrc_visita_audit_chrono').on(table.visitaId, table.changedAt),
 }));

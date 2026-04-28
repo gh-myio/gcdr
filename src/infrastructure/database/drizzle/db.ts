@@ -97,3 +97,43 @@ export type NewWikiPageLinkRow = typeof schema.wikiPageLinks.$inferInsert;
 // File Assets (generic file storage)
 export type FileAssetRow = typeof schema.fileAssets.$inferSelect;
 export type NewFileAssetRow = typeof schema.fileAssets.$inferInsert;
+
+// RFC-0032: QR Checker module
+export type QrcCustomerSettingsRow = typeof schema.qrcCustomerSettings.$inferSelect;
+export type NewQrcCustomerSettingsRow = typeof schema.qrcCustomerSettings.$inferInsert;
+
+export type QrcInstallationRow = typeof schema.qrcInstallations.$inferSelect;
+export type NewQrcInstallationRow = typeof schema.qrcInstallations.$inferInsert;
+
+export type QrcInstallationImageRow = typeof schema.qrcInstallationImages.$inferSelect;
+export type NewQrcInstallationImageRow = typeof schema.qrcInstallationImages.$inferInsert;
+
+export type QrcInstallationAuditRow = typeof schema.qrcInstallationAudit.$inferSelect;
+export type NewQrcInstallationAuditRow = typeof schema.qrcInstallationAudit.$inferInsert;
+
+export type QrcMaintenanceTaskRow = typeof schema.qrcMaintenanceTasks.$inferSelect;
+export type NewQrcMaintenanceTaskRow = typeof schema.qrcMaintenanceTasks.$inferInsert;
+
+export type QrcCustomerObservationRow = typeof schema.qrcCustomerObservations.$inferSelect;
+export type NewQrcCustomerObservationRow = typeof schema.qrcCustomerObservations.$inferInsert;
+
+export type QrcVisitaTecnicaRow = typeof schema.qrcVisitasTecnicas.$inferSelect;
+export type NewQrcVisitaTecnicaRow = typeof schema.qrcVisitasTecnicas.$inferInsert;
+
+export type QrcVisitaAmbienteRow = typeof schema.qrcVisitaAmbientes.$inferSelect;
+export type NewQrcVisitaAmbienteRow = typeof schema.qrcVisitaAmbientes.$inferInsert;
+
+export type QrcVisitaAmbienteImageRow = typeof schema.qrcVisitaAmbienteImages.$inferSelect;
+export type NewQrcVisitaAmbienteImageRow = typeof schema.qrcVisitaAmbienteImages.$inferInsert;
+
+export type QrcVisitaProductRow = typeof schema.qrcVisitaProducts.$inferSelect;
+export type NewQrcVisitaProductRow = typeof schema.qrcVisitaProducts.$inferInsert;
+
+export type QrcVisitaProductImageRow = typeof schema.qrcVisitaProductImages.$inferSelect;
+export type NewQrcVisitaProductImageRow = typeof schema.qrcVisitaProductImages.$inferInsert;
+
+export type QrcVisitaObservationRow = typeof schema.qrcVisitaObservations.$inferSelect;
+export type NewQrcVisitaObservationRow = typeof schema.qrcVisitaObservations.$inferInsert;
+
+export type QrcVisitaAuditRow = typeof schema.qrcVisitaAudit.$inferSelect;
+export type NewQrcVisitaAuditRow = typeof schema.qrcVisitaAudit.$inferInsert;
