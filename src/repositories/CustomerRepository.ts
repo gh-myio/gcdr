@@ -635,6 +635,44 @@ export class CustomerRepository implements ICustomerRepository {
     return roots;
   }
 
+  // RFC-0032: list QR-enabled customers the user has access to via
+  // any active role assignment whose scope is `customer:<uuid>`.
+  // Inner join on qrc_customer_settings filters to QR-enabled only.
+  async listQrcEnabledForUser(tenantId: string, userId: string): Promise<Customer[]> {
+    const { qrcCustomerSettings, roleAssignments } = schema;
+
+    const rows = await db
+      .select({ c: customers })
+      .from(customers)
+      .innerJoin(
+        qrcCustomerSettings,
+        eq(qrcCustomerSettings.customerId, customers.id),
+      )
+      .innerJoin(
+        roleAssignments,
+        and(
+          eq(roleAssignments.tenantId, customers.tenantId),
+          eq(roleAssignments.userId, userId),
+          eq(roleAssignments.status, 'active'),
+          eq(roleAssignments.scope, sql`'customer:' || ${customers.id}::text`),
+        ),
+      )
+      .where(and(
+        eq(customers.tenantId, tenantId),
+        isNull(customers.deletedAt),
+      ))
+      .orderBy(customers.name);
+
+    const seen = new Set<string>();
+    const out: Customer[] = [];
+    for (const r of rows) {
+      if (seen.has(r.c.id)) continue;
+      seen.add(r.c.id);
+      out.push(this.mapToEntity(r.c));
+    }
+    return out;
+  }
+
   private generateCode(name: string): string {
     return name
       .toUpperCase()

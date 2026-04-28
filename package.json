@@ -43,6 +43,7 @@
     "@aws-sdk/client-s3": "^3.1037.0",
     "@aws-sdk/lib-dynamodb": "^3.400.0",
     "@aws-sdk/s3-request-presigner": "^3.1037.0",
+    "bcryptjs": "^3.0.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.45.1",
@@ -58,6 +59,7 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.119",
+    "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

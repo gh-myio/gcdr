@@ -11,7 +11,9 @@ import {
   VerifyEmailRequestSchema,
   ResendVerificationRequestSchema,
 } from '../dto/request/AuthDTO';
+import { OperatorPinSchema } from '../dto/request/auth/OperatorPinSchema';
 import { sendSuccess, sendCreated, sendNoContent, logEvent, authMiddleware } from '../middleware';
+import { operatorPinRateLimiter } from '../middleware/rateLimit';
 import { ValidationError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT } from '../middleware/context';
 import { registrationService } from '../services/RegistrationService';
@@ -20,6 +22,7 @@ import { customerApiKeyService } from '../services/CustomerApiKeyService';
 import { userService } from '../services/UserService';
 import { authorizationService } from '../services/AuthorizationService';
 import { toUserDetailDTO } from '../dto/response/UserResponseDTO';
+import { toCustomerResponseDTOList } from '../dto/response/CustomerResponseDTO';
 
 const router = Router();
 
@@ -48,6 +51,48 @@ router.post('/login',
       const response = await authService.login(email, password, mfaCode, ip, deviceInfo);
 
       sendSuccess(res, response, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /auth/operator-pin
+ * RFC-0032 — Field-operator login by 4-digit PIN.
+ *
+ * Body: { pin: 4-digit string, tenantId: uuid }
+ * Returns: { accessToken, refreshToken, user, customers, ... }
+ *
+ * Rate-limited per IP: 10 attempts / 5 minutes (operatorPinRateLimiter).
+ */
+router.post('/operator-pin',
+  operatorPinRateLimiter,
+  logEvent({
+    eventType: EventType.AUTH_LOGIN_SUCCESS,
+    description: () => `Operator PIN login attempt`,
+    getMetadata: (req) => ({
+      tenantId: typeof req.body?.tenantId === 'string' ? req.body.tenantId : undefined,
+    }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { ip, requestId } = req.context;
+
+      const result = OperatorPinSchema.safeParse(req.body);
+      if (!result.success) {
+        throw new ValidationError('Dados de login inválidos', {
+          validation: result.error.errors.map((e) => e.message),
+        });
+      }
+
+      const { pin, tenantId } = result.data;
+      const { customers, ...rest } = await authService.loginByPin(pin, tenantId, ip);
+
+      sendSuccess(res, {
+        ...rest,
+        customers: toCustomerResponseDTOList(customers),
+      }, 200, requestId);
     } catch (err) {
       next(err);
     }

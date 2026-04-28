@@ -802,12 +802,50 @@ export class UserRepository implements IUserRepository {
       invitationAcceptedAt: row.invitationAcceptedAt?.toISOString(),
       tags: row.tags as string[],
       metadata: row.metadata as Record<string, unknown>,
+      qrcFieldPinLookup: row.qrcFieldPinLookup ?? null,
+      qrcFieldPinHash: row.qrcFieldPinHash ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       createdBy: row.createdBy || undefined,
       updatedBy: row.updatedBy || undefined,
       version: row.version,
     };
+  }
+
+  // ─── RFC-0032: QR Checker field-operator PIN ────────────────────────────────
+
+  async getByQrcPinLookup(tenantId: string, lookup: string): Promise<User | null> {
+    const [row] = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.tenantId, tenantId),
+        eq(users.qrcFieldPinLookup, lookup),
+      ))
+      .limit(1);
+    return row ? this.mapToEntity(row) : null;
+  }
+
+  async updateQrcPin(
+    tenantId: string,
+    id: string,
+    pin: { lookup: string; hash: string } | null,
+  ): Promise<void> {
+    const updates: Record<string, unknown> = pin
+      ? {
+          qrcFieldPinLookup: pin.lookup,
+          qrcFieldPinHash: pin.hash,
+          updatedAt: new Date(),
+        }
+      : {
+          qrcFieldPinLookup: null,
+          qrcFieldPinHash: null,
+          updatedAt: new Date(),
+        };
+
+    await db.update(users)
+      .set(updates)
+      .where(and(eq(users.tenantId, tenantId), eq(users.id, id)));
   }
 }
 

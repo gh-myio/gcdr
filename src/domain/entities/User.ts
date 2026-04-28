@@ -119,6 +119,12 @@ export interface User extends BaseEntity {
   // Tags and metadata
   tags: string[];
   metadata: Record<string, unknown>;
+
+  // RFC-0032: QR Checker field-operator credentials
+  // Both fields are sensitive — toUserDTO() must strip them before
+  // sending in any HTTP response.
+  qrcFieldPinLookup?: string | null;  // HMAC-SHA256, indexed
+  qrcFieldPinHash?: string | null;    // bcrypt; verify-only
 }
 
 export function createDefaultPreferences(): UserPreferences {

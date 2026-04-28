@@ -40,4 +40,9 @@ export interface ICustomerRepository extends IRepository<Customer, CreateCustome
   listWithFilters(tenantId: string, params: ListCustomersParams): Promise<PaginatedResult<Customer>>;
   updatePath(tenantId: string, customerId: string, newPath: string, newDepth: number): Promise<void>;
   forceDelete(tenantId: string, customerId: string, options?: ForceDeleteOptions): Promise<ForceDeleteResult>;
+
+  // RFC-0032: list QR-enabled customers (i.e., have a row in
+  // qrc_customer_settings) that the given user has any active
+  // role assignment scoped to via `customer:<uuid>`.
+  listQrcEnabledForUser(tenantId: string, userId: string): Promise<Customer[]>;
 }

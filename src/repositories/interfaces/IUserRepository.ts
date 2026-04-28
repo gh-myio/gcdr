@@ -40,4 +40,20 @@ export interface IUserRepository {
 
   // Invitation
   setInvitationAccepted(tenantId: string, id: string): Promise<void>;
+
+  // RFC-0032: QR Checker field-operator PIN credentials
+  /**
+   * O(1) lookup using the deterministic HMAC token.
+   * Returns the user iff (tenantId, lookup) matches a live row.
+   */
+  getByQrcPinLookup(tenantId: string, lookup: string): Promise<User | null>;
+  /**
+   * Atomically write both PIN columns. Pass null to clear (demote
+   * field operator → email-only).
+   */
+  updateQrcPin(
+    tenantId: string,
+    id: string,
+    pin: { lookup: string; hash: string } | null,
+  ): Promise<void>;
 }

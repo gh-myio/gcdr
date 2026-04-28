@@ -1,9 +1,13 @@
 import * as crypto from 'crypto';
 import { User } from '../domain/entities/User';
+import { Customer } from '../domain/entities/Customer';
 import { UserService, userService as defaultUserService } from './UserService';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
 import { registrationService } from './RegistrationService';
 import { authorizationService } from './AuthorizationService';
+import { userRepository } from '../repositories/UserRepository';
+import { customerRepository } from '../repositories/CustomerRepository';
+import { pinLookupToken, pinVerify } from './qrc/QrcPinService';
 
 // RFC-0011: Configuration for account lockout
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;
@@ -306,6 +310,85 @@ export class AuthService {
         type: user.type,
         roles,
       },
+    };
+  }
+
+  /**
+   * RFC-0032 — Field-operator login by 4-digit PIN.
+   *
+   * Flow:
+   *   1. Compute deterministic HMAC lookup token for (tenantId, pin).
+   *   2. SELECT user by (tenantId, qrc_field_pin_lookup) — O(1) via partial unique index.
+   *   3. Defence-in-depth: bcrypt verify against qrc_field_pin_hash.
+   *   4. Reject inactive / locked / non-ACTIVE users (same gates as password login).
+   *   5. Mint access + refresh JWT (24h access window per RFC).
+   *   6. Return the list of QR-enabled customers the operator has access to.
+   *
+   * Brute-force protection lives in the route layer (operatorPinRateLimiter
+   * by IP). Per-user lockout reuses the existing failed-attempt machinery.
+   */
+  async loginByPin(
+    pin: string,
+    tenantId: string,
+    ip?: string,
+  ): Promise<LoginResponse & { customers: Customer[] }> {
+    if (!/^\d{4}$/.test(pin)) {
+      throw new ValidationError('PIN inválido');
+    }
+    if (!tenantId) {
+      throw new ValidationError('tenantId é obrigatório');
+    }
+
+    const lookup = pinLookupToken(tenantId, pin);
+    const user = await userRepository.getByQrcPinLookup(tenantId, lookup);
+    if (!user) {
+      throw new UnauthorizedError('PIN inválido');
+    }
+
+    // Defence in depth: re-verify against the bcrypt hash. If the lookup
+    // column was crafted/leaked but the bcrypt hash doesn't match, reject.
+    const ok = await pinVerify(pin, user.qrcFieldPinHash ?? null);
+    if (!ok) {
+      throw new UnauthorizedError('PIN inválido');
+    }
+
+    switch (user.status) {
+      case 'UNVERIFIED':
+      case 'PENDING_APPROVAL':
+        throw new UnauthorizedError('Usuário pendente de aprovação');
+      case 'INACTIVE':
+        throw new UnauthorizedError('Usuário desativado');
+      case 'LOCKED':
+        throw new UnauthorizedError('Usuário bloqueado');
+      case 'ACTIVE':
+        break;
+      default:
+        throw new UnauthorizedError('Status de usuário inválido');
+    }
+
+    if (user.security.lockedUntil) {
+      const lockedUntil = new Date(user.security.lockedUntil);
+      if (lockedUntil > new Date()) {
+        throw new UnauthorizedError('Usuário temporariamente bloqueado');
+      }
+    }
+
+    await registrationService.recordSuccessfulLogin(tenantId, user.id, ip || 'unknown');
+
+    const roles = await authorizationService.getUserRoleKeys(tenantId, user.id);
+    const tokens = await this.generateTokens(user, tenantId, roles);
+    const customers = await customerRepository.listQrcEnabledForUser(tenantId, user.id);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.profile.displayName || `${user.profile.firstName} ${user.profile.lastName}`,
+        type: user.type,
+        roles,
+      },
+      customers,
     };
   }
 
