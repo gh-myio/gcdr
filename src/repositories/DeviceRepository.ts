@@ -549,6 +549,29 @@ export class DeviceRepository implements IDeviceRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  // RFC-0032: lookup by (customer, addrLow, addrHigh) — the legacy QR
+  // payload format that the field operator scans. The columns were added
+  // in migration 0025; partial index `idx_devices_qrc_addr` covers this.
+  async findByQrcAddress(
+    tenantId: string,
+    customerId: string,
+    addrLow: number,
+    addrHigh: number,
+  ): Promise<Device | null> {
+    const [result] = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.customerId, customerId),
+        eq(devices.qrcAddrLow, addrLow),
+        eq(devices.qrcAddrHigh, addrHigh),
+      ))
+      .limit(1);
+
+    return result ? this.mapToEntity(result) : null;
+  }
+
   async findByProfile(tenantId: string, deviceProfile: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
     const limit = params?.limit || 20;
     const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;

@@ -19,6 +19,8 @@ export interface IDeviceRepository {
 
   // Lookup
   findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null>;
+  // RFC-0032: lookup by QR Checker (addr_low, addr_high) inside a customer
+  findByQrcAddress(tenantId: string, customerId: string, addrLow: number, addrHigh: number): Promise<Device | null>;
 
   // Connectivity
   updateConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<Device>;
