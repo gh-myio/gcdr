@@ -6,23 +6,24 @@ on:
   push:
     branches: [main, desenv]
 
-# Cancel in-progress runs for the same PR when new commits arrive — saves
-# CI minutes and gives faster feedback on the latest push.
+# Cancel in-progress runs for the same PR when new commits arrive.
 concurrency:
   group: pr-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Typecheck + tests + coverage (with PR comment)
+  # ---------------------------------------------------------------------------
   typecheck-and-test:
     name: Typecheck + tests + coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
+    permissions:
+      contents: read
+      pull-requests: write   # for jest-coverage-comment
     steps:
       - uses: actions/checkout@v4
-        with:
-          # SonarCloud needs full git history for accurate "new code" detection.
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -35,16 +36,15 @@ jobs:
       - name: TypeScript typecheck
         run: npm run typecheck
 
-      - name: Run unit + integration tests with coverage (LCOV)
+      - name: Jest tests + coverage
+        # Threshold (currently 10% global) is enforced by jest.config.js
+        # coverageThreshold. Raise it gradually as old code gets tested.
         run: npm run test:ci
         env:
-          # Required by tests/helpers/setup.ts at module load.
           DATABASE_URL: postgres://test:test@localhost:5432/test
-          # PIN service tests set this themselves; provide a default for any
-          # service tests that transitively require it.
           QRC_PIN_PEPPER: ci-test-pepper-32-chars-min-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-      - name: Upload coverage as workflow artifact
+      - name: Upload coverage HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -52,7 +52,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      - name: Upload jest-junit report
+      - name: Upload jest-junit XML
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -61,14 +61,25 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  sonarcloud:
-    name: SonarCloud scan
-    needs: typecheck-and-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Skip on forks — SonarCloud token is not available to PRs from forks.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      - name: Post coverage table on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: MishaKav/jest-coverage-comment@v1
+        with:
+          coverage-summary-path: coverage/coverage-summary.json
+          junitxml-path: junit.xml
+          junitxml-title: Jest results
+          summary-title: Coverage summary
+          coverage-title: Coverage (lines)
+          remove-link-from-badge: true
 
+  # ---------------------------------------------------------------------------
+  # ESLint on changed files — "new code" quality gate
+  # ---------------------------------------------------------------------------
+  lint-changed-files:
+    name: Lint (changed files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,17 +93,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Re-run tests to produce coverage for Sonar
-        # The sonarcloud job runs in its own runner and needs its own
-        # coverage/lcov.info. Cheaper than passing it as an artifact
-        # and re-attaching it across jobs.
-        run: npm run test:ci
-        env:
-          DATABASE_URL: postgres://test:test@localhost:5432/test
-          QRC_PIN_PEPPER: ci-test-pepper-32-chars-min-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - name: List changed .ts files
+        id: changed
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            src/**/*.ts
+            tests/**/*.ts
+            scripts/**/*.ts
 
-      - name: SonarCloud scan
-        uses: SonarSource/sonarcloud-github-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: ESLint changed files (block on errors)
+        if: steps.changed.outputs.any_changed == 'true'
+        run: |
+          echo "Linting changed files:"
+          printf '  %s\n' ${{ steps.changed.outputs.all_changed_files }}
+          npx eslint --max-warnings 0 ${{ steps.changed.outputs.all_changed_files }}
+
+      - name: No-op when no .ts changed
+        if: steps.changed.outputs.any_changed != 'true'
+        run: echo "No .ts files changed in this PR — lint skipped."

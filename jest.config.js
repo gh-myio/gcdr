@@ -11,7 +11,9 @@ module.exports = {
     '!src/shared/types/**',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html', 'json'],
+  // json-summary feeds the PR-comment action with one-line totals.
+  // text-summary prints the same totals to CI logs for quick eyeballing.
+  coverageReporters: ['text', 'text-summary', 'lcov', 'html', 'json', 'json-summary'],
   coverageThreshold: {
     global: {
       branches: 10,
