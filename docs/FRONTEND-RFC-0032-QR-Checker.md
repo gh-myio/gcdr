@@ -1,12 +1,51 @@
 # QR Checker on GCDR — Frontend Integration Guide
 
-- **Status:** Integration brief (RFC-0032 backend implementation in progress)
-- **Created:** 2026-04-28
+- **Status:** Integration brief — backend Phases 1-4 live (controllers mounted)
+- **Last updated:** 2026-04-29
 - **Audience:** Frontend / mobile developers re-pointing the QR Checker UI at GCDR
 - **Companion docs:**
   - [RFC-0032 — QR Checker Migration](./RFC-0032-QR-Checker-Migration-to-GCDR.md) (full backend spec)
   - [FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md) (image upload contract)
   - [GCDR-USER.md](./GCDR-USER.md) (auth, RBAC, customer hierarchy)
+  - **OpenAPI:** [docs/openapi.yaml](./openapi.yaml) — every endpoint below has a corresponding entry under tag `QR Checker`. Swagger UI at `/docs` (local + prod).
+
+---
+
+## What's live today (Phase 4)
+
+The backend is callable; the frontend can start integrating. Phases 5-8
+(data migration script, MCP, cutover) are still ahead but they don't
+gate the FE.
+
+| Surface                                                                   | Status |
+| ------------------------------------------------------------------------- | ------ |
+| `POST /api/v1/auth/operator-pin`                                          | ✅ live |
+| `GET /api/v1/qrc/customers` (+`?include=stats`)                           | ✅ live |
+| `GET /api/v1/qrc/customers/by-code/:code`                                 | ✅ live |
+| `POST /api/v1/qrc/customers/:customerId/{enable, disable, viewer-login}`  | ✅ live |
+| `PATCH /api/v1/qrc/customers/:customerId/settings`                        | ✅ live |
+| `GET /api/v1/qrc/customers/:customerId/{devices, observations, report}`   | ✅ live |
+| `POST/DELETE /api/v1/qrc/customers/:customerId/observations[/:obsId]`     | ✅ live |
+| `POST /api/v1/qrc/install`  (deviceId or addrLow+addrHigh)                | ✅ live |
+| `GET / PATCH /api/v1/qrc/installations/:id`                               | ✅ live |
+| `GET /api/v1/qrc/installations/:id/audit`                                 | ✅ live |
+| Installation images (multipart upload + caption/order + delete)            | ✅ live |
+| Installation tasks (CRUD + status changes emit audit)                      | ✅ live |
+| Visitas (CRUD + audit + report)                                           | ✅ live |
+| Visita ambientes (CRUD + images, max 50/ambiente)                         | ✅ live |
+| Visita products (CRUD + images, max 5/product)                            | ✅ live |
+| Visita observations (CRUD)                                                | ✅ live |
+| `PATCH /api/v1/qrc/users/:userId/pin` (set/clear; 409 PIN_TAKEN)          | ✅ live |
+| `GET /api/v1/qrc/users/:userId/audit`                                     | ✅ live |
+| Customer report `?format=xlsx` / `pdf`                                     | ⏳ json only in v1 |
+| Bulk device import/export per customer                                     | ⏳ later phase |
+
+**FE checklist (now actionable):**
+1. Flip `BASE_URL` to `process.env.NEXT_PUBLIC_GCDR_BASE_URL` (e.g. `https://gcdr-api.a.myio-bas.com/api/v1`).
+2. Send `X-Tenant-Id` header on every request.
+3. Resolve `slug → customerId` once per page-mount via `GET /qrc/customers/by-code/:code`.
+4. Wire the 3 image-upload screens to the multipart `POST` endpoints.
+5. Replace the legacy `POST /api/admin/users/check-pin` pre-check with `409 PIN_TAKEN` handling on submit.
 
 ---
 

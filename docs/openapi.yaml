@@ -75,6 +75,14 @@ tags:
     description: Anonymous-friendly read endpoints for wiki pages with `visibility ⊇ PUBLIC` and `status = PUBLISHED` (RFC-0030 Phase 2). No auth required.
   - name: File Assets
     description: Generic S3-backed file storage. Polymorphic (owner_type, owner_id) so any feature can register binaries — wiki attachments, PDF artefacts, future avatars/logos/manuals (RFC-0030 / RFC-0031).
+  - name: QR Checker
+    description: |
+      RFC-0032 — QR Checker module migrated from `qrcode-check.git`. Tracks
+      device installations across MYIO customer sites. PIN-based field-operator
+      auth + standard JWT for admin. Customer-scoped (`mall ⊂ customer` via
+      `qrc_customer_settings` opt-in extension). All endpoints under
+      `/api/v1/qrc/*` plus `POST /api/v1/auth/operator-pin` and
+      `POST /api/v1/qrc/customers/:customerId/viewer-login` (public).
 
 security:
   - bearerAuth: []
@@ -4686,6 +4694,327 @@ components:
         filename: { type: string }
         contentType: { type: string }
       required: [url, expiresInSeconds, filename, contentType]
+
+    # =========================================================================
+    # RFC-0032 — QR Checker module schemas
+    # =========================================================================
+
+    OperatorPinRequest:
+      type: object
+      required: [pin, tenantId]
+      properties:
+        pin:      { type: string, pattern: '^\d{4}$', example: '1234' }
+        tenantId: { type: string, format: uuid }
+
+    OperatorPinResponse:
+      type: object
+      properties:
+        accessToken:       { type: string }
+        refreshToken:      { type: string }
+        tokenType:         { type: string, example: Bearer }
+        expiresIn:         { type: integer, example: 3600 }
+        refreshExpiresIn:  { type: integer, example: 604800 }
+        user:
+          type: object
+          properties:
+            id:           { type: string, format: uuid }
+            email:        { type: string, format: email }
+            displayName:  { type: string }
+            type:         { type: string, enum: [INTERNAL, CUSTOMER, PARTNER, SERVICE_ACCOUNT] }
+            roles:        { type: array, items: { type: string } }
+        customers:
+          type: array
+          description: QR-enabled customers the operator has access to
+          items: { $ref: '#/components/schemas/Customer' }
+
+    QrcCustomerSettings:
+      type: object
+      properties:
+        customerId:         { type: string, format: uuid }
+        tenantId:           { type: string, format: uuid }
+        viewerPasswordHash: { type: string, nullable: true }
+        defaultCentralId:   { type: string, format: uuid, nullable: true }
+        qrcMetadata:        { type: object, additionalProperties: true }
+        createdBy:          { type: string, format: uuid }
+        createdAt:          { type: string, format: date-time }
+        updatedAt:          { type: string, format: date-time }
+
+    EnableQrcCustomerRequest:
+      type: object
+      properties:
+        defaultCentralId: { type: string, format: uuid, nullable: true }
+        viewerPassword:   { type: string, nullable: true, minLength: 4 }
+        qrcMetadata:      { type: object, additionalProperties: true }
+
+    UpdateQrcCustomerSettingsRequest:
+      $ref: '#/components/schemas/EnableQrcCustomerRequest'
+
+    ViewerLoginRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string }
+
+    ViewerLoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType:   { type: string, example: Bearer }
+        expiresIn:   { type: integer, example: 3600 }
+        customer:    { $ref: '#/components/schemas/Customer' }
+
+    Installation:
+      type: object
+      properties:
+        id:                 { type: string, format: uuid }
+        tenantId:           { type: string, format: uuid }
+        deviceId:           { type: string, format: uuid }
+        customerId:         { type: string, format: uuid }
+        position:           { type: string }
+        tcType:             { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
+        status:             { type: string, enum: [instalado, impedimento, removido, defeito] }
+        obs:                { type: string, nullable: true }
+        currentMultiplier:  { type: number, nullable: true }
+        voltageMultiplier:  { type: number, nullable: true }
+        installedBy:        { type: string, format: uuid }
+        installedAt:        { type: string, format: date-time }
+        updatedAt:          { type: string, format: date-time }
+        deletedAt:          { type: string, format: date-time, nullable: true }
+
+    InstallByDeviceIdRequest:
+      type: object
+      required: [customerId, deviceId, position]
+      properties:
+        customerId:        { type: string, format: uuid }
+        deviceId:          { type: string, format: uuid }
+        position:          { type: string }
+        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
+        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
+        obs:               { type: string, nullable: true }
+        currentMultiplier: { type: number, nullable: true }
+        voltageMultiplier: { type: number, nullable: true }
+
+    InstallByAddressRequest:
+      type: object
+      required: [customerId, addrLow, addrHigh, position]
+      properties:
+        customerId:        { type: string, format: uuid }
+        addrLow:           { type: integer, minimum: 0, maximum: 255 }
+        addrHigh:          { type: integer, minimum: 0, maximum: 255 }
+        position:          { type: string }
+        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
+        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
+        obs:               { type: string, nullable: true }
+        currentMultiplier: { type: number, nullable: true }
+        voltageMultiplier: { type: number, nullable: true }
+
+    InstallRequest:
+      oneOf:
+        - $ref: '#/components/schemas/InstallByDeviceIdRequest'
+        - $ref: '#/components/schemas/InstallByAddressRequest'
+
+    UpdateInstallationRequest:
+      type: object
+      properties:
+        position:          { type: string }
+        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
+        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
+        obs:               { type: string, nullable: true }
+        currentMultiplier: { type: number, nullable: true }
+        voltageMultiplier: { type: number, nullable: true }
+
+    InstallationImage:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        tenantId:       { type: string, format: uuid }
+        installationId: { type: string, format: uuid }
+        fileAssetId:    { type: string, format: uuid }
+        imageOrder:     { type: integer, minimum: 0, maximum: 19 }
+        caption:        { type: string, nullable: true }
+        createdAt:      { type: string, format: date-time }
+
+    InstallationImageWithUrl:
+      allOf:
+        - $ref: '#/components/schemas/InstallationImage'
+        - type: object
+          properties:
+            fileAsset:   { $ref: '#/components/schemas/FileAsset' }
+            downloadUrl: { type: string, format: uri }
+
+    InstallationAudit:
+      type: object
+      properties:
+        id:                { type: string, format: uuid }
+        tenantId:          { type: string, format: uuid }
+        installationId:    { type: string, format: uuid }
+        revision:          { type: integer }
+        changeType:        { type: string, enum: [created, updated, deleted, image_added, image_removed, task_created, task_completed] }
+        changeDescription: { type: string, nullable: true }
+        oldValue:          { type: object, additionalProperties: true, nullable: true }
+        newValue:          { type: object, additionalProperties: true, nullable: true }
+        changedBy:         { type: string, format: uuid }
+        changedAt:         { type: string, format: date-time }
+
+    MaintenanceTask:
+      type: object
+      properties:
+        id:              { type: string, format: uuid }
+        tenantId:        { type: string, format: uuid }
+        installationId:  { type: string, format: uuid }
+        description:     { type: string }
+        status:          { type: string, enum: [pending, pending_review, resolved, removido] }
+        createdBy:       { type: string, format: uuid }
+        createdAt:       { type: string, format: date-time }
+        completedBy:     { type: string, format: uuid, nullable: true }
+        completedAt:     { type: string, format: date-time, nullable: true }
+        completedNotes:  { type: string, nullable: true }
+        reviewedBy:      { type: string, format: uuid, nullable: true }
+        reviewedAt:      { type: string, format: date-time, nullable: true }
+
+    CreateMaintenanceTaskRequest:
+      type: object
+      required: [description]
+      properties:
+        description: { type: string, minLength: 1, maxLength: 2000 }
+
+    UpdateMaintenanceTaskRequest:
+      type: object
+      properties:
+        description:    { type: string }
+        status:         { type: string, enum: [pending, pending_review, resolved, removido] }
+        completedNotes: { type: string, nullable: true }
+
+    CustomerObservation:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        tenantId:     { type: string, format: uuid }
+        customerId:   { type: string, format: uuid }
+        observation:  { type: string }
+        fileAssetId:  { type: string, format: uuid, nullable: true }
+        createdBy:    { type: string, format: uuid }
+        createdAt:    { type: string, format: date-time }
+
+    CreateCustomerObservationRequest:
+      type: object
+      required: [observation]
+      properties:
+        observation: { type: string, minLength: 1, maxLength: 5000 }
+        fileAssetId: { type: string, format: uuid, nullable: true }
+
+    Visita:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        tenantId:     { type: string, format: uuid }
+        customerId:   { type: string, format: uuid, nullable: true }
+        name:         { type: string }
+        observation:  { type: string, nullable: true }
+        status:       { type: string, enum: [pending, in_progress, done] }
+        createdBy:    { type: string, format: uuid }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time }
+        deletedAt:    { type: string, format: date-time, nullable: true }
+
+    CreateVisitaRequest:
+      type: object
+      required: [name]
+      properties:
+        customerId:  { type: string, format: uuid, nullable: true }
+        name:        { type: string, minLength: 1, maxLength: 200 }
+        observation: { type: string, nullable: true }
+
+    UpdateVisitaRequest:
+      type: object
+      properties:
+        customerId:  { type: string, format: uuid, nullable: true }
+        name:        { type: string }
+        observation: { type: string, nullable: true }
+        status:      { type: string, enum: [pending, in_progress, done] }
+
+    VisitaAmbiente:
+      type: object
+      properties:
+        id:               { type: string, format: uuid }
+        tenantId:         { type: string, format: uuid }
+        visitaId:         { type: string, format: uuid }
+        name:             { type: string }
+        observation:      { type: string, nullable: true }
+        acQuantity:       { type: integer, nullable: true }
+        productQuantity:  { type: integer, nullable: true }
+        productType:      { type: string, nullable: true }
+        createdBy:        { type: string, format: uuid }
+        createdAt:        { type: string, format: date-time }
+        updatedAt:        { type: string, format: date-time }
+
+    CreateVisitaAmbienteRequest:
+      type: object
+      required: [name]
+      properties:
+        name:             { type: string, minLength: 1, maxLength: 200 }
+        observation:      { type: string, nullable: true }
+        acQuantity:       { type: integer, minimum: 0, nullable: true }
+        productQuantity:  { type: integer, minimum: 0, nullable: true }
+        productType:      { type: string, nullable: true }
+
+    UpdateVisitaAmbienteRequest:
+      $ref: '#/components/schemas/CreateVisitaAmbienteRequest'
+
+    VisitaProduct:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        tenantId:     { type: string, format: uuid }
+        ambienteId:   { type: string, format: uuid }
+        productType:  { type: string }
+        description:  { type: string, nullable: true }
+        quantity:     { type: integer, minimum: 1 }
+        createdBy:    { type: string, format: uuid }
+        createdAt:    { type: string, format: date-time }
+
+    CreateVisitaProductRequest:
+      type: object
+      required: [productType]
+      properties:
+        productType: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        quantity:    { type: integer, minimum: 1, default: 1 }
+
+    UpdateVisitaProductRequest:
+      $ref: '#/components/schemas/CreateVisitaProductRequest'
+
+    VisitaObservation:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        tenantId:     { type: string, format: uuid }
+        visitaId:     { type: string, format: uuid }
+        observation:  { type: string }
+        fileAssetId:  { type: string, format: uuid, nullable: true }
+        createdBy:    { type: string, format: uuid }
+        createdAt:    { type: string, format: date-time }
+
+    QrcCustomerProgressReport:
+      type: object
+      properties:
+        customerId:        { type: string, format: uuid }
+        customerName:      { type: string }
+        customerCode:      { type: string }
+        totalDevices:      { type: integer }
+        installedCount:    { type: integer }
+        impedimentoCount:  { type: integer }
+        removidoCount:     { type: integer }
+        defeitoCount:      { type: integer }
+        pendingCount:      { type: integer }
+        progressPercent:   { type: number }
+        lastInstalledAt:   { type: string, format: date-time, nullable: true }
+
+    SetOperatorPinRequest:
+      type: object
+      required: [pin]
+      properties:
+        pin: { type: string, pattern: '^\d{4}$', nullable: true, description: 'Pass null to clear PIN' }
 
 paths:
   # Health
@@ -12420,3 +12749,1292 @@ paths:
         '404':
           description: Slug not registered, asset soft-deleted, or asset QUARANTINED — semantics intentional, no existence leak
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  # ===========================================================================
+  # RFC-0032 — QR Checker module
+  # ===========================================================================
+
+  /auth/operator-pin:
+    post:
+      tags: [QR Checker, Authentication]
+      summary: Field-operator PIN login
+      description: |
+        Trades a 4-digit PIN + tenantId for a 24h JWT. Field operators on the
+        QR Checker mobile UX never see an email form. Two-column credential
+        design: HMAC lookup token + bcrypt hash. Rate-limited at 10 attempts
+        / 5 min / IP.
+      operationId: authOperatorPin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OperatorPinRequest' }
+      responses:
+        '200':
+          description: Login successful — JWT + accessible customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/OperatorPinResponse' }
+        '401': { description: PIN inválido, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '429':
+          description: Rate-limited — 10 attempts / 5 min / IP
+          headers:
+            Retry-After: { schema: { type: integer }, description: Seconds before next attempt }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  # --- Customers (QR-enabled) -----------------------------------------------
+
+  /qrc/customers:
+    get:
+      tags: [QR Checker]
+      summary: List QR-enabled customers
+      description: Returns only customers with a `qrc_customer_settings` row.
+      operationId: qrcListCustomers
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: include
+          schema: { type: string, enum: [stats] }
+          description: When `stats`, attaches a `qrc` progress block to each customer.
+      responses:
+        '200':
+          description: List of QR-enabled customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Customer' }
+
+  /qrc/customers/by-code/{code}:
+    get:
+      tags: [QR Checker]
+      summary: Resolve a customer by code (legacy slug)
+      operationId: qrcGetCustomerByCode
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Customer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Customer' }
+        '404': { description: Not found / not QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/customers/{customerId}/enable:
+    post:
+      tags: [QR Checker]
+      summary: Mark a customer as QR-enabled
+      operationId: qrcEnableCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnableQrcCustomerRequest' }
+      responses:
+        '201':
+          description: Settings created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QrcCustomerSettings' }
+        '409': { description: Already QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/customers/{customerId}/settings:
+    patch:
+      tags: [QR Checker]
+      summary: Update QR-checker settings (viewer password, default central, metadata)
+      operationId: qrcUpdateCustomerSettings
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateQrcCustomerSettingsRequest' }
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QrcCustomerSettings' }
+
+  /qrc/customers/{customerId}/disable:
+    post:
+      tags: [QR Checker]
+      summary: Soft-disable QR Checker for a customer (drops settings; data preserved)
+      operationId: qrcDisableCustomer
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Disabled }
+
+  /qrc/customers/{customerId}/viewer-login:
+    post:
+      tags: [QR Checker]
+      summary: Viewer password login (read-only stakeholder)
+      description: |
+        Issues a 1h viewer JWT with `role:qrc-viewer` + `scope:customer:<id>`
+        claims. Public — no JWT required to call this. Returns 401 on bad
+        password, 404 if customer not QR-enabled.
+      operationId: qrcViewerLogin
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ViewerLoginRequest' }
+      responses:
+        '200':
+          description: Viewer JWT + customer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ViewerLoginResponse' }
+        '401': { description: Senha de viewer inválida, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/customers/{customerId}/devices:
+    get:
+      tags: [QR Checker]
+      summary: List devices for a QR-enabled customer (joins installation status)
+      operationId: qrcListCustomerDevices
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Devices with optional `qrcInstallation` join
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+
+  /qrc/customers/{customerId}/observations:
+    get:
+      tags: [QR Checker]
+      summary: List customer-level observations
+      operationId: qrcListCustomerObservations
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Observations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/CustomerObservation' }
+    post:
+      tags: [QR Checker]
+      summary: Add a customer-level observation (with optional photo via fileAssetId)
+      operationId: qrcCreateCustomerObservation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCustomerObservationRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/CustomerObservation' }
+
+  /qrc/customers/{customerId}/observations/{observationId}:
+    delete:
+      tags: [QR Checker]
+      summary: Delete a customer observation
+      operationId: qrcDeleteCustomerObservation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: observationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  /qrc/customers/{customerId}/report:
+    get:
+      tags: [QR Checker]
+      summary: Customer installation progress report
+      operationId: qrcCustomerReport
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: format
+          schema: { type: string, enum: [json], default: json }
+          description: |
+            Only `json` is implemented in v1. `xlsx`/`pdf` ship in a later phase.
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QrcCustomerProgressReport' }
+
+  # --- Install + installations ----------------------------------------------
+
+  /qrc/install:
+    post:
+      tags: [QR Checker]
+      summary: Record a device installation (idempotent on tenantId+deviceId)
+      description: |
+        Accepts `deviceId` directly OR `addrLow + addrHigh` (legacy QR payload).
+        If an installation already exists for the resolved device, the call is
+        treated as an update.
+      operationId: qrcInstall
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallRequest' }
+      responses:
+        '201':
+          description: Installation created/updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Installation' }
+        '404': { description: Device or customer not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/installations/{id}:
+    get:
+      tags: [QR Checker]
+      summary: Get an installation
+      operationId: qrcGetInstallation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Installation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Installation' }
+    patch:
+      tags: [QR Checker]
+      summary: Update an installation (audit row emitted)
+      operationId: qrcUpdateInstallation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateInstallationRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Installation' }
+
+  /qrc/installations/{id}/audit:
+    get:
+      tags: [QR Checker]
+      summary: List the installation's revision audit
+      operationId: qrcInstallationAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Audit entries (revision-ordered)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/InstallationAudit' }
+
+  /qrc/installations/{id}/images:
+    get:
+      tags: [QR Checker]
+      summary: List installation images
+      operationId: qrcListInstallationImages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Images
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/InstallationImage' }
+    post:
+      tags: [QR Checker]
+      summary: Upload an installation image (multipart) and write the join row
+      description: |
+        Multipart payload: field `file` (binary), optional `caption`, optional
+        `imageOrder`. Server-side cap of 20 images per installation. The
+        backend uploads to S3 via FileAssets and returns the join row + a
+        short-lived signed downloadUrl.
+      operationId: qrcUploadInstallationImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:       { type: string, format: binary }
+                caption:    { type: string }
+                imageOrder: { type: integer, minimum: 0, maximum: 19 }
+      responses:
+        '201':
+          description: Image uploaded + join row created + audit emitted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InstallationImageWithUrl' }
+        '409': { description: Image limit reached (max 20 / installation), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/installations/{installationId}/images/{imageId}:
+    patch:
+      tags: [QR Checker]
+      summary: Update image caption/order
+      operationId: qrcUpdateInstallationImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: installationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imageOrder: { type: integer }
+                caption:    { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InstallationImage' }
+    delete:
+      tags: [QR Checker]
+      summary: Detach an installation image (audit emitted)
+      operationId: qrcDeleteInstallationImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: installationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Detached }
+
+  /qrc/installations/{id}/tasks:
+    get:
+      tags: [QR Checker]
+      summary: List maintenance tasks for an installation
+      operationId: qrcListInstallationTasks
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/MaintenanceTask' }
+    post:
+      tags: [QR Checker]
+      summary: Create a maintenance task (audit row task_created)
+      operationId: qrcCreateInstallationTask
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMaintenanceTaskRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/MaintenanceTask' }
+
+  /qrc/installations/{installationId}/tasks/{taskId}:
+    patch:
+      tags: [QR Checker]
+      summary: Update a task (status changes emit task_completed audit)
+      operationId: qrcUpdateInstallationTask
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: installationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMaintenanceTaskRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/MaintenanceTask' }
+
+  # --- Visitas ---------------------------------------------------------------
+
+  /qrc/visitas:
+    get:
+      tags: [QR Checker]
+      summary: List visitas técnicas (paginated)
+      operationId: qrcListVisitas
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, in_progress, done] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Visitas + total count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Visita' }
+                          total: { type: integer }
+    post:
+      tags: [QR Checker]
+      summary: Create a visita técnica (audit row created)
+      operationId: qrcCreateVisita
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVisitaRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Visita' }
+
+  /qrc/visitas/{id}:
+    get:
+      tags: [QR Checker]
+      summary: Get a visita
+      operationId: qrcGetVisita
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Visita
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Visita' }
+    patch:
+      tags: [QR Checker]
+      summary: Update a visita (audit emitted)
+      operationId: qrcUpdateVisita
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateVisitaRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Visita' }
+    delete:
+      tags: [QR Checker]
+      summary: Soft-delete a visita
+      operationId: qrcDeleteVisita
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Soft-deleted }
+
+  /qrc/visitas/{id}/audit:
+    get:
+      tags: [QR Checker]
+      summary: List visita audit log
+      operationId: qrcVisitaAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+
+  /qrc/visitas/{id}/report:
+    get:
+      tags: [QR Checker]
+      summary: Visita summary (counts of ambientes, products)
+      operationId: qrcVisitaReport
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+
+  /qrc/visitas/{id}/observations:
+    get:
+      tags: [QR Checker]
+      summary: List visita-level observations
+      operationId: qrcListVisitaObservations
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Observations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+    post:
+      tags: [QR Checker]
+      summary: Create a visita observation (with optional fileAssetId photo)
+      operationId: qrcCreateVisitaObservation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [observation]
+              properties:
+                observation: { type: string }
+                fileAssetId: { type: string, format: uuid, nullable: true }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/VisitaObservation' }
+
+  /qrc/visitas/{id}/observations/{observationId}:
+    delete:
+      tags: [QR Checker]
+      summary: Delete a visita observation
+      operationId: qrcDeleteVisitaObservation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: observationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  # --- Visita ambientes ------------------------------------------------------
+
+  /qrc/visitas/{id}/ambientes:
+    get:
+      tags: [QR Checker]
+      summary: List ambientes for a visita
+      operationId: qrcListAmbientes
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Ambientes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/VisitaAmbiente' }
+    post:
+      tags: [QR Checker]
+      summary: Create an ambiente in a visita (audit emitted)
+      operationId: qrcCreateAmbiente
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVisitaAmbienteRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/VisitaAmbiente' }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}:
+    get:
+      tags: [QR Checker]
+      summary: Get an ambiente
+      operationId: qrcGetAmbiente
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Ambiente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/VisitaAmbiente' }
+    patch:
+      tags: [QR Checker]
+      summary: Update an ambiente (auto-save target — debounce on FE)
+      operationId: qrcUpdateAmbiente
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateVisitaAmbienteRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+    delete:
+      tags: [QR Checker]
+      summary: Delete an ambiente (audit emitted; cascades to images/products)
+      operationId: qrcDeleteAmbiente
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/images:
+    get:
+      tags: [QR Checker]
+      summary: List ambiente images
+      operationId: qrcListAmbienteImages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Images
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+    post:
+      tags: [QR Checker]
+      summary: Upload an ambiente image (multipart, max 50 / ambiente)
+      operationId: qrcUploadAmbienteImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:       { type: string, format: binary }
+                caption:    { type: string }
+                imageOrder: { type: integer, minimum: 0, maximum: 49 }
+      responses:
+        '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '409': { description: Image limit reached (50/ambiente), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/images/{imageId}:
+    patch:
+      tags: [QR Checker]
+      summary: Update ambiente image caption/order
+      operationId: qrcUpdateAmbienteImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    delete:
+      tags: [QR Checker]
+      summary: Delete an ambiente image
+      operationId: qrcDeleteAmbienteImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  # --- Visita products -------------------------------------------------------
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/products:
+    get:
+      tags: [QR Checker]
+      summary: List products in an ambiente
+      operationId: qrcListProducts
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Products, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    post:
+      tags: [QR Checker]
+      summary: Create a product
+      operationId: qrcCreateProduct
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVisitaProductRequest' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}:
+    patch:
+      tags: [QR Checker]
+      summary: Update a product
+      operationId: qrcUpdateProduct
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    delete:
+      tags: [QR Checker]
+      summary: Delete a product
+      operationId: qrcDeleteProduct
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images:
+    get:
+      tags: [QR Checker]
+      summary: List product images
+      operationId: qrcListProductImages
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Images, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    post:
+      tags: [QR Checker]
+      summary: Upload a product image (multipart, max 5 / product)
+      operationId: qrcUploadProductImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '409': { description: Image limit reached (5/product), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images/{imageId}:
+    delete:
+      tags: [QR Checker]
+      summary: Delete a product image
+      operationId: qrcDeleteProductImage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: ambienteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+
+  # --- Users (PIN admin + audit history) ------------------------------------
+
+  /qrc/users/{userId}/pin:
+    patch:
+      tags: [QR Checker]
+      summary: Set or clear a user's field-operator PIN
+      description: |
+        Body `{ pin: "1234" }` sets/replaces; `{ pin: null }` clears. Server
+        writes both `qrc_field_pin_lookup` (HMAC) and `qrc_field_pin_hash`
+        (bcrypt). PG `23505` violations on the partial UNIQUE index are
+        mapped to `409 PIN_TAKEN`.
+      operationId: qrcSetUserPin
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetOperatorPinRequest' }
+      responses:
+        '204': { description: PIN set or cleared }
+        '409': { description: PIN already in use, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /qrc/users/{userId}/audit:
+    get:
+      tags: [QR Checker]
+      summary: List installation-audit entries authored by this user
+      operationId: qrcUserAudit
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Audit timeline
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/InstallationAudit' }
+                          total: { type: integer }
