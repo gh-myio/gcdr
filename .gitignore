@@ -149,6 +149,11 @@ Copia.env.txt
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/skills/
+
+# BMAD per-user installer answers (regenerated on every install)
+_bmad/config.user.toml
+_bmad/custom/config.user.toml
 
 # Test outputs (generated dynamically)
 tests/get_bundles/simple_bundle_output.json

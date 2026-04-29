@@ -16,10 +16,20 @@ const expectErrorWithCode = async (promise: Promise<unknown>, code: string) => {
   }
 };
 
-// Mock EventService
-jest.mock('../../../src/infrastructure/events/EventService', () => ({
-  eventService: {
-    publish: jest.fn().mockResolvedValue(undefined),
+// CustomerService.delete() calls userService.clearDefaultCustomerForAll
+// (RFC: customer-default-customer cleanup). Stub it so this unit test
+// doesn't hit the real DB.
+jest.mock('../../../src/services/UserService', () => ({
+  userService: {
+    clearDefaultCustomerForAll: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+// alarmBundleService.invalidateCache is fire-and-forget and tries to
+// read the live tenant cache; stub it for deterministic unit tests.
+jest.mock('../../../src/services/AlarmBundleService', () => ({
+  alarmBundleService: {
+    invalidateCache: jest.fn(),
   },
 }));
 
@@ -60,6 +70,7 @@ describe('CustomerService', () => {
       create: jest.fn(),
       getById: jest.fn(),
       getByCode: jest.fn(),
+      getByExternalId: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       list: jest.fn(),
@@ -70,6 +81,8 @@ describe('CustomerService', () => {
       getTree: jest.fn(),
       move: jest.fn(),
       updatePath: jest.fn(),
+      forceDelete: jest.fn(),
+      listQrcEnabledForUser: jest.fn(),
     };
 
     service = new CustomerService(mockRepository);
