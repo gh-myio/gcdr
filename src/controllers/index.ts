@@ -48,6 +48,14 @@ export { default as wikiPublicController } from './wiki-public.controller';
 export { default as fileAssetsController } from './file-assets.controller';
 export { default as fileAssetsPublicController } from './file-assets-public.controller';
 
+// RFC-0032: QR Checker module
+export {
+  qrcCustomersController,
+  qrcInstallationsController,
+  qrcVisitasController,
+  qrcUsersController,
+} from './qrc';
+
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';
 

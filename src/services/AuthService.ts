@@ -492,6 +492,26 @@ export class AuthService {
     return verifyJWT<JWTPayload>(token);
   }
 
+  /**
+   * RFC-0032 — Viewer JWT for read-only stakeholder access scoped to a
+   * single customer. Carries `role:qrc-viewer` and `scope:customer:<id>`
+   * in the roles claim. Lifetime 1h; no refresh — viewer re-authenticates
+   * with the password.
+   */
+  signViewerJwt(input: { tenantId: string; customerId: string; ip: string }): string {
+    return createJWT(
+      {
+        sub: `qrc-viewer:${input.customerId}`,
+        tenant_id: input.tenantId,
+        email: `viewer-${input.customerId}@viewer.local`,
+        roles: [`role:qrc-viewer`, `scope:customer:${input.customerId}`],
+        type: 'CUSTOMER',
+        viewer_customer_id: input.customerId,
+      },
+      ACCESS_TOKEN_EXPIRY,
+    );
+  }
+
   private async generateTokens(user: User, tenantId: string, roles: string[] = []): Promise<TokenResponse> {
     // Generate access token
     const accessToken = createJWT(

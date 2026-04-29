@@ -73,6 +73,11 @@ import {
   // Generic file/asset storage (S3)
   fileAssetsController,
   fileAssetsPublicController,
+  // RFC-0032: QR Checker module
+  qrcCustomersController,
+  qrcInstallationsController,
+  qrcVisitasController,
+  qrcUsersController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -301,6 +306,23 @@ apiV1Router.use('/public/files', fileAssetsPublicController);
 // in src/controllers/assets.controller.ts and Express's first-match routing
 // would never reach this handler if both shared the path.
 apiV1Router.use('/files', authMiddleware, fileAssetsController);
+
+// =============================================================================
+// RFC-0032: QR Checker module
+// All routers handle their own auth — qrc-customers exposes a public
+// /viewer-login route, the rest of the surface uses authMiddleware
+// internally.
+// =============================================================================
+// /api/v1/qrc/install                       (POST — upsert installation)
+// /api/v1/qrc/installations/:id             (GET, PATCH, audit, images, tasks)
+apiV1Router.use('/qrc', qrcInstallationsController);
+// /api/v1/qrc/visitas/...                   (full CRUD + ambientes + products)
+apiV1Router.use('/qrc/visitas', qrcVisitasController);
+// /api/v1/qrc/users/:userId/{pin,audit}
+apiV1Router.use('/qrc/users', qrcUsersController);
+// /api/v1/qrc/customers/...                 (must be LAST — generic /:customerId
+//                                            matchers would shadow specific paths)
+apiV1Router.use('/qrc/customers', qrcCustomersController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
