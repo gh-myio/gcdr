@@ -109,6 +109,55 @@ export const UpdateNamespaceSchema = z.object({
 export type UpdateNamespaceDTO = z.infer<typeof UpdateNamespaceSchema>;
 
 // -----------------------------------------------------------------------------
+// POST /wiki/integrations/from-form
+// Form-driven creation of an "Integrations" wiki page (RFC-0030 helper).
+// Forces namespace='Integrations', visibility=['PUBLIC'], status='PUBLISHED'.
+// -----------------------------------------------------------------------------
+const IntegrationStatusSchema = z.enum(['ATIVO', 'AVALIACAO', 'DESCONTINUADO']);
+
+export const CreateIntegrationFromFormSchema = z.object({
+  name: z.string().min(2).max(120),
+  description: z.string().min(1).max(2000),
+  motivation: z.string().max(2000).optional(),
+  category: z.string().max(80).optional(),
+  url: z.string().url().max(500).optional(),
+  loginInfo: z.string().max(500).optional(),
+  api: z.object({
+    docsUrl: z.string().url().max(500).optional(),
+    auth: z.string().max(120).optional(),
+    endpoints: z.string().max(2000).optional(),
+    webhooks: z.string().max(2000).optional(),
+  }).optional(),
+  cost: z.object({
+    value: z.string().max(120).optional(),
+    currency: z.string().max(8).optional(),
+    model: z.string().max(120).optional(),
+  }).optional(),
+  plan: z.string().max(120).optional(),
+  limits: z.object({
+    seats: z.number().int().nonnegative().optional(),
+    requestsPerMonth: z.string().max(120).optional(),
+    storage: z.string().max(120).optional(),
+    other: z.string().max(500).optional(),
+  }).optional(),
+  owner: z.object({
+    responsible: z.string().max(120).optional(),
+    backup: z.string().max(120).optional(),
+  }).optional(),
+  status: IntegrationStatusSchema.optional(),
+  dates: z.object({
+    contractedAt: z.string().max(40).optional(),
+    renewalAt: z.string().max(40).optional(),
+    discontinuedAt: z.string().max(40).optional(),
+  }).optional(),
+  gcdrIntegration: z.string().max(2000).optional(),
+  notes: z.string().max(4000).optional(),
+  tags: z.array(z.string().min(1).max(32)).max(20).optional(),
+  slug: SlugSchema.optional(),
+});
+export type CreateIntegrationFromFormDTO = z.infer<typeof CreateIntegrationFromFormSchema>;
+
+// -----------------------------------------------------------------------------
 // List / pagination parameters
 // -----------------------------------------------------------------------------
 export interface ListPagesParams extends PaginationParams {

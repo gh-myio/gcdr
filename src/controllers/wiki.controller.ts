@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { wikiPageService } from '../services/WikiPageService';
 import { wikiAudienceResolver } from '../services/WikiAudienceResolver';
+import { wikiAccessAuditService } from '../services/WikiAccessAuditService';
 import { wikiNamespaceRepository } from '../repositories/WikiPageRepository';
 import {
   CreatePageSchema,
@@ -10,6 +11,7 @@ import {
   PublishPageSchema,
   CreateNamespaceSchema,
   UpdateNamespaceSchema,
+  CreateIntegrationFromFormSchema,
   ListPagesParams,
 } from '../dto/request/WikiDTO';
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
@@ -124,6 +126,73 @@ router.delete('/namespaces/:name', async (req: Request, res: Response, next: Nex
     }
     await wikiNamespaceRepository.delete(tenantId, req.params.name);
     sendNoContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Access audit (for FE diagnostic UI)
+// -----------------------------------------------------------------------------
+
+/**
+ * GET /wiki/access-check/:userId
+ *
+ * Returns a structured audit of the target user's wiki write access:
+ *   - user identity
+ *   - active role assignments
+ *   - roles + their policy keys
+ *   - policies with wiki.* allow/deny filtered out
+ *   - aggregated effective wiki.* allow + deny lists
+ *   - per-permission verdict (ALLOWED / DENIED / NOT_GRANTED) for the 16
+ *     wiki permissions that matter for write/publish flows
+ *   - summary specific to POST /wiki/integrations/from-form
+ *
+ * The audit runs in the caller's tenant (req.context.tenantId).
+ * If the target user lives in another tenant, returns 404.
+ */
+const UserIdSchema = z.string().uuid();
+
+router.get('/access-check/:userId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const userId = UserIdSchema.parse(req.params.userId);
+    const report = await wikiAccessAuditService.auditUser(tenantId, userId);
+    sendSuccess(res, report, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Integrations form helper
+// -----------------------------------------------------------------------------
+
+/**
+ * POST /wiki/integrations/from-form
+ *
+ * Form-driven creation of a Wiki page in the `Integrations` namespace.
+ * The Markdown body is generated from the structured payload using the
+ * canonical layout (descrição, motivação, custo, usuários suportados, URL,
+ * API, etc.). The page is forced to:
+ *   - namespace  = 'Integrations'
+ *   - visibility = ['PUBLIC']
+ *   - status     = 'PUBLISHED'
+ *
+ * The caller still needs permission to assign the PUBLIC audience tag.
+ */
+router.post('/integrations/from-form', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const data = CreateIntegrationFromFormSchema.parse(req.body);
+    const result = await wikiPageService.createIntegrationFromForm(
+      { tenantId, userId },
+      data,
+    );
+    sendCreated(res, {
+      ...result.page,
+      currentRevision: result.revision,
+    }, requestId);
   } catch (err) {
     next(err);
   }

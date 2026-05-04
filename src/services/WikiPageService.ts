@@ -3,12 +3,14 @@ import {
   wikiRevisionRepository,
   wikiPageLinkRepository,
   wikiSearchRepository,
+  wikiNamespaceRepository,
 } from '../repositories/WikiPageRepository';
 import {
   IWikiPageRepository,
   IWikiRevisionRepository,
   IWikiPageLinkRepository,
   IWikiSearchRepository,
+  IWikiNamespaceRepository,
   ListWikiPagesParams,
   SearchWikiParams,
   BacklinksParams,
@@ -30,6 +32,7 @@ import {
   UpdatePageDTO,
   MovePageDTO,
   PublishPageDTO,
+  CreateIntegrationFromFormDTO,
 } from '../dto/request/WikiDTO';
 import { PaginatedResult } from '../shared/types';
 import {
@@ -146,6 +149,7 @@ export class WikiPageService {
     private readonly audiences: WikiAudienceResolver = wikiAudienceResolver,
     private readonly linkRepo: IWikiPageLinkRepository = wikiPageLinkRepository,
     private readonly searchRepo: IWikiSearchRepository = wikiSearchRepository,
+    private readonly namespaceRepo: IWikiNamespaceRepository = wikiNamespaceRepository,
   ) {}
 
   // ----- Read operations (audience-filtered) --------------------------------
@@ -517,6 +521,136 @@ export class WikiPageService {
         `You are not allowed to assign visibility tag(s): ${deniedTags.join(', ')}`
       );
     }
+  }
+
+  // ----- Integration form helper --------------------------------------------
+  // Dedicated factory that takes a structured form payload and produces an
+  // "Integrations" wiki page with PUBLIC visibility / PUBLISHED status. Reuses
+  // createPage() so audience guards, conflict detection, link extraction and
+  // revision history all behave normally.
+
+  static readonly INTEGRATIONS_NAMESPACE = 'Integrations';
+
+  async createIntegrationFromForm(
+    ctx: { tenantId: string; userId: string },
+    data: CreateIntegrationFromFormDTO,
+  ): Promise<{ page: WikiPage; revision: WikiPageRevision }> {
+    const namespace = WikiPageService.INTEGRATIONS_NAMESPACE;
+
+    // Ensure the namespace exists (idempotent — silent if already present).
+    const existingNs = await this.namespaceRepo.get(ctx.tenantId, namespace);
+    if (!existingNs) {
+      await this.namespaceRepo.create(ctx.tenantId, {
+        name: namespace,
+        description:
+          'Inventário de integrações e ferramentas SaaS usadas internamente pela MYIO.',
+        reviewRequired: false,
+      });
+    }
+
+    const slug = data.slug ?? this.slugifyForWiki(data.name);
+    const body = this.buildIntegrationMarkdown(data);
+
+    const tags = Array.from(new Set([
+      'integrations',
+      ...(data.category ? [this.slugifyForWiki(data.category)] : []),
+      ...(data.tags ?? []),
+    ])).slice(0, 20);
+
+    return this.createPage(ctx, {
+      namespace,
+      slug,
+      title: data.name,
+      body,
+      tags,
+      visibility: ['PUBLIC'],
+      status: 'PUBLISHED',
+      frontmatter: {
+        source:   'integration-form',
+        owner:    data.owner?.responsible ?? null,
+        category: data.category ?? null,
+        status:   data.status ?? 'ATIVO',
+        url:      data.url ?? null,
+      },
+      changeNote: 'Created via POST /wiki/integrations/from-form',
+    });
+  }
+
+  /**
+   * Slug compatible with `^[a-z0-9][a-z0-9/_-]{0,127}$` (the wiki_pages slug
+   * regex). Strips diacritics, lowercases, replaces non-alnum with `-`.
+   */
+  private slugifyForWiki(input: string): string {
+    const base = input
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 128);
+    return base.length === 0 ? 'integration' : base;
+  }
+
+  /**
+   * Render the integration form payload into the canonical Markdown layout
+   * used by the `Integrations` namespace. Sections without data fall back to
+   * a `_TODO_` placeholder so the page is still scannable.
+   */
+  private buildIntegrationMarkdown(data: CreateIntegrationFromFormDTO): string {
+    const todo = '_TODO_';
+    const get = (v?: string | number | null): string =>
+      v === undefined || v === null || v === '' ? todo : String(v);
+
+    const lines: string[] = [];
+    lines.push(`# ${data.name}`, '');
+    lines.push('## Descrição', '', data.description, '');
+    lines.push('## Motivação', '', get(data.motivation), '');
+    lines.push('## Categoria', '', get(data.category), '');
+
+    lines.push('## URL / Acesso', '');
+    lines.push(`- **URL principal:** ${get(data.url)}`);
+    lines.push(`- **Login / Acesso:** ${get(data.loginInfo)}`);
+    lines.push('');
+
+    lines.push('## API / Webhooks', '');
+    lines.push(`- **Docs:** ${get(data.api?.docsUrl)}`);
+    lines.push(`- **Auth:** ${get(data.api?.auth)}`);
+    lines.push(`- **Endpoints relevantes:** ${get(data.api?.endpoints)}`);
+    lines.push(`- **Webhooks:** ${get(data.api?.webhooks)}`);
+    lines.push('');
+
+    lines.push('## Custo', '');
+    lines.push(`- **Valor:** ${get(data.cost?.value)}`);
+    lines.push(`- **Moeda:** ${get(data.cost?.currency)}`);
+    lines.push(`- **Modelo de cobrança:** ${get(data.cost?.model)}`);
+    lines.push('');
+
+    lines.push('## Plano atual', '', get(data.plan), '');
+
+    lines.push('## Usuários suportados / Limites', '');
+    lines.push(`- **Seats:** ${get(data.limits?.seats)}`);
+    lines.push(`- **Requests/mês:** ${get(data.limits?.requestsPerMonth)}`);
+    lines.push(`- **Storage:** ${get(data.limits?.storage)}`);
+    lines.push(`- **Outros limites:** ${get(data.limits?.other)}`);
+    lines.push('');
+
+    lines.push('## Owner interno', '');
+    lines.push(`- **Responsável:** ${get(data.owner?.responsible)}`);
+    lines.push(`- **Backup:** ${get(data.owner?.backup)}`);
+    lines.push('');
+
+    lines.push('## Status', '', `\`${data.status ?? 'ATIVO'}\``, '');
+
+    lines.push('## Datas', '');
+    lines.push(`- **Contratação:** ${get(data.dates?.contractedAt)}`);
+    lines.push(`- **Renovação:** ${get(data.dates?.renewalAt)}`);
+    lines.push(`- **Encerramento:** ${get(data.dates?.discontinuedAt)}`);
+    lines.push('');
+
+    lines.push('## Integração com GCDR', '', get(data.gcdrIntegration), '');
+    lines.push('## Notas / Observações', '', get(data.notes), '');
+
+    return lines.join('\n');
   }
 }
 
