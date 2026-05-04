@@ -1,21 +1,35 @@
 # QR Checker on GCDR — Frontend Integration Guide
 
-- **Status:** Integration brief — backend Phases 1-4 live (controllers mounted)
-- **Last updated:** 2026-04-29
+- **Status:** Integration brief — backend Phases 1-4 live (controllers mounted); Phases 5-8 ⏸ stand-by
+- **Last updated:** 2026-04-30
 - **Audience:** Frontend / mobile developers re-pointing the QR Checker UI at GCDR
 - **Companion docs:**
-  - [RFC-0032 — QR Checker Migration](./RFC-0032-QR-Checker-Migration-to-GCDR.md) (full backend spec)
+  - [RFC-0032 — QR Checker Migration](./RFC-0032-QR-Checker-Migration-to-GCDR.md) (full backend spec, status snapshot)
+  - [Source DB Structure (qrcode-check SQLite)](./RFC-0032-QR-Checker-Migration-to-GCDR-DATABASE-Structure-QRCODE-CHECKER.md) (only relevant if migration is reactivated)
   - [FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md) (image upload contract)
   - [GCDR-USER.md](./GCDR-USER.md) (auth, RBAC, customer hierarchy)
-  - **OpenAPI:** [docs/openapi.yaml](./openapi.yaml) — every endpoint below has a corresponding entry under tag `QR Checker`. Swagger UI at `/docs` (local + prod).
+  - **OpenAPI:** [docs/openapi.yaml](./openapi.yaml) — every endpoint below has a corresponding entry under tag `QR Checker` (50 operations indexed). Swagger UI at `/docs` (local + prod).
+
+---
+
+## Current goal: greenfield validation
+
+Phases 5–8 (data migration, MCP, cutover) are on **stand-by**. The current
+focus is to **exercise the GCDR backend end-to-end against an empty
+Postgres**, as if the project were starting from scratch, and confirm
+the API surface is adherent to the product flows. Only after that go/no-go
+signal does it make sense to invest in migration tooling.
+
+If the validation succeeds and no historical `qrcode-check.git` data needs
+to survive, the legacy app gets archived (not migrated) — Phases 5 and 8
+are retired entirely.
 
 ---
 
 ## What's live today (Phase 4)
 
-The backend is callable; the frontend can start integrating. Phases 5-8
-(data migration script, MCP, cutover) are still ahead but they don't
-gate the FE.
+The backend is callable; the frontend can start integrating against an
+empty Postgres tenant.
 
 | Surface                                                                   | Status |
 | ------------------------------------------------------------------------- | ------ |
@@ -39,6 +53,8 @@ gate the FE.
 | `GET /api/v1/qrc/users/:userId/audit`                                     | ✅ live |
 | Customer report `?format=xlsx` / `pdf`                                     | ⏳ json only in v1 |
 | Bulk device import/export per customer                                     | ⏳ later phase |
+| MCP server / NL access to QR data                                          | ⏸ stand-by (Phases 6/7) |
+| Historical data import from `qrcode-check.git` SQLite                      | ⏸ stand-by (Phase 5) |
 
 **FE checklist (now actionable):**
 1. Flip `BASE_URL` to `process.env.NEXT_PUBLIC_GCDR_BASE_URL` (e.g. `https://gcdr-api.a.myio-bas.com/api/v1`).
@@ -172,9 +188,7 @@ customer:<id>` claims. Viewer tokens are deliberately narrow — they can
 read the customer's devices, installations, images, and report. They
 cannot list other customers, write anything, or hit `/admin/*`.
 
-> **Backend note:** the viewer-login endpoint is *Phase 4* (controllers).
-> Until it ships, frontend dev can stub against the operator-PIN flow with
-> a read-only role.
+> **Status:** ✅ live — `qrc-customers.controller.ts:123` mounts the route.
 
 ### Header conventions
 
@@ -594,7 +608,7 @@ A practical task list for re-pointing the existing Next.js app:
 - [ ] Rename path placeholders: `aid → ambienteId`, `pid → productId`, `iid → imageId`, `obsId → observationId`
 - [ ] Wrap fetch with `success/data/meta` envelope unwrapping
 - [ ] Drop the `POST /api/admin/users/check-pin` pre-check; handle `409 PIN_TAKEN` on submit instead
-- [ ] Update viewer-login to the customer-scoped endpoint when Phase 4 ships
+- [ ] Update viewer-login to the customer-scoped endpoint (already live: `POST /api/v1/qrc/customers/:customerId/viewer-login`)
 - [ ] Replace `<img src="/api/installations/.../images/x.jpg">` with the signed `downloadUrl` from the upload response (and refresh via `GET /files/:id/url` on expiry)
 - [ ] Switch from "load everything" to cursor pagination on customer / device lists
 - [ ] Add `Retry-After` countdown to the PIN-login error toast for `429`
@@ -618,14 +632,15 @@ A practical task list for re-pointing the existing Next.js app:
 ## Open questions for the FE team
 
 1. Does the existing Next.js app point at a configurable API host, or is
-   `'/api'` baked in? If baked in, the cutover is a coordinated app
+   `'/api'` baked in? If baked in, switching to GCDR is a coordinated app
    release, not just a config flip.
 2. Image cache strategy: keep the legacy `installation-images-resized/`
    sharp pipeline, or rely on a future `?w=600` query param on the
    FileAssets download endpoint?
 3. Authoritative slug source on `/mall/[slug]`: route param or store?
    The store-only path makes the once-per-page resolution cleanest.
-4. How quickly can we drop the legacy `/api/auth/login` PIN branch from
-   the form? Coordinated with backend cutover.
+4. Greenfield validation outcome: does the empty-Postgres run cover all
+   product flows, or are there gaps that require seeding fixtures (or
+   eventually reactivating Phase 5)? Decision pending the FE walkthrough.
 
 Track answers in this doc as they land.

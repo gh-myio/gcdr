@@ -1,7 +1,8 @@
 # RFC-0032 — QR Checker Migration to GCDR (Backend, Data, MCP)
 
-- **Status:** Draft
+- **Status:** Partially shipped — Phases 1–4 ✅ done; Phases 5–8 ⏸ stand-by (greenfield validation first)
 - **Created:** 2026-04-27
+- **Last updated:** 2026-04-30
 - **Author:** MYIO Engineering
 - **Domain:** Domain consolidation / Multi-stack reduction / MCP
 - **Builds on:**
@@ -9,6 +10,32 @@
   - [RFC-0030 — MYIO Wiki (file_assets, public_slug, S3 layout)](./RFC-0030-MYIO-Wiki-Knowledge-Base.md)
   - [RFC-0030 — S3 Bucket Setup](./RFC-0030-S3-Bucket-Setup.md)
   - [FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md)
+
+## Status snapshot (2026-04-30)
+
+| Phase | Description                                                   | Status                                |
+|-------|---------------------------------------------------------------|---------------------------------------|
+| 1     | DB schema + entities (migrations 0024 + 0025)                  | ✅ done (`005b746`)                    |
+| 2     | Auth — operator-pin login + bcrypt PIN storage                | ✅ done (`e66983c`)                    |
+| 3     | Repositories + Services + audit emission                       | ✅ done (`cf573ce`, tests `0371309`)   |
+| 4     | Controllers + ~48 routes mounted + OpenAPI                     | ✅ done (`4dd305b`, `b46f56e`)         |
+| 5     | Data migration script (SQLite → Postgres)                      | ⏸ **stand-by**                         |
+| 6     | MCP server port (10 tools)                                     | ⏸ **stand-by**                         |
+| 7     | MCP expansion (+12 tools: customers / wiki / observability)    | ⏸ **stand-by**                         |
+| 8     | Cutover (freeze, dry-run, migrate, sample-test)                | ⏸ **stand-by** (depends on Phase 5)    |
+
+### Why stand-by (and not in progress)
+
+The team's current goal is to **validate the GCDR backend (Phases 1–4) end-to-end as if the project were greenfield** — wire the FE up, exercise the full navigation against a clean Postgres, and confirm the API surface is adherent to the product flows. Only after that go/no-go signal does it make sense to invest in the migration script (Phase 5), the MCP port (6/7), or the cutover ritual (8).
+
+If greenfield testing reveals the API is adherent and no historical data needs to survive, **Phases 5 and 8 may be retired entirely** (`qrcode-check.git` archived without migration). Phases 6/7 remain optional regardless — they unlock NL/Claude access to the data, not the core product.
+
+**What's live today:** the GCDR backend exposes `/api/v1/qrc/*` and `/api/v1/auth/operator-pin`. The frontend can re-point at GCDR and run end-to-end against an empty Postgres for validation. No legacy data is being touched.
+
+**Companion docs for the deferred work:**
+- [Phase 5 — Data Migration Script](./RFC-0032-QR-Checker-Migration-to-GCDR-Phase-5.md)
+- [Source DB Structure (SQLite)](./RFC-0032-QR-Checker-Migration-to-GCDR-DATABASE-Structure-QRCODE-CHECKER.md)
+- [Frontend Integration Guide](./FRONTEND-RFC-0032-QR-Checker.md)
 
 ## Companion documents
 
@@ -1273,7 +1300,14 @@ upload image → fetch installation) returns expected responses.
 
 **Estimate**: 2 days.
 
-### Phase 5 — Data migration script
+### Phase 5 — Data migration script ⏸ STAND-BY
+
+> **Status (2026-04-30):** on hold while greenfield validation runs.
+> May be retired entirely if no historical data needs to survive.
+> Detailed spec preserved for later in
+> [RFC-0032 Phase 5 doc](./RFC-0032-QR-Checker-Migration-to-GCDR-Phase-5.md).
+> Source schema reference:
+> [DATABASE Structure of qrcode-check](./RFC-0032-QR-Checker-Migration-to-GCDR-DATABASE-Structure-QRCODE-CHECKER.md).
 
 - `scripts/migrate-qrchecker.ts`
 - `npm run migrate:qrchecker` script in `package.json`
@@ -1288,7 +1322,11 @@ projected counts, full run persists every row, re-run as no-op.
 
 **Estimate**: 2 days.
 
-### Phase 6 — MCP server port
+### Phase 6 — MCP server port ⏸ STAND-BY
+
+> **Status (2026-04-30):** on hold. Independent from Phase 5 (no data
+> dependency); no consumer blocked today. Resume only when there's a
+> concrete user wanting NL/Claude access to QR data.
 
 - `src/mcp/server.ts`
 - `src/mcp/transport/{stdio,http}.ts`
@@ -1304,7 +1342,9 @@ swapped for mall-id keys).
 
 **Estimate**: 2 days.
 
-### Phase 7 — MCP expansion (12 new tools)
+### Phase 7 — MCP expansion (12 new tools) ⏸ STAND-BY
+
+> **Status (2026-04-30):** on hold. Depends on Phase 6.
 
 - `src/mcp/tools/customers/*.ts` (4 tools)
 - `src/mcp/tools/wiki/*.ts` (5 tools)
@@ -1315,7 +1355,13 @@ a smoke test.
 
 **Estimate**: 3 days.
 
-### Phase 8 — Cutover
+### Phase 8 — Cutover ⏸ STAND-BY (gated by Phase 5)
+
+> **Status (2026-04-30):** on hold. Cutover only makes sense if Phase 5
+> ships — it *is* the act of executing the migration script in production.
+> If greenfield validation succeeds and no legacy data needs to survive,
+> this phase is retired entirely (the legacy app gets archived, not cut
+> over).
 
 - Pre-flight: backup SQLite + tarball of installation-images
 - Window: chosen Saturday morning
