@@ -130,6 +130,33 @@ export class DeviceRepository implements IDeviceRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  async countByName(
+    tenantId: string,
+    name: string,
+    opts?: { customerIds?: string[]; caseSensitive?: boolean },
+  ): Promise<number> {
+    const caseSensitive = opts?.caseSensitive !== false; // default true
+
+    const nameCondition = caseSensitive
+      ? eq(devices.name, name)
+      : sql`lower(${devices.name}) = lower(${name})`;
+
+    const conditions = [
+      eq(devices.tenantId, tenantId),
+      nameCondition,
+    ];
+    if (opts?.customerIds && opts.customerIds.length > 0) {
+      conditions.push(inArray(devices.customerId, opts.customerIds));
+    }
+
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(devices)
+      .where(and(...conditions));
+
+    return row?.count ?? 0;
+  }
+
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Device | null> {
     const [result] = await db
       .select()

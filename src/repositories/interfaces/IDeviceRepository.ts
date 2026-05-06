@@ -22,6 +22,16 @@ export interface IDeviceRepository {
   // RFC-0032: lookup by QR Checker (addr_low, addr_high) inside a customer
   findByQrcAddress(tenantId: string, customerId: string, addrLow: number, addrHigh: number): Promise<Device | null>;
 
+  // Name uniqueness check across the whole tenant (NOT scoped to a customer).
+  // Used by the FE before submitting a create/edit form to surface an inline
+  // warning even when the unique constraint is per (tenant_id, customer_id, name).
+  // `caseSensitive` defaults to true (matches the unique-index behavior).
+  countByName(
+    tenantId: string,
+    name: string,
+    opts?: { customerIds?: string[]; caseSensitive?: boolean },
+  ): Promise<number>;
+
   // Connectivity
   updateConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<Device>;
 

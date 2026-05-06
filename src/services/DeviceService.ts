@@ -175,6 +175,34 @@ export class DeviceService {
     return this.repository.listByCustomer(tenantId, customerId, params);
   }
 
+  /**
+   * Tenant-wide existence check for a device name. The unique constraint is
+   * (tenant_id, customer_id, name), so the same name can repeat across
+   * customers — this method counts ALL occurrences in the tenant. If
+   * `customerIds` is provided (e.g., from deepCustomers middleware), the
+   * query is narrowed to that subset.
+   *
+   * `caseSensitive` defaults to true (matches the unique-index behavior).
+   * Pass `false` for a UX-friendly check that treats `MyDev`, `mydev`, and
+   * `MYDEV` as the same name.
+   */
+  async existsByName(
+    tenantId: string,
+    name: string,
+    opts?: { customerIds?: string[]; caseSensitive?: boolean },
+  ): Promise<{ exists: boolean; count: number; caseSensitive: boolean }> {
+    const caseSensitive = opts?.caseSensitive !== false;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      return { exists: false, count: 0, caseSensitive };
+    }
+    const count = await this.repository.countByName(tenantId, trimmed, {
+      customerIds: opts?.customerIds,
+      caseSensitive,
+    });
+    return { exists: count > 0, count, caseSensitive };
+  }
+
   async updateConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<Device> {
     await this.getById(tenantId, id);
     return this.repository.updateConnectivityStatus(tenantId, id, status);

@@ -104,6 +104,49 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /devices/exists?name=<value>[&caseSensitive=true|false]
+ *
+ * Tenant-wide existence check for a device name (NOT scoped to a customer).
+ * The unique constraint is (tenant_id, customer_id, name), so the same name
+ * can repeat across customers — this endpoint reports the global count in
+ * the tenant. If the caller is restricted by deepCustomers middleware
+ * (allowedCustomerIds set), the count is narrowed to that scope.
+ *
+ * Query params:
+ *   - name           (required, trimmed, max 255 chars)
+ *   - caseSensitive  (optional, default `true` — matches the unique-index
+ *                     behavior; pass `false` to treat `Foo` / `FOO` / `foo`
+ *                     as the same name)
+ *
+ * Response: { exists: boolean, count: number, caseSensitive: boolean }
+ */
+router.get('/exists', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId, allowedCustomerIds } = req.context;
+    const name = (req.query.name as string | undefined)?.trim();
+    if (!name) {
+      throw new ValidationError('Query param "name" is required');
+    }
+    if (name.length > 255) {
+      throw new ValidationError('Query param "name" must be <= 255 chars');
+    }
+
+    // caseSensitive: 'false' or '0' disables; everything else (including
+    // missing) defaults to true. Aligned with the unique-index behavior.
+    const csRaw = (req.query.caseSensitive as string | undefined)?.toLowerCase();
+    const caseSensitive = !(csRaw === 'false' || csRaw === '0');
+
+    const result = await deviceService.existsByName(tenantId, name, {
+      customerIds: allowedCustomerIds,
+      caseSensitive,
+    });
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /devices/external/:externalId
  * Get device by ThingsBoard / external ID — returns enriched payload with asset, customer and rules
  */
