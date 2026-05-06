@@ -189,7 +189,11 @@ export function logEvent(options: LogEventOptions) {
       httpMethod: req.method,
       httpPath: truncateString(req.originalUrl, AUDIT_PAYLOAD_LIMITS.httpPath.maxLength),
       tenantId: req.context?.tenantId || auditReq.tenantId,
-      userId: req.user?.sub,
+      // For API Key auth, req.user.sub is "apikey:<keyId>" (not a UUID).
+      // audit_logs.user_id is a UUID column, so prefer the clean keyId from
+      // req.context.apiKeyId when present; fall back to req.user.sub for
+      // JWT / master-key / dev paths where sub is already a UUID.
+      userId: req.context?.apiKeyId ?? req.user?.sub,
       userEmail: req.user?.email,
       actorType: determineActorType(req),
     };
@@ -279,12 +283,17 @@ export function logEvent(options: LogEventOptions) {
           ),
         };
 
-        // Write audit log asynchronously - fire and forget with error logging
+        // Write audit log asynchronously - fire and forget with error logging.
+        // Drizzle wraps the original pg error inside `error.cause`, so surface
+        // its message/code too — otherwise debug becomes a needle-in-haystack
+        // when the SQL itself is fine but the data violates a column type.
         auditLogWriter(auditLog).catch(error => {
           console.error('[AUDIT] Failed to write audit log:', {
             eventType: options.eventType,
             requestId: context.requestId,
             error: error.message,
+            cause: error?.cause?.message,
+            code: error?.cause?.code,
           });
         });
       } catch (error) {
