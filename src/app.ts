@@ -209,7 +209,8 @@ apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCus
 apiV1Router.use('/users/:userId/contacts', authMiddleware, userContactsController);
 
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
-apiV1Router.use('/customers/:customerId/channels', authMiddleware, customerChannelsController);
+// hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
+apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod('customers:read', 'customers:write'), customerChannelsController);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
@@ -255,7 +256,8 @@ apiV1Router.use('/integrations', authMiddleware, integrationsController);
 apiV1Router.use('/partners', authMiddleware, partnersController);
 
 // RFC-0024: Group dispatch matrix (nested — must come before general /groups router)
-apiV1Router.use('/groups/:groupId/dispatch', authMiddleware, groupDispatchController);
+// hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
+apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod('customers:read', 'customers:write'), groupDispatchController);
 
 // RFC-0024: Group channel targets (nested — must come before general /groups router)
 apiV1Router.use('/groups/:groupId/channels', authMiddleware, groupChannelsController);
