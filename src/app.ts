@@ -64,6 +64,7 @@ import {
   deviceSyncJobsController,
   // RFC-0024: Alarm Dispatch Configuration
   customerChannelsController,
+  customerIntegrationsController,
   groupDispatchController,
   groupChannelsController,
   userContactsController,
@@ -211,6 +212,10 @@ apiV1Router.use('/users/:userId/contacts', authMiddleware, userContactsControlle
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
 apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod('customers:read', 'customers:write'), customerChannelsController);
+
+// RFC-0033: Customer integration sync state (nested — must come before general /customers router)
+// hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
+apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod('customers:read', 'customers:write'), customerIntegrationsController);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)

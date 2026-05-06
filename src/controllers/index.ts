@@ -64,3 +64,6 @@ export { default as customerChannelsController } from './customer-channels.contr
 export { default as groupDispatchController } from './group-dispatch.controller';
 export { default as groupChannelsController } from './group-channels.controller';
 export { default as userContactsController } from './user-contacts.controller';
+
+// RFC-0033: Customer Integration Sync State
+export { default as customerIntegrationsController } from './customer-integrations.controller';
