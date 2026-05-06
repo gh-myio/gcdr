@@ -11,10 +11,20 @@
 ## Summary
 
 Introduce a structured `integrations` namespace inside the existing
-`customers.metadata` JSONB column to track the **sync state** and a **bounded
-version log** of every external ecosystem the customer participates in
-(Ingestion, Centrals registry, ThingsBoard, Alarm orchestrator, Work Orders,
-Freshdesk).
+`customers.metadata` JSONB column to track the **live sync state** of every
+external ecosystem the customer participates in (Ingestion, Centrals
+registry, ThingsBoard, Alarm orchestrator, Work Orders, Freshdesk).
+
+The version log is **not** kept in-row. Every sync event emits exactly one
+audit log entry (RFC-0009); querying `audit_logs` is the single supported
+way to read past events.
+
+For the `centrals` integration specifically, the state carries an
+`items[]` array, one entry per central, each with the connection
+parameters (`uuid`, `ingestionGatewayId`, `mqttUserName`, `mqttClientId`,
+`mqttPassword`, `ipv6Yggdrasil`). The MQTT password is stored as plaintext
+in JSONB — see the **Security** section for the trade-off and the
+mitigations required before this RFC ships.
 
 No schema migration is required — the column `customers.metadata jsonb NOT NULL
 DEFAULT '{}'` already exists (`schema.ts:178`). This RFC defines the shape,
@@ -92,19 +102,56 @@ treated as `IDLE` for every known integration.
   "lastError":      null,                          // string (truncated) when status=FAILED/DEGRADED
   "syncCount":      137,                           // monotonically increasing
   "failureCount":   2,                             // resets on any successful sync
-  "payload":        { /* free-form, integration-owned */ },
-  "history": [                                     // bounded version log, newest first
+  "payload":        { /* free-form, integration-owned */ }
+}
+```
+
+There is **no in-row history array**. The complete version log lives in
+`audit_logs` (RFC-0009) under `entity_type = 'customer.integration'` —
+that is the canonical, queryable, retention-bound version log for every
+sync event. Carrying a duplicate copy in `metadata` would cost row size
+without buying anything `audit_logs` does not already provide.
+
+### The `centrals` integration is special: it carries an `items[]` list
+
+Every other integration key is a plain `IntegrationState`. The `centrals`
+integration **extends** the state with an `items` array — one entry per
+central provisioned for the customer. This is the only place in this RFC
+where shape differs by key.
+
+```jsonc
+"centrals": {
+  "status":        "OK",
+  "version":       "rev-7",
+  "lastSyncAt":    "2026-05-06T12:30:00.000Z",
+  "lastSuccessAt": "2026-05-06T12:30:00.000Z",
+  "lastError":     null,
+  "syncCount":     12,
+  "failureCount":  0,
+  "payload":       { /* free-form, integration-owned */ },
+  "items": [
     {
-      "at":        "2026-05-06T12:30:00.000Z",
-      "status":    "OK",
-      "version":   "v42",
-      "actor":     "tb-bridge:cron",               // who triggered the sync
-      "note":      "incremental sync, 12 entities updated"
+      "uuid":               "e982edf9-edb1-4aa6-8a14-4782465ae5a3",
+      "ingestionGatewayId": "11111111-2222-3333-4444-555555555555",
+      "mqttUserName":       "central-moxuara-01",
+      "mqttClientId":       "moxuara-01",
+      "mqttPassword":       "<plaintext — see Security>",
+      "ipv6Yggdrasil":      "200:abcd:1234:::1"
     }
-    // ... up to 20 entries, oldest entries are dropped ...
   ]
 }
 ```
+
+Field meanings:
+
+| Field                | Purpose                                                                  |
+|----------------------|--------------------------------------------------------------------------|
+| `uuid`               | The central's GCDR id (`centrals.id`).                                   |
+| `ingestionGatewayId` | The id of the ingestion gateway that owns the MQTT bridge for the central |
+| `mqttUserName`       | MQTT broker username used by this central                                |
+| `mqttClientId`       | MQTT broker client id (must be unique on the broker)                     |
+| `mqttPassword`       | MQTT broker password — **plaintext** in JSONB (see Security)         |
+| `ipv6Yggdrasil`      | Yggdrasil-mesh IPv6 address of the central (used for direct addressing)  |
 
 ### Recording a sync event (operator-level)
 
@@ -125,7 +172,8 @@ The helper is responsible for:
 1. Reading `metadata.integrations.thingsboard` (or initialising it).
 2. Updating the live state fields (`status`, `version`, `lastSyncAt`,
    `lastSuccessAt`, counters, `payload`, `lastError`).
-3. Prepending a new entry to `history` and truncating to 20 entries.
+3. Emitting an audit-log entry (RFC-0009) carrying the full sync event —
+   that audit row, **not** an in-row array, is the durable version log.
 4. Persisting the whole `metadata` column with a single `UPDATE` (atomic write,
    `version` column on `customers` is incremented by the existing optimistic
    locking layer).
@@ -200,7 +248,8 @@ export type IntegrationStatus = (typeof INTEGRATION_STATUS)[number];
 ```
 
 State transitions are not enforced — any backend may move directly from
-`IDLE` to `OK` or from `OK` to `FAILED`. The history log is the audit trail.
+`IDLE` to `OK` or from `OK` to `FAILED`. The audit log (RFC-0009) is the
+trail.
 
 ### 5. Zod schema
 
@@ -208,14 +257,6 @@ State transitions are not enforced — any backend may move directly from
 // src/dto/customerIntegrationSchema.ts
 import { z } from 'zod';
 import { INTEGRATION_KEYS, INTEGRATION_STATUS } from '../domain/integrations/IntegrationKey';
-
-const HistoryEntrySchema = z.object({
-  at:      z.string().datetime(),
-  status:  z.enum(INTEGRATION_STATUS),
-  version: z.string().max(255).optional(),
-  actor:   z.string().max(255),
-  note:    z.string().max(500).optional(),
-});
 
 export const IntegrationStateSchema = z.object({
   status:        z.enum(INTEGRATION_STATUS),
@@ -226,14 +267,33 @@ export const IntegrationStateSchema = z.object({
   syncCount:     z.number().int().nonnegative().default(0),
   failureCount:  z.number().int().nonnegative().default(0),
   payload:       z.record(z.unknown()).default({}),
-  history:       z.array(HistoryEntrySchema).max(20).default([]),
 });
 
-export const CustomerIntegrationsSchema = z.object(
-  Object.fromEntries(
-    INTEGRATION_KEYS.map((k) => [k, IntegrationStateSchema.optional()]),
-  ),
-);
+// Per-central entry stored under integrations.centrals.items[].
+// `mqttPassword` is held as plaintext on this row — see Security.
+export const CentralEntrySchema = z.object({
+  uuid:               z.string().uuid(),
+  ingestionGatewayId: z.string().uuid().nullable().default(null),
+  mqttUserName:       z.string().min(1).max(255),
+  mqttClientId:       z.string().min(1).max(255),
+  mqttPassword:       z.string().min(1).max(2000),
+  ipv6Yggdrasil:      z.string().min(1).max(64),
+});
+
+export const CentralsIntegrationStateSchema = IntegrationStateSchema.extend({
+  items: z.array(CentralEntrySchema).default([]),
+});
+
+// The full integrations map: every known key is optional, but `centrals`
+// (when present) MUST conform to the extended schema with `items`.
+export const CustomerIntegrationsSchema = z.object({
+  ingestion:   IntegrationStateSchema.optional(),
+  centrals:    CentralsIntegrationStateSchema.optional(),
+  thingsboard: IntegrationStateSchema.optional(),
+  alarms:      IntegrationStateSchema.optional(),
+  workorders:  IntegrationStateSchema.optional(),
+  freshdesk:   IntegrationStateSchema.optional(),
+});
 ```
 
 ### 6. Service contract
@@ -270,7 +330,7 @@ export interface ICustomerIntegrationService {
 | `syncCount`     | `+= 1`                                                               |
 | `failureCount`  | `+= 1` on FAILED/DEGRADED, reset to `0` on OK                        |
 | `payload`       | overwritten with `input.payload` if provided, otherwise preserved    |
-| `history`       | new entry prepended; array truncated to **20 entries** (newest kept) |
+| audit log       | one row appended to `audit_logs` (RFC-0009) per call — see §9        |
 
 ### 7. Repository write strategy
 
@@ -295,7 +355,8 @@ RETURNING *;
 Two integrations writing simultaneously to **different** keys cannot collide on
 the JSON path. Two writers updating the **same** integration race for
 last-write-wins on that path — acceptable, because the last write reflects the
-latest sync attempt and `history` records the lost detail.
+latest sync attempt and the per-call audit row in `audit_logs` (§9) preserves
+both the lost write and the winning write.
 
 ### 8. REST surface (under `/customers/:customerId/integrations`)
 
@@ -312,27 +373,43 @@ calls. It is the only mutating route exposed to non-admin callers, and it is
 restricted to **machine-to-machine** keys via `X-API-Key: gcdr_pk_*` /
 `gcdr_cust_*`.
 
-### 9. Audit logs (RFC-0009 hook)
+### 9. Audit logs (RFC-0009) — the canonical version log
 
-Every `recordSync`, `reset`, and `disable` call emits an audit log entry with:
+Every `recordSync`, `reset`, and `disable` call emits **exactly one** audit
+log entry. There is no in-row duplicate. The audit row is the version log.
 
 - `entity_type = 'customer.integration'`
 - `entity_id  = '<customerId>:<key>'`
+- `customer_id = <customerId>`
 - `action     = 'sync' | 'reset' | 'disable'`
-- payload contains the `RecordSyncInput`
+- `metadata` carries the full `RecordSyncInput` (status, version, actor,
+  note, payload, error if any) plus the previous `version` for diffing
+- `created_at` is the timestamp of the event
 
-The on-row `history` array is the **fast** local log (last 20). The audit log
-is the **complete** log, kept for 1 year per RFC-0009 retention.
+`audit_logs` is already indexed on `(tenantId, entityType, entityId)` and
+`(tenantId, customerId, createdAt)` — both fit this access pattern (e.g.
+"the last 50 sync events for customer X / integration thingsboard"). Retention
+is 1 year per RFC-0009.
 
-### 10. Bounded history
+Querying the recent history for one customer × integration becomes a normal
+SQL filter:
 
-The hard cap is **20 entries** in `metadata.integrations.<key>.history`. With
-six integrations this caps `metadata` growth at roughly **6 × 20 = 120**
-history entries plus state envelopes — typically under 32 KB per row, well
-inside Postgres `jsonb` performance bounds. The complete history lives in
-audit logs (see §9).
+```sql
+SELECT created_at, action, metadata->>'status' AS status,
+       metadata->>'version' AS version, metadata->>'actor' AS actor
+FROM audit_logs
+WHERE tenant_id   = $1
+  AND entity_type = 'customer.integration'
+  AND entity_id   = $2 || ':' || $3   -- customerId:key
+ORDER BY created_at DESC
+LIMIT 50;
+```
 
-### 11. Indexes (none)
+This replaces what the original draft of this RFC stored as an in-row
+`history` array. Carrying a duplicate copy in `metadata` would cost row size
+without buying anything `audit_logs` does not already provide.
+
+### 10. Indexes (none)
 
 No indexes are added on `metadata`. Operational queries answered by this RFC
 are **per-customer** (ID lookup is already indexed). Cross-customer reports
@@ -341,6 +418,70 @@ are **per-customer** (ID lookup is already indexed). Cross-customer reports
 not by scanning `metadata`. If that query pattern becomes hot, a partial
 expression index on `(metadata->'integrations'->'thingsboard'->>'status')` can
 be added later without breaking this RFC.
+
+---
+
+## Security
+
+### Plaintext MQTT credentials in `customers.metadata`
+
+`integrations.centrals.items[].mqttPassword` is stored as **plaintext** in
+the JSONB `customers.metadata` column. This is a deliberate trade-off, not
+an oversight, and operators must understand the surface area before this
+RFC ships:
+
+- **`pg_dump` carries it.** Every backup, every snapshot, every replication
+  bootstrap. Any operator with read access to a dump has the password.
+- **Replicas carry it.** Read replicas, dev mirrors, anything that
+  follows the primary will hold the credential.
+- **Audit log snapshots may carry it.** RFC-0009 captures `oldValues` and
+  `newValues` on customer updates. If a customer update sets
+  `metadata.integrations.centrals.items[]`, the password lands in
+  `audit_logs.new_values` unless the audit middleware explicitly redacts
+  the path. **A redaction rule is required before this ships** — see
+  `pii-sanitizer.ts` for the existing redaction layer; this RFC adds
+  `metadata.integrations.centrals.items[*].mqttPassword` to its deny list.
+- **API responses must redact.** `GET /customers/:id/integrations` and
+  `GET /customers/:id` (which returns the full row) MUST scrub the
+  password field unless the caller holds an explicit
+  `centrals:credentials:read` scope. The default response replaces the
+  field with `"<redacted>"` and a sibling `mqttPasswordSet: boolean`.
+- **Logs and error traces.** Any error path that serialises the customer
+  row (validation errors, repository failures) risks leaking the password
+  to the application log. Service-layer error formatters MUST drop the
+  field before logging.
+
+### Mitigations included in this RFC
+
+1. **PII sanitiser deny list.** `pii-sanitizer.ts` is updated to redact
+   `mqttPassword` on every JSON traversal it performs (audit log diffs,
+   error logs, response serialisers that opt in).
+2. **Default API response redaction.** The integrations endpoints replace
+   `mqttPassword` with `<redacted>` unless the caller has the
+   `centrals:credentials:read` scope. Writers do not get the password
+   back on their own writes.
+3. **Service-layer write guard.** `CustomerIntegrationService.recordSync`
+   refuses to log an audit row whose `metadata` contains a verbatim
+   password — it strips the field server-side before emitting the audit
+   record.
+
+### What this RFC does NOT solve
+
+- **At-rest encryption of the password column.** This requires either
+  pgcrypto with a managed key, or a vault-reference indirection. Both
+  are option-3-grade migrations and are deliberately out of scope for
+  this RFC. They are flagged in Drawbacks §3 as the trigger for option 3
+  if security review demands them before merge.
+- **Rotation.** There is no built-in mechanism to rotate the MQTT password
+  for a central. A rotation flow can be added later as a single-call
+  endpoint that updates `mqttPassword`, emits an audit event with the
+  password redacted, and notifies the broker out-of-band.
+
+### Decision required before implementation
+
+Stakeholders MUST sign off on storing the MQTT password in plaintext
+JSONB or push back to option 3. This is an explicit gate in the
+acceptance criteria below.
 
 ---
 
@@ -357,19 +498,25 @@ be added later without breaking this RFC.
    the alarm dashboard needs sub-second cross-tenant reports, escalate to
    option 3 of the design discussion (dedicated `customer_integrations`
    table).
-3. **Bounded history.** Only the last 20 entries per integration are retained
-   in-row. The full version log lives in `audit_logs` (RFC-0009) and outlives
-   the bounded copy.
+3. **Plaintext MQTT credentials in `customers.metadata`** *(see Security).* The
+   `centrals.items[].mqttPassword` field is stored as **plaintext** in a
+   JSONB column with no column-level encryption, no field-level masking,
+   and no row-level access control beyond the application layer. Every
+   `pg_dump`, every replica, and every audit row that captures a `metadata`
+   snapshot will carry the password in clear. This is the highest-risk
+   trade-off in this RFC and may force option 3 (or a dedicated secrets
+   table / vault reference) before this section ships.
 4. **Last-write-wins on concurrent same-key updates.** Two writers calling
    `recordSync('thingsboard', …)` simultaneously will overwrite each other's
-   live state; only one history entry is kept. Acceptable because each
-   integration is owned by a single backend that does not run two writers in
-   parallel for the same customer.
-5. **Large `metadata` rows.** With six integrations and twenty history entries
-   each, the column can reach tens of kilobytes per row. Postgres TOASTs this
-   transparently, but very wide reads (`SELECT * FROM customers`) will pull it
-   in. Mitigation: repository methods that don't need integrations fetch with
-   an explicit column list.
+   live state. Acceptable because each integration is owned by a single
+   backend that does not run two writers in parallel for the same customer,
+   and the per-call audit row in `audit_logs` (§9) preserves the lost write.
+5. **Large `metadata` rows when `centrals.items` grows.** Each central entry
+   carries six string fields including the long Yggdrasil IPv6 address. With
+   ~50 centrals on the largest customer this is still well under 32 KB and
+   fits inside Postgres TOAST without performance pain, but it is the only
+   integration whose row size scales with cardinality. Mitigation: repository
+   methods that don't need integrations fetch with an explicit column list.
 
 ---
 
@@ -392,14 +539,17 @@ cleaner separation but adds a migration and gives no real query benefit over
 option 1, since the queryability ceiling of a JSONB column is the same.
 **Rejected** as not worth the migration.
 
-### Option 3 — relational `customer_integrations` + `customer_integration_events`
+### Option 3 — relational `customer_integrations` + per-central secrets table
 
-Two new tables (`customer_integrations` for live state, append-only
-`customer_integration_events` for full version log). Best for cross-customer
-reporting, retry policies, and full unbounded audit. **Deferred**: revisit
-when option 1's drawbacks become operational pain (see §11). The pivot cost is
-moderate — one migration that backfills from `metadata.integrations` and a
-swap of the repository layer; no domain change.
+Two new tables (`customer_integrations` for live state per integration,
+plus a dedicated `customer_central_credentials` for the MQTT credentials
+of `centrals.items`). Best for cross-customer reporting, retry policies,
+and — critically — column-level isolation of the MQTT password. **Deferred**:
+revisit when option 1's drawbacks become operational pain (Drawback §2)
+or when the Security risk forces credential isolation. The pivot
+cost is moderate — one migration that backfills from `metadata.integrations`
+and a swap of the repository layer; the public service interface stays
+stable, callers do not change.
 
 ---
 
@@ -414,11 +564,13 @@ swap of the repository layer; no domain change.
   the relational equivalent of option 3 above, scoped to one integration and
   one operation, and does not generalise to "every ecosystem the customer
   participates in".
-- **RFC-0009 — Events / Audit Logs**: provides the long-tail log this RFC
-  hooks into. The on-row `history` is a 20-entry cache; the authoritative log
-  is `audit_logs`.
+- **RFC-0009 — Events / Audit Logs**: this RFC delegates the entire version
+  log to `audit_logs`. There is no in-row history copy. Querying the audit
+  log directly is the supported and only way to read past sync events for a
+  customer × integration pair.
 - **RFC-0015 — Alarm Bundle Version History**: precedent for per-customer
-  versioned state with bounded retention.
+  versioned state — but it stores its history in a dedicated table, not on
+  the customer row.
 
 ---
 
@@ -463,16 +615,28 @@ swap of the repository layer; no domain change.
 
 - [ ] `INTEGRATION_KEYS` and `INTEGRATION_STATUS` constants added to
       `src/domain/integrations/`.
-- [ ] `IntegrationStateSchema` and `CustomerIntegrationsSchema` Zod schemas
-      shipped in `src/dto/`.
+- [ ] `IntegrationStateSchema`, `CentralEntrySchema`,
+      `CentralsIntegrationStateSchema`, and `CustomerIntegrationsSchema`
+      Zod schemas shipped in `src/dto/`.
 - [ ] `CustomerIntegrationService` implemented with the contract in §6,
       writing through `jsonb_set` as in §7.
 - [ ] REST routes under `/customers/:customerId/integrations` (§8) with auth
       rules enforced.
-- [ ] Audit log emission wired through `recordSync`, `reset`, `disable` (§9).
-- [ ] Unit tests cover: history cap at 20, counter reset on success, last-error
-      cleared on success, status transitions, and `jsonb_set` correctness when
-      `metadata` was previously `{}`.
+- [ ] Audit log emission wired through `recordSync`, `reset`, `disable` (§9) —
+      one row per call; **no in-row history array** is written.
+- [ ] **Security gate (Security)**: stakeholder sign-off on storing
+      `mqttPassword` plaintext in JSONB, OR pivot to option 3 before merge.
+- [ ] `pii-sanitizer.ts` deny list updated to redact
+      `metadata.integrations.centrals.items[*].mqttPassword` on every
+      traversal.
+- [ ] API responses for `GET /customers/:id` and
+      `GET /customers/:id/integrations` redact `mqttPassword` unless the
+      caller holds the `centrals:credentials:read` scope; sibling
+      `mqttPasswordSet: boolean` exposed instead.
+- [ ] Unit tests cover: counter reset on success, last-error cleared on
+      success, status transitions, `jsonb_set` correctness when `metadata`
+      was previously `{}`, and `centrals.items` round-trip through Zod
+      including the password-redaction layer on read paths.
 - [ ] Integration test against a real Postgres validating no clobbering when
       two integrations write concurrently to different keys.
 - [ ] Operator runbook entry in `docs/ONBOARDING.md` pointing at this RFC.
