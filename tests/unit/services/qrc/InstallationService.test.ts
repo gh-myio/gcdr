@@ -83,6 +83,7 @@ describe('InstallationService', () => {
       move: jest.fn(),
       countByAsset: jest.fn(),
       countByCustomer: jest.fn(),
+      countByName: jest.fn(),
     };
     service = new InstallationService(repo, imageRepo, auditRepo, deviceRepo);
   });
