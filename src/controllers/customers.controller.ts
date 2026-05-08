@@ -289,18 +289,26 @@ router.get('/:id/ancestors', async (req: Request, res: Response, next: NextFunct
 
 /**
  * GET /customers/:id/tree
- * Get customer tree structure
+ *   ?deep=1   include assets + centrals + devices for the customer and every descendant
+ *
+ * Default (deep=0): returns just the customer hierarchy as { tree: CustomerTreeNode[] }.
+ * With deep=1: returns { tree: EnrichedCustomer } where each node carries its
+ *   own assets[], centrals[], devices[] and recursive children[].
  */
 router.get('/:id/tree', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const { id } = req.params;
+    const deep = req.query.deep === '1';
 
     if (!id) {
       throw new ValidationError('Customer ID is required');
     }
 
-    const tree = await customerService.getTree(tenantId, id);
+    const tree = deep
+      ? await customerService.getEnrichedTree(tenantId, id)
+      : await customerService.getTree(tenantId, id);
+
     sendSuccess(res, { tree }, 200, requestId);
   } catch (err) {
     next(err);

@@ -2,6 +2,7 @@ import { Customer } from '../domain/entities/Customer';
 import { Asset } from '../domain/entities/Asset';
 import { Device } from '../domain/entities/Device';
 import { Rule } from '../domain/entities/Rule';
+import { Central } from '../domain/entities/Central';
 import {
   CreateCustomerDTO,
   UpdateCustomerDTO,
@@ -17,6 +18,8 @@ import { DeviceRepository } from '../repositories/DeviceRepository';
 import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
 import { RuleRepository } from '../repositories/RuleRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
+import { CentralRepository } from '../repositories/CentralRepository';
+import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
@@ -46,6 +49,7 @@ export interface EnrichedCustomer {
   customer: Customer;
   assets: Asset[];
   devices: (Device & { ruleIds?: string[] })[];
+  centrals?: Central[];
   rules?: Record<string, RuleMeta>;
   children?: EnrichedCustomer[];
 }
@@ -55,17 +59,20 @@ export class CustomerService {
   private assetRepository: IAssetRepository;
   private deviceRepository: IDeviceRepository;
   private ruleRepository: IRuleRepository;
+  private centralRepository: ICentralRepository;
 
   constructor(
     repository?: ICustomerRepository,
     assetRepository?: IAssetRepository,
     deviceRepository?: IDeviceRepository,
     ruleRepository?: IRuleRepository,
+    centralRepository?: ICentralRepository,
   ) {
     this.repository = repository || new CustomerRepository();
     this.assetRepository = assetRepository || new AssetRepository();
     this.deviceRepository = deviceRepository || new DeviceRepository();
     this.ruleRepository = ruleRepository || new RuleRepository();
+    this.centralRepository = centralRepository || new CentralRepository();
   }
 
   private buildRuleMeta(rule: Rule): RuleMeta {
@@ -359,6 +366,32 @@ export class CustomerService {
       await this.getById(tenantId, rootCustomerId);
     }
     return this.repository.getTree(tenantId, rootCustomerId);
+  }
+
+  async getEnrichedTree(tenantId: string, rootCustomerId: string): Promise<EnrichedCustomer> {
+    const root = await this.getById(tenantId, rootCustomerId);
+    return this.enrichRecursive(tenantId, root);
+  }
+
+  private async enrichRecursive(tenantId: string, customer: Customer): Promise<EnrichedCustomer> {
+    const [assetsResult, centrals, devicesResult, children] = await Promise.all([
+      this.assetRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
+      this.centralRepository.listByCustomer(tenantId, customer.id),
+      this.deviceRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
+      this.repository.getChildren(tenantId, customer.id),
+    ]);
+
+    const enrichedChildren = await Promise.all(
+      children.map((child) => this.enrichRecursive(tenantId, child)),
+    );
+
+    return {
+      customer,
+      assets: assetsResult.items,
+      centrals,
+      devices: devicesResult.items,
+      ...(enrichedChildren.length > 0 && { children: enrichedChildren }),
+    };
   }
 
   async move(tenantId: string, customerId: string, data: MoveCustomerDTO, userId: string): Promise<Customer> {

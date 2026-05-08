@@ -1,6 +1,13 @@
 import { CustomerService } from '../../../src/services/CustomerService';
 import { ICustomerRepository, CustomerTreeNode } from '../../../src/repositories/interfaces/ICustomerRepository';
+import { IAssetRepository } from '../../../src/repositories/interfaces/IAssetRepository';
+import { IDeviceRepository } from '../../../src/repositories/interfaces/IDeviceRepository';
+import { IRuleRepository } from '../../../src/repositories/interfaces/IRuleRepository';
+import { ICentralRepository } from '../../../src/repositories/interfaces/ICentralRepository';
 import { Customer } from '../../../src/domain/entities/Customer';
+import { Asset } from '../../../src/domain/entities/Asset';
+import { Device } from '../../../src/domain/entities/Device';
+import { Central } from '../../../src/domain/entities/Central';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../../../src/dto/request/CustomerDTO';
 import { PaginatedResult } from '../../../src/shared/types';
 import { AppError } from '../../../src/shared/errors/AppError';
@@ -36,6 +43,10 @@ jest.mock('../../../src/services/AlarmBundleService', () => ({
 describe('CustomerService', () => {
   let service: CustomerService;
   let mockRepository: jest.Mocked<ICustomerRepository>;
+  let mockAssetRepository: jest.Mocked<IAssetRepository>;
+  let mockDeviceRepository: jest.Mocked<IDeviceRepository>;
+  let mockRuleRepository: jest.Mocked<IRuleRepository>;
+  let mockCentralRepository: jest.Mocked<ICentralRepository>;
 
   const tenantId = 'tenant-test';
   const userId = 'user-test';
@@ -85,7 +96,26 @@ describe('CustomerService', () => {
       listQrcEnabledForUser: jest.fn(),
     };
 
-    service = new CustomerService(mockRepository);
+    // getEnrichedTree consumes listByCustomer on these three repos. Other
+    // methods aren't exercised by this suite — partial mock cast to satisfy TS.
+    mockAssetRepository = {
+      listByCustomer: jest.fn(),
+    } as unknown as jest.Mocked<IAssetRepository>;
+    mockDeviceRepository = {
+      listByCustomer: jest.fn(),
+    } as unknown as jest.Mocked<IDeviceRepository>;
+    mockCentralRepository = {
+      listByCustomer: jest.fn(),
+    } as unknown as jest.Mocked<ICentralRepository>;
+    mockRuleRepository = {} as unknown as jest.Mocked<IRuleRepository>;
+
+    service = new CustomerService(
+      mockRepository,
+      mockAssetRepository,
+      mockDeviceRepository,
+      mockRuleRepository,
+      mockCentralRepository,
+    );
   });
 
   afterEach(() => {
@@ -342,6 +372,92 @@ describe('CustomerService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].children).toHaveLength(1);
+    });
+  });
+
+  describe('getEnrichedTree', () => {
+    const childCustomer: Customer = {
+      ...mockCustomer,
+      id: 'cust-002',
+      parentCustomerId: 'cust-001',
+      path: `/${tenantId}/cust-001/cust-002`,
+      depth: 1,
+    };
+
+    const asset = { id: 'asset-1', customerId: 'cust-001', name: 'Site A' } as unknown as Asset;
+    const device = { id: 'dev-1', customerId: 'cust-001', assetId: 'asset-1', name: 'Meter 1' } as unknown as Device;
+    const central = { id: 'central-1', customerId: 'cust-001', assetId: 'asset-1', name: 'GW-1' } as unknown as Central;
+
+    const emptyAssets: PaginatedResult<Asset> = { items: [], pagination: { hasMore: false } };
+    const emptyDevices: PaginatedResult<Device> = { items: [], pagination: { hasMore: false } };
+
+    it('should enrich a leaf customer with its assets, centrals and devices', async () => {
+      mockRepository.getById.mockResolvedValue(mockCustomer);
+      mockRepository.getChildren.mockResolvedValue([]);
+      mockAssetRepository.listByCustomer.mockResolvedValue({ items: [asset], pagination: { hasMore: false } });
+      mockCentralRepository.listByCustomer.mockResolvedValue([central]);
+      mockDeviceRepository.listByCustomer.mockResolvedValue({ items: [device], pagination: { hasMore: false } });
+
+      const result = await service.getEnrichedTree(tenantId, 'cust-001');
+
+      expect(result.customer.id).toBe('cust-001');
+      expect(result.assets).toEqual([asset]);
+      expect(result.centrals).toEqual([central]);
+      expect(result.devices).toEqual([device]);
+      expect(result.children).toBeUndefined();
+      expect(mockAssetRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001', { limit: 1000 });
+      expect(mockCentralRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001');
+      expect(mockDeviceRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001', { limit: 1000 });
+    });
+
+    it('should recursively enrich descendants', async () => {
+      mockRepository.getById.mockResolvedValue(mockCustomer);
+      mockRepository.getChildren
+        .mockResolvedValueOnce([childCustomer]) // children of cust-001
+        .mockResolvedValueOnce([]);             // children of cust-002
+      mockAssetRepository.listByCustomer.mockResolvedValue(emptyAssets);
+      mockCentralRepository.listByCustomer.mockResolvedValue([]);
+      mockDeviceRepository.listByCustomer.mockResolvedValue(emptyDevices);
+
+      const result = await service.getEnrichedTree(tenantId, 'cust-001');
+
+      expect(result.customer.id).toBe('cust-001');
+      expect(result.children).toHaveLength(1);
+      expect(result.children![0].customer.id).toBe('cust-002');
+      expect(result.children![0].children).toBeUndefined();
+      // Each customer (root + child) triggers one fetch per repo.
+      expect(mockAssetRepository.listByCustomer).toHaveBeenCalledTimes(2);
+      expect(mockCentralRepository.listByCustomer).toHaveBeenCalledTimes(2);
+      expect(mockDeviceRepository.listByCustomer).toHaveBeenCalledTimes(2);
+      expect(mockRepository.getChildren).toHaveBeenCalledWith(tenantId, 'cust-001');
+      expect(mockRepository.getChildren).toHaveBeenCalledWith(tenantId, 'cust-002');
+    });
+
+    it('should throw NotFoundError when root customer does not exist', async () => {
+      mockRepository.getById.mockResolvedValue(null);
+
+      await expect(service.getEnrichedTree(tenantId, 'missing')).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+      expect(mockAssetRepository.listByCustomer).not.toHaveBeenCalled();
+      expect(mockCentralRepository.listByCustomer).not.toHaveBeenCalled();
+      expect(mockDeviceRepository.listByCustomer).not.toHaveBeenCalled();
+    });
+
+    it('should return empty arrays when customer has no assets/centrals/devices', async () => {
+      mockRepository.getById.mockResolvedValue(mockCustomer);
+      mockRepository.getChildren.mockResolvedValue([]);
+      mockAssetRepository.listByCustomer.mockResolvedValue(emptyAssets);
+      mockCentralRepository.listByCustomer.mockResolvedValue([]);
+      mockDeviceRepository.listByCustomer.mockResolvedValue(emptyDevices);
+
+      const result = await service.getEnrichedTree(tenantId, 'cust-001');
+
+      expect(result.assets).toEqual([]);
+      expect(result.centrals).toEqual([]);
+      expect(result.devices).toEqual([]);
+      expect(result.children).toBeUndefined();
     });
   });
 });
