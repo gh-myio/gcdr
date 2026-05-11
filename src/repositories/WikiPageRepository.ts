@@ -168,8 +168,10 @@ export class WikiPageRepository implements IWikiPageRepository {
 
     if (params?.status) {
       conditions.push(eq(wikiPages.status, params.status));
-    } else {
-      // Default: hide DRAFT from generic listing unless explicitly asked.
+    } else if (!params?.includeDrafts) {
+      // Default: hide DRAFT from generic listing unless the caller explicitly
+      // opts in via `includeDrafts: true` (used by the moderation UI so admins
+      // see pending public submissions alongside published pages).
       conditions.push(sql`${wikiPages.status} <> 'DRAFT'`);
     }
 

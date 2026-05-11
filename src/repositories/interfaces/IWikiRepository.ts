@@ -18,6 +18,12 @@ export interface ListWikiPagesParams extends PaginationParams {
   /** Title prefix search (server does ILIKE). Full-text search is Phase 3. */
   q?: string;
   includeDeleted?: boolean;
+  /**
+   * When true, DRAFT pages are included in the listing. The default behaviour
+   * is to hide them — that suits readers, but admins moderating anonymous
+   * public submissions need to see them in the same call.
+   */
+  includeDrafts?: boolean;
 }
 
 /**

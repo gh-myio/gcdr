@@ -210,4 +210,5 @@ export interface ListPagesParams extends PaginationParams {
   tag?: string;
   q?: string;
   includeDeleted?: boolean;
+  includeDrafts?: boolean;
 }

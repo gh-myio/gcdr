@@ -237,6 +237,7 @@ router.get('/pages', async (req: Request, res: Response, next: NextFunction) => 
       tag: req.query.tag as string | undefined,
       q: req.query.q as string | undefined,
       includeDeleted: req.query.includeDeleted === 'true',
+      includeDrafts: req.query.includeDrafts === 'true',
       limit,
       cursor,
     };
