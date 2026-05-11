@@ -73,6 +73,18 @@ export interface EnrichedAssignment {
   role: EnrichedRole | null;
 }
 
+export interface AssignmentUserRef {
+  id: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+export interface AssignmentListItem extends RoleAssignment {
+  user: AssignmentUserRef | null;
+  grantedByUser: AssignmentUserRef | null;
+  roleDisplayName: string | null;
+}
+
 export interface UserFullAuthz {
   assignments: EnrichedAssignment[];
   effectivePermissions: string[];
@@ -307,8 +319,53 @@ export class AuthorizationService {
     return [...new Set(assignments.map(a => a.roleKey))];
   }
 
-  async listAssignments(tenantId: string, params?: { limit?: number; cursor?: string }): Promise<PaginatedResult<RoleAssignment>> {
-    return this.roleAssignmentRepository.list(tenantId, params);
+  async listAssignments(
+    tenantId: string,
+    params?: { limit?: number; cursor?: string },
+  ): Promise<PaginatedResult<AssignmentListItem>> {
+    const page = await this.roleAssignmentRepository.list(tenantId, params);
+
+    const userIds = new Set<string>();
+    const roleKeys = new Set<string>();
+    for (const a of page.items) {
+      if (a.userId) userIds.add(a.userId);
+      if (a.grantedBy) userIds.add(a.grantedBy);
+      if (a.roleKey) roleKeys.add(a.roleKey);
+    }
+
+    const [userRows, roleRows] = await Promise.all([
+      userIds.size > 0
+        ? this.userRepository.getByIds(tenantId, Array.from(userIds))
+        : Promise.resolve([]),
+      roleKeys.size > 0
+        ? Promise.all(
+            Array.from(roleKeys).map((k) => this.roleRepository.getByKey(tenantId, k)),
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const userMap = new Map<string, AssignmentUserRef>();
+    for (const u of userRows) {
+      const displayName =
+        u.profile?.displayName ||
+        `${u.profile?.firstName ?? ''} ${u.profile?.lastName ?? ''}`.trim() ||
+        null;
+      userMap.set(u.id, { id: u.id, email: u.email ?? null, displayName });
+    }
+
+    const roleMap = new Map<string, string>();
+    for (const r of roleRows) {
+      if (r) roleMap.set(r.key, r.displayName);
+    }
+
+    const items: AssignmentListItem[] = page.items.map((a) => ({
+      ...a,
+      user: userMap.get(a.userId) ?? null,
+      grantedByUser: a.grantedBy ? userMap.get(a.grantedBy) ?? null : null,
+      roleDisplayName: roleMap.get(a.roleKey) ?? null,
+    }));
+
+    return { items, pagination: page.pagination };
   }
 
   // ==================== Permission Evaluation ====================
