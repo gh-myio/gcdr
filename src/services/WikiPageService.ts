@@ -33,6 +33,7 @@ import {
   MovePageDTO,
   PublishPageDTO,
   CreateIntegrationFromFormDTO,
+  PublicCreateIntegrationFromFormDTO,
 } from '../dto/request/WikiDTO';
 import { PaginatedResult } from '../shared/types';
 import {
@@ -217,11 +218,17 @@ export class WikiPageService {
   async createPage(
     ctx: { tenantId: string; userId: string },
     data: CreatePageDTO,
+    options: { skipVisibilityCheck?: boolean } = {},
   ): Promise<{ page: WikiPage; revision: WikiPageRevision }> {
     const status: WikiPageStatus = data.status ?? 'DRAFT';
     const visibility: WikiAudience[] = (data.visibility ?? ['TENANT_PRIVATE']) as WikiAudience[];
 
-    await this.assertCanAssign(ctx, visibility);
+    // The skip flag exists for trusted internal callers (e.g. public/anonymous
+    // submissions that land as DRAFT) where the visibility tag isn't being
+    // *assigned by the submitter* — it's a holding state until an admin reviews.
+    if (!options.skipVisibilityCheck) {
+      await this.assertCanAssign(ctx, visibility);
+    }
 
     // Reject duplicate slug before we open a transaction.
     const existing = await this.pageRepo.getBySlug(ctx.tenantId, data.namespace, data.slug);
@@ -531,6 +538,13 @@ export class WikiPageService {
 
   static readonly INTEGRATIONS_NAMESPACE = 'Integrations';
 
+  // Reserved UUID stamped onto pages created via the anonymous public submission
+  // endpoint. The wiki_pages.created_by column has no FK so this never has to
+  // exist in the users table — it's a sentinel that the moderation UI uses to
+  // recognize external submissions. See createPublicIntegrationSubmission.
+  static readonly ANONYMOUS_SUBMITTER_USER_ID =
+    '00000000-0000-0000-0000-000000000001';
+
   async createIntegrationFromForm(
     ctx: { tenantId: string; userId: string },
     data: CreateIntegrationFromFormDTO,
@@ -574,6 +588,105 @@ export class WikiPageService {
       },
       changeNote: 'Created via POST /wiki/integrations/from-form',
     });
+  }
+
+  /**
+   * Anonymous public submission of an integration form.
+   *
+   * Differences from `createIntegrationFromForm`:
+   *   - status: DRAFT (not PUBLISHED)
+   *   - visibility: ['TENANT_PRIVATE'] — NOT public yet; the admin promotes it
+   *     to PUBLIC on approval. This way the synthetic anonymous user never
+   *     assigns the PUBLIC tag (which RBAC would block anyway).
+   *   - frontmatter.submitter — name/email/phone captured for audit
+   *   - frontmatter.pendingPublicVisibility: true — moderation flag
+   *   - slug auto-suffixed if a collision exists (so a second submitter naming
+   *     "Omie ERP" doesn't get a 409; admin can rename on approval)
+   */
+  async createPublicIntegrationSubmission(
+    tenantId: string,
+    data: PublicCreateIntegrationFromFormDTO,
+  ): Promise<{ page: WikiPage; revision: WikiPageRevision }> {
+    const namespace = WikiPageService.INTEGRATIONS_NAMESPACE;
+    const ctx = {
+      tenantId,
+      userId: WikiPageService.ANONYMOUS_SUBMITTER_USER_ID,
+    };
+
+    const existingNs = await this.namespaceRepo.get(tenantId, namespace);
+    if (!existingNs) {
+      await this.namespaceRepo.create(tenantId, {
+        name: namespace,
+        description:
+          'Inventário de integrações e ferramentas SaaS usadas internamente pela MYIO.',
+        reviewRequired: false,
+      });
+    }
+
+    const baseSlug = data.slug ?? this.slugifyForWiki(data.name);
+    const slug = await this.findFreeSlug(tenantId, namespace, baseSlug);
+    const body = this.buildIntegrationMarkdown(data);
+
+    const tags = Array.from(new Set([
+      'integrations',
+      'pending-review',
+      ...(data.category ? [this.slugifyForWiki(data.category)] : []),
+      ...(data.tags ?? []),
+    ])).slice(0, 20);
+
+    return this.createPage(
+      ctx,
+      {
+        namespace,
+        slug,
+        title: data.name,
+        body,
+        tags,
+        // Held in TENANT_PRIVATE until an admin reviews and promotes to PUBLIC.
+        visibility: ['TENANT_PRIVATE'],
+        status: 'DRAFT',
+        frontmatter: {
+          source: 'public-integration-form',
+          owner: data.owner?.responsible ?? null,
+          category: data.category ?? null,
+          status: data.status ?? 'ATIVO',
+          url: data.url ?? null,
+          submitter: {
+            name: data.submitter.name,
+            email: data.submitter.email,
+            phone: data.submitter.phone,
+            submittedAt: new Date().toISOString(),
+          },
+          // Signal to the moderation UI: this draft is meant to become PUBLIC
+          // once the admin reviews and publishes it.
+          pendingPublicVisibility: true,
+        },
+        changeNote:
+          `Anonymous submission by ${data.submitter.name} <${data.submitter.email}>`,
+      },
+      { skipVisibilityCheck: true },
+    );
+  }
+
+  /**
+   * Find an unused slug in (tenant, namespace) by appending -2, -3, ... when
+   * the base collides. Caps the search at 50 attempts to avoid pathological
+   * loops; if nothing is free by then the caller gets the last candidate and
+   * a normal ConflictError from createPage.
+   */
+  private async findFreeSlug(
+    tenantId: string,
+    namespace: string,
+    baseSlug: string,
+  ): Promise<string> {
+    const taken = await this.pageRepo.getBySlug(tenantId, namespace, baseSlug);
+    if (!taken) return baseSlug;
+    for (let i = 2; i <= 50; i++) {
+      const candidate = `${baseSlug}-${i}`.slice(0, 128);
+      const exists = await this.pageRepo.getBySlug(tenantId, namespace, candidate);
+      if (!exists) return candidate;
+    }
+    return `${baseSlug}-${Date.now()}`.slice(0, 128);
   }
 
   /**

@@ -158,6 +158,50 @@ export const CreateIntegrationFromFormSchema = z.object({
 export type CreateIntegrationFromFormDTO = z.infer<typeof CreateIntegrationFromFormSchema>;
 
 // -----------------------------------------------------------------------------
+// POST /public/wiki/integrations/submit
+// Anonymous form-driven submission: lands as DRAFT with TENANT_PRIVATE visibility
+// and awaits admin moderation. The admin promotes it to PUBLIC+PUBLISHED later.
+// Requires submitter identity for audit and a captcha token for bot defense.
+// -----------------------------------------------------------------------------
+
+// Brazilian phone numbers — accepts:
+//   "(11) 98765-4321"        — local format with parens
+//   "11 98765-4321"          — local without parens
+//   "11987654321"            — digits only, 10 or 11 chars
+//   "+55 11 98765-4321"      — international BR with country code
+// All forms must contain 10 or 11 digits after stripping non-digits, optionally
+// prefixed with "+55".
+const BR_PHONE_REGEX = /^(\+?55)?[\s.-]?\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}$/;
+
+export const SubmitterSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().toLowerCase().email().max(200),
+  phone: z
+    .string()
+    .trim()
+    .min(8)
+    .max(40)
+    .regex(BR_PHONE_REGEX, {
+      message:
+        'Telefone inválido. Use (11) 99999-9999, 11999999999 ou +55 11 99999-9999.',
+    }),
+});
+
+export const PublicCreateIntegrationFromFormSchema =
+  CreateIntegrationFromFormSchema.extend({
+    submitter: SubmitterSchema,
+    captchaToken: z.string().trim().min(1).max(4000),
+    // Honeypot — must be empty. Bots typically fill all fields.
+    // The frontend renders this field hidden via CSS, so real users won't see it.
+    website: z.string().max(0).optional(),
+  });
+
+export type PublicCreateIntegrationFromFormDTO = z.infer<
+  typeof PublicCreateIntegrationFromFormSchema
+>;
+export type SubmitterDTO = z.infer<typeof SubmitterSchema>;
+
+// -----------------------------------------------------------------------------
 // List / pagination parameters
 // -----------------------------------------------------------------------------
 export interface ListPagesParams extends PaginationParams {
