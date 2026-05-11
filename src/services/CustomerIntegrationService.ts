@@ -7,11 +7,13 @@ import {
   CentralsIntegrationStateSchema,
   CentralEntrySchema,
   RecordSyncInput,
+  ReplaceCentralsItemsInput,
   IntegrationState,
   CentralsIntegrationState,
   CentralEntry,
   stripCredentialsForAudit,
 } from '../dto/request/CustomerIntegrationDTO';
+import { NotFoundError } from '../shared/errors/AppError';
 import { IntegrationKey } from '../domain/integrations/IntegrationKey';
 import { logAuditEvent } from '../middleware/audit';
 import { EventType, ActorType } from '../shared/types/audit.types';
@@ -166,6 +168,116 @@ export class CustomerIntegrationService {
     });
 
     return next;
+  }
+
+  /**
+   * Admin replacement of `centrals.items[]`. Unlike `recordSync` (M2M), this
+   * is the explicit operator path: an admin in the UI edits the list of
+   * provisioned centrals and persists it. Per-entry merge rule for
+   * `mqttPassword`: incoming empty string keeps the previously-stored value
+   * for the same `uuid`, so the operator never has to retype a password they
+   * cannot see on read (passwords are masked in GET responses).
+   */
+  async replaceCentralsItems(
+    tenantId: string,
+    customerId: string,
+    input: ReplaceCentralsItemsInput,
+    actor: CustomerIntegrationActor & { actorLabel: string },
+  ): Promise<CentralsIntegrationState> {
+    const raw = await this.repo.getOne(tenantId, customerId, 'centrals');
+    const previous = parseExistingState('centrals', raw) as CentralsIntegrationState;
+
+    const previousByUuid = new Map(previous.items.map((e) => [e.uuid, e]));
+
+    const mergedItems: CentralEntry[] = input.items.map((incoming) => {
+      // Empty password on an existing uuid → keep the stored secret.
+      const existing = previousByUuid.get(incoming.uuid);
+      const mqttPassword =
+        incoming.mqttPassword.length === 0 && existing
+          ? existing.mqttPassword
+          : incoming.mqttPassword;
+      const merged = {
+        uuid:               incoming.uuid,
+        ingestionGatewayId: incoming.ingestionGatewayId,
+        mqttUserName:       incoming.mqttUserName,
+        mqttClientId:       incoming.mqttClientId,
+        mqttPassword,
+        ipv6Yggdrasil:      incoming.ipv6Yggdrasil,
+      };
+      return CentralEntrySchema.parse(merged);
+    });
+
+    const next: CentralsIntegrationState = {
+      ...previous,
+      items: mergedItems,
+    };
+
+    await this.repo.setIntegration(
+      tenantId,
+      customerId,
+      'centrals',
+      next as unknown as Record<string, unknown>,
+    );
+
+    await this.emitAudit(
+      tenantId,
+      customerId,
+      'centrals',
+      EventType.CUSTOMER_INTEGRATION_ITEMS_UPDATED,
+      actor,
+      {
+        actor:           actor.actorLabel,
+        note:            input.note,
+        itemsCount:      mergedItems.length,
+        previousCount:   previous.items.length,
+        // Both snapshots have credentials stripped — the audit row never
+        // carries plaintext passwords.
+        previous:        stripCredentialsForAudit('centrals', previous),
+        next:            stripCredentialsForAudit('centrals', next),
+      },
+    );
+
+    return next;
+  }
+
+  /**
+   * Reveal one central's plaintext MQTT password. Sensitive operation —
+   * emits an audit event (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED) on
+   * every successful call, so abuse leaves a trail. The controller gates
+   * this with `customers:write` (admin-only) since `centrals:credentials:read`
+   * is not yet a first-class permission in the RBAC layer.
+   */
+  async revealCentralCredential(
+    tenantId: string,
+    customerId: string,
+    itemUuid: string,
+    actor: CustomerIntegrationActor & { actorLabel: string },
+  ): Promise<{ mqttPassword: string }> {
+    const raw = await this.repo.getOne(tenantId, customerId, 'centrals');
+    const state = parseExistingState('centrals', raw) as CentralsIntegrationState;
+
+    const item = state.items.find((e) => e.uuid === itemUuid);
+    if (!item) {
+      throw new NotFoundError(
+        `Central item ${itemUuid} not found in customer ${customerId}`,
+      );
+    }
+
+    await this.emitAudit(
+      tenantId,
+      customerId,
+      'centrals',
+      EventType.CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED,
+      actor,
+      {
+        actor:    actor.actorLabel,
+        itemUuid,
+        // Audit MUST NOT carry the plaintext value — only the fact that a
+        // reveal happened, who did it, and which item.
+      },
+    );
+
+    return { mqttPassword: item.mqttPassword };
   }
 
   /**

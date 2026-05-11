@@ -97,6 +97,28 @@ export const IntegrationKeyParamSchema = z.object({
   key: z.enum(INTEGRATION_KEYS),
 });
 
+// Admin replacement of centrals.items[] via the UI. The full array is sent
+// each call (the controller refuses partial PATCH semantics for predictability
+// — the operator sees exactly what they're persisting). `mqttPassword` may be
+// left empty on an existing entry to keep the stored value; the service
+// merges per-uuid when so.
+export const ReplaceCentralsItemsInputSchema = z.object({
+  actor: z.string().min(1).max(255),
+  note:  z.string().max(500).optional(),
+  items: z.array(
+    CentralEntrySchema.extend({
+      // Override password — allow empty string to signal "keep existing".
+      mqttPassword: z.string().max(2000),
+    }),
+  ).max(200),
+});
+
+export type ReplaceCentralsItemsInput = z.infer<typeof ReplaceCentralsItemsInputSchema>;
+
+export const ItemUuidParamSchema = z.object({
+  itemUuid: z.string().uuid(),
+});
+
 // -----------------------------------------------------------------------------
 // Response shaping — masks mqttPassword on read.
 //

@@ -5,6 +5,8 @@ import {
   DisableInputSchema,
   ResetInputSchema,
   IntegrationKeyParamSchema,
+  ReplaceCentralsItemsInputSchema,
+  ItemUuidParamSchema,
   maskIntegrationsMapForRead,
   maskIntegrationStateForRead,
 } from '../dto/request/CustomerIntegrationDTO';
@@ -163,5 +165,70 @@ router.post('/:key/reset', async (req: Request, res: Response, next: NextFunctio
     next(err);
   }
 });
+
+/**
+ * PUT /customers/:customerId/integrations/centrals/items
+ * Admin replacement of the centrals.items[] array. Auth: `customers:write`
+ * (already enforced at mount time via hybridAuthByMethod).
+ *
+ * Per-entry rule for mqttPassword: empty string on an existing uuid keeps
+ * the previously-stored secret — admins editing a row don't have to retype
+ * a password they can't read (passwords are masked on GET).
+ */
+router.put('/centrals/items', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+    requireUuid('customerId', customerId);
+    const input = ReplaceCentralsItemsInputSchema.parse(req.body ?? {});
+
+    const ctx = actorContext(req);
+    const next = await customerIntegrationService.replaceCentralsItems(
+      tenantId,
+      customerId,
+      input,
+      { ...ctx, actorLabel: input.actor },
+    );
+    sendSuccess(res, maskIntegrationStateForRead('centrals', next), 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /customers/:customerId/integrations/centrals/items/:itemUuid/credentials
+ * Reveal one central's plaintext MQTT password. Sensitive — every call
+ * emits an audit log entry (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED).
+ *
+ * NOTE: `customers:write` is the current gate (admin-only). A dedicated
+ * `centrals:credentials:read` scope would be cleaner; promoting this gate
+ * is a future hardening once the RBAC layer surfaces credential scopes.
+ *
+ * Even though this is GET semantically (idempotent — returns the stored
+ * password), it's mounted under the write-permission method because reveal
+ * is the kind of action that warrants admin-level authorization, not just
+ * read.
+ */
+router.post('/centrals/items/:itemUuid/reveal-credentials',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { customerId } = req.params;
+      requireUuid('customerId', customerId);
+      const { itemUuid } = ItemUuidParamSchema.parse({ itemUuid: req.params.itemUuid });
+
+      const ctx = actorContext(req);
+      const result = await customerIntegrationService.revealCentralCredential(
+        tenantId,
+        customerId,
+        itemUuid,
+        { ...ctx, actorLabel: ctx.actorLabel },
+      );
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;
