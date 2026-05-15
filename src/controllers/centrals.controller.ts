@@ -8,7 +8,7 @@ import {
   ListCentralsDTO,
 } from '../dto/request/CentralDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
-import { ValidationError } from '../shared/errors/AppError';
+import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 import { EventType } from '../shared/types';
 
 const router = Router();
@@ -82,6 +82,30 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     sendSuccess(res, central, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/statistics
+ * Get central runtime statistics (passthrough of stats JSONB column)
+ */
+router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ValidationError('Central ID is required');
+    }
+
+    const central = await centralRepository.getById(tenantId, id);
+    if (!central) {
+      throw new NotFoundError('Central not found');
+    }
+
+    sendSuccess(res, central.stats, 200, requestId);
   } catch (err) {
     next(err);
   }
