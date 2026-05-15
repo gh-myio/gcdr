@@ -241,6 +241,77 @@ export class CustomerIntegrationService {
   }
 
   /**
+   * Partial upsert of a single centrals.items[] entry, keyed by uuid.
+   * Used by `PUT /centrals/:id` body.connection sugar route. Differs from
+   * replaceCentralsItems: writes only the fields the caller sent, leaves
+   * the rest of the entry untouched. The entry must already exist —
+   * creation goes through replaceCentralsItems (admin batch flow).
+   */
+  async upsertCentralEntry(
+    tenantId: string,
+    customerId: string,
+    centralUuid: string,
+    partial: {
+      mqttUserName?: string;
+      mqttClientId?: string;
+      mqttPassword?: string;
+      ipv6Yggdrasil?: string;
+      ingestionGatewayId?: string | null;
+    },
+    actor: CustomerIntegrationActor & { actorLabel: string },
+  ): Promise<CentralEntry> {
+    const raw = await this.repo.getOne(tenantId, customerId, 'centrals');
+    const state = parseExistingState('centrals', raw) as CentralsIntegrationState;
+
+    const idx = state.items.findIndex((e) => e.uuid === centralUuid);
+    if (idx < 0) {
+      throw new NotFoundError(
+        `Central ${centralUuid} has no integration entry under customer ${customerId}. ` +
+        `Create it via PATCH /customers/${customerId}/integrations first.`,
+      );
+    }
+    const existing = state.items[idx]!;
+
+    const merged: CentralEntry = CentralEntrySchema.parse({
+      uuid:               existing.uuid,
+      ingestionGatewayId: partial.ingestionGatewayId !== undefined ? partial.ingestionGatewayId : existing.ingestionGatewayId,
+      mqttUserName:       partial.mqttUserName ?? existing.mqttUserName,
+      mqttClientId:       partial.mqttClientId ?? existing.mqttClientId,
+      mqttPassword:       partial.mqttPassword && partial.mqttPassword.length > 0
+                            ? partial.mqttPassword
+                            : existing.mqttPassword,
+      ipv6Yggdrasil:      partial.ipv6Yggdrasil ?? existing.ipv6Yggdrasil,
+    });
+
+    const nextItems = [...state.items];
+    nextItems[idx] = merged;
+    const next: CentralsIntegrationState = { ...state, items: nextItems };
+
+    await this.repo.setIntegration(
+      tenantId,
+      customerId,
+      'centrals',
+      next as unknown as Record<string, unknown>,
+    );
+
+    await this.emitAudit(
+      tenantId,
+      customerId,
+      'centrals',
+      EventType.CUSTOMER_INTEGRATION_ITEMS_UPDATED,
+      actor,
+      {
+        actor:        actor.actorLabel,
+        itemUuid:     centralUuid,
+        changedKeys:  Object.keys(partial),
+        passwordChanged: !!(partial.mqttPassword && partial.mqttPassword.length > 0),
+      },
+    );
+
+    return merged;
+  }
+
+  /**
    * Reveal one central's plaintext MQTT password. Sensitive operation —
    * emits an audit event (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED) on
    * every successful call, so abuse leaves a trail. The controller gates

@@ -39,6 +39,21 @@ export interface CentralStats {
   diskUsage?: number;
 }
 
+/**
+ * Connection params for a central, sourced from
+ * customers.metadata.integrations.centrals.items[] (RFC-0033).
+ * Loaded on demand by CentralService.enrichWithConnection() — never
+ * persisted on the centrals row. mqttPassword is omitted by default;
+ * mqttPasswordSet exposes whether a password is configured.
+ */
+export interface CentralConnection {
+  mqttUserName?: string;
+  mqttClientId?: string;
+  ipv6Yggdrasil?: string;
+  ingestionGatewayId?: string | null;
+  mqttPasswordSet?: boolean;
+}
+
 export interface Central extends BaseEntity {
   // Relationships
   customerId: string;
@@ -64,6 +79,9 @@ export interface Central extends BaseEntity {
 
   // Stats (updated periodically)
   stats: CentralStats;
+
+  // Connection params (enriched on read from customer integrations — RFC-0033)
+  connection?: CentralConnection;
 
   // Location (can differ from asset location)
   location?: {

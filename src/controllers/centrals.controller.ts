@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { centralRepository } from '../repositories/CentralRepository';
+import { centralService } from '../services/CentralService';
 import {
   CreateCentralSchema,
   UpdateCentralSchema,
@@ -9,7 +10,7 @@ import {
 } from '../dto/request/CentralDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
-import { EventType } from '../shared/types';
+import { EventType, ActorType } from '../shared/types';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       cursor: cursor as string | undefined,
     };
 
-    const result = await centralRepository.list(tenantId, params);
+    const result = await centralService.list(tenantId, params);
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
@@ -76,11 +77,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       throw new ValidationError('Central ID is required');
     }
 
-    const central = await centralRepository.getById(tenantId, id);
-    if (!central) {
-      throw new ValidationError('Central not found');
-    }
-
+    const central = await centralService.getById(tenantId, id);
     sendSuccess(res, central, 200, requestId);
   } catch (err) {
     next(err);
@@ -124,11 +121,7 @@ router.get('/serial/:serialNumber', async (req: Request, res: Response, next: Ne
       throw new ValidationError('Serial number is required');
     }
 
-    const central = await centralRepository.getBySerialNumber(tenantId, serialNumber);
-    if (!central) {
-      throw new ValidationError('Central not found');
-    }
-
+    const central = await centralService.getBySerialNumber(tenantId, serialNumber);
     sendSuccess(res, central, 200, requestId);
   } catch (err) {
     next(err);
@@ -156,7 +149,13 @@ router.put('/:id',
       }
 
       const data = UpdateCentralSchema.parse(req.body);
-      const central = await centralRepository.update(tenantId, id, data, userId);
+      const central = await centralService.update(tenantId, id, data, userId, {
+        userId,
+        userEmail:  (req.context as { userEmail?: string }).userEmail,
+        actorType:  ActorType.USER,
+        actorLabel: userId,
+        requestId,
+      });
       sendSuccess(res, central, 200, requestId);
     } catch (err) {
       next(err);
@@ -275,7 +274,7 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
       throw new ValidationError('Customer ID is required');
     }
 
-    const centrals = await centralRepository.listByCustomer(tenantId, customerId);
+    const centrals = await centralService.listByCustomer(tenantId, customerId);
     sendSuccess(res, { items: centrals }, 200, requestId);
   } catch (err) {
     next(err);
@@ -295,7 +294,7 @@ export const listByAssetHandler = async (req: Request, res: Response, next: Next
       throw new ValidationError('Asset ID is required');
     }
 
-    const centrals = await centralRepository.listByAsset(tenantId, assetId);
+    const centrals = await centralService.listByAsset(tenantId, assetId);
     sendSuccess(res, { items: centrals }, 200, requestId);
   } catch (err) {
     next(err);
