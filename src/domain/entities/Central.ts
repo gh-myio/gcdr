@@ -77,19 +77,12 @@ export interface CentralStats {
 }
 
 /**
- * Connection params for a central, sourced from
- * customers.metadata.integrations.centrals.items[] (RFC-0033).
- * Loaded on demand by CentralService.enrichWithConnection() — never
- * persisted on the centrals row. mqttPassword is omitted by default;
- * mqttPasswordSet exposes whether a password is configured.
+ * Per-integration password-presence indicator (RFC-0035).
+ * Enriched on read from customers.metadata.integrations.centrals.items[i].mqttPasswords.
+ * Values are booleans only — plaintext passwords are exposed exclusively via
+ * the dedicated reveal endpoint.
  */
-export interface CentralConnection {
-  mqttUserName?: string;
-  mqttClientId?: string;
-  ipv6Yggdrasil?: string;
-  ingestionGatewayId?: string | null;
-  mqttPasswordSet?: boolean;
-}
+export type CentralMqttPasswordsSet = Partial<Record<CentralMqttIntegrationId, boolean>>;
 
 export interface Central extends BaseEntity {
   // Relationships
@@ -117,8 +110,9 @@ export interface Central extends BaseEntity {
   // Stats (updated periodically)
   stats: CentralStats;
 
-  // Connection params (enriched on read from customer integrations — RFC-0033)
-  connection?: CentralConnection;
+  // Per-integration password presence (enriched on read from customer
+  // integrations — RFC-0035). Plaintext available only via reveal endpoint.
+  mqttPasswordsSet?: CentralMqttPasswordsSet;
 
   // Location (can differ from asset location)
   location?: {

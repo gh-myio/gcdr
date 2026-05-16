@@ -1,4 +1,4 @@
-import { Central, CentralConnection, ConnectionStatus } from '../domain/entities/Central';
+import { Central, CentralMqttPasswordsSet, ConnectionStatus } from '../domain/entities/Central';
 import {
   CreateCentralDTO,
   UpdateCentralDTO,
@@ -12,8 +12,9 @@ import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
-import { customerIntegrationService, CustomerIntegrationActor } from './CustomerIntegrationService';
+import { customerIntegrationService } from './CustomerIntegrationService';
 import { CentralsIntegrationState, CentralEntry } from '../dto/request/CustomerIntegrationDTO';
+import { CENTRAL_MQTT_INTEGRATION_IDS } from '../domain/integrations/CentralMqttIntegrationId';
 
 export class CentralService {
   private repository: ICentralRepository;
@@ -56,7 +57,7 @@ export class CentralService {
     if (!central) {
       throw new NotFoundError(`Central ${id} not found`);
     }
-    return this.enrichWithConnection(tenantId, central);
+    return this.enrichWithMqttPasswordsSet(tenantId, central);
   }
 
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Central> {
@@ -64,7 +65,7 @@ export class CentralService {
     if (!central) {
       throw new NotFoundError(`Central with serial number ${serialNumber} not found`);
     }
-    return this.enrichWithConnection(tenantId, central);
+    return this.enrichWithMqttPasswordsSet(tenantId, central);
   }
 
   async update(
@@ -72,35 +73,18 @@ export class CentralService {
     id: string,
     data: UpdateCentralDTO,
     userId: string,
-    actor?: CustomerIntegrationActor & { actorLabel: string },
   ): Promise<Central> {
-    const existingRaw = await this.repository.getById(tenantId, id);
-    if (!existingRaw) {
+    const existing = await this.repository.getById(tenantId, id);
+    if (!existing) {
       throw new NotFoundError(`Central ${id} not found`);
     }
 
-    // Split connection (proxy to customer integrations) from central row fields
-    const { connection, ...centralData } = data;
+    const updated = await this.repository.update(tenantId, id, data, userId);
+    alarmBundleService.invalidateCache(tenantId, existing.customerId, {
+      reason: 'central_updated', entityType: 'central', entityId: id, userId,
+    });
 
-    let updated = existingRaw;
-    if (Object.keys(centralData).length > 0) {
-      updated = await this.repository.update(tenantId, id, centralData, userId);
-      alarmBundleService.invalidateCache(tenantId, existingRaw.customerId, {
-        reason: 'central_updated', entityType: 'central', entityId: id, userId,
-      });
-    }
-
-    if (connection && Object.keys(connection).length > 0) {
-      await customerIntegrationService.upsertCentralEntry(
-        tenantId,
-        existingRaw.customerId,
-        id,
-        connection,
-        actor ?? { userId, actorLabel: userId },
-      );
-    }
-
-    return this.enrichWithConnection(tenantId, updated);
+    return this.enrichWithMqttPasswordsSet(tenantId, updated);
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
@@ -120,13 +104,13 @@ export class CentralService {
       }
     }
     const result = await this.repository.list(tenantId, params);
-    result.items = await this.enrichManyWithConnection(tenantId, result.items);
+    result.items = await this.enrichManyWithMqttPasswordsSet(tenantId, result.items);
     return result;
   }
 
   async listByCustomer(tenantId: string, customerId: string): Promise<Central[]> {
     const centrals = await this.repository.listByCustomer(tenantId, customerId);
-    return this.enrichManyWithConnection(tenantId, centrals);
+    return this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
   }
 
   async listByAsset(tenantId: string, assetId: string): Promise<Central[]> {
@@ -135,38 +119,39 @@ export class CentralService {
       throw new NotFoundError(`Asset ${assetId} not found`);
     }
     const centrals = await this.repository.listByAsset(tenantId, assetId);
-    return this.enrichManyWithConnection(tenantId, centrals);
+    return this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
   }
 
   // ---------------------------------------------------------------------------
-  // Connection enrichment (RFC-0033 lookup, not migration)
+  // MQTT password-set enrichment (RFC-0035 lookup)
   //
-  // Connection params live in customers.metadata.integrations.centrals.items[].
-  // We enrich Central reads with that data so consumers see a single payload.
-  // Writes via PUT /centrals/:id (body.connection) proxy back to the same
-  // JSONB through customerIntegrationService.upsertCentralEntry().
+  // Per-integration password presence lives in
+  // customers.metadata.integrations.centrals.items[i].mqttPasswords.
+  // We enrich Central reads with a boolean indicator map so consumers see
+  // a single payload. Plaintext passwords are only accessible via the
+  // dedicated reveal endpoint. Writes go through the new mqtt-passwords
+  // routes — body.connection on PUT /centrals/:id is removed.
   // ---------------------------------------------------------------------------
 
-  async enrichWithConnection(tenantId: string, central: Central): Promise<Central> {
+  async enrichWithMqttPasswordsSet(tenantId: string, central: Central): Promise<Central> {
     try {
       const state = await customerIntegrationService.get(tenantId, central.customerId, 'centrals');
       if (!state) return central;
       const items = (state as CentralsIntegrationState).items ?? [];
       const item = items.find((e) => e.uuid === central.id);
       if (!item) return central;
-      return { ...central, connection: this.toConnection(item) };
+      return { ...central, mqttPasswordsSet: this.toMqttPasswordsSet(item) };
     } catch {
-      // If the customer doesn't exist or integrations are missing we still
-      // return the bare central — enrichment is best-effort.
+      // Enrichment is best-effort — missing customer / integrations returns
+      // the bare central.
       return central;
     }
   }
 
-  async enrichManyWithConnection(tenantId: string, centrals: Central[]): Promise<Central[]> {
+  async enrichManyWithMqttPasswordsSet(tenantId: string, centrals: Central[]): Promise<Central[]> {
     if (centrals.length === 0) return centrals;
 
-    // Group by customerId — one customer read per group, regardless of how
-    // many centrals share that customer (no N+1).
+    // Group by customerId — one customer read per group, no N+1.
     const byCustomer = new Map<string, Central[]>();
     for (const c of centrals) {
       const arr = byCustomer.get(c.customerId);
@@ -193,18 +178,19 @@ export class CentralService {
     return centrals.map((c) => {
       const items = itemsByCustomer.get(c.customerId) ?? [];
       const item = items.find((e) => e.uuid === c.id);
-      return item ? { ...c, connection: this.toConnection(item) } : c;
+      return item ? { ...c, mqttPasswordsSet: this.toMqttPasswordsSet(item) } : c;
     });
   }
 
-  private toConnection(entry: CentralEntry): CentralConnection {
-    return {
-      mqttUserName:       entry.mqttUserName,
-      mqttClientId:       entry.mqttClientId,
-      ipv6Yggdrasil:      entry.ipv6Yggdrasil,
-      ingestionGatewayId: entry.ingestionGatewayId,
-      mqttPasswordSet:    typeof entry.mqttPassword === 'string' && entry.mqttPassword.length > 0,
-    };
+  private toMqttPasswordsSet(entry: CentralEntry): CentralMqttPasswordsSet {
+    const set: CentralMqttPasswordsSet = {};
+    for (const id of CENTRAL_MQTT_INTEGRATION_IDS) {
+      const v = entry.mqttPasswords?.[id];
+      if (typeof v === 'string' && v.length > 0) {
+        set[id] = true;
+      }
+    }
+    return set;
   }
 
   async updateStatus(tenantId: string, id: string, status: EntityStatus, userId: string): Promise<Central> {

@@ -6,7 +6,6 @@ import {
   ResetInputSchema,
   IntegrationKeyParamSchema,
   ReplaceCentralsItemsInputSchema,
-  ItemUuidParamSchema,
   maskIntegrationsMapForRead,
   maskIntegrationStateForRead,
 } from '../dto/request/CustomerIntegrationDTO';
@@ -195,40 +194,9 @@ router.put('/centrals/items', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-/**
- * GET /customers/:customerId/integrations/centrals/items/:itemUuid/credentials
- * Reveal one central's plaintext MQTT password. Sensitive — every call
- * emits an audit log entry (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED).
- *
- * NOTE: `customers:write` is the current gate (admin-only). A dedicated
- * `centrals:credentials:read` scope would be cleaner; promoting this gate
- * is a future hardening once the RBAC layer surfaces credential scopes.
- *
- * Even though this is GET semantically (idempotent — returns the stored
- * password), it's mounted under the write-permission method because reveal
- * is the kind of action that warrants admin-level authorization, not just
- * read.
- */
-router.post('/centrals/items/:itemUuid/reveal-credentials',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { tenantId, requestId } = req.context;
-      const { customerId } = req.params;
-      requireUuid('customerId', customerId);
-      const { itemUuid } = ItemUuidParamSchema.parse({ itemUuid: req.params.itemUuid });
-
-      const ctx = actorContext(req);
-      const result = await customerIntegrationService.revealCentralCredential(
-        tenantId,
-        customerId,
-        itemUuid,
-        { ...ctx, actorLabel: ctx.actorLabel },
-      );
-      sendSuccess(res, result, 200, requestId);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Legacy `POST /customers/:customerId/integrations/centrals/items/:itemUuid/reveal-credentials`
+// removed in RFC-0035 — single-password-per-central no longer exists. Use the per-integration
+// endpoint on the central resource instead:
+//   POST /centrals/:id/mqtt-passwords/:integrationId/reveal
 
 export default router;

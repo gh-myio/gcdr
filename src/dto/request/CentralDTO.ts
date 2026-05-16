@@ -56,17 +56,6 @@ const LocationSchema = z.object({
   altitude: z.number().optional(),
 });
 
-// Connection params patch (sugar route — proxies to customer.metadata.integrations.centrals.items[])
-export const CentralConnectionPatchSchema = z.object({
-  mqttUserName:       z.string().min(1).max(255).optional(),
-  mqttClientId:       z.string().min(1).max(255).optional(),
-  mqttPassword:       z.string().min(1).max(2000).optional(),
-  ipv6Yggdrasil:      z.string().min(1).max(64).optional(),
-  ingestionGatewayId: z.string().uuid().nullable().optional(),
-});
-
-export type CentralConnectionPatchDTO = z.infer<typeof CentralConnectionPatchSchema>;
-
 // Create Central DTO
 export const CreateCentralSchema = z.object({
   id: z.string().uuid().optional(),
@@ -97,8 +86,6 @@ export const UpdateCentralSchema = z.object({
   location: LocationSchema.optional().nullable(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   metadata: z.record(z.unknown()).optional(),
-  // Sugar: when present, server proxies to customer.metadata.integrations.centrals.items[]
-  connection: CentralConnectionPatchSchema.optional(),
 });
 
 export type UpdateCentralDTO = z.infer<typeof UpdateCentralSchema>;

@@ -1,27 +1,34 @@
 import { z } from 'zod';
 import { INTEGRATION_KEYS, INTEGRATION_STATUS } from '../../domain/integrations/IntegrationKey';
+import {
+  CENTRAL_MQTT_INTEGRATION_IDS,
+  CentralMqttIntegrationId,
+} from '../../domain/integrations/CentralMqttIntegrationId';
 
 // =============================================================================
 // RFC-0033 — Customer Integration Sync State (DTOs)
+//   centrals.items[] shape partially superseded by RFC-0035 — see header.
 // =============================================================================
 // One IntegrationStateSchema covers ingestion, thingsboard, alarms,
 // workorders, freshdesk. The `centrals` key extends it with an `items[]`
-// array carrying per-central connection params (incl. plaintext MQTT
-// password — see RFC-0033 Security section).
+// array carrying per-central MQTT credentials only (one password per
+// integration destination). Identity (ipv6) and broker config moved to
+// centrals.config in RFC-0035.
 
 const REDACTED = '<redacted>';
 
 // -----------------------------------------------------------------------------
-// Per-central entry under integrations.centrals.items[]
+// Per-central entry under integrations.centrals.items[] (RFC-0035 shape)
 // -----------------------------------------------------------------------------
 
+const MqttPasswordsSchema = z.record(
+  z.enum(CENTRAL_MQTT_INTEGRATION_IDS),
+  z.string().min(1).max(2000),
+);
+
 export const CentralEntrySchema = z.object({
-  uuid:               z.string().uuid(),
-  ingestionGatewayId: z.string().uuid().nullable().default(null),
-  mqttUserName:       z.string().min(1).max(255),
-  mqttClientId:       z.string().min(1).max(255),
-  mqttPassword:       z.string().min(1).max(2000),
-  ipv6Yggdrasil:      z.string().min(1).max(64),
+  uuid:          z.string().uuid(),
+  mqttPasswords: MqttPasswordsSchema.default({}),
 });
 
 export type CentralEntry = z.infer<typeof CentralEntrySchema>;
@@ -99,50 +106,62 @@ export const IntegrationKeyParamSchema = z.object({
 
 // Admin replacement of centrals.items[] via the UI. The full array is sent
 // each call (the controller refuses partial PATCH semantics for predictability
-// — the operator sees exactly what they're persisting). `mqttPassword` may be
-// left empty on an existing entry to keep the stored value; the service
-// merges per-uuid when so.
+// — the operator sees exactly what they're persisting). Per-integration
+// password merge rule: empty string for an existing integration id keeps the
+// stored value; missing integration id keeps the stored value; setting to
+// "" cannot be expressed (use DELETE on the dedicated route to clear).
 export const ReplaceCentralsItemsInputSchema = z.object({
   actor: z.string().min(1).max(255),
   note:  z.string().max(500).optional(),
   items: z.array(
-    CentralEntrySchema.extend({
-      // Override password — allow empty string to signal "keep existing".
-      mqttPassword: z.string().max(2000),
+    z.object({
+      uuid:          z.string().uuid(),
+      mqttPasswords: z
+        .record(z.enum(CENTRAL_MQTT_INTEGRATION_IDS), z.string().max(2000))
+        .default({}),
     }),
   ).max(200),
 });
 
 export type ReplaceCentralsItemsInput = z.infer<typeof ReplaceCentralsItemsInputSchema>;
 
+// Per-integration password upsert (PUT /centrals/:id/mqtt-passwords/:integrationId)
+export const SetMqttPasswordInputSchema = z.object({
+  password: z.string().min(1).max(2000),
+});
+
+export type SetMqttPasswordInput = z.infer<typeof SetMqttPasswordInputSchema>;
+
+export const MqttIntegrationIdParamSchema = z.object({
+  integrationId: z.enum(CENTRAL_MQTT_INTEGRATION_IDS),
+});
+
 export const ItemUuidParamSchema = z.object({
   itemUuid: z.string().uuid(),
 });
 
 // -----------------------------------------------------------------------------
-// Response shaping — masks mqttPassword on read.
+// Response shaping — masks every MQTT password on read (RFC-0035).
 //
-// Every read path passes the state through `maskIntegrationStateForRead`
-// before serialising. Callers without the (future) credential-read scope
-// see "<redacted>" + a sibling `mqttPasswordSet: boolean` so the UI can
-// distinguish "missing" from "present-but-hidden".
+// Default reads replace mqttPasswords (Record<id,string>) with
+// mqttPasswordsSet (Record<id,boolean>) — same key set, boolean indicator
+// only. Plaintext is only available via the dedicated reveal endpoint.
 // -----------------------------------------------------------------------------
 
-export interface CentralEntryRead extends Omit<CentralEntry, 'mqttPassword'> {
-  mqttPassword:    string;   // always "<redacted>" on read
-  mqttPasswordSet: boolean;  // true iff the stored value is non-empty
+export interface CentralEntryRead {
+  uuid:              string;
+  mqttPasswordsSet:  Partial<Record<CentralMqttIntegrationId, boolean>>;
 }
 
 export function maskCentralEntry(e: CentralEntry): CentralEntryRead {
-  return {
-    uuid:               e.uuid,
-    ingestionGatewayId: e.ingestionGatewayId,
-    mqttUserName:       e.mqttUserName,
-    mqttClientId:       e.mqttClientId,
-    ipv6Yggdrasil:      e.ipv6Yggdrasil,
-    mqttPassword:       REDACTED,
-    mqttPasswordSet:    typeof e.mqttPassword === 'string' && e.mqttPassword.length > 0,
-  };
+  const set: Partial<Record<CentralMqttIntegrationId, boolean>> = {};
+  for (const id of CENTRAL_MQTT_INTEGRATION_IDS) {
+    const v = e.mqttPasswords?.[id];
+    if (typeof v === 'string' && v.length > 0) {
+      set[id] = true;
+    }
+  }
+  return { uuid: e.uuid, mqttPasswordsSet: set };
 }
 
 export function maskIntegrationStateForRead(
@@ -166,8 +185,8 @@ export function maskIntegrationsMapForRead(
   return out;
 }
 
-// Strip the password when the state is going into an audit log row.
-// Audit metadata MUST never carry the plaintext credential.
+// Strip every MQTT password when state is going into an audit log row.
+// Audit metadata MUST never carry plaintext credentials.
 export function stripCredentialsForAudit(
   key: string,
   state: unknown,
@@ -177,9 +196,10 @@ export function stripCredentialsForAudit(
   if (!Array.isArray(s.items)) return s;
   return {
     ...s,
-    items: s.items.map((e) => {
-      const { mqttPassword: _omit, ...rest } = e;
-      return { ...rest, mqttPasswordSet: typeof e.mqttPassword === 'string' && e.mqttPassword.length > 0 };
-    }),
+    items: s.items.map((e) => maskCentralEntry(e)),
   };
 }
+
+// `REDACTED` is no longer used externally but kept for backward compatibility
+// with any caller that still references the constant. Safe to remove later.
+export { REDACTED };

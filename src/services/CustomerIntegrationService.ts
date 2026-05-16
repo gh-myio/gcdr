@@ -15,6 +15,7 @@ import {
 } from '../dto/request/CustomerIntegrationDTO';
 import { NotFoundError } from '../shared/errors/AppError';
 import { IntegrationKey } from '../domain/integrations/IntegrationKey';
+import { CentralMqttIntegrationId } from '../domain/integrations/CentralMqttIntegrationId';
 import { logAuditEvent } from '../middleware/audit';
 import { EventType, ActorType } from '../shared/types/audit.types';
 
@@ -171,12 +172,12 @@ export class CustomerIntegrationService {
   }
 
   /**
-   * Admin replacement of `centrals.items[]`. Unlike `recordSync` (M2M), this
-   * is the explicit operator path: an admin in the UI edits the list of
-   * provisioned centrals and persists it. Per-entry merge rule for
-   * `mqttPassword`: incoming empty string keeps the previously-stored value
-   * for the same `uuid`, so the operator never has to retype a password they
-   * cannot see on read (passwords are masked in GET responses).
+   * Admin replacement of `centrals.items[]` (RFC-0035 shape). Each entry
+   * is keyed by uuid; the per-integration password map is merged per-id:
+   *   - id present with non-empty value  → overwrites stored value
+   *   - id present with empty value      → keeps stored value
+   *   - id missing                       → keeps stored value
+   * (To remove a password entirely use `DELETE /centrals/:id/mqtt-passwords/:integrationId`.)
    */
   async replaceCentralsItems(
     tenantId: string,
@@ -190,21 +191,21 @@ export class CustomerIntegrationService {
     const previousByUuid = new Map(previous.items.map((e) => [e.uuid, e]));
 
     const mergedItems: CentralEntry[] = input.items.map((incoming) => {
-      // Empty password on an existing uuid → keep the stored secret.
       const existing = previousByUuid.get(incoming.uuid);
-      const mqttPassword =
-        incoming.mqttPassword.length === 0 && existing
-          ? existing.mqttPassword
-          : incoming.mqttPassword;
-      const merged = {
-        uuid:               incoming.uuid,
-        ingestionGatewayId: incoming.ingestionGatewayId,
-        mqttUserName:       incoming.mqttUserName,
-        mqttClientId:       incoming.mqttClientId,
-        mqttPassword,
-        ipv6Yggdrasil:      incoming.ipv6Yggdrasil,
-      };
-      return CentralEntrySchema.parse(merged);
+      const existingPwds = existing?.mqttPasswords ?? {};
+      const mergedPwds: Record<string, string> = { ...existingPwds };
+
+      for (const [id, value] of Object.entries(incoming.mqttPasswords ?? {})) {
+        if (typeof value === 'string' && value.length > 0) {
+          mergedPwds[id] = value;
+        }
+        // empty string or missing → keep stored
+      }
+
+      return CentralEntrySchema.parse({
+        uuid:          incoming.uuid,
+        mqttPasswords: mergedPwds,
+      });
     });
 
     const next: CentralsIntegrationState = {
@@ -230,8 +231,7 @@ export class CustomerIntegrationService {
         note:            input.note,
         itemsCount:      mergedItems.length,
         previousCount:   previous.items.length,
-        // Both snapshots have credentials stripped — the audit row never
-        // carries plaintext passwords.
+        // Both snapshots have credentials stripped — audit never carries plaintext.
         previous:        stripCredentialsForAudit('centrals', previous),
         next:            stripCredentialsForAudit('centrals', next),
       },
@@ -241,50 +241,43 @@ export class CustomerIntegrationService {
   }
 
   /**
-   * Partial upsert of a single centrals.items[] entry, keyed by uuid.
-   * Used by `PUT /centrals/:id` body.connection sugar route. Differs from
-   * replaceCentralsItems: writes only the fields the caller sent, leaves
-   * the rest of the entry untouched. The entry must already exist —
-   * creation goes through replaceCentralsItems (admin batch flow).
+   * Set or clear one (uuid, integrationId) password. Used by RFC-0035
+   * `PUT/DELETE /centrals/:id/mqtt-passwords/:integrationId`.
+   * `password = undefined` clears the key entirely; non-empty string sets it.
+   * Creates the items[] entry if absent for the given uuid.
    */
-  async upsertCentralEntry(
+  async upsertCentralPassword(
     tenantId: string,
     customerId: string,
     centralUuid: string,
-    partial: {
-      mqttUserName?: string;
-      mqttClientId?: string;
-      mqttPassword?: string;
-      ipv6Yggdrasil?: string;
-      ingestionGatewayId?: string | null;
-    },
+    integrationId: CentralMqttIntegrationId,
+    password: string | undefined,
     actor: CustomerIntegrationActor & { actorLabel: string },
   ): Promise<CentralEntry> {
     const raw = await this.repo.getOne(tenantId, customerId, 'centrals');
     const state = parseExistingState('centrals', raw) as CentralsIntegrationState;
 
     const idx = state.items.findIndex((e) => e.uuid === centralUuid);
-    if (idx < 0) {
-      throw new NotFoundError(
-        `Central ${centralUuid} has no integration entry under customer ${customerId}. ` +
-        `Create it via PATCH /customers/${customerId}/integrations first.`,
-      );
+    const existing = idx >= 0 ? state.items[idx]! : { uuid: centralUuid, mqttPasswords: {} as Record<string, string> };
+
+    const mergedPwds: Record<string, string> = { ...(existing.mqttPasswords ?? {}) };
+    if (typeof password === 'string' && password.length > 0) {
+      mergedPwds[integrationId] = password;
+    } else {
+      delete mergedPwds[integrationId];
     }
-    const existing = state.items[idx]!;
 
     const merged: CentralEntry = CentralEntrySchema.parse({
-      uuid:               existing.uuid,
-      ingestionGatewayId: partial.ingestionGatewayId !== undefined ? partial.ingestionGatewayId : existing.ingestionGatewayId,
-      mqttUserName:       partial.mqttUserName ?? existing.mqttUserName,
-      mqttClientId:       partial.mqttClientId ?? existing.mqttClientId,
-      mqttPassword:       partial.mqttPassword && partial.mqttPassword.length > 0
-                            ? partial.mqttPassword
-                            : existing.mqttPassword,
-      ipv6Yggdrasil:      partial.ipv6Yggdrasil ?? existing.ipv6Yggdrasil,
+      uuid:          centralUuid,
+      mqttPasswords: mergedPwds,
     });
 
     const nextItems = [...state.items];
-    nextItems[idx] = merged;
+    if (idx >= 0) {
+      nextItems[idx] = merged;
+    } else {
+      nextItems.push(merged);
+    }
     const next: CentralsIntegrationState = { ...state, items: nextItems };
 
     await this.repo.setIntegration(
@@ -301,10 +294,10 @@ export class CustomerIntegrationService {
       EventType.CUSTOMER_INTEGRATION_ITEMS_UPDATED,
       actor,
       {
-        actor:        actor.actorLabel,
-        itemUuid:     centralUuid,
-        changedKeys:  Object.keys(partial),
-        passwordChanged: !!(partial.mqttPassword && partial.mqttPassword.length > 0),
+        actor:           actor.actorLabel,
+        itemUuid:        centralUuid,
+        integrationId,
+        operation:       (typeof password === 'string' && password.length > 0) ? 'set' : 'clear',
       },
     );
 
@@ -312,18 +305,18 @@ export class CustomerIntegrationService {
   }
 
   /**
-   * Reveal one central's plaintext MQTT password. Sensitive operation —
-   * emits an audit event (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED) on
-   * every successful call, so abuse leaves a trail. The controller gates
-   * this with `customers:write` (admin-only) since `centrals:credentials:read`
-   * is not yet a first-class permission in the RBAC layer.
+   * Reveal one (uuid, integrationId) plaintext MQTT password. Sensitive
+   * operation — emits an audit event on every call, tagged with integrationId
+   * so abuse is traceable per integration. Throws NotFoundError if neither
+   * the entry nor the integration password exists.
    */
-  async revealCentralCredential(
+  async revealCentralPassword(
     tenantId: string,
     customerId: string,
     itemUuid: string,
+    integrationId: CentralMqttIntegrationId,
     actor: CustomerIntegrationActor & { actorLabel: string },
-  ): Promise<{ mqttPassword: string }> {
+  ): Promise<{ password: string }> {
     const raw = await this.repo.getOne(tenantId, customerId, 'centrals');
     const state = parseExistingState('centrals', raw) as CentralsIntegrationState;
 
@@ -331,6 +324,12 @@ export class CustomerIntegrationService {
     if (!item) {
       throw new NotFoundError(
         `Central item ${itemUuid} not found in customer ${customerId}`,
+      );
+    }
+    const password = item.mqttPasswords?.[integrationId];
+    if (typeof password !== 'string' || password.length === 0) {
+      throw new NotFoundError(
+        `No "${integrationId}" password configured for central ${itemUuid} in customer ${customerId}`,
       );
     }
 
@@ -343,12 +342,12 @@ export class CustomerIntegrationService {
       {
         actor:    actor.actorLabel,
         itemUuid,
-        // Audit MUST NOT carry the plaintext value — only the fact that a
-        // reveal happened, who did it, and which item.
+        integrationId,
+        // Audit MUST NOT carry the plaintext value.
       },
     );
 
-    return { mqttPassword: item.mqttPassword };
+    return { password };
   }
 
   /**

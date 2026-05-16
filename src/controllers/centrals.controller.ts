@@ -8,6 +8,11 @@ import {
   UpdateConnectionStatusSchema,
   ListCentralsDTO,
 } from '../dto/request/CentralDTO';
+import { customerIntegrationService } from '../services/CustomerIntegrationService';
+import {
+  SetMqttPasswordInputSchema,
+  MqttIntegrationIdParamSchema,
+} from '../dto/request/CustomerIntegrationDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 import { EventType, ActorType } from '../shared/types';
@@ -149,13 +154,7 @@ router.put('/:id',
       }
 
       const data = UpdateCentralSchema.parse(req.body);
-      const central = await centralService.update(tenantId, id, data, userId, {
-        userId,
-        userEmail:  (req.context as { userEmail?: string }).userEmail,
-        actorType:  ActorType.USER,
-        actorLabel: userId,
-        requestId,
-      });
+      const central = await centralService.update(tenantId, id, data, userId);
       sendSuccess(res, central, 200, requestId);
     } catch (err) {
       next(err);
@@ -233,6 +232,131 @@ router.post('/:id/heartbeat', async (req: Request, res: Response, next: NextFunc
     next(err);
   }
 });
+
+/**
+ * PUT /centrals/:id/mqtt-passwords/:integrationId
+ * Set the MQTT password for one (central, integration) pair (RFC-0035).
+ * Body: { password: string }. Writes to
+ * customers.metadata.integrations.centrals.items[uuid].mqttPasswords[integrationId].
+ * Creates the items[] entry if absent for the uuid.
+ */
+router.put('/:id/mqtt-passwords/:integrationId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId, userId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      const central = await centralService.getById(tenantId, id);
+      const { integrationId } = MqttIntegrationIdParamSchema.parse({ integrationId: req.params.integrationId });
+      const { password } = SetMqttPasswordInputSchema.parse(req.body ?? {});
+
+      await customerIntegrationService.upsertCentralPassword(
+        tenantId,
+        central.customerId,
+        id,
+        integrationId,
+        password,
+        {
+          userId,
+          userEmail:  (req.context as { userEmail?: string }).userEmail,
+          actorType:  ActorType.USER,
+          actorLabel: userId,
+          requestId,
+        },
+      );
+
+      const updated = await centralService.getById(tenantId, id);
+      sendSuccess(res, updated, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /centrals/:id/mqtt-passwords/:integrationId
+ * Clear the MQTT password for one (central, integration) pair.
+ */
+router.delete('/:id/mqtt-passwords/:integrationId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId, userId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      const central = await centralService.getById(tenantId, id);
+      const { integrationId } = MqttIntegrationIdParamSchema.parse({ integrationId: req.params.integrationId });
+
+      await customerIntegrationService.upsertCentralPassword(
+        tenantId,
+        central.customerId,
+        id,
+        integrationId,
+        undefined,
+        {
+          userId,
+          userEmail:  (req.context as { userEmail?: string }).userEmail,
+          actorType:  ActorType.USER,
+          actorLabel: userId,
+          requestId,
+        },
+      );
+
+      sendNoContent(res);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /centrals/:id/mqtt-passwords/:integrationId/reveal
+ * Return the plaintext MQTT password for one (central, integration) pair.
+ * Audit-logged on every successful call (CUSTOMER_INTEGRATION_CREDENTIALS_REVEALED
+ * with metadata.integrationId). POST (not GET) so caches and shareable URLs
+ * cannot capture the response. Auth at mount time gates this with the same
+ * scope as the rest of /centrals — promote to a credentials-read scope when
+ * the RBAC layer surfaces one.
+ */
+router.post('/:id/mqtt-passwords/:integrationId/reveal',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId, userId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError('Central ID is required');
+      }
+
+      const central = await centralService.getById(tenantId, id);
+      const { integrationId } = MqttIntegrationIdParamSchema.parse({ integrationId: req.params.integrationId });
+
+      const result = await customerIntegrationService.revealCentralPassword(
+        tenantId,
+        central.customerId,
+        id,
+        integrationId,
+        {
+          userId,
+          userEmail:  (req.context as { userEmail?: string }).userEmail,
+          actorType:  ActorType.USER,
+          actorLabel: userId,
+          requestId,
+        },
+      );
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * DELETE /centrals/:id
