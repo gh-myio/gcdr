@@ -1,10 +1,20 @@
 # RFC-0033 — Customer Integration Sync State
 
-- **Status:** Draft (pending approval)
+- **Status:** Draft (pending approval) — **partially superseded by [RFC-0035](./RFC-0035-Plural-MQTT-Integrations-On-Centrals.md) (centrals.items[] shape — §5 `CentralEntrySchema` and §115–154)**
 - **Created:** 2026-05-06
 - **Author:** GCDR Core Team
 - **Domain:** Customers / Cross-System Integrations
 - **Decision needed by:** before implementation kickoff
+
+> ⚠️ **Partial supersession**: The `centrals.items[]` entry shape defined in this RFC
+> (`uuid`, `ingestionGatewayId`, `mqttUserName`, `mqttClientId`, `mqttPassword`,
+> `ipv6Yggdrasil`) is replaced by RFC-0035. Identity (`ipv6Yggdrasil`) moves to
+> `centrals.config`; broker config (`mqttUserName`/`mqttClientId`/etc.) becomes a
+> plural `centrals.config.mqttIntegrations[]`; per-integration passwords stay in
+> `customers.metadata.integrations.centrals.items[].mqttPasswords` partitioned by
+> integration id. All other integration keys (`ingestion`, `thingsboard`, `alarms`,
+> `workorders`, `freshdesk`) and the sync-state ledger contract in this RFC remain
+> in effect.
 
 ---
 
