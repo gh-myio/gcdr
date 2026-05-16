@@ -1,8 +1,12 @@
 # API — GET /rules/:ruleId
 
 > **Audiencia:** Frontend, Integradores, Alarm Orchestrator
-> **Data:** 2026-03-06
+> **Data:** 2026-03-06 · **Atualizado:** 2026-05-16
 > **Relacionado:** [RULE-ENTITY.md](./RULE-ENTITY.md), [API-Bundle-Verify.md](./API-Bundle-Verify.md)
+
+> ⚠️ **Removido:** o campo `gatewayToken` foi removido do response da rule
+> (ver `GCDR-USER.md` §5.5). Consumidores que ainda fizerem `rawRule?.gatewayToken`
+> recebem `undefined` em runtime. Nao usar mais.
 
 ---
 
@@ -16,7 +20,6 @@ Retorna os detalhes completos de uma rule pelo seu ID, incluindo:
 
 - Configuracao da rule (alarmConfig, slaConfig, etc.)
 - Notificacoes por categoria (`alarmNotify`, `alarmReport`, `alarmInsight`) com destinatarios e emailRelay
-- `gatewayToken` do customer ao qual a rule pertence
 
 ---
 
@@ -67,7 +70,6 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 | `maintenanceConfig` | object? | Configuracao de janela de manutencao (somente `MAINTENANCE_WINDOW`) |
 | `notifications` | object? | Notificacoes por categoria (ausente se nao configurado) |
 | `scopeEntityOverrides` | object? | Overrides de value/valueHigh por device UUID (RFC-0018) |
-| `gatewayToken` | string? | Token do gateway do customer (ausente se nao configurado) |
 | `lastTriggeredAt` | string? | ISO 8601 — ultima vez que a rule foi disparada |
 | `triggerCount` | number? | Total de disparos |
 | `createdAt` | string | ISO 8601 |
@@ -233,21 +235,12 @@ Cada categoria e independente — lista de destinatarios e configuracao SMTP pro
       "value": 28
     }
   },
-  "gatewayToken": "gw_tok_moxuara_2026_xYzK9...",
   "lastTriggeredAt": "2026-03-06T08:42:00.000Z",
   "triggerCount": 14,
   "createdAt": "2026-01-15T12:00:00.000Z",
   "updatedAt": "2026-03-05T17:30:00.000Z"
 }
 ```
-
----
-
-## Campos enriquecidos (nao persistidos na rule)
-
-| Campo | Origem | Descricao |
-|---|---|---|
-| `gatewayToken` | `customer.config.gatewayToken` | Token do gateway; ausente se o customer nao tiver configurado |
 
 ---
 
@@ -265,5 +258,5 @@ Cada categoria e independente — lista de destinatarios e configuracao SMTP pro
 ## Ver tambem
 
 - `PATCH /api/v1/rules/:ruleId` — atualizar rule (incluindo `notifications`)
-- `GET /api/v1/customers/:customerId/alarm-rules/bundle/verify` — bundle enriquecido com `gatewayToken` e `notifications` de todas as rules
+- `GET /api/v1/customers/:customerId/alarm-rules/bundle/verify` — bundle enriquecido com `notifications` de todas as rules
 - `GET /api/v1/rules/notification-categories` — categorias de notificacao disponiveis
