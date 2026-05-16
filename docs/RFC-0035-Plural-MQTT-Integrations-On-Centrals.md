@@ -1,11 +1,11 @@
 # RFC-0035 — Plural MQTT Integrations on Centrals
 
-- **Status:** Draft (pending approval)
+- **Status:** Implemented (2026-05-16)
 - **Created:** 2026-05-15
 - **Author:** GCDR Core Team
 - **Domain:** Centrals / Customer Integrations
 - **Supersedes (partial):** RFC-0033 §5 `CentralEntrySchema`, §115–154 `centrals.items[]` shape
-- **Decision needed by:** before implementation kickoff
+- **Implementation commits:** `94e2283` (Phase 2 additive), `4504fd2` (backend cutover), `b821125` (frontend cutover)
 
 ---
 

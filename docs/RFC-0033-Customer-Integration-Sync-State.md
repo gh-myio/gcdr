@@ -1,6 +1,6 @@
 # RFC-0033 — Customer Integration Sync State
 
-- **Status:** Draft (pending approval) — **partially superseded by [RFC-0035](./RFC-0035-Plural-MQTT-Integrations-On-Centrals.md) (centrals.items[] shape — §5 `CentralEntrySchema` and §115–154)**
+- **Status:** Implemented — **partially superseded by [RFC-0035](./RFC-0035-Plural-MQTT-Integrations-On-Centrals.md) on 2026-05-16 (centrals.items[] shape — §5 `CentralEntrySchema` and §115–154)**
 - **Created:** 2026-05-06
 - **Author:** GCDR Core Team
 - **Domain:** Customers / Cross-System Integrations

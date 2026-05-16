@@ -35,28 +35,6 @@ These RFCs have a detailed spec and can be started without any design blockers.
 
 ---
 
-### RFC-0035 — Plural MQTT Integrations on Centrals
-
-**Status**: 📐 Draft (spec complete, pending approval)
-**File**: `docs/RFC-0035-Plural-MQTT-Integrations-On-Centrals.md`
-**Estimated effort**: Medium (3-4 effective days)
-**Supersedes**: RFC-0033 §5 `CentralEntrySchema` and §115–154 `centrals.items[]` shape (the rest of RFC-0033 stays).
-
-**What's missing:**
-- Add `ipv6Yggdrasil` to `centrals.config` and `mqttIntegrations[]` (4-slot array: gcdr/alarms/thingsboard/ingestion).
-- Drop legacy `centrals.config.mqttConfig` (single broker, mixed targets) after backfill.
-- Reshape `customers.metadata.integrations.centrals.items[]` to `{ uuid, mqttPasswords: Record<integrationId, string> }`.
-- Two idempotent SQL backfill phases (no schema migration — JSONB-only).
-- New routes: `PUT/DELETE /centrals/:id/mqtt-passwords/:integrationId`, `GET .../reveal`.
-- Frontend reshape: remove "Connection" card (added in `d9fa492`), move IPv6 to Network card, replace single MQTT card with N sub-cards.
-- Update `pii-sanitizer.ts` deny-list to wildcard `mqttPasswords.*`.
-
-> External-consumer audit (alarms-orchestrator + alarms-backend) confirmed zero
-> direct reads of the affected fields — refactor is internal to GCDR backend +
-> `gcdr-frontend`.
-
----
-
 ### RFC-0027 — Internal Support Rules in Bundle
 
 **Status**: 🔴 Not started (1-line fix + minimal logic)
