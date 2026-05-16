@@ -1,4 +1,26 @@
 import { z } from 'zod';
+import { CENTRAL_MQTT_INTEGRATION_IDS } from '../../domain/integrations/CentralMqttIntegrationId';
+
+// Per-destination MQTT broker config (RFC-0035). N entries live under
+// centrals.config.mqttIntegrations[], one per destination id. Passwords
+// stay in customers.metadata.integrations.centrals.items[].mqttPasswords
+// keyed by the same `id`.
+export const CentralMqttIntegrationSchema = z.object({
+  id:                   z.enum(CENTRAL_MQTT_INTEGRATION_IDS),
+  enabled:              z.boolean().default(false),
+  broker:               z.string().max(500).optional(),
+  port:                 z.number().int().min(1).max(65535).optional(),
+  clientId:             z.string().max(255).optional(),
+  userName:             z.string().max(255).optional(),
+  useTls:               z.boolean().default(true),
+  qos:                  z.union([z.literal(0), z.literal(1), z.literal(2)]).default(1),
+  keepAlive:            z.number().int().min(0).max(3600).optional(),
+  topicPrefix:          z.string().max(500).optional(),
+  topic:                z.string().max(500).optional(),
+  destinationGatewayId: z.string().uuid().nullable().optional(),
+});
+
+export type CentralMqttIntegrationDTO = z.infer<typeof CentralMqttIntegrationSchema>;
 
 // Central Config Schema
 const CentralConfigSchema = z.object({
@@ -7,6 +29,10 @@ const CentralConfigSchema = z.object({
     .string()
     .regex(/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/)
     .optional(),
+  // RFC-0035: intrinsic identity. Yggdrasil mesh address of the central.
+  // Backfilled in Phase A from customers.metadata.integrations.centrals.items[].ipv6Yggdrasil;
+  // legacy location remains writable during the dual-source window.
+  ipv6Yggdrasil: z.string().max(64).optional(),
   hostname: z.string().max(255).optional(),
   port: z.number().min(1).max(65535).optional(),
   syncInterval: z.number().min(10).max(86400).default(60),
@@ -17,6 +43,10 @@ const CentralConfigSchema = z.object({
   maxDevices: z.number().min(1).max(10000).default(100),
   maxRules: z.number().min(1).max(1000).default(50),
   customSettings: z.record(z.unknown()).default({}),
+  // RFC-0035: plural MQTT destinations. Additive in Phase 2 — legacy
+  // mqttConfig (if present on the row) is NOT enforced here and is dropped
+  // in Phase B. Up to 8 entries to cap row size; today only 4 ids exist.
+  mqttIntegrations: z.array(CentralMqttIntegrationSchema).max(8).optional(),
 });
 
 // Location Schema

@@ -1,12 +1,41 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
+import type { CentralMqttIntegrationId } from '../integrations/CentralMqttIntegrationId';
 
 export type CentralType = 'NODEHUB' | 'GATEWAY' | 'EDGE_CONTROLLER' | 'VIRTUAL';
 export type ConnectionStatus = 'ONLINE' | 'OFFLINE' | 'DEGRADED' | 'MAINTENANCE';
+
+/**
+ * Per-destination MQTT broker config (RFC-0035). One entry per upstream
+ * destination a central can publish to. Lives under
+ * centrals.config.mqttIntegrations[]. Credentials (password) are stored
+ * separately under customers.metadata.integrations.centrals.items[].mqttPasswords
+ * keyed by the same `id`.
+ */
+export interface CentralMqttIntegration {
+  id:                    CentralMqttIntegrationId;
+  enabled:               boolean;
+  broker?:               string;
+  port?:                 number;
+  clientId?:             string;
+  userName?:             string;
+  useTls:                boolean;
+  qos:                   0 | 1 | 2;
+  keepAlive?:            number;
+  topicPrefix?:          string;
+  topic?:                string;
+  destinationGatewayId?: string | null;
+}
 
 export interface CentralConfig {
   // Network
   ipAddress?: string;
   macAddress?: string;
+  /**
+   * Yggdrasil mesh IPv6 address (RFC-0035 — intrinsic identity).
+   * Backfilled in Phase A from customers.metadata.integrations.centrals.items[].ipv6Yggdrasil.
+   * Read-prefer this over the legacy customer-scope location.
+   */
+  ipv6Yggdrasil?: string;
   hostname?: string;
   port?: number;
 
@@ -26,6 +55,14 @@ export interface CentralConfig {
 
   // Custom config
   customSettings: Record<string, unknown>;
+
+  /**
+   * RFC-0035 — plural MQTT destinations. Additive in Phase 2: present
+   * after backfill, optional during the dual-source window. Legacy
+   * mqttConfig on this column (if present) is read-only and dropped in
+   * Phase B once the frontend reshape ships.
+   */
+  mqttIntegrations?: CentralMqttIntegration[];
 }
 
 export interface CentralStats {
