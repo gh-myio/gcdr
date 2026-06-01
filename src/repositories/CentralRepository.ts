@@ -30,6 +30,7 @@ export class CentralRepository implements ICentralRepository {
       connectionStatus: 'OFFLINE',
       firmwareVersion: data.firmwareVersion || '0.0.0',
       softwareVersion: data.softwareVersion || '0.0.0',
+      frequency: data.frequency ?? 60,
       config: data.config ? { ...createDefaultCentralConfig(), ...data.config } : createDefaultCentralConfig(),
       stats: createDefaultCentralStats(),
       location: data.location || null,
@@ -84,6 +85,7 @@ export class CentralRepository implements ICentralRepository {
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.firmwareVersion !== undefined) updateData.firmwareVersion = data.firmwareVersion;
     if (data.softwareVersion !== undefined) updateData.softwareVersion = data.softwareVersion;
+    if (data.frequency !== undefined) updateData.frequency = data.frequency;
     if (data.location !== undefined) updateData.location = data.location;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
@@ -296,6 +298,7 @@ export class CentralRepository implements ICentralRepository {
       connectionStatus: row.connectionStatus,
       firmwareVersion: row.firmwareVersion,
       softwareVersion: row.softwareVersion,
+      frequency: row.frequency,
       config: row.config as Central['config'],
       stats: row.stats as Central['stats'],
       location: row.location as Central['location'],

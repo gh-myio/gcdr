@@ -67,6 +67,8 @@ export const CreateCentralSchema = z.object({
   type: z.enum(['NODEHUB', 'GATEWAY', 'EDGE_CONTROLLER', 'VIRTUAL']),
   firmwareVersion: z.string().max(50).default('0.0.0'),
   softwareVersion: z.string().max(50).default('0.0.0'),
+  // Polling/read cadence in seconds (mirrors devices.frequency, RFC-0008).
+  frequency: z.number().int().min(1).max(3600).default(60),
   config: CentralConfigSchema.optional(),
   location: LocationSchema.optional(),
   tags: z.array(z.string().max(50)).max(20).default([]),
@@ -82,6 +84,7 @@ export const UpdateCentralSchema = z.object({
   type: z.enum(['NODEHUB', 'GATEWAY', 'EDGE_CONTROLLER', 'VIRTUAL']).optional(),
   firmwareVersion: z.string().max(50).optional(),
   softwareVersion: z.string().max(50).optional(),
+  frequency: z.number().int().min(1).max(3600).optional(),
   config: CentralConfigSchema.partial().optional(),
   location: LocationSchema.optional().nullable(),
   tags: z.array(z.string().max(50)).max(20).optional(),

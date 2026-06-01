@@ -12,6 +12,7 @@ export interface CentralSummaryDTO {
   connectionStatus: string;
   firmwareVersion: string;
   softwareVersion: string;
+  frequency: number;
   connectedDevices: number;
   lastHeartbeatAt?: string;
   updatedAt: string;
@@ -31,6 +32,7 @@ export interface CentralDetailDTO {
   firmwareVersion: string;
   softwareVersion: string;
   lastUpdateAt?: string;
+  frequency: number;
   config: CentralConfig;
   stats: CentralStats;
   location?: {
@@ -57,6 +59,7 @@ export function toCentralSummaryDTO(central: Central): CentralSummaryDTO {
     connectionStatus: central.connectionStatus,
     firmwareVersion: central.firmwareVersion,
     softwareVersion: central.softwareVersion,
+    frequency: central.frequency,
     connectedDevices: central.stats.connectedDevices,
     lastHeartbeatAt: central.stats.lastHeartbeatAt,
     updatedAt: central.updatedAt,
@@ -78,6 +81,7 @@ export function toCentralDetailDTO(central: Central): CentralDetailDTO {
     firmwareVersion: central.firmwareVersion,
     softwareVersion: central.softwareVersion,
     lastUpdateAt: central.lastUpdateAt,
+    frequency: central.frequency,
     config: central.config,
     stats: central.stats,
     location: central.location,

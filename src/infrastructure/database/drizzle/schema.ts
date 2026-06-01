@@ -676,6 +676,10 @@ export const centrals = pgTable('centrals', {
   softwareVersion: varchar('software_version', { length: 50 }).notNull(),
   lastUpdateAt: timestamp('last_update_at', { withTimezone: true }),
 
+  // Polling/read cadence in seconds (mirrors devices.frequency, RFC-0008).
+  // Range 1..3600 enforced by centrals_frequency_range_check (migration 0027).
+  frequency: integer('frequency').notNull().default(60),
+
   // Configuration and Stats
   config: jsonb('config').notNull().default({}),
   stats: jsonb('stats').notNull().default({}),
