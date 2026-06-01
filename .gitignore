@@ -22,6 +22,9 @@ lib-cov
 coverage
 *.lcov
 
+# Jest JUnit reporter output (CI artifact)
+junit.xml
+
 # nyc test coverage
 .nyc_output
 
