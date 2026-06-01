@@ -32,7 +32,9 @@ export interface ApiResponse<T = unknown> {
   error?: {
     message: string;
     code: string;
-    details?: Record<string, string[]>;
+    // Validation errors use field -> messages (string[]); PG constraint
+    // errors use { constraint } / { column } (string). Hence unknown values.
+    details?: Record<string, unknown>;
   };
   meta?: {
     requestId: string;
