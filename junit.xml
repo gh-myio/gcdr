@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="115" failures="0" errors="0" time="39.812">
+  <testsuite name="VisitaService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="26.001" tests="11">
+    <testcase classname="VisitaService create / update / softDelete emit audit create emits a created audit row" name="VisitaService create / update / softDelete emit audit create emits a created audit row" time="0.048">
+    </testcase>
+    <testcase classname="VisitaService create / update / softDelete emit audit update emits an updated audit row with old/new" name="VisitaService create / update / softDelete emit audit update emits an updated audit row with old/new" time="0.005">
+    </testcase>
+    <testcase classname="VisitaService create / update / softDelete emit audit softDelete emits a deleted audit row" name="VisitaService create / update / softDelete emit audit softDelete emits a deleted audit row" time="0.01">
+    </testcase>
+    <testcase classname="VisitaService attachAmbienteImage (50-cap) writes the join + emits ambiente_image_added when below cap" name="VisitaService attachAmbienteImage (50-cap) writes the join + emits ambiente_image_added when below cap" time="0.004">
+    </testcase>
+    <testcase classname="VisitaService attachAmbienteImage (50-cap) throws ConflictError at exactly 50 images" name="VisitaService attachAmbienteImage (50-cap) throws ConflictError at exactly 50 images" time="0.156">
+    </testcase>
+    <testcase classname="VisitaService attachAmbienteImage (50-cap) throws NotFoundError when ambiente is missing" name="VisitaService attachAmbienteImage (50-cap) throws NotFoundError when ambiente is missing" time="0.003">
+    </testcase>
+    <testcase classname="VisitaService attachProductImage (5-cap) writes when below cap" name="VisitaService attachProductImage (5-cap) writes when below cap" time="0.002">
+    </testcase>
+    <testcase classname="VisitaService attachProductImage (5-cap) throws ConflictError at exactly 5 images" name="VisitaService attachProductImage (5-cap) throws ConflictError at exactly 5 images" time="0.002">
+    </testcase>
+    <testcase classname="VisitaService ambiente CRUD audit emission createAmbiente emits ambiente_created with ambienteId" name="VisitaService ambiente CRUD audit emission createAmbiente emits ambiente_created with ambienteId" time="0.002">
+    </testcase>
+    <testcase classname="VisitaService ambiente CRUD audit emission updateAmbiente emits ambiente_updated" name="VisitaService ambiente CRUD audit emission updateAmbiente emits ambiente_updated" time="0.051">
+    </testcase>
+    <testcase classname="VisitaService ambiente CRUD audit emission deleteAmbiente emits ambiente_deleted" name="VisitaService ambiente CRUD audit emission deleteAmbiente emits ambiente_deleted" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="CustomerService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="26.53" tests="22">
+    <testcase classname="CustomerService create should create a customer successfully" name="CustomerService create should create a customer successfully" time="0.028">
+    </testcase>
+    <testcase classname="CustomerService create should throw ConflictError if code already exists" name="CustomerService create should throw ConflictError if code already exists" time="0.019">
+    </testcase>
+    <testcase classname="CustomerService getById should return customer when found" name="CustomerService getById should return customer when found" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService getById should throw NotFoundError when customer not found" name="CustomerService getById should throw NotFoundError when customer not found" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService update should update customer successfully" name="CustomerService update should update customer successfully" time="0.003">
+    </testcase>
+    <testcase classname="CustomerService update should throw NotFoundError when customer not found" name="CustomerService update should throw NotFoundError when customer not found" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService update should throw ConflictError when updating to existing code" name="CustomerService update should throw ConflictError when updating to existing code" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService delete should delete customer successfully" name="CustomerService delete should delete customer successfully" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService delete should throw NotFoundError when customer not found" name="CustomerService delete should throw NotFoundError when customer not found" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService delete should throw ValidationError when customer has children" name="CustomerService delete should throw ValidationError when customer has children" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService list should return paginated list of customers" name="CustomerService list should return paginated list of customers" time="0.038">
+    </testcase>
+    <testcase classname="CustomerService getChildren should return children of a customer" name="CustomerService getChildren should return children of a customer" time="0.004">
+    </testcase>
+    <testcase classname="CustomerService getDescendants should return descendants of a customer" name="CustomerService getDescendants should return descendants of a customer" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService getDescendants should respect maxDepth parameter" name="CustomerService getDescendants should respect maxDepth parameter" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService move should move customer to new parent" name="CustomerService move should move customer to new parent" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService move should throw ValidationError when moving to self" name="CustomerService move should throw ValidationError when moving to self" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService move should throw ValidationError when moving to descendant" name="CustomerService move should throw ValidationError when moving to descendant" time="0.001">
+    </testcase>
+    <testcase classname="CustomerService getTree should return customer tree" name="CustomerService getTree should return customer tree" time="0.002">
+    </testcase>
+    <testcase classname="CustomerService getEnrichedTree should enrich a leaf customer with its assets, centrals and devices" name="CustomerService getEnrichedTree should enrich a leaf customer with its assets, centrals and devices" time="0.007">
+    </testcase>
+    <testcase classname="CustomerService getEnrichedTree should recursively enrich descendants" name="CustomerService getEnrichedTree should recursively enrich descendants" time="0.003">
+    </testcase>
+    <testcase classname="CustomerService getEnrichedTree should throw NotFoundError when root customer does not exist" name="CustomerService getEnrichedTree should throw NotFoundError when root customer does not exist" time="0.003">
+    </testcase>
+    <testcase classname="CustomerService getEnrichedTree should return empty arrays when customer has no assets/centrals/devices" name="CustomerService getEnrichedTree should return empty arrays when customer has no assets/centrals/devices" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="InstallationService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="26.744" tests="13">
+    <testcase classname="InstallationService install (idempotent) creates a new installation when none exists for the device" name="InstallationService install (idempotent) creates a new installation when none exists for the device" time="0.029">
+    </testcase>
+    <testcase classname="InstallationService install (idempotent) updates in place when an installation already exists for the device (idempotent)" name="InstallationService install (idempotent) updates in place when an installation already exists for the device (idempotent)" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService install (idempotent) rejects when the resolved device belongs to a different customer" name="InstallationService install (idempotent) rejects when the resolved device belongs to a different customer" time="0.087">
+    </testcase>
+    <testcase classname="InstallationService install (idempotent) throws NotFoundError when the device does not exist" name="InstallationService install (idempotent) throws NotFoundError when the device does not exist" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService install (idempotent) resolves device by (addrLow, addrHigh) when deviceId is not provided" name="InstallationService install (idempotent) resolves device by (addrLow, addrHigh) when deviceId is not provided" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService install (idempotent) throws NotFoundError when QR address does not match a device" name="InstallationService install (idempotent) throws NotFoundError when QR address does not match a device" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService update emits an updated audit row with old/new snapshots" name="InstallationService update emits an updated audit row with old/new snapshots" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService update throws NotFoundError when installation is missing" name="InstallationService update throws NotFoundError when installation is missing" time="0.002">
+    </testcase>
+    <testcase classname="InstallationService attachImage (20-image cap) writes the join row + emits image_added audit" name="InstallationService attachImage (20-image cap) writes the join row + emits image_added audit" time="0.005">
+    </testcase>
+    <testcase classname="InstallationService attachImage (20-image cap) throws ConflictError when the 20-image cap is reached" name="InstallationService attachImage (20-image cap) throws ConflictError when the 20-image cap is reached" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService attachImage (20-image cap) passes through any caller-provided imageOrder" name="InstallationService attachImage (20-image cap) passes through any caller-provided imageOrder" time="0.002">
+    </testcase>
+    <testcase classname="InstallationService detachImage emits an image_removed audit row carrying the join-row snapshot" name="InstallationService detachImage emits an image_removed audit row carrying the join-row snapshot" time="0.003">
+    </testcase>
+    <testcase classname="InstallationService softDelete marks deleted_at and emits a deleted audit row" name="InstallationService softDelete marks deleted_at and emits a deleted audit row" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="MaintenanceTaskService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="26.811" tests="6">
+    <testcase classname="MaintenanceTaskService create creates a task and emits a task_created audit row" name="MaintenanceTaskService create creates a task and emits a task_created audit row" time="0.062">
+    </testcase>
+    <testcase classname="MaintenanceTaskService create throws NotFoundError when the installation does not exist" name="MaintenanceTaskService create throws NotFoundError when the installation does not exist" time="0.059">
+    </testcase>
+    <testcase classname="MaintenanceTaskService update — status transitions emits task_completed audit when status moves pending → resolved" name="MaintenanceTaskService update — status transitions emits task_completed audit when status moves pending → resolved" time="0.004">
+    </testcase>
+    <testcase classname="MaintenanceTaskService update — status transitions emits task_completed audit when status moves to pending_review" name="MaintenanceTaskService update — status transitions emits task_completed audit when status moves to pending_review" time="0.023">
+    </testcase>
+    <testcase classname="MaintenanceTaskService update — status transitions does NOT emit audit when description changes but status stays the same" name="MaintenanceTaskService update — status transitions does NOT emit audit when description changes but status stays the same" time="0.002">
+    </testcase>
+    <testcase classname="MaintenanceTaskService update — status transitions throws NotFoundError when the task is missing" name="MaintenanceTaskService update — status transitions throws NotFoundError when the task is missing" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="UserService.setDefaultCustomer" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:46" time="0.624" tests="6">
+    <testcase classname="UserService.setDefaultCustomer sets defaultCustomerId when user has a matching customer-scoped assignment" name="UserService.setDefaultCustomer sets defaultCustomerId when user has a matching customer-scoped assignment" time="0.004">
+    </testcase>
+    <testcase classname="UserService.setDefaultCustomer sets defaultCustomerId when user has a wildcard (*) assignment" name="UserService.setDefaultCustomer sets defaultCustomerId when user has a wildcard (*) assignment" time="0.001">
+    </testcase>
+    <testcase classname="UserService.setDefaultCustomer clears defaultCustomerId when customerId is null (no validation performed)" name="UserService.setDefaultCustomer clears defaultCustomerId when customerId is null (no validation performed)" time="0.001">
+    </testcase>
+    <testcase classname="UserService.setDefaultCustomer throws NotFoundError when customer does not exist" name="UserService.setDefaultCustomer throws NotFoundError when customer does not exist" time="0.081">
+    </testcase>
+    <testcase classname="UserService.setDefaultCustomer throws ValidationError when user has no matching assignment" name="UserService.setDefaultCustomer throws ValidationError when user has no matching assignment" time="0.002">
+    </testcase>
+    <testcase classname="UserService.setDefaultCustomer throws NotFoundError when user does not exist" name="UserService.setDefaultCustomer throws NotFoundError when user does not exist" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="WikiPageRepository SQL shape" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:47" time="0.475" tests="3">
+    <testcase classname="WikiPageRepository SQL shape list query expands visibility as ARRAY[$n,...]::text[], not a scalar" name="WikiPageRepository SQL shape list query expands visibility as ARRAY[$n,...]::text[], not a scalar" time="0.09">
+    </testcase>
+    <testcase classname="WikiPageRepository SQL shape regression: reproduces the shape that was causing &quot;malformed array literal&quot;" name="WikiPageRepository SQL shape regression: reproduces the shape that was causing &quot;malformed array literal&quot;" time="0.001">
+    </testcase>
+    <testcase classname="WikiPageRepository SQL shape expands multi-tag visibility into one placeholder per tag" name="WikiPageRepository SQL shape expands multi-tag visibility into one placeholder per tag" time="0.007">
+    </testcase>
+  </testsuite>
+  <testsuite name="audit middleware — userId mapping" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:47" time="0.465" tests="2">
+    <testcase classname="audit middleware — userId mapping writes the bare apiKeyId UUID into userId for API Key callers" name="audit middleware — userId mapping writes the bare apiKeyId UUID into userId for API Key callers" time="0.01">
+    </testcase>
+    <testcase classname="audit middleware — userId mapping falls back to req.user.sub when apiKeyId is not set (JWT path)" name="audit middleware — userId mapping falls back to req.user.sub when apiKeyId is not set (JWT path)" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="AuthorizationService.getUserFullAuthz" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="27.736" tests="5">
+    <testcase classname="AuthorizationService.getUserFullAuthz returns empty snapshot when user has no active assignments" name="AuthorizationService.getUserFullAuthz returns empty snapshot when user has no active assignments" time="0.045">
+    </testcase>
+    <testcase classname="AuthorizationService.getUserFullAuthz enriches assignments with role and expanded policies" name="AuthorizationService.getUserFullAuthz enriches assignments with role and expanded policies" time="0.006">
+    </testcase>
+    <testcase classname="AuthorizationService.getUserFullAuthz applies deny-wins semantics across policies" name="AuthorizationService.getUserFullAuthz applies deny-wins semantics across policies" time="0.003">
+    </testcase>
+    <testcase classname="AuthorizationService.getUserFullAuthz leaves role as null when roleKey has no matching role (orphan assignment)" name="AuthorizationService.getUserFullAuthz leaves role as null when roleKey has no matching role (orphan assignment)" time="0.002">
+    </testcase>
+    <testcase classname="AuthorizationService.getUserFullAuthz deduplicates role and policy lookups when multiple assignments share the same role" name="AuthorizationService.getUserFullAuthz deduplicates role and policy lookups when multiple assignments share the same role" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="WikiPageService — visibility" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="27.91" tests="12">
+    <testcase classname="WikiPageService — visibility listPages passes the user effective audiences to the repo filter" name="WikiPageService — visibility listPages passes the user effective audiences to the repo filter" time="0.081">
+    </testcase>
+    <testcase classname="WikiPageService — visibility getPageById returns the page when the user has overlap with its visibility" name="WikiPageService — visibility getPageById returns the page when the user has overlap with its visibility" time="0.002">
+    </testcase>
+    <testcase classname="WikiPageService — visibility getPageById throws NotFound when the caller has no overlap (leaks nothing about existence)" name="WikiPageService — visibility getPageById throws NotFound when the caller has no overlap (leaks nothing about existence)" time="0.137">
+    </testcase>
+    <testcase classname="WikiPageService — visibility getPageById throws NotFound when the page does not exist" name="WikiPageService — visibility getPageById throws NotFound when the page does not exist" time="0.003">
+    </testcase>
+    <testcase classname="WikiPageService — visibility getPageById grants access when any single overlap exists with multi-tag visibility" name="WikiPageService — visibility getPageById grants access when any single overlap exists with multi-tag visibility" time="0.024">
+    </testcase>
+    <testcase classname="WikiPageService — visibility createPage rejects with FORBIDDEN when the caller cannot assign the requested visibility" name="WikiPageService — visibility createPage rejects with FORBIDDEN when the caller cannot assign the requested visibility" time="0.004">
+    </testcase>
+    <testcase classname="WikiPageService — visibility createPage rejects with CONFLICT when a page with the same slug already exists" name="WikiPageService — visibility createPage rejects with CONFLICT when a page with the same slug already exists" time="0.003">
+    </testcase>
+    <testcase classname="WikiPageService — visibility createPage creates page + first revision when allowed" name="WikiPageService — visibility createPage creates page + first revision when allowed" time="0.003">
+    </testcase>
+    <testcase classname="WikiPageService — visibility extractEntityLinks parses @type:id tokens and dedupes at the caller/repo layer" name="WikiPageService — visibility extractEntityLinks parses @type:id tokens and dedupes at the caller/repo layer" time="0.012">
+    </testcase>
+    <testcase classname="WikiPageService — visibility unifiedDiff produces a diff with + / - lines for insertions and deletions" name="WikiPageService — visibility unifiedDiff produces a diff with + / - lines for insertions and deletions" time="0.004">
+    </testcase>
+    <testcase classname="WikiPageService — visibility unifiedDiff returns identical body as all context" name="WikiPageService — visibility unifiedDiff returns identical body as all context" time="0.002">
+    </testcase>
+    <testcase classname="WikiPageService — visibility movePage rejects with CONFLICT when target slug already exists" name="WikiPageService — visibility movePage rejects with CONFLICT when target slug already exists" time="0.03">
+    </testcase>
+  </testsuite>
+  <testsuite name="QrcCustomerSettingsService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:20" time="28.629" tests="10">
+    <testcase classname="QrcCustomerSettingsService enable hashes the viewer password (bcrypt) and calls the repo" name="QrcCustomerSettingsService enable hashes the viewer password (bcrypt) and calls the repo" time="0.408">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService enable passes null viewerPasswordHash when no password is given" name="QrcCustomerSettingsService enable passes null viewerPasswordHash when no password is given" time="0.002">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService enable throws NotFoundError when the customer does not exist" name="QrcCustomerSettingsService enable throws NotFoundError when the customer does not exist" time="0.103">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService verifyViewerPassword returns true on a matching password (bcrypt verifies)" name="QrcCustomerSettingsService verifyViewerPassword returns true on a matching password (bcrypt verifies)" time="0.809">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService verifyViewerPassword returns false when settings have no password hash" name="QrcCustomerSettingsService verifyViewerPassword returns false when settings have no password hash" time="0.002">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService verifyViewerPassword returns false when the customer is not QR-enabled" name="QrcCustomerSettingsService verifyViewerPassword returns false when the customer is not QR-enabled" time="0.005">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService update hashes a new viewer password before persisting" name="QrcCustomerSettingsService update hashes a new viewer password before persisting" time="0.209">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService update passes null when viewerPassword is explicitly nulled" name="QrcCustomerSettingsService update passes null when viewerPassword is explicitly nulled" time="0.002">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService update does NOT include viewerPasswordHash when only metadata changes" name="QrcCustomerSettingsService update does NOT include viewerPasswordHash when only metadata changes" time="0.003">
+    </testcase>
+    <testcase classname="QrcCustomerSettingsService disable drops the settings row" name="QrcCustomerSettingsService disable drops the settings row" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="QrcPinService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:46" time="3.309" tests="18">
+    <testcase classname="QrcPinService pinLookupToken returns a 64-char hex string (HMAC-SHA256)" name="QrcPinService pinLookupToken returns a 64-char hex string (HMAC-SHA256)" time="0.006">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken is deterministic: same (tenantId, pin) always yields the same token" name="QrcPinService pinLookupToken is deterministic: same (tenantId, pin) always yields the same token" time="0.001">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken is tenant-scoped: same PIN in different tenants yields different tokens" name="QrcPinService pinLookupToken is tenant-scoped: same PIN in different tenants yields different tokens" time="0">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken is PIN-sensitive: different PINs in the same tenant yield different tokens" name="QrcPinService pinLookupToken is PIN-sensitive: different PINs in the same tenant yield different tokens" time="0.001">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken throws when PIN is not 4 digits" name="QrcPinService pinLookupToken throws when PIN is not 4 digits" time="0.063">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken throws when tenantId is missing" name="QrcPinService pinLookupToken throws when tenantId is missing" time="0.001">
+    </testcase>
+    <testcase classname="QrcPinService pinLookupToken throws if pepper is missing or too short" name="QrcPinService pinLookupToken throws if pepper is missing or too short" time="0.003">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify produces a bcrypt hash that verifies against the original PIN" name="QrcPinService pinHash + pinVerify produces a bcrypt hash that verifies against the original PIN" time="0.632">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify rejects a wrong PIN" name="QrcPinService pinHash + pinVerify rejects a wrong PIN" time="0.482">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify uses a random salt: same PIN twice produces different hashes" name="QrcPinService pinHash + pinVerify uses a random salt: same PIN twice produces different hashes" time="0.875">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify returns false on null hash without throwing" name="QrcPinService pinHash + pinVerify returns false on null hash without throwing" time="0.002">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify returns false on a malformed PIN without comparing" name="QrcPinService pinHash + pinVerify returns false on a malformed PIN without comparing" time="0.276">
+    </testcase>
+    <testcase classname="QrcPinService pinHash + pinVerify throws on hash() with non-4-digit PIN" name="QrcPinService pinHash + pinVerify throws on hash() with non-4-digit PIN" time="0.002">
+    </testcase>
+    <testcase classname="QrcPinService pinColumnsForWrite returns both lookup and hash columns" name="QrcPinService pinColumnsForWrite returns both lookup and hash columns" time="0.188">
+    </testcase>
+    <testcase classname="QrcPinService pinColumnsForWrite lookup is identical to pinLookupToken; hash verifies independently" name="QrcPinService pinColumnsForWrite lookup is identical to pinLookupToken; hash verifies independently" time="0.379">
+    </testcase>
+    <testcase classname="QrcPinService constantTimeEqual returns true for identical strings" name="QrcPinService constantTimeEqual returns true for identical strings" time="0.001">
+    </testcase>
+    <testcase classname="QrcPinService constantTimeEqual returns false for different strings" name="QrcPinService constantTimeEqual returns false for different strings" time="0.001">
+    </testcase>
+    <testcase classname="QrcPinService constantTimeEqual returns false for different lengths (without throwing)" name="QrcPinService constantTimeEqual returns false for different lengths (without throwing)" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="CustomerIntegrationService" errors="0" failures="0" skipped="0" timestamp="2026-06-01T22:44:47" time="9.365" tests="7">
+    <testcase classname="CustomerIntegrationService recordSync initialises state from {} on first sync and writes via setIntegration" name="CustomerIntegrationService recordSync initialises state from {} on first sync and writes via setIntegration" time="0.004">
+    </testcase>
+    <testcase classname="CustomerIntegrationService recordSync increments failureCount on FAILED and resets it on the next OK" name="CustomerIntegrationService recordSync increments failureCount on FAILED and resets it on the next OK" time="0.006">
+    </testcase>
+    <testcase classname="CustomerIntegrationService recordSync persists centrals.items[] verbatim and strips mqttPassword from audit metadata" name="CustomerIntegrationService recordSync persists centrals.items[] verbatim and strips mqttPassword from audit metadata" time="0.006">
+    </testcase>
+    <testcase classname="CustomerIntegrationService disable flips status to DISABLED without touching previously stored payload/items" name="CustomerIntegrationService disable flips status to DISABLED without touching previously stored payload/items" time="0.007">
+    </testcase>
+    <testcase classname="CustomerIntegrationService reset clears the integration via clearIntegration and emits one audit row" name="CustomerIntegrationService reset clears the integration via clearIntegration and emits one audit row" time="0.001">
+    </testcase>
+    <testcase classname="CustomerIntegrationService get / list returns null for absent integrations" name="CustomerIntegrationService get / list returns null for absent integrations" time="0.001">
+    </testcase>
+    <testcase classname="CustomerIntegrationService get / list parses centrals through the extended schema (items[] preserved)" name="CustomerIntegrationService get / list parses centrals through the extended schema (items[] preserved)" time="0.004">
+    </testcase>
+  </testsuite>
+</testsuites>

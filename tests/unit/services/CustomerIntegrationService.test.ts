@@ -98,12 +98,8 @@ describe('CustomerIntegrationService', () => {
       repo.getOne.mockResolvedValue(null);
 
       const item: CentralEntry = {
-        uuid:               CENTRAL_ID,
-        ingestionGatewayId: '11111111-2222-3333-4444-555555555555',
-        mqttUserName:       'central-moxuara-01',
-        mqttClientId:       'moxuara-01',
-        mqttPassword:       'super-secret-mqtt-password-do-not-leak',
-        ipv6Yggdrasil:      '200:abcd:1234:::1',
+        uuid:          CENTRAL_ID,
+        mqttPasswords: { ingestion: 'super-secret-mqtt-password-do-not-leak' },
       };
 
       const next = await svc.recordSync(TENANT_ID, CUSTOMER_ID, 'centrals', {
@@ -116,11 +112,11 @@ describe('CustomerIntegrationService', () => {
       // is the trade-off documented in RFC-0033 Security).
       const persisted = repo.setIntegration.mock.calls[0][3] as unknown as CentralsIntegrationState;
       expect(persisted.items).toHaveLength(1);
-      expect(persisted.items[0].mqttPassword).toBe('super-secret-mqtt-password-do-not-leak');
+      expect(persisted.items[0].mqttPasswords.ingestion).toBe('super-secret-mqtt-password-do-not-leak');
 
       // The return value mirrors what was persisted — no masking at the
       // service layer (controller is responsible for that).
-      expect((next as CentralsIntegrationState).items[0].mqttPassword).toBe(
+      expect((next as CentralsIntegrationState).items[0].mqttPasswords.ingestion).toBe(
         'super-secret-mqtt-password-do-not-leak',
       );
 
@@ -128,8 +124,8 @@ describe('CustomerIntegrationService', () => {
       expect(logAuditEvent).toHaveBeenCalledTimes(1);
       const auditMetadata = (logAuditEvent as jest.Mock).mock.calls[0][2].metadata;
       const auditedNext = auditMetadata.next as { items: Array<Record<string, unknown>> };
-      expect(auditedNext.items[0]).not.toHaveProperty('mqttPassword');
-      expect(auditedNext.items[0].mqttPasswordSet).toBe(true);
+      expect(auditedNext.items[0]).not.toHaveProperty('mqttPasswords');
+      expect(auditedNext.items[0].mqttPasswordsSet).toEqual({ ingestion: true });
       // Sanity: serialising the whole audit metadata must not contain the password string.
       expect(JSON.stringify(auditMetadata)).not.toContain('super-secret-mqtt-password-do-not-leak');
     });
@@ -202,12 +198,8 @@ describe('CustomerIntegrationService', () => {
         payload:       {},
         items: [
           {
-            uuid:               CENTRAL_ID,
-            ingestionGatewayId: null,
-            mqttUserName:       'central-moxuara-01',
-            mqttClientId:       'moxuara-01',
-            mqttPassword:       'pw',
-            ipv6Yggdrasil:      '200:abcd:1234:::1',
+            uuid:          CENTRAL_ID,
+            mqttPasswords: { ingestion: 'pw' },
           },
         ],
       });
@@ -216,8 +208,8 @@ describe('CustomerIntegrationService', () => {
       expect(state).not.toBeNull();
       const centrals = state as CentralsIntegrationState;
       expect(centrals.items).toHaveLength(1);
-      expect(centrals.items[0].mqttUserName).toBe('central-moxuara-01');
-      expect(centrals.items[0].ingestionGatewayId).toBeNull();
+      expect(centrals.items[0].uuid).toBe(CENTRAL_ID);
+      expect(centrals.items[0].mqttPasswords.ingestion).toBe('pw');
     });
   });
 });
