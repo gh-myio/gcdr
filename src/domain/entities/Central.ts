@@ -104,7 +104,7 @@ export interface Central extends BaseEntity {
   softwareVersion: string;
   lastUpdateAt?: string;
 
-  // Polling/read cadence in seconds (mirrors devices.frequency, RFC-0008). 1..3600.
+  // Radio channel of the central (integer 1..255, preferably above 90).
   frequency: number;
 
   // Configuration
