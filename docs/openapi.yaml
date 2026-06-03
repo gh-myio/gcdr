@@ -3163,6 +3163,14 @@ components:
       description: Notification channel type.
       enum: [EMAIL, SMS, TELEGRAM, WHATSAPP, SLACK, TEAMS, WEBHOOK, EMAIL_RELAY, CUSTOM]
 
+    UserContactChannel:
+      type: string
+      description: >-
+        Notification channel for a user contact (RFC-0025). For EMAIL the value
+        must be a valid email; for WHATSAPP/SMS it must be an E.164 phone
+        (e.g. +5527999999999). Other channels accept a free-form value.
+      enum: [EMAIL, TELEGRAM, WHATSAPP, SMS, SLACK, TEAMS, CUSTOM]
+
     UserContact:
       type: object
       properties:
@@ -3170,10 +3178,12 @@ components:
         tenantId: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         channel:
-          $ref: '#/components/schemas/ContactChannelType'
+          $ref: '#/components/schemas/UserContactChannel'
         value: { type: string, description: 'email, chat_id, E.164 phone, URL, etc.' }
         label: { type: string, nullable: true }
-        verified: { type: boolean }
+        verified:
+          type: boolean
+          description: Read-only; contact verification is a future phase and cannot be set via the API.
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -3182,7 +3192,8 @@ components:
       type: object
       required: [channel, value]
       properties:
-        channel: { type: string, minLength: 1, maxLength: 50 }
+        channel:
+          $ref: '#/components/schemas/UserContactChannel'
         value: { type: string, minLength: 1, maxLength: 500 }
         label: { type: string, maxLength: 100 }
         active: { type: boolean, default: true }
@@ -11606,6 +11617,16 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - properties:
                       data: { $ref: '#/components/schemas/UserContact' }
+        '400':
+          description: Validation error (unknown channel, or value invalid for channel)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: A contact with this channel and value already exists for the user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /users/{userId}/contacts/{contactId}:
     patch:
@@ -11636,6 +11657,16 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - properties:
                       data: { $ref: '#/components/schemas/UserContact' }
+        '400':
+          description: Validation error (value invalid for the contact's channel)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: User contact not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
     delete:
       tags: [User Contacts]
       summary: Remove a notification contact
@@ -11652,6 +11683,11 @@ paths:
       responses:
         '204':
           description: Deleted
+        '404':
+          description: User contact not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   # =============================================================================
   # Customer Channels (RFC-0024)

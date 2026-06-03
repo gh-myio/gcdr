@@ -1,7 +1,12 @@
 import { userContactRepository, UserContact } from '../repositories/UserContactRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import { NotFoundError, ConflictError } from '../shared/errors/AppError';
-import { CreateUserContactDTO, UpdateUserContactDTO } from '../dto/request/UserContactDTO';
+import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
+import {
+  CreateUserContactDTO,
+  UpdateUserContactDTO,
+  UserContactChannel,
+  validateValueForChannel,
+} from '../dto/request/UserContactDTO';
 
 const userRepo = new UserRepository();
 
@@ -30,6 +35,13 @@ export class UserContactService {
     const contact = await userContactRepository.findById(tenantId, contactId);
     if (!contact || contact.userId !== userId) {
       throw new NotFoundError('User contact not found');
+    }
+
+    // PATCH has no `channel` in the body — revalidate a changed `value`
+    // against the persisted contact's channel (e.g. EMAIL must stay an email).
+    if (data.value !== undefined) {
+      const error = validateValueForChannel(contact.channel as UserContactChannel, data.value);
+      if (error) throw new ValidationError(error);
     }
 
     const updated = await userContactRepository.update(tenantId, contactId, data);
