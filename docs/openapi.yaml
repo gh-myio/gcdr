@@ -1395,6 +1395,18 @@ components:
           minimum: 1
           maximum: 247
           description: Modbus slave ID — combined with centralId for exact device lookup
+        channel:
+          type: integer
+          minimum: 0
+          maximum: 999
+          description: >-
+            Optional channel index on a multi-channel board. Part of the
+            (centralId, slaveId, channel, deviceChannelType) uniqueness, letting
+            one physical board expose several devices.
+        deviceChannelType:
+          type: string
+          maxLength: 100
+          description: Optional channel sub-type (e.g. "lamp", "presence_sensor").
         updatedAt:
           type: string
           format: date-time
@@ -1452,12 +1464,14 @@ components:
 
     CreateDevice:
       type: object
+      description: >-
+        Request body for POST /devices and PUT /devices/{id}. Only assetId, name
+        and type are required; serialNumber is auto-generated (AUTO-<id8>) when
+        omitted, and displayName defaults to name.
       required:
         - assetId
         - name
-        - displayName
         - type
-        - serialNumber
       properties:
         assetId:
           type: string
@@ -1468,38 +1482,99 @@ components:
           maxLength: 255
         displayName:
           type: string
-          minLength: 1
           maxLength: 255
+          description: Defaults to name when omitted
+        code:
+          type: string
+          maxLength: 50
+        label:
+          type: string
+          maxLength: 100
         type:
           type: string
-          enum: [SENSOR, ACTUATOR, CONTROLLER, GATEWAY, METER, CAMERA, HVAC, LIGHTING, ACCESS_CONTROL, OTHER]
+          enum: [SENSOR, ACTUATOR, GATEWAY, CONTROLLER, METER, CAMERA, OUTLET, INFRARED, OTHER]
+        description:
+          type: string
+          maxLength: 1000
         serialNumber:
           type: string
-          minLength: 1
+          maxLength: 100
+          description: Optional — auto-generated as AUTO-<id8> when omitted. Unique per tenant.
+        externalId:
+          type: string
           maxLength: 100
         manufacturer:
           type: string
-          maxLength: 100
+          maxLength: 200
         model:
           type: string
-          maxLength: 100
+          maxLength: 200
         firmwareVersion:
           type: string
           maxLength: 50
-        connectivity:
-          $ref: '#/components/schemas/DeviceConnectivity'
         specs:
           $ref: '#/components/schemas/DeviceSpecs'
-        telemetry:
-          $ref: '#/components/schemas/DeviceTelemetry'
         credentials:
           type: object
+          description: 'Device credentials (type ACCESS_TOKEN | X509_CERTIFICATE | MQTT_BASIC)'
+        telemetryConfig:
+          type: object
+          description: 'reportingInterval, telemetryKeys[], attributeKeys[]'
         tags:
           type: array
           items:
             type: string
+            maxLength: 50
         metadata:
           type: object
+        attributes:
+          type: object
+        # RFC-0008: Modbus / identity fields
+        slaveId:
+          type: integer
+          minimum: 1
+          maximum: 999
+          description: Modbus slave ID (combined with centralId for exact lookup)
+        centralId:
+          type: string
+          format: uuid
+          description: Associated central (gateway)
+        identifier:
+          type: string
+          maxLength: 255
+        deviceProfile:
+          type: string
+          maxLength: 100
+        deviceType:
+          type: string
+          maxLength: 100
+        channel:
+          type: integer
+          minimum: 0
+          maximum: 999
+          description: >-
+            Optional channel index on a multi-channel board. Part of the
+            (centralId, slaveId, channel, deviceChannelType) uniqueness, so one
+            physical board can expose several devices.
+        deviceChannelType:
+          type: string
+          maxLength: 100
+          description: Optional channel sub-type (e.g. "lamp", "presence_sensor").
+        ingestionId:
+          type: string
+          format: uuid
+        ingestionGatewayId:
+          type: string
+          format: uuid
+      example:
+        assetId: 455accf5-4aad-49e6-934f-97ae691b6c45
+        name: SW QGBT_01_LEN2C37 - Lamp 0
+        type: OUTLET
+        centralId: a77ac87c-addd-4172-a65f-0f6f6038e98e
+        slaveId: 1
+        channel: 0
+        deviceChannelType: lamp
+        deviceProfile: SW_ILUMINACAO
 
     # Rule Schemas
     # ── Decision Engine Guard Configs ──────────────────────────────────

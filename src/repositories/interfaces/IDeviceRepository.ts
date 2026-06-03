@@ -18,7 +18,13 @@ export interface IDeviceRepository {
   listByCustomer(tenantId: string, customerId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>>;
 
   // Lookup
-  findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null>;
+  findBySlaveId(
+    tenantId: string,
+    centralId: string,
+    slaveId: number,
+    channel?: number | null,
+    deviceChannelType?: string | null,
+  ): Promise<Device | null>;
   // RFC-0032: lookup by QR Checker (addr_low, addr_high) inside a customer
   findByQrcAddress(tenantId: string, customerId: string, addrLow: number, addrHigh: number): Promise<Device | null>;
 

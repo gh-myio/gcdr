@@ -1,4 +1,4 @@
-import { eq, and, sql, lt, isNotNull, inArray } from 'drizzle-orm';
+import { eq, and, sql, lt, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Device, ConnectivityStatus, createDefaultDeviceSpecs, createDefaultTelemetryConfig } from '../domain/entities/Device';
 import { CreateDeviceDTO, UpdateDeviceDTO, ListDevicesParams } from '../dto/request/DeviceDTO';
@@ -113,6 +113,8 @@ export class DeviceRepository implements IDeviceRepository {
       identifier: data.identifier,
       deviceProfile: data.deviceProfile,
       deviceType: data.deviceType,
+      channel: data.channel,
+      deviceChannelType: data.deviceChannelType,
       ingestionId: data.ingestionId,
       ingestionGatewayId: data.ingestionGatewayId,
     }).returning();
@@ -224,6 +226,8 @@ export class DeviceRepository implements IDeviceRepository {
     if (data.identifier !== undefined) updateData.identifier = data.identifier;
     if (data.deviceProfile !== undefined) updateData.deviceProfile = data.deviceProfile;
     if (data.deviceType !== undefined) updateData.deviceType = data.deviceType;
+    if (data.channel !== undefined) updateData.channel = data.channel;
+    if (data.deviceChannelType !== undefined) updateData.deviceChannelType = data.deviceChannelType;
     if (data.ingestionId !== undefined) updateData.ingestionId = data.ingestionId;
     if (data.ingestionGatewayId !== undefined) updateData.ingestionGatewayId = data.ingestionGatewayId;
 
@@ -491,6 +495,8 @@ export class DeviceRepository implements IDeviceRepository {
       identifier: row.identifier || undefined,
       deviceProfile: row.deviceProfile || undefined,
       deviceType: row.deviceType || undefined,
+      channel: row.channel ?? undefined,
+      deviceChannelType: row.deviceChannelType || undefined,
       ingestionId: row.ingestionId || undefined,
       ingestionGatewayId: row.ingestionGatewayId || undefined,
       lastActivityTime: row.lastActivityTime?.toISOString(),
@@ -549,14 +555,32 @@ export class DeviceRepository implements IDeviceRepository {
     return results.map(this.mapToEntity);
   }
 
-  async findBySlaveId(tenantId: string, centralId: string, slaveId: number): Promise<Device | null> {
+  async findBySlaveId(
+    tenantId: string,
+    centralId: string,
+    slaveId: number,
+    channel?: number | null,
+    deviceChannelType?: string | null,
+  ): Promise<Device | null> {
+    // Match the `devices_tenant_central_slave_channel_unique` index, which uses
+    // NULLS NOT DISTINCT: an absent (null/undefined) channel/type matches an
+    // existing row whose column is NULL, so the conflict check mirrors the DB key.
+    const channelMissing = channel === null || channel === undefined;
+    const typeMissing = deviceChannelType === null || deviceChannelType === undefined;
+    const channelCond = channelMissing ? isNull(devices.channel) : eq(devices.channel, channel);
+    const typeCond = typeMissing
+      ? isNull(devices.deviceChannelType)
+      : eq(devices.deviceChannelType, deviceChannelType);
+
     const [result] = await db
       .select()
       .from(devices)
       .where(and(
         eq(devices.tenantId, tenantId),
         eq(devices.centralId, centralId),
-        eq(devices.slaveId, slaveId)
+        eq(devices.slaveId, slaveId),
+        channelCond,
+        typeCond,
       ))
       .limit(1);
 

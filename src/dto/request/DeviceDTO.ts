@@ -104,6 +104,8 @@ export const CreateDeviceSchema = z.object({
   identifier: z.string().max(255).optional(),            // Human-readable identifier
   deviceProfile: z.string().max(100).optional(),         // Device profile
   deviceType: z.string().max(100).optional(),            // Specific device type
+  channel: z.number().int().min(0).max(999).optional(),  // RFC-0008 follow-up: channel index on the board
+  deviceChannelType: z.string().max(100).optional(),     // RFC-0008 follow-up: channel sub-type (e.g. "lamp")
   ingestionId: z.string().uuid().optional(),             // Ingestion system ID
   ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
 });
@@ -138,6 +140,8 @@ export const UpdateDeviceSchema = z.object({
   identifier: z.string().max(255).optional(),            // Human-readable identifier
   deviceProfile: z.string().max(100).optional(),         // Device profile
   deviceType: z.string().max(100).optional(),            // Specific device type
+  channel: z.number().int().min(0).max(999).optional(),  // RFC-0008 follow-up: channel index on the board
+  deviceChannelType: z.string().max(100).optional(),     // RFC-0008 follow-up: channel sub-type (e.g. "lamp")
   ingestionId: z.string().uuid().optional(),             // Ingestion system ID
   ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
 });

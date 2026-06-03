@@ -68,12 +68,24 @@ export class DeviceService {
       }
     }
 
-    // Check for duplicate (central_id, slave_id) — constraint devices_tenant_central_slave_unique
+    // Check for duplicate (central_id, slave_id, channel, device_channel_type) —
+    // constraint devices_tenant_central_slave_channel_unique (NULLS NOT DISTINCT).
+    // channel/type are optional: when absent they match an existing NULL row,
+    // preserving board-level (central, slave) uniqueness.
     if (data.centralId && data.slaveId !== undefined) {
-      const existingByCentralSlave = await this.repository.findBySlaveId(tenantId, data.centralId, data.slaveId);
+      const existingByCentralSlave = await this.repository.findBySlaveId(
+        tenantId,
+        data.centralId,
+        data.slaveId,
+        data.channel ?? null,
+        data.deviceChannelType ?? null,
+      );
       if (existingByCentralSlave) {
+        const detail =
+          (data.channel !== undefined ? `, channel ${data.channel}` : '') +
+          (data.deviceChannelType ? `, type ${data.deviceChannelType}` : '');
         throw new ConflictError(
-          `Device with central ${data.centralId} and slave ID ${data.slaveId} already exists (id: ${existingByCentralSlave.id})`
+          `Device with central ${data.centralId} and slave ID ${data.slaveId}${detail} already exists (id: ${existingByCentralSlave.id})`
         );
       }
     }

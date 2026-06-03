@@ -356,6 +356,11 @@ export const devices = pgTable('devices', {
   slaveId: smallint('slave_id'),  // Modbus slave ID (1-247)
   centralId: uuid('central_id'),  // FK to centrals table (added after centrals definition)
 
+  // RFC-0008 follow-up (migration 0029): channel-centric identity. A board at
+  // (central, slave) can expose multiple channels; these distinguish them.
+  channel: smallint('channel'),                              // channel index on the board (optional)
+  deviceChannelType: varchar('device_channel_type', { length: 100 }),  // e.g. 'lamp', 'presence_sensor' (optional)
+
   // Identification Extended
   identifier: varchar('identifier', { length: 255 }),  // Human-readable unique identifier
   deviceProfile: varchar('device_profile', { length: 100 }),  // Device profile (e.g., HIDROMETRO_AREA_COMUM)
@@ -399,7 +404,12 @@ export const devices = pgTable('devices', {
   // NOTE: tenantIdentifierUnique was removed — identifier is a Modbus register
   // name (e.g. 'CAG', 'TEMPERATURA') that repeats across devices on different
   // centrals/slaves within the same tenant. See fix-identifier-unique-constraint.sql
-  tenantCentralSlaveUnique: uniqueIndex('devices_tenant_central_slave_unique').on(table.tenantId, table.centralId, table.slaveId),
+  // Channel-aware central/slave uniqueness (migration 0029 is authoritative:
+  // it applies NULLS NOT DISTINCT so (central, slave, NULL, NULL) stays unique,
+  // and a partial WHERE so NULL-central devices are unconstrained).
+  tenantCentralSlaveChannelUnique: uniqueIndex('devices_tenant_central_slave_channel_unique')
+    .on(table.tenantId, table.centralId, table.slaveId, table.channel, table.deviceChannelType)
+    .where(sql`${table.centralId} IS NOT NULL AND ${table.slaveId} IS NOT NULL`),
   tenantCustomerNameUnique: uniqueIndex('devices_tenant_customer_name_unique').on(table.tenantId, table.customerId, table.name),
 
   // Check constraint for valid slave_id (1-999; Modbus RTU max 247, other protocols up to 999)

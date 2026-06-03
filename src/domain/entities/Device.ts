@@ -153,6 +153,12 @@ export interface Device extends BaseEntity {
   deviceProfile?: string;        // Device profile (e.g., "HIDROMETRO_AREA_COMUM")
   deviceType?: string;           // Specific device type (e.g., "3F_MEDIDOR") - complements 'type' enum
 
+  // RFC-0008 follow-up: channel-centric identity (a board at (central, slave)
+  // can expose multiple channels). Both optional; part of the central/slave
+  // uniqueness key when present.
+  channel?: number;              // channel index on the board (e.g., 0, 1)
+  deviceChannelType?: string;    // channel sub-type (e.g., "lamp", "presence_sensor")
+
   // Ingestion Integration
   ingestionId?: string;          // UUID in ingestion system
   ingestionGatewayId?: string;   // UUID of ingestion gateway
