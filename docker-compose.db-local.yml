@@ -1,0 +1,44 @@
+# Standalone local PostgreSQL for GCDR development (Docker Desktop).
+# Brings up ONLY the database — no API build, no JWT, no MinIO required.
+#
+# Quick start (PowerShell):
+#   docker compose -f docker-compose.db-local.yml up -d
+#   # point the app/drizzle at it (or put DATABASE_URL in .env):
+#   $env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/db_gcdr"
+#   npm run db:push          # materialize the full current schema from schema.ts
+#   npm run db:seed          # optional: seed demo data
+#
+# Stop:            docker compose -f docker-compose.db-local.yml down
+# Stop + wipe DB:  docker compose -f docker-compose.db-local.yml down -v
+#
+# Connection string:  postgresql://postgres:postgres@localhost:5432/db_gcdr
+# (override POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB / POSTGRES_PORT via env)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gcdr-db-local
+    restart: unless-stopped
+    # Credentials are hard-coded (LOCAL DEV ONLY) so this stack never depends on
+    # the repo .env — the documented connection string always works.
+    environment:
+      POSTGRES_DB: db_gcdr
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # C collation + UTF-8, matching the production/compose Postgres.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      # Fixed dedicated host port (5544) to avoid clashing with the main stack's
+      # Postgres (5432/5433) or any native Postgres, and to not depend on .env.
+      - "5544:5432"
+    volumes:
+      - gcdr-db-local-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d db_gcdr"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  gcdr-db-local-data:
+    name: gcdr-db-local-data
