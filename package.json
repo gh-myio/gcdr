@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/docs && cp docs/openapi.yaml dist/docs/openapi.yaml",
     "start": "node dist/app.js",
-    "dev": "tsx watch --env-file-if-exists=.env src/app.ts",
+    "dev": "tsx watch --env-file-if-exists=.env --env-file-if-exists=.env.local src/app.ts",
     "offline": "serverless offline start",
     "deploy": "serverless deploy",
     "deploy:prod": "serverless deploy --stage prod",
