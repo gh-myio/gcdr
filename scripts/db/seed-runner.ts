@@ -31,6 +31,9 @@ const DB_PORT = process.env.DB_PORT || '5433';
 const DB_NAME = process.env.DB_NAME || 'db_gcdr';
 const DB_USER = process.env.DB_USER || 'postgres';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'gcdr_dev_password_123';
+// Docker container running Postgres. Override with DB_CONTAINER for the
+// standalone local DB (e.g. gcdr-db-local from docker-compose.db-local.yml).
+const DB_CONTAINER = process.env.DB_CONTAINER || 'gcdr-postgres';
 
 // Colors for console output
 const colors = {
@@ -90,7 +93,7 @@ async function executeSqlFile(filename: string, verbose: boolean = false): Promi
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
 
     // Execute via docker exec
-    const command = `docker exec -i gcdr-postgres psql -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1`;
+    const command = `docker exec -i ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1`;
 
     const result = execSync(command, {
       input: sqlContent,
