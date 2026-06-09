@@ -6,6 +6,8 @@ export interface ICentralRepository {
   create(tenantId: string, data: CreateCentralDTO, createdBy: string): Promise<Central>;
   getById(tenantId: string, id: string): Promise<Central | null>;
   getBySerialNumber(tenantId: string, serialNumber: string): Promise<Central | null>;
+  // Global (cross-tenant) existence check — used by the public central_id generator.
+  existsBySerialNumberGlobal(serialNumber: string): Promise<boolean>;
   update(tenantId: string, id: string, data: UpdateCentralDTO, updatedBy: string): Promise<Central>;
   delete(tenantId: string, id: string): Promise<void>;
 

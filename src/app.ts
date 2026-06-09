@@ -47,6 +47,8 @@ import {
   centralsController,
   centralsListByCustomerHandler,
   centralsListByAssetHandler,
+  centralSerialAvailableHandler,
+  centralSerialNextHandler,
   themesController,
   themesListByCustomerHandler,
   themesGetDefaultByCustomerHandler,
@@ -232,6 +234,11 @@ apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHa
 
 // Asset Centrals (nested route)
 apiV1Router.get('/assets/:assetId/centrals', authMiddleware, centralsListByAssetHandler);
+
+// Central ID (serial) helpers — PUBLIC (no auth), must come before the
+// auth-gated /centrals router. Global collision check, format S1.S2.S3.S4.
+apiV1Router.get('/centrals/serial/available', centralSerialAvailableHandler);
+apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 
 // Centrals
 apiV1Router.use('/centrals', authMiddleware, centralsController);

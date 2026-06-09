@@ -1,6 +1,6 @@
 import { eq, and, like, isNull, sql, inArray, notInArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
-import { Customer, createDefaultCustomerSettings } from '../domain/entities/Customer';
+import { Customer, createDefaultCustomerSettings, generateCustomerCode } from '../domain/entities/Customer';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../dto/request/CustomerDTO';
 import { PaginatedResult } from '../shared/types';
 import { ICustomerRepository, CustomerTreeNode, ForceDeleteResult } from './interfaces/ICustomerRepository';
@@ -33,8 +33,8 @@ export class CustomerRepository implements ICustomerRepository {
       depth = 0;
     }
 
-    // Generate code if not provided
-    const code = data.code || this.generateCode(data.name);
+    // Generate code if not provided (CustomerService normally resolves it upfront)
+    const code = data.code || generateCustomerCode(data.name);
 
     const [result] = await db.insert(customers).values({
       id,
@@ -671,14 +671,6 @@ export class CustomerRepository implements ICustomerRepository {
       out.push(this.mapToEntity(r.c));
     }
     return out;
-  }
-
-  private generateCode(name: string): string {
-    return name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .substring(0, 20);
   }
 
   private mapToEntity(row: typeof customers.$inferSelect): Customer {

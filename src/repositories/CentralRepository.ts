@@ -68,6 +68,16 @@ export class CentralRepository implements ICentralRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  async existsBySerialNumberGlobal(serialNumber: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: centrals.id })
+      .from(centrals)
+      .where(eq(centrals.serialNumber, serialNumber))
+      .limit(1);
+
+    return !!row;
+  }
+
   async update(tenantId: string, id: string, data: UpdateCentralDTO, updatedBy: string): Promise<Central> {
     const existing = await this.getById(tenantId, id);
     if (!existing) {

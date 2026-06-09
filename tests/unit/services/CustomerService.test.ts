@@ -135,7 +135,33 @@ describe('CustomerService', () => {
       const result = await service.create(tenantId, createDto, userId);
 
       expect(result).toEqual(mockCustomer);
-      expect(mockRepository.create).toHaveBeenCalledWith(tenantId, createDto, userId);
+      expect(mockRepository.create).toHaveBeenCalledWith(tenantId, { ...createDto, code: 'NEW-CUSTOMER' }, userId);
+    });
+
+    it('should pass the same auto-generated code it checked for duplicates to the repository', async () => {
+      const dto: CreateCustomerDTO = { ...createDto, name: 'Teste Cliente 09-06-2026 17-16' };
+      mockRepository.getByCode.mockResolvedValue(null);
+      mockRepository.create.mockResolvedValue(mockCustomer);
+
+      await service.create(tenantId, dto, userId);
+
+      expect(mockRepository.getByCode).toHaveBeenCalledWith(tenantId, 'TESTE-CLIENTE-09-06-2026-17-16');
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        tenantId,
+        { ...dto, code: 'TESTE-CLIENTE-09-06-2026-17-16' },
+        userId
+      );
+    });
+
+    it('should keep an explicit code untouched', async () => {
+      const dto: CreateCustomerDTO = { ...createDto, code: 'MY-CODE' };
+      mockRepository.getByCode.mockResolvedValue(null);
+      mockRepository.create.mockResolvedValue(mockCustomer);
+
+      await service.create(tenantId, dto, userId);
+
+      expect(mockRepository.getByCode).toHaveBeenCalledWith(tenantId, 'MY-CODE');
+      expect(mockRepository.create).toHaveBeenCalledWith(tenantId, dto, userId);
     });
 
     it('should throw ConflictError if code already exists', async () => {

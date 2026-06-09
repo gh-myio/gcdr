@@ -8766,6 +8766,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
 
+  /centrals/serial/next:
+    get:
+      tags: [Centrals]
+      summary: Generate a free central_id (PUBLIC)
+      description: >-
+        Returns a collision-free central_id (serial number) for a gateway, format
+        S1.S2.S3.S4 with each slot a random integer 1–254. Uniqueness is checked
+        GLOBALLY across all tenants. PUBLIC — no authentication.
+      operationId: centralSerialNext
+      security: []
+      responses:
+        '200':
+          description: A free central_id
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          centralId:
+                            type: string
+                            example: "92.238.22.98"
+
+  /centrals/serial/available:
+    get:
+      tags: [Centrals]
+      summary: Check a specific central_id (PUBLIC)
+      description: >-
+        Validates the format (S1.S2.S3.S4, each slot 1–254) and checks GLOBAL
+        collision for a given central_id. PUBLIC — no authentication.
+      operationId: centralSerialAvailable
+      security: []
+      parameters:
+        - name: value
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "42.137.8.201"
+      responses:
+        '200':
+          description: Availability of the given central_id
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          value: { type: string }
+                          valid: { type: boolean, description: 'true if the format is S1.S2.S3.S4 with each slot 1–254' }
+                          available: { type: boolean, description: 'true if valid AND not used by any central (global)' }
+        '400':
+          description: Missing "value" query param
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /centrals/serial/{serialNumber}:
     get:
       tags: [Centrals]

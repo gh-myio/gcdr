@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { Central, CentralMqttPasswordsSet, ConnectionStatus } from '../domain/entities/Central';
 import {
   CreateCentralDTO,
@@ -66,6 +67,42 @@ export class CentralService {
       throw new NotFoundError(`Central with serial number ${serialNumber} not found`);
     }
     return this.enrichWithMqttPasswordsSet(tenantId, central);
+  }
+
+  // ===========================================================================
+  // Central ID (serial number) generation — public, collision-free.
+  // Format: S1.S2.S3.S4 with each Sn a random integer 1..254 (~254^4 ≈ 4.1B).
+  // Uniqueness is checked GLOBALLY (across all tenants).
+  // ===========================================================================
+
+  /** A slot is 1..254 (IP-octet-like, but excludes 0 and 255). */
+  private static readonly SERIAL_REGEX =
+    /^(?:[1-9]|[1-9]\d|1\d\d|2[0-4]\d|25[0-4])(?:\.(?:[1-9]|[1-9]\d|1\d\d|2[0-4]\d|25[0-4])){3}$/;
+
+  isValidSerial(value: string): boolean {
+    return typeof value === 'string' && CentralService.SERIAL_REGEX.test(value);
+  }
+
+  generateSerial(): string {
+    // randomInt(1, 255) yields 1..254 (upper bound exclusive).
+    return Array.from({ length: 4 }, () => randomInt(1, 255)).join('.');
+  }
+
+  /** True if the serial is well-formed AND not already used by any central. */
+  async isSerialAvailable(value: string): Promise<boolean> {
+    if (!this.isValidSerial(value)) return false;
+    return !(await this.repository.existsBySerialNumberGlobal(value));
+  }
+
+  /** Draw a collision-free central_id, retrying on the (rare) clash. */
+  async findAvailableSerial(maxTries = 20): Promise<string> {
+    for (let i = 0; i < maxTries; i++) {
+      const candidate = this.generateSerial();
+      if (!(await this.repository.existsBySerialNumberGlobal(candidate))) {
+        return candidate;
+      }
+    }
+    throw new ConflictError('Could not allocate a free central_id after several attempts');
   }
 
   async update(

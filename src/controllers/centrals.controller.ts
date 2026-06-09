@@ -425,4 +425,37 @@ export const listByAssetHandler = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * GET /centrals/serial/available?value=S1.S2.S3.S4   (PUBLIC, no auth)
+ * Checks a specific central_id: validates format + global collision.
+ */
+export const serialAvailableHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestId = req.context?.requestId;
+    const value = String(req.query.value ?? '').trim();
+    if (!value) {
+      throw new ValidationError('Query param "value" is required');
+    }
+    const valid = centralService.isValidSerial(value);
+    const available = valid ? await centralService.isSerialAvailable(value) : false;
+    sendSuccess(res, { value, valid, available }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /centrals/serial/next   (PUBLIC, no auth)
+ * Returns a collision-free central_id (S1.S2.S3.S4, each slot 1..254).
+ */
+export const serialNextHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestId = req.context?.requestId;
+    const centralId = await centralService.findAvailableSerial();
+    sendSuccess(res, { centralId }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default router;

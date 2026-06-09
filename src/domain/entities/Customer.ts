@@ -61,6 +61,18 @@ export interface CustomerConfig {
   bundle?: CustomerBundleConfig;
 }
 
+// Single source of truth for auto-generated customer codes — the service uses it
+// for the duplicate check and passes the result to the repository, so the value
+// checked is always the value inserted (codes column is varchar(50)).
+export function generateCustomerCode(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 50)
+    .replace(/^-|-$/g, '');
+}
+
 export function createDefaultCustomerSettings(): CustomerSettings {
   return {
     timezone: 'America/Sao_Paulo',
