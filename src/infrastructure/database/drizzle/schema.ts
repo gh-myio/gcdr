@@ -414,6 +414,9 @@ export const devices = pgTable('devices', {
 
   // Check constraint for valid slave_id (1-999; Modbus RTU max 247, other protocols up to 999)
   validSlaveId: check('valid_slave_id', sql`${table.slaveId} IS NULL OR (${table.slaveId} >= 1 AND ${table.slaveId} <= 999)`),
+  // migration 0029/0030. NULLS NOT DISTINCT on the unique index above is applied
+  // by migration 0030 only (drizzle cannot express it in schema.ts).
+  validChannel: check('devices_channel_range_check', sql`${table.channel} IS NULL OR (${table.channel} >= 0 AND ${table.channel} <= 999)`),
 
   // RFC-0032: index keyed on (tenant_id, qrc_addr_low, qrc_addr_high) — used by
   // POST /api/v1/qrc/install when the field client passes addr_low/high
