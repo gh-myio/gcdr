@@ -20,6 +20,10 @@ import bcrypt from 'bcryptjs';
 // =============================================================================
 
 const PEPPER_ENV = 'WO_PIN_PEPPER';
+// Legacy name from before the qrc→wo rename. Still honored so existing
+// deployments (Dokploy/CI/.env) don't need to rename the secret — its VALUE
+// must stay identical, since it derives the stored PIN lookup hashes.
+const PEPPER_ENV_LEGACY = 'QRC_PIN_PEPPER';
 const BCRYPT_COST = 10;
 
 /**
@@ -29,10 +33,10 @@ const BCRYPT_COST = 10;
  * temporarily override it via process.env.
  */
 function readPepper(): string {
-  const pepper = process.env[PEPPER_ENV];
+  const pepper = process.env[PEPPER_ENV] ?? process.env[PEPPER_ENV_LEGACY];
   if (!pepper || pepper.length < 32) {
     throw new Error(
-      `${PEPPER_ENV} must be set and contain at least 32 hex characters. ` +
+      `${PEPPER_ENV} (or legacy ${PEPPER_ENV_LEGACY}) must be set and contain at least 32 hex characters. ` +
       `Generate one once via: openssl rand -hex 32`
     );
   }
