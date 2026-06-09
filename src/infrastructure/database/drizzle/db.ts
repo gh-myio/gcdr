@@ -99,41 +99,41 @@ export type FileAssetRow = typeof schema.fileAssets.$inferSelect;
 export type NewFileAssetRow = typeof schema.fileAssets.$inferInsert;
 
 // RFC-0032: QR Checker module
-export type QrcCustomerSettingsRow = typeof schema.qrcCustomerSettings.$inferSelect;
-export type NewQrcCustomerSettingsRow = typeof schema.qrcCustomerSettings.$inferInsert;
+export type WoCustomerSettingsRow = typeof schema.woCustomerSettings.$inferSelect;
+export type NewWoCustomerSettingsRow = typeof schema.woCustomerSettings.$inferInsert;
 
-export type QrcInstallationRow = typeof schema.qrcInstallations.$inferSelect;
-export type NewQrcInstallationRow = typeof schema.qrcInstallations.$inferInsert;
+export type WoInstallationRow = typeof schema.woInstallations.$inferSelect;
+export type NewWoInstallationRow = typeof schema.woInstallations.$inferInsert;
 
-export type QrcInstallationImageRow = typeof schema.qrcInstallationImages.$inferSelect;
-export type NewQrcInstallationImageRow = typeof schema.qrcInstallationImages.$inferInsert;
+export type WoInstallationImageRow = typeof schema.woInstallationImages.$inferSelect;
+export type NewWoInstallationImageRow = typeof schema.woInstallationImages.$inferInsert;
 
-export type QrcInstallationAuditRow = typeof schema.qrcInstallationAudit.$inferSelect;
-export type NewQrcInstallationAuditRow = typeof schema.qrcInstallationAudit.$inferInsert;
+export type WoInstallationAuditRow = typeof schema.woInstallationAudit.$inferSelect;
+export type NewWoInstallationAuditRow = typeof schema.woInstallationAudit.$inferInsert;
 
-export type QrcMaintenanceTaskRow = typeof schema.qrcMaintenanceTasks.$inferSelect;
-export type NewQrcMaintenanceTaskRow = typeof schema.qrcMaintenanceTasks.$inferInsert;
+export type WoMaintenanceTaskRow = typeof schema.woMaintenanceTasks.$inferSelect;
+export type NewWoMaintenanceTaskRow = typeof schema.woMaintenanceTasks.$inferInsert;
 
-export type QrcCustomerObservationRow = typeof schema.qrcCustomerObservations.$inferSelect;
-export type NewQrcCustomerObservationRow = typeof schema.qrcCustomerObservations.$inferInsert;
+export type WoCustomerObservationRow = typeof schema.woCustomerObservations.$inferSelect;
+export type NewWoCustomerObservationRow = typeof schema.woCustomerObservations.$inferInsert;
 
-export type QrcVisitaTecnicaRow = typeof schema.qrcVisitasTecnicas.$inferSelect;
-export type NewQrcVisitaTecnicaRow = typeof schema.qrcVisitasTecnicas.$inferInsert;
+export type WoVisitaTecnicaRow = typeof schema.woVisitasTecnicas.$inferSelect;
+export type NewWoVisitaTecnicaRow = typeof schema.woVisitasTecnicas.$inferInsert;
 
-export type QrcVisitaAmbienteRow = typeof schema.qrcVisitaAmbientes.$inferSelect;
-export type NewQrcVisitaAmbienteRow = typeof schema.qrcVisitaAmbientes.$inferInsert;
+export type WoVisitaAmbienteRow = typeof schema.woVisitaAmbientes.$inferSelect;
+export type NewWoVisitaAmbienteRow = typeof schema.woVisitaAmbientes.$inferInsert;
 
-export type QrcVisitaAmbienteImageRow = typeof schema.qrcVisitaAmbienteImages.$inferSelect;
-export type NewQrcVisitaAmbienteImageRow = typeof schema.qrcVisitaAmbienteImages.$inferInsert;
+export type WoVisitaAmbienteImageRow = typeof schema.woVisitaAmbienteImages.$inferSelect;
+export type NewWoVisitaAmbienteImageRow = typeof schema.woVisitaAmbienteImages.$inferInsert;
 
-export type QrcVisitaProductRow = typeof schema.qrcVisitaProducts.$inferSelect;
-export type NewQrcVisitaProductRow = typeof schema.qrcVisitaProducts.$inferInsert;
+export type WoVisitaProductRow = typeof schema.woVisitaProducts.$inferSelect;
+export type NewWoVisitaProductRow = typeof schema.woVisitaProducts.$inferInsert;
 
-export type QrcVisitaProductImageRow = typeof schema.qrcVisitaProductImages.$inferSelect;
-export type NewQrcVisitaProductImageRow = typeof schema.qrcVisitaProductImages.$inferInsert;
+export type WoVisitaProductImageRow = typeof schema.woVisitaProductImages.$inferSelect;
+export type NewWoVisitaProductImageRow = typeof schema.woVisitaProductImages.$inferInsert;
 
-export type QrcVisitaObservationRow = typeof schema.qrcVisitaObservations.$inferSelect;
-export type NewQrcVisitaObservationRow = typeof schema.qrcVisitaObservations.$inferInsert;
+export type WoVisitaObservationRow = typeof schema.woVisitaObservations.$inferSelect;
+export type NewWoVisitaObservationRow = typeof schema.woVisitaObservations.$inferInsert;
 
-export type QrcVisitaAuditRow = typeof schema.qrcVisitaAudit.$inferSelect;
-export type NewQrcVisitaAuditRow = typeof schema.qrcVisitaAudit.$inferInsert;
+export type WoVisitaAuditRow = typeof schema.woVisitaAudit.$inferSelect;
+export type NewWoVisitaAuditRow = typeof schema.woVisitaAudit.$inferInsert;

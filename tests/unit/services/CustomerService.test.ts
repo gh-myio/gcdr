@@ -93,7 +93,7 @@ describe('CustomerService', () => {
       move: jest.fn(),
       updatePath: jest.fn(),
       forceDelete: jest.fn(),
-      listQrcEnabledForUser: jest.fn(),
+      listWoEnabledForUser: jest.fn(),
     };
 
     // getEnrichedTree consumes listByCustomer on these three repos. Other

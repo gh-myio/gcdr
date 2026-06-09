@@ -26,7 +26,7 @@ export interface IDeviceRepository {
     deviceChannelType?: string | null,
   ): Promise<Device | null>;
   // RFC-0032: lookup by QR Checker (addr_low, addr_high) inside a customer
-  findByQrcAddress(tenantId: string, customerId: string, addrLow: number, addrHigh: number): Promise<Device | null>;
+  findByWoAddress(tenantId: string, customerId: string, addrLow: number, addrHigh: number): Promise<Device | null>;
 
   // Name uniqueness check across the whole tenant (NOT scoped to a customer).
   // Used by the FE before submitting a create/edit form to surface an inline

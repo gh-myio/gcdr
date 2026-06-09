@@ -80,9 +80,9 @@ tags:
       RFC-0032 — QR Checker module migrated from `qrcode-check.git`. Tracks
       device installations across MYIO customer sites. PIN-based field-operator
       auth + standard JWT for admin. Customer-scoped (`mall ⊂ customer` via
-      `qrc_customer_settings` opt-in extension). All endpoints under
-      `/api/v1/qrc/*` plus `POST /api/v1/auth/operator-pin` and
-      `POST /api/v1/qrc/customers/:customerId/viewer-login` (public).
+      `wo_customer_settings` opt-in extension). All endpoints under
+      `/api/v1/wo/*` plus `POST /api/v1/auth/operator-pin` and
+      `POST /api/v1/wo/customers/:customerId/viewer-login` (public).
 
 security:
   - bearerAuth: []
@@ -4813,27 +4813,27 @@ components:
           description: QR-enabled customers the operator has access to
           items: { $ref: '#/components/schemas/Customer' }
 
-    QrcCustomerSettings:
+    WoCustomerSettings:
       type: object
       properties:
         customerId:         { type: string, format: uuid }
         tenantId:           { type: string, format: uuid }
         viewerPasswordHash: { type: string, nullable: true }
         defaultCentralId:   { type: string, format: uuid, nullable: true }
-        qrcMetadata:        { type: object, additionalProperties: true }
+        woMetadata:        { type: object, additionalProperties: true }
         createdBy:          { type: string, format: uuid }
         createdAt:          { type: string, format: date-time }
         updatedAt:          { type: string, format: date-time }
 
-    EnableQrcCustomerRequest:
+    EnableWoCustomerRequest:
       type: object
       properties:
         defaultCentralId: { type: string, format: uuid, nullable: true }
         viewerPassword:   { type: string, nullable: true, minLength: 4 }
-        qrcMetadata:      { type: object, additionalProperties: true }
+        woMetadata:      { type: object, additionalProperties: true }
 
-    UpdateQrcCustomerSettingsRequest:
-      $ref: '#/components/schemas/EnableQrcCustomerRequest'
+    UpdateWoCustomerSettingsRequest:
+      $ref: '#/components/schemas/EnableWoCustomerRequest'
 
     ViewerLoginRequest:
       type: object
@@ -5081,7 +5081,7 @@ components:
         createdBy:    { type: string, format: uuid }
         createdAt:    { type: string, format: date-time }
 
-    QrcCustomerProgressReport:
+    WoCustomerProgressReport:
       type: object
       properties:
         customerId:        { type: string, format: uuid }
@@ -12901,18 +12901,18 @@ paths:
 
   # --- Customers (QR-enabled) -----------------------------------------------
 
-  /qrc/customers:
+  /wo/customers:
     get:
       tags: [QR Checker]
       summary: List QR-enabled customers
-      description: Returns only customers with a `qrc_customer_settings` row.
-      operationId: qrcListCustomers
+      description: Returns only customers with a `wo_customer_settings` row.
+      operationId: woListCustomers
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: query
           name: include
           schema: { type: string, enum: [stats] }
-          description: When `stats`, attaches a `qrc` progress block to each customer.
+          description: When `stats`, attaches a `wo` progress block to each customer.
       responses:
         '200':
           description: List of QR-enabled customers
@@ -12930,11 +12930,11 @@ paths:
                             type: array
                             items: { $ref: '#/components/schemas/Customer' }
 
-  /qrc/customers/by-code/{code}:
+  /wo/customers/by-code/{code}:
     get:
       tags: [QR Checker]
       summary: Resolve a customer by code (legacy slug)
-      operationId: qrcGetCustomerByCode
+      operationId: woGetCustomerByCode
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -12954,11 +12954,11 @@ paths:
                       data: { $ref: '#/components/schemas/Customer' }
         '404': { description: Not found / not QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/customers/{customerId}/enable:
+  /wo/customers/{customerId}/enable:
     post:
       tags: [QR Checker]
       summary: Mark a customer as QR-enabled
-      operationId: qrcEnableCustomer
+      operationId: woEnableCustomer
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -12968,7 +12968,7 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/EnableQrcCustomerRequest' }
+            schema: { $ref: '#/components/schemas/EnableWoCustomerRequest' }
       responses:
         '201':
           description: Settings created
@@ -12979,14 +12979,14 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/QrcCustomerSettings' }
+                      data: { $ref: '#/components/schemas/WoCustomerSettings' }
         '409': { description: Already QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/customers/{customerId}/settings:
+  /wo/customers/{customerId}/settings:
     patch:
       tags: [QR Checker]
       summary: Update QR-checker settings (viewer password, default central, metadata)
-      operationId: qrcUpdateCustomerSettings
+      operationId: woUpdateCustomerSettings
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -12996,7 +12996,7 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateQrcCustomerSettingsRequest' }
+            schema: { $ref: '#/components/schemas/UpdateWoCustomerSettingsRequest' }
       responses:
         '200':
           description: Updated settings
@@ -13007,13 +13007,13 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/QrcCustomerSettings' }
+                      data: { $ref: '#/components/schemas/WoCustomerSettings' }
 
-  /qrc/customers/{customerId}/disable:
+  /wo/customers/{customerId}/disable:
     post:
       tags: [QR Checker]
       summary: Soft-disable QR Checker for a customer (drops settings; data preserved)
-      operationId: qrcDisableCustomer
+      operationId: woDisableCustomer
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13023,15 +13023,15 @@ paths:
       responses:
         '204': { description: Disabled }
 
-  /qrc/customers/{customerId}/viewer-login:
+  /wo/customers/{customerId}/viewer-login:
     post:
       tags: [QR Checker]
       summary: Viewer password login (read-only stakeholder)
       description: |
-        Issues a 1h viewer JWT with `role:qrc-viewer` + `scope:customer:<id>`
+        Issues a 1h viewer JWT with `role:wo-viewer` + `scope:customer:<id>`
         claims. Public — no JWT required to call this. Returns 401 on bad
         password, 404 if customer not QR-enabled.
-      operationId: qrcViewerLogin
+      operationId: woViewerLogin
       security: []
       parameters:
         - $ref: '#/components/parameters/TenantId'
@@ -13057,11 +13057,11 @@ paths:
                       data: { $ref: '#/components/schemas/ViewerLoginResponse' }
         '401': { description: Senha de viewer inválida, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/customers/{customerId}/devices:
+  /wo/customers/{customerId}/devices:
     get:
       tags: [QR Checker]
       summary: List devices for a QR-enabled customer (joins installation status)
-      operationId: qrcListCustomerDevices
+      operationId: woListCustomerDevices
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13070,18 +13070,18 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200':
-          description: Devices with optional `qrcInstallation` join
+          description: Devices with optional `woInstallation` join
           content:
             application/json:
               schema:
                 allOf:
                   - $ref: '#/components/schemas/SuccessResponse'
 
-  /qrc/customers/{customerId}/observations:
+  /wo/customers/{customerId}/observations:
     get:
       tags: [QR Checker]
       summary: List customer-level observations
-      operationId: qrcListCustomerObservations
+      operationId: woListCustomerObservations
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13107,7 +13107,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Add a customer-level observation (with optional photo via fileAssetId)
-      operationId: qrcCreateCustomerObservation
+      operationId: woCreateCustomerObservation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13131,11 +13131,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/CustomerObservation' }
 
-  /qrc/customers/{customerId}/observations/{observationId}:
+  /wo/customers/{customerId}/observations/{observationId}:
     delete:
       tags: [QR Checker]
       summary: Delete a customer observation
-      operationId: qrcDeleteCustomerObservation
+      operationId: woDeleteCustomerObservation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13149,11 +13149,11 @@ paths:
       responses:
         '204': { description: Deleted }
 
-  /qrc/customers/{customerId}/report:
+  /wo/customers/{customerId}/report:
     get:
       tags: [QR Checker]
       summary: Customer installation progress report
-      operationId: qrcCustomerReport
+      operationId: woCustomerReport
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13175,11 +13175,11 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/QrcCustomerProgressReport' }
+                      data: { $ref: '#/components/schemas/WoCustomerProgressReport' }
 
   # --- Install + installations ----------------------------------------------
 
-  /qrc/install:
+  /wo/install:
     post:
       tags: [QR Checker]
       summary: Record a device installation (idempotent on tenantId+deviceId)
@@ -13187,7 +13187,7 @@ paths:
         Accepts `deviceId` directly OR `addrLow + addrHigh` (legacy QR payload).
         If an installation already exists for the resolved device, the call is
         treated as an update.
-      operationId: qrcInstall
+      operationId: woInstall
       parameters:
         - $ref: '#/components/parameters/TenantId'
       requestBody:
@@ -13208,11 +13208,11 @@ paths:
                       data: { $ref: '#/components/schemas/Installation' }
         '404': { description: Device or customer not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/installations/{id}:
+  /wo/installations/{id}:
     get:
       tags: [QR Checker]
       summary: Get an installation
-      operationId: qrcGetInstallation
+      operationId: woGetInstallation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13233,7 +13233,7 @@ paths:
     patch:
       tags: [QR Checker]
       summary: Update an installation (audit row emitted)
-      operationId: qrcUpdateInstallation
+      operationId: woUpdateInstallation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13257,11 +13257,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/Installation' }
 
-  /qrc/installations/{id}/audit:
+  /wo/installations/{id}/audit:
     get:
       tags: [QR Checker]
       summary: List the installation's revision audit
-      operationId: qrcInstallationAudit
+      operationId: woInstallationAudit
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13285,11 +13285,11 @@ paths:
                             type: array
                             items: { $ref: '#/components/schemas/InstallationAudit' }
 
-  /qrc/installations/{id}/images:
+  /wo/installations/{id}/images:
     get:
       tags: [QR Checker]
       summary: List installation images
-      operationId: qrcListInstallationImages
+      operationId: woListInstallationImages
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13320,7 +13320,7 @@ paths:
         `imageOrder`. Server-side cap of 20 images per installation. The
         backend uploads to S3 via FileAssets and returns the join row + a
         short-lived signed downloadUrl.
-      operationId: qrcUploadInstallationImage
+      operationId: woUploadInstallationImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13351,11 +13351,11 @@ paths:
                       data: { $ref: '#/components/schemas/InstallationImageWithUrl' }
         '409': { description: Image limit reached (max 20 / installation), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/installations/{installationId}/images/{imageId}:
+  /wo/installations/{installationId}/images/{imageId}:
     patch:
       tags: [QR Checker]
       summary: Update image caption/order
-      operationId: qrcUpdateInstallationImage
+      operationId: woUpdateInstallationImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13388,7 +13388,7 @@ paths:
     delete:
       tags: [QR Checker]
       summary: Detach an installation image (audit emitted)
-      operationId: qrcDeleteInstallationImage
+      operationId: woDeleteInstallationImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13402,11 +13402,11 @@ paths:
       responses:
         '204': { description: Detached }
 
-  /qrc/installations/{id}/tasks:
+  /wo/installations/{id}/tasks:
     get:
       tags: [QR Checker]
       summary: List maintenance tasks for an installation
-      operationId: qrcListInstallationTasks
+      operationId: woListInstallationTasks
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13432,7 +13432,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Create a maintenance task (audit row task_created)
-      operationId: qrcCreateInstallationTask
+      operationId: woCreateInstallationTask
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13456,11 +13456,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/MaintenanceTask' }
 
-  /qrc/installations/{installationId}/tasks/{taskId}:
+  /wo/installations/{installationId}/tasks/{taskId}:
     patch:
       tags: [QR Checker]
       summary: Update a task (status changes emit task_completed audit)
-      operationId: qrcUpdateInstallationTask
+      operationId: woUpdateInstallationTask
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13490,11 +13490,11 @@ paths:
 
   # --- Visitas ---------------------------------------------------------------
 
-  /qrc/visitas:
+  /wo/visitas:
     get:
       tags: [QR Checker]
       summary: List visitas técnicas (paginated)
-      operationId: qrcListVisitas
+      operationId: woListVisitas
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: query
@@ -13529,7 +13529,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Create a visita técnica (audit row created)
-      operationId: qrcCreateVisita
+      operationId: woCreateVisita
       parameters:
         - $ref: '#/components/parameters/TenantId'
       requestBody:
@@ -13549,11 +13549,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/Visita' }
 
-  /qrc/visitas/{id}:
+  /wo/visitas/{id}:
     get:
       tags: [QR Checker]
       summary: Get a visita
-      operationId: qrcGetVisita
+      operationId: woGetVisita
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13574,7 +13574,7 @@ paths:
     patch:
       tags: [QR Checker]
       summary: Update a visita (audit emitted)
-      operationId: qrcUpdateVisita
+      operationId: woUpdateVisita
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13599,7 +13599,7 @@ paths:
     delete:
       tags: [QR Checker]
       summary: Soft-delete a visita
-      operationId: qrcDeleteVisita
+      operationId: woDeleteVisita
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13609,11 +13609,11 @@ paths:
       responses:
         '204': { description: Soft-deleted }
 
-  /qrc/visitas/{id}/audit:
+  /wo/visitas/{id}/audit:
     get:
       tags: [QR Checker]
       summary: List visita audit log
-      operationId: qrcVisitaAudit
+      operationId: woVisitaAudit
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13627,11 +13627,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SuccessResponse' }
 
-  /qrc/visitas/{id}/report:
+  /wo/visitas/{id}/report:
     get:
       tags: [QR Checker]
       summary: Visita summary (counts of ambientes, products)
-      operationId: qrcVisitaReport
+      operationId: woVisitaReport
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13645,11 +13645,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SuccessResponse' }
 
-  /qrc/visitas/{id}/observations:
+  /wo/visitas/{id}/observations:
     get:
       tags: [QR Checker]
       summary: List visita-level observations
-      operationId: qrcListVisitaObservations
+      operationId: woListVisitaObservations
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13665,7 +13665,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Create a visita observation (with optional fileAssetId photo)
-      operationId: qrcCreateVisitaObservation
+      operationId: woCreateVisitaObservation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13694,11 +13694,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/VisitaObservation' }
 
-  /qrc/visitas/{id}/observations/{observationId}:
+  /wo/visitas/{id}/observations/{observationId}:
     delete:
       tags: [QR Checker]
       summary: Delete a visita observation
-      operationId: qrcDeleteVisitaObservation
+      operationId: woDeleteVisitaObservation
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13714,11 +13714,11 @@ paths:
 
   # --- Visita ambientes ------------------------------------------------------
 
-  /qrc/visitas/{id}/ambientes:
+  /wo/visitas/{id}/ambientes:
     get:
       tags: [QR Checker]
       summary: List ambientes for a visita
-      operationId: qrcListAmbientes
+      operationId: woListAmbientes
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13744,7 +13744,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Create an ambiente in a visita (audit emitted)
-      operationId: qrcCreateAmbiente
+      operationId: woCreateAmbiente
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13768,11 +13768,11 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/VisitaAmbiente' }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}:
+  /wo/visitas/{id}/ambientes/{ambienteId}:
     get:
       tags: [QR Checker]
       summary: Get an ambiente
-      operationId: qrcGetAmbiente
+      operationId: woGetAmbiente
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13797,7 +13797,7 @@ paths:
     patch:
       tags: [QR Checker]
       summary: Update an ambiente (auto-save target — debounce on FE)
-      operationId: qrcUpdateAmbiente
+      operationId: woUpdateAmbiente
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13821,7 +13821,7 @@ paths:
     delete:
       tags: [QR Checker]
       summary: Delete an ambiente (audit emitted; cascades to images/products)
-      operationId: qrcDeleteAmbiente
+      operationId: woDeleteAmbiente
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13835,11 +13835,11 @@ paths:
       responses:
         '204': { description: Deleted }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/images:
+  /wo/visitas/{id}/ambientes/{ambienteId}/images:
     get:
       tags: [QR Checker]
       summary: List ambiente images
-      operationId: qrcListAmbienteImages
+      operationId: woListAmbienteImages
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13859,7 +13859,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Upload an ambiente image (multipart, max 50 / ambiente)
-      operationId: qrcUploadAmbienteImage
+      operationId: woUploadAmbienteImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13885,11 +13885,11 @@ paths:
         '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '409': { description: Image limit reached (50/ambiente), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/images/{imageId}:
+  /wo/visitas/{id}/ambientes/{ambienteId}/images/{imageId}:
     patch:
       tags: [QR Checker]
       summary: Update ambiente image caption/order
-      operationId: qrcUpdateAmbienteImage
+      operationId: woUpdateAmbienteImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13909,7 +13909,7 @@ paths:
     delete:
       tags: [QR Checker]
       summary: Delete an ambiente image
-      operationId: qrcDeleteAmbienteImage
+      operationId: woDeleteAmbienteImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13929,11 +13929,11 @@ paths:
 
   # --- Visita products -------------------------------------------------------
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/products:
+  /wo/visitas/{id}/ambientes/{ambienteId}/products:
     get:
       tags: [QR Checker]
       summary: List products in an ambiente
-      operationId: qrcListProducts
+      operationId: woListProducts
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13949,7 +13949,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Create a product
-      operationId: qrcCreateProduct
+      operationId: woCreateProduct
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13968,11 +13968,11 @@ paths:
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}:
+  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}:
     patch:
       tags: [QR Checker]
       summary: Update a product
-      operationId: qrcUpdateProduct
+      operationId: woUpdateProduct
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13992,7 +13992,7 @@ paths:
     delete:
       tags: [QR Checker]
       summary: Delete a product
-      operationId: qrcDeleteProduct
+      operationId: woDeleteProduct
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -14010,11 +14010,11 @@ paths:
       responses:
         '204': { description: Deleted }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images:
+  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images:
     get:
       tags: [QR Checker]
       summary: List product images
-      operationId: qrcListProductImages
+      operationId: woListProductImages
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -14034,7 +14034,7 @@ paths:
     post:
       tags: [QR Checker]
       summary: Upload a product image (multipart, max 5 / product)
-      operationId: qrcUploadProductImage
+      operationId: woUploadProductImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -14062,11 +14062,11 @@ paths:
         '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '409': { description: Image limit reached (5/product), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images/{imageId}:
+  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images/{imageId}:
     delete:
       tags: [QR Checker]
       summary: Delete a product image
-      operationId: qrcDeleteProductImage
+      operationId: woDeleteProductImage
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -14090,16 +14090,16 @@ paths:
 
   # --- Users (PIN admin + audit history) ------------------------------------
 
-  /qrc/users/{userId}/pin:
+  /wo/users/{userId}/pin:
     patch:
       tags: [QR Checker]
       summary: Set or clear a user's field-operator PIN
       description: |
         Body `{ pin: "1234" }` sets/replaces; `{ pin: null }` clears. Server
-        writes both `qrc_field_pin_lookup` (HMAC) and `qrc_field_pin_hash`
+        writes both `wo_field_pin_lookup` (HMAC) and `wo_field_pin_hash`
         (bcrypt). PG `23505` violations on the partial UNIQUE index are
         mapped to `409 PIN_TAKEN`.
-      operationId: qrcSetUserPin
+      operationId: woSetUserPin
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -14115,11 +14115,11 @@ paths:
         '204': { description: PIN set or cleared }
         '409': { description: PIN already in use, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
-  /qrc/users/{userId}/audit:
+  /wo/users/{userId}/audit:
     get:
       tags: [QR Checker]
       summary: List installation-audit entries authored by this user
-      operationId: qrcUserAudit
+      operationId: woUserAudit
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path

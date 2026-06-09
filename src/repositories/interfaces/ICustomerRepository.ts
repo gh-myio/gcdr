@@ -42,7 +42,7 @@ export interface ICustomerRepository extends IRepository<Customer, CreateCustome
   forceDelete(tenantId: string, customerId: string, options?: ForceDeleteOptions): Promise<ForceDeleteResult>;
 
   // RFC-0032: list QR-enabled customers (i.e., have a row in
-  // qrc_customer_settings) that the given user has any active
+  // wo_customer_settings) that the given user has any active
   // role assignment scoped to via `customer:<uuid>`.
-  listQrcEnabledForUser(tenantId: string, userId: string): Promise<Customer[]>;
+  listWoEnabledForUser(tenantId: string, userId: string): Promise<Customer[]>;
 }

@@ -1,6 +1,8 @@
 # QR Checker on GCDR — Frontend Integration Guide
 
-- **Status:** Integration brief — backend Phases 1-4 live (controllers mounted); Phases 5-8 ⏸ stand-by
+> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical guide keeps the original `qrc` route naming throughout; for current routes/paths see [WO-OS-MAP.md](./WO-OS-MAP.md).
+
+- **Status:** Integration brief — backend Phases 1-4 live (controllers mounted); **Phases 5-8 RETIRED** (greenfield validated; `qrcode-check.git` archived without data migration).
 - **Last updated:** 2026-04-30
 - **Audience:** Frontend / mobile developers re-pointing the QR Checker UI at GCDR
 - **Companion docs:**
@@ -12,17 +14,18 @@
 
 ---
 
-## Current goal: greenfield validation
+## Greenfield validation — done
 
-Phases 5–8 (data migration, MCP, cutover) are on **stand-by**. The current
-focus is to **exercise the GCDR backend end-to-end against an empty
-Postgres**, as if the project were starting from scratch, and confirm
-the API surface is adherent to the product flows. Only after that go/no-go
-signal does it make sense to invest in migration tooling.
+Phases 5–8 (data migration, MCP, cutover) are **RETIRED**. The goal was to
+**exercise the GCDR backend end-to-end against an empty Postgres**, as if the
+project were starting from scratch, and confirm the API surface is adherent to
+the product flows.
 
-If the validation succeeds and no historical `qrcode-check.git` data needs
-to survive, the legacy app gets archived (not migrated) — Phases 5 and 8
-are retired entirely.
+**Decision (2026-06-08):** validation succeeded and no historical
+`qrcode-check.git` data needs to survive — the legacy app is archived (not
+migrated), so Phases 5–8 are retired entirely. The backend domain was then
+renamed `qrc`→`wo` (routes `/api/v1/wo/*`); the `/api/v1/qrc/*` paths below are
+historical.
 
 ---
 

@@ -19,5 +19,5 @@ export * from './WikiPage';
 // Generic file/asset storage (S3-backed)
 export * from './FileAsset';
 
-// RFC-0032: QR Checker module (under qrc/ subfolder)
-export * from './qrc';
+// RFC-0032: QR Checker module (under wo/ subfolder)
+export * from './wo';

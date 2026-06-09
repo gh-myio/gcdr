@@ -602,8 +602,8 @@ export class DeviceRepository implements IDeviceRepository {
 
   // RFC-0032: lookup by (customer, addrLow, addrHigh) — the legacy QR
   // payload format that the field operator scans. The columns were added
-  // in migration 0025; partial index `idx_devices_qrc_addr` covers this.
-  async findByQrcAddress(
+  // in migration 0025; partial index `idx_devices_wo_addr` covers this.
+  async findByWoAddress(
     tenantId: string,
     customerId: string,
     addrLow: number,
@@ -615,8 +615,8 @@ export class DeviceRepository implements IDeviceRepository {
       .where(and(
         eq(devices.tenantId, tenantId),
         eq(devices.customerId, customerId),
-        eq(devices.qrcAddrLow, addrLow),
-        eq(devices.qrcAddrHigh, addrHigh),
+        eq(devices.woAddrLow, addrLow),
+        eq(devices.woAddrHigh, addrHigh),
       ))
       .limit(1);
 

@@ -1,6 +1,8 @@
 # RFC-0032 — QR Checker Migration to GCDR (Backend, Data, MCP)
 
-- **Status:** Partially shipped — Phases 1–4 ✅ done; Phases 5–8 ⏸ stand-by (greenfield validation first)
+> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical RFC keeps the original `qrc` naming throughout; see [WO-OS-MAP.md](./WO-OS-MAP.md) for the current domain map.
+
+- **Status:** Phases 1–4 ✅ done; **Phases 5–8 RETIRED** — greenfield validated, `qrcode-check.git` archived without data migration.
 - **Created:** 2026-04-27
 - **Last updated:** 2026-04-30
 - **Author:** MYIO Engineering
@@ -19,16 +21,16 @@
 | 2     | Auth — operator-pin login + bcrypt PIN storage                | ✅ done (`e66983c`)                    |
 | 3     | Repositories + Services + audit emission                       | ✅ done (`cf573ce`, tests `0371309`)   |
 | 4     | Controllers + ~48 routes mounted + OpenAPI                     | ✅ done (`4dd305b`, `b46f56e`)         |
-| 5     | Data migration script (SQLite → Postgres)                      | ⏸ **stand-by**                         |
-| 6     | MCP server port (10 tools)                                     | ⏸ **stand-by**                         |
-| 7     | MCP expansion (+12 tools: customers / wiki / observability)    | ⏸ **stand-by**                         |
-| 8     | Cutover (freeze, dry-run, migrate, sample-test)                | ⏸ **stand-by** (depends on Phase 5)    |
+| 5     | Data migration script (SQLite → Postgres)                      | ❌ **RETIRED** (no data migration)      |
+| 6     | MCP server port (10 tools)                                     | ❌ **RETIRED**                          |
+| 7     | MCP expansion (+12 tools: customers / wiki / observability)    | ❌ **RETIRED**                          |
+| 8     | Cutover (freeze, dry-run, migrate, sample-test)                | ❌ **RETIRED** (depended on Phase 5)    |
 
-### Why stand-by (and not in progress)
+### Why RETIRED (decision)
 
-The team's current goal is to **validate the GCDR backend (Phases 1–4) end-to-end as if the project were greenfield** — wire the FE up, exercise the full navigation against a clean Postgres, and confirm the API surface is adherent to the product flows. Only after that go/no-go signal does it make sense to invest in the migration script (Phase 5), the MCP port (6/7), or the cutover ritual (8).
+The team's goal was to **validate the GCDR backend (Phases 1–4) end-to-end as if the project were greenfield** — wire the FE up, exercise the full navigation against a clean Postgres, and confirm the API surface is adherent to the product flows.
 
-If greenfield testing reveals the API is adherent and no historical data needs to survive, **Phases 5 and 8 may be retired entirely** (`qrcode-check.git` archived without migration). Phases 6/7 remain optional regardless — they unlock NL/Claude access to the data, not the core product.
+**Decision (2026-06-08):** greenfield validation succeeded, the API is adherent, and no historical data needs to survive. **Phases 5 and 8 are RETIRED** — `qrcode-check.git` is archived without migration; the SQLite→Postgres migration will not be implemented. **Phases 6 and 7 (MCP) are also RETIRED** as out of scope for the core product (they only unlocked NL/Claude access to the data). The backend domain was subsequently renamed `qrc`→`wo`.
 
 **What's live today:** the GCDR backend exposes `/api/v1/qrc/*` and `/api/v1/auth/operator-pin`. The frontend can re-point at GCDR and run end-to-end against an empty Postgres for validation. No legacy data is being touched.
 

@@ -50,11 +50,11 @@ export { default as fileAssetsPublicController } from './file-assets-public.cont
 
 // RFC-0032: QR Checker module
 export {
-  qrcCustomersController,
-  qrcInstallationsController,
-  qrcVisitasController,
-  qrcUsersController,
-} from './qrc';
+  woCustomersController,
+  woInstallationsController,
+  woVisitasController,
+  woUsersController,
+} from './wo';
 
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';

@@ -22,6 +22,13 @@ were only ever created by `drizzle-kit push`, never by a CREATE-TABLE migration.
 So the migration set is a series of **patches on top of a push-built base**, not
 a replayable history.
 
+> **Note — 0026 (`qrc`→`wo` rename):** `0026_rename_qrc_to_wo.sql` is the **live
+> rename** applied to push-built environments. It renames the QR-Checker domain
+> objects (`qrc_*` tables/columns/indexes → `wo_*`) in place on environments that
+> were materialized via `db:push`. `schema.ts` already reflects the `wo_*` names,
+> so a fresh `db:push` creates them directly and 0026 is a no-op there (recorded
+> via `db:mig:baseline`).
+
 Given that, the pragmatic, honest model is:
 
 | Scenario | Do this |

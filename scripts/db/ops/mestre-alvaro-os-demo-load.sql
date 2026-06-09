@@ -9,7 +9,7 @@
 -- visits (visitas) with ambientes / products / observations.
 --
 -- This script:
---   1. Enables OS for the customer            -> qrc_customer_settings
+--   1. Enables OS for the customer            -> wo_customer_settings
 --   2. Creates installations on up to 6 of the customer's existing devices
 --      (mixed statuses) + an audit row + a couple maintenance tasks
 --   3. Creates one technical visit with 2 ambientes, products, an observation
@@ -24,13 +24,13 @@
 -- It only references EXISTING devices (FK restrict) — discovered at run time.
 --
 -- Cleanup (remove all demo data):
---   DELETE FROM qrc_visitas_tecnicas
+--   DELETE FROM wo_visitas_tecnicas
 --     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND name LIKE '[DEMO]%';
---   DELETE FROM qrc_customer_observations
+--   DELETE FROM wo_customer_observations
 --     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND observation LIKE '[DEMO]%';
---   DELETE FROM qrc_installations
+--   DELETE FROM wo_installations
 --     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND obs LIKE '[DEMO]%';
---   -- (qrc_customer_settings row can be left enabled, or deleted to disable OS)
+--   -- (wo_customer_settings row can be left enabled, or deleted to disable OS)
 -- =============================================================================
 
 DO $$
@@ -64,10 +64,10 @@ BEGIN
    LIMIT 1;
 
   -- 1) Enable OS for the customer ------------------------------------------------
-  INSERT INTO qrc_customer_settings (customer_id, tenant_id, default_central_id, qrc_metadata, created_by)
+  INSERT INTO wo_customer_settings (customer_id, tenant_id, default_central_id, wo_metadata, created_by)
   VALUES (v_customer, v_tenant, v_central, '{"demo": true}'::jsonb, v_user)
   ON CONFLICT (customer_id) DO UPDATE
-    SET default_central_id = COALESCE(qrc_customer_settings.default_central_id, EXCLUDED.default_central_id),
+    SET default_central_id = COALESCE(wo_customer_settings.default_central_id, EXCLUDED.default_central_id),
         updated_at = now();
 
   -- 2) Installations on up to 6 existing devices --------------------------------
@@ -85,7 +85,7 @@ BEGIN
   LOOP
     v_inst := NULL;
 
-    INSERT INTO qrc_installations (
+    INSERT INTO wo_installations (
       id, tenant_id, device_id, customer_id, position, tc_type,
       impedimento_text, obs, current_multiplier, voltage_multiplier, installed_by
     )
@@ -104,14 +104,14 @@ BEGIN
       v_installs := v_installs + 1;
 
       -- audit: created
-      INSERT INTO qrc_installation_audit (
+      INSERT INTO wo_installation_audit (
         tenant_id, installation_id, revision, change_type, change_description, changed_by
       )
       VALUES (v_tenant, v_inst, 1, 'created', '[DEMO] Instalação registrada em campo', v_user);
 
       -- maintenance task on the problem ones (impedimento / defeito)
       IF v_dev.rn IN (3, 5) THEN
-        INSERT INTO qrc_maintenance_tasks (
+        INSERT INTO wo_maintenance_tasks (
           tenant_id, installation_id, description, status, created_by
         )
         VALUES (
@@ -120,7 +120,7 @@ BEGIN
           'pending', v_user
         );
 
-        INSERT INTO qrc_installation_audit (
+        INSERT INTO wo_installation_audit (
           tenant_id, installation_id, revision, change_type, change_description, changed_by
         )
         VALUES (v_tenant, v_inst, 2, 'task_created', '[DEMO] Tarefa de manutenção aberta', v_user);
@@ -129,10 +129,10 @@ BEGIN
   END LOOP;
 
   -- 3) Technical visit (idempotent: drop prior demo visitas, cascade) -----------
-  DELETE FROM qrc_visitas_tecnicas
+  DELETE FROM wo_visitas_tecnicas
    WHERE tenant_id = v_tenant AND customer_id = v_customer AND name LIKE '[DEMO]%';
 
-  INSERT INTO qrc_visitas_tecnicas (id, tenant_id, customer_id, name, observation, status, created_by)
+  INSERT INTO wo_visitas_tecnicas (id, tenant_id, customer_id, name, observation, status, created_by)
   VALUES (
     gen_random_uuid(), v_tenant, v_customer,
     '[DEMO] Visita técnica inicial',
@@ -142,7 +142,7 @@ BEGIN
   RETURNING id INTO v_visita;
 
   -- ambiente 1 + product
-  INSERT INTO qrc_visita_ambientes (
+  INSERT INTO wo_visita_ambientes (
     id, tenant_id, visita_id, name, observation, ac_quantity, product_quantity, product_type, created_by
   )
   VALUES (
@@ -151,11 +151,11 @@ BEGIN
   )
   RETURNING id INTO v_amb;
 
-  INSERT INTO qrc_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
+  INSERT INTO wo_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
   VALUES (v_tenant, v_amb, 'sensor', '[DEMO] Sensor de corrente (TC)', 3, v_user);
 
   -- ambiente 2 + product
-  INSERT INTO qrc_visita_ambientes (
+  INSERT INTO wo_visita_ambientes (
     id, tenant_id, visita_id, name, observation, ac_quantity, product_quantity, product_type, created_by
   )
   VALUES (
@@ -164,21 +164,21 @@ BEGIN
   )
   RETURNING id INTO v_amb;
 
-  INSERT INTO qrc_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
+  INSERT INTO wo_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
   VALUES (v_tenant, v_amb, 'gateway', '[DEMO] Central NodeHub', 1, v_user);
 
   -- visit observation + audit
-  INSERT INTO qrc_visita_observations (tenant_id, visita_id, observation, created_by)
+  INSERT INTO wo_visita_observations (tenant_id, visita_id, observation, created_by)
   VALUES (v_tenant, v_visita, '[DEMO] Cliente solicitou retorno na próxima semana para concluir.', v_user);
 
-  INSERT INTO qrc_visita_audit (tenant_id, visita_id, revision, change_type, change_description, changed_by)
+  INSERT INTO wo_visita_audit (tenant_id, visita_id, revision, change_type, change_description, changed_by)
   VALUES (v_tenant, v_visita, 1, 'created', '[DEMO] Visita técnica criada', v_user);
 
   -- 4) Customer-level OS observation (idempotent) -------------------------------
-  DELETE FROM qrc_customer_observations
+  DELETE FROM wo_customer_observations
    WHERE tenant_id = v_tenant AND customer_id = v_customer AND observation LIKE '[DEMO]%';
 
-  INSERT INTO qrc_customer_observations (tenant_id, customer_id, observation, created_by)
+  INSERT INTO wo_customer_observations (tenant_id, customer_id, observation, created_by)
   VALUES (v_tenant, v_customer, '[DEMO] Observação geral de OS do cliente (carga demo).', v_user);
 
   RAISE NOTICE 'OS demo load OK — customer %, installations created/kept this run: %, visita: %',
@@ -188,15 +188,15 @@ END $$;
 -- =============================================================================
 -- Verification
 -- =============================================================================
-SELECT 'os_enabled'   AS what, count(*) AS n FROM qrc_customer_settings   WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'os_enabled'   AS what, count(*) AS n FROM wo_customer_settings   WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
 UNION ALL
-SELECT 'installations', count(*)            FROM qrc_installations        WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'installations', count(*)            FROM wo_installations        WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
 UNION ALL
-SELECT 'maint_tasks',   count(*)            FROM qrc_maintenance_tasks    WHERE tenant_id = '11111111-1111-1111-1111-111111111111'
-   AND installation_id IN (SELECT id FROM qrc_installations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+SELECT 'maint_tasks',   count(*)            FROM wo_maintenance_tasks    WHERE tenant_id = '11111111-1111-1111-1111-111111111111'
+   AND installation_id IN (SELECT id FROM wo_installations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
 UNION ALL
-SELECT 'visitas',       count(*)            FROM qrc_visitas_tecnicas     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'visitas',       count(*)            FROM wo_visitas_tecnicas     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
 UNION ALL
-SELECT 'ambientes',     count(*)            FROM qrc_visita_ambientes     WHERE visita_id IN (SELECT id FROM qrc_visitas_tecnicas WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+SELECT 'ambientes',     count(*)            FROM wo_visita_ambientes     WHERE visita_id IN (SELECT id FROM wo_visitas_tecnicas WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
 UNION ALL
-SELECT 'cust_obs',      count(*)            FROM qrc_customer_observations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1';
+SELECT 'cust_obs',      count(*)            FROM wo_customer_observations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1';

@@ -637,16 +637,16 @@ export class CustomerRepository implements ICustomerRepository {
 
   // RFC-0032: list QR-enabled customers the user has access to via
   // any active role assignment whose scope is `customer:<uuid>`.
-  // Inner join on qrc_customer_settings filters to QR-enabled only.
-  async listQrcEnabledForUser(tenantId: string, userId: string): Promise<Customer[]> {
-    const { qrcCustomerSettings, roleAssignments } = schema;
+  // Inner join on wo_customer_settings filters to QR-enabled only.
+  async listWoEnabledForUser(tenantId: string, userId: string): Promise<Customer[]> {
+    const { woCustomerSettings, roleAssignments } = schema;
 
     const rows = await db
       .select({ c: customers })
       .from(customers)
       .innerJoin(
-        qrcCustomerSettings,
-        eq(qrcCustomerSettings.customerId, customers.id),
+        woCustomerSettings,
+        eq(woCustomerSettings.customerId, customers.id),
       )
       .innerJoin(
         roleAssignments,

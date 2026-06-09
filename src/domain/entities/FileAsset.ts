@@ -10,16 +10,16 @@ export type FileAssetOwnerType =
   | 'wiki_pdf'                   // rendered PDF artefact of a wiki page revision
   | 'free'                       // uploaded but not yet attached to anything
   // RFC-0032 — QR Checker module (migration 0024 extends the CHECK constraint).
-  | 'qrc_installation'           // installation photo
-  | 'qrc_customer_observation'   // photo on a customer-level QR observation
-  | 'qrc_visita_ambiente'        // photo of an environment in a Visita Técnica
-  | 'qrc_visita_product'         // photo of an inventoried product in a Visita
-  | 'qrc_visita_observation';    // photo on a visita-level observation
+  | 'wo_installation'           // installation photo
+  | 'wo_customer_observation'   // photo on a customer-level QR observation
+  | 'wo_visita_ambiente'        // photo of an environment in a Visita Técnica
+  | 'wo_visita_product'         // photo of an inventoried product in a Visita
+  | 'wo_visita_observation';    // photo on a visita-level observation
 
 export const ALL_FILE_ASSET_OWNER_TYPES: readonly FileAssetOwnerType[] = [
   'wiki_page', 'wiki_pdf', 'free',
-  'qrc_installation', 'qrc_customer_observation',
-  'qrc_visita_ambiente', 'qrc_visita_product', 'qrc_visita_observation',
+  'wo_installation', 'wo_customer_observation',
+  'wo_visita_ambiente', 'wo_visita_product', 'wo_visita_observation',
 ] as const;
 
 export type FileAssetStatus =

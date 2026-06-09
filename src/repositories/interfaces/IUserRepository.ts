@@ -46,12 +46,12 @@ export interface IUserRepository {
    * O(1) lookup using the deterministic HMAC token.
    * Returns the user iff (tenantId, lookup) matches a live row.
    */
-  getByQrcPinLookup(tenantId: string, lookup: string): Promise<User | null>;
+  getByWoPinLookup(tenantId: string, lookup: string): Promise<User | null>;
   /**
    * Atomically write both PIN columns. Pass null to clear (demote
    * field operator → email-only).
    */
-  updateQrcPin(
+  updateWoPin(
     tenantId: string,
     id: string,
     pin: { lookup: string; hash: string } | null,

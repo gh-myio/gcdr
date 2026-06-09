@@ -91,13 +91,15 @@ ALTER INDEX IF EXISTS "idx_qrc_visita_obs_chrono"             RENAME TO "idx_wo_
 ALTER INDEX IF EXISTS "idx_qrc_visita_audit_chrono"           RENAME TO "idx_wo_visita_audit_chrono";
 
 -- =============================================================================
--- 6) Named CHECK / UNIQUE constraints (10)
---    PostgreSQL does not support IF EXISTS on RENAME CONSTRAINT, so these
---    require constraints to exist (which they do, from migration 0024).
+-- 6) Named CHECK constraints + UNIQUE indexes (10)
+--    CHECK constraints → ALTER TABLE RENAME CONSTRAINT (no IF EXISTS in PG).
+--    *_unique objects are UNIQUE INDEXES (drizzle uniqueIndex(), not table
+--    constraints) → ALTER INDEX. This is the corrected form: the original
+--    treated the 3 *_unique as constraints, which fails on every env because
+--    they are indexes.
 -- =============================================================================
 
-ALTER TABLE "wo_installations"
-  RENAME CONSTRAINT "qrc_installations_device_unique" TO "wo_installations_device_unique";
+ALTER INDEX IF EXISTS "qrc_installations_device_unique" RENAME TO "wo_installations_device_unique";
 ALTER TABLE "wo_installations"
   RENAME CONSTRAINT "qrc_installations_status_check" TO "wo_installations_status_check";
 ALTER TABLE "wo_installations"
@@ -105,11 +107,9 @@ ALTER TABLE "wo_installations"
 
 ALTER TABLE "wo_installation_images"
   RENAME CONSTRAINT "qrc_installation_images_order_range" TO "wo_installation_images_order_range";
-ALTER TABLE "wo_installation_images"
-  RENAME CONSTRAINT "qrc_installation_images_unique" TO "wo_installation_images_unique";
+ALTER INDEX IF EXISTS "qrc_installation_images_unique" RENAME TO "wo_installation_images_unique";
 
-ALTER TABLE "wo_installation_audit"
-  RENAME CONSTRAINT "qrc_installation_audit_revision_unique" TO "wo_installation_audit_revision_unique";
+ALTER INDEX IF EXISTS "qrc_installation_audit_revision_unique" RENAME TO "wo_installation_audit_revision_unique";
 ALTER TABLE "wo_installation_audit"
   RENAME CONSTRAINT "qrc_installation_audit_change_type_check" TO "wo_installation_audit_change_type_check";
 

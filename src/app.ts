@@ -75,10 +75,10 @@ import {
   fileAssetsController,
   fileAssetsPublicController,
   // RFC-0032: QR Checker module
-  qrcCustomersController,
-  qrcInstallationsController,
-  qrcVisitasController,
-  qrcUsersController,
+  woCustomersController,
+  woInstallationsController,
+  woVisitasController,
+  woUsersController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -316,20 +316,20 @@ apiV1Router.use('/files', authMiddleware, fileAssetsController);
 
 // =============================================================================
 // RFC-0032: QR Checker module
-// All routers handle their own auth — qrc-customers exposes a public
+// All routers handle their own auth — wo-customers exposes a public
 // /viewer-login route, the rest of the surface uses authMiddleware
 // internally.
 // =============================================================================
-// /api/v1/qrc/install                       (POST — upsert installation)
-// /api/v1/qrc/installations/:id             (GET, PATCH, audit, images, tasks)
-apiV1Router.use('/qrc', qrcInstallationsController);
-// /api/v1/qrc/visitas/...                   (full CRUD + ambientes + products)
-apiV1Router.use('/qrc/visitas', qrcVisitasController);
-// /api/v1/qrc/users/:userId/{pin,audit}
-apiV1Router.use('/qrc/users', qrcUsersController);
-// /api/v1/qrc/customers/...                 (must be LAST — generic /:customerId
+// /api/v1/wo/install                       (POST — upsert installation)
+// /api/v1/wo/installations/:id             (GET, PATCH, audit, images, tasks)
+apiV1Router.use('/wo', woInstallationsController);
+// /api/v1/wo/visitas/...                   (full CRUD + ambientes + products)
+apiV1Router.use('/wo/visitas', woVisitasController);
+// /api/v1/wo/users/:userId/{pin,audit}
+apiV1Router.use('/wo/users', woUsersController);
+// /api/v1/wo/customers/...                 (must be LAST — generic /:customerId
 //                                            matchers would shadow specific paths)
-apiV1Router.use('/qrc/customers', qrcCustomersController);
+apiV1Router.use('/wo/customers', woCustomersController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);

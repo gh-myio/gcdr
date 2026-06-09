@@ -7,7 +7,7 @@ import { registrationService } from './RegistrationService';
 import { authorizationService } from './AuthorizationService';
 import { userRepository } from '../repositories/UserRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
-import { pinLookupToken, pinVerify } from './qrc/QrcPinService';
+import { pinLookupToken, pinVerify } from './wo/WoPinService';
 
 // RFC-0011: Configuration for account lockout
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;
@@ -318,8 +318,8 @@ export class AuthService {
    *
    * Flow:
    *   1. Compute deterministic HMAC lookup token for (tenantId, pin).
-   *   2. SELECT user by (tenantId, qrc_field_pin_lookup) — O(1) via partial unique index.
-   *   3. Defence-in-depth: bcrypt verify against qrc_field_pin_hash.
+   *   2. SELECT user by (tenantId, wo_field_pin_lookup) — O(1) via partial unique index.
+   *   3. Defence-in-depth: bcrypt verify against wo_field_pin_hash.
    *   4. Reject inactive / locked / non-ACTIVE users (same gates as password login).
    *   5. Mint access + refresh JWT (24h access window per RFC).
    *   6. Return the list of QR-enabled customers the operator has access to.
@@ -340,14 +340,14 @@ export class AuthService {
     }
 
     const lookup = pinLookupToken(tenantId, pin);
-    const user = await userRepository.getByQrcPinLookup(tenantId, lookup);
+    const user = await userRepository.getByWoPinLookup(tenantId, lookup);
     if (!user) {
       throw new UnauthorizedError('PIN inválido');
     }
 
     // Defence in depth: re-verify against the bcrypt hash. If the lookup
     // column was crafted/leaked but the bcrypt hash doesn't match, reject.
-    const ok = await pinVerify(pin, user.qrcFieldPinHash ?? null);
+    const ok = await pinVerify(pin, user.woFieldPinHash ?? null);
     if (!ok) {
       throw new UnauthorizedError('PIN inválido');
     }
@@ -377,7 +377,7 @@ export class AuthService {
 
     const roles = await authorizationService.getUserRoleKeys(tenantId, user.id);
     const tokens = await this.generateTokens(user, tenantId, roles);
-    const customers = await customerRepository.listQrcEnabledForUser(tenantId, user.id);
+    const customers = await customerRepository.listWoEnabledForUser(tenantId, user.id);
 
     return {
       ...tokens,
@@ -494,17 +494,17 @@ export class AuthService {
 
   /**
    * RFC-0032 — Viewer JWT for read-only stakeholder access scoped to a
-   * single customer. Carries `role:qrc-viewer` and `scope:customer:<id>`
+   * single customer. Carries `role:wo-viewer` and `scope:customer:<id>`
    * in the roles claim. Lifetime 1h; no refresh — viewer re-authenticates
    * with the password.
    */
   signViewerJwt(input: { tenantId: string; customerId: string; ip: string }): string {
     return createJWT(
       {
-        sub: `qrc-viewer:${input.customerId}`,
+        sub: `wo-viewer:${input.customerId}`,
         tenant_id: input.tenantId,
         email: `viewer-${input.customerId}@viewer.local`,
-        roles: [`role:qrc-viewer`, `scope:customer:${input.customerId}`],
+        roles: [`role:wo-viewer`, `scope:customer:${input.customerId}`],
         type: 'CUSTOMER',
         viewer_customer_id: input.customerId,
       },

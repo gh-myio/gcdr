@@ -15,7 +15,7 @@ export const OperatorPinSchema = z.object({
 export type OperatorPinDTO = z.infer<typeof OperatorPinSchema>;
 
 // Admin endpoint: set / change / clear a field operator's PIN.
-// PATCH /api/v1/qrc/users/:userId/pin
+// PATCH /api/v1/wo/users/:userId/pin
 //
 // Body: { pin: 4-digit string }    → set or replace
 //       { pin: null }               → clear
