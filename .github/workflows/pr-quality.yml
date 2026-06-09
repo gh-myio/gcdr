@@ -42,7 +42,7 @@ jobs:
         run: npm run test:ci
         env:
           DATABASE_URL: postgres://test:test@localhost:5432/test
-          QRC_PIN_PEPPER: ci-test-pepper-32-chars-min-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          WO_PIN_PEPPER: ci-test-pepper-32-chars-min-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
       - name: Upload coverage HTML report
         if: always()

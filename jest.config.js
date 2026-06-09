@@ -34,7 +34,7 @@ module.exports = {
       statements: 3,
     },
     // High bar on the QR Checker module — it has 84 unit tests today.
-    'src/services/qrc/': {
+    'src/services/wo/': {
       branches:   55,
       functions:  45,
       lines:      65,
