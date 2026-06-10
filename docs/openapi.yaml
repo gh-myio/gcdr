@@ -75,14 +75,21 @@ tags:
     description: Anonymous-friendly read endpoints for wiki pages with `visibility ⊇ PUBLIC` and `status = PUBLISHED` (RFC-0030 Phase 2). No auth required.
   - name: File Assets
     description: Generic S3-backed file storage. Polymorphic (owner_type, owner_id) so any feature can register binaries — wiki attachments, PDF artefacts, future avatars/logos/manuals (RFC-0030 / RFC-0031).
-  - name: QR Checker
+  - name: Work Orders
     description: |
-      RFC-0032 — QR Checker module migrated from `qrcode-check.git`. Tracks
-      device installations across MYIO customer sites. PIN-based field-operator
-      auth + standard JWT for admin. Customer-scoped (`mall ⊂ customer` via
-      `wo_customer_settings` opt-in extension). All endpoints under
-      `/api/v1/wo/*` plus `POST /api/v1/auth/operator-pin` and
+      RFC-0037 — Work Orders event model (replaces the RFC-0032 QR-Checker
+      module). A Work Order has N events (lifecycle transitions, structural
+      events, observation/attachment markers); `status` is a projection of the
+      latest lifecycle event. Device scope and file evidence hang off the WO.
+      Customer-scoped via `work_orders_customer_settings` opt-in. All endpoints
+      under `/api/v1/wo/*` plus `POST /api/v1/auth/operator-pin` and
       `POST /api/v1/wo/customers/:customerId/viewer-login` (public).
+  - name: Annotations
+    description: |
+      RFC-0036 — Polymorphic annotation subsystem (entityType =
+      device | work_order | work_order_event). Text + status + responses +
+      events + mentions + attachments, with optimistic locking. Work-order
+      observations are expressed as annotations on the WO or a specific event.
 
 security:
   - bearerAuth: []
@@ -181,6 +188,16 @@ components:
               nullable: true
             hasMore:
               type: boolean
+
+    Pagination:
+      type: object
+      description: Cursor-based pagination metadata (PaginatedResult.pagination).
+      properties:
+        total:      { type: integer, nullable: true }
+        totalPages: { type: integer, nullable: true }
+        hasMore:    { type: boolean }
+        nextCursor: { type: string, nullable: true }
+      required: [hasMore]
 
     SuccessMessageResponse:
       type: object
@@ -4782,7 +4799,7 @@ components:
       required: [url, expiresInSeconds, filename, contentType]
 
     # =========================================================================
-    # RFC-0032 — QR Checker module schemas
+    # RFC-0037 — Work Orders module schemas (operator-pin auth, viewer-login)
     # =========================================================================
 
     OperatorPinRequest:
@@ -4813,6 +4830,7 @@ components:
           description: QR-enabled customers the operator has access to
           items: { $ref: '#/components/schemas/Customer' }
 
+    # ---- Customer opt-in (carried over from QR Checker) ----------------------
     WoCustomerSettings:
       type: object
       properties:
@@ -4849,252 +4867,250 @@ components:
         expiresIn:   { type: integer, example: 3600 }
         customer:    { $ref: '#/components/schemas/Customer' }
 
-    Installation:
+    # =========================================================================
+    # RFC-0037 - Work Orders (event model) schemas
+    # =========================================================================
+    ActorSnapshot:
+      type: object
+      description: Immutable id/email/name actor snapshot (survives user deletion).
+      properties:
+        id:    { type: string, format: uuid, nullable: true }
+        email: { type: string, nullable: true }
+        name:  { type: string, nullable: true }
+
+    WorkOrder:
       type: object
       properties:
-        id:                 { type: string, format: uuid }
-        tenantId:           { type: string, format: uuid }
-        deviceId:           { type: string, format: uuid }
-        customerId:         { type: string, format: uuid }
-        position:           { type: string }
-        tcType:             { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
-        status:             { type: string, enum: [instalado, impedimento, removido, defeito] }
-        obs:                { type: string, nullable: true }
-        currentMultiplier:  { type: number, nullable: true }
-        voltageMultiplier:  { type: number, nullable: true }
-        installedBy:        { type: string, format: uuid }
-        installedAt:        { type: string, format: date-time }
-        updatedAt:          { type: string, format: date-time }
-        deletedAt:          { type: string, format: date-time, nullable: true }
+        id:          { type: string, format: uuid }
+        tenantId:    { type: string, format: uuid }
+        customerId:  { type: string, format: uuid }
+        rootAssetId: { type: string, format: uuid, nullable: true }
+        type:        { type: string, enum: [INSTALACAO, MANUTENCAO, VISITA_TECNICA] }
+        status:
+          type: string
+          description: Projection of the latest lifecycle event.
+          enum: [PLANEJADA, EM_ANDAMENTO, INTERROMPIDA, AGUARDANDO, REAGENDADA, FINALIZADA, CANCELADA]
+        code:        { type: string, nullable: true }
+        assignedTo:  { type: string, format: uuid, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        createdBy:   { type: string, format: uuid }
+        createdAt:   { type: string, format: date-time }
+        updatedAt:   { type: string, format: date-time }
 
-    InstallByDeviceIdRequest:
-      type: object
-      required: [customerId, deviceId, position]
-      properties:
-        customerId:        { type: string, format: uuid }
-        deviceId:          { type: string, format: uuid }
-        position:          { type: string }
-        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
-        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
-        obs:               { type: string, nullable: true }
-        currentMultiplier: { type: number, nullable: true }
-        voltageMultiplier: { type: number, nullable: true }
-
-    InstallByAddressRequest:
-      type: object
-      required: [customerId, addrLow, addrHigh, position]
-      properties:
-        customerId:        { type: string, format: uuid }
-        addrLow:           { type: integer, minimum: 0, maximum: 255 }
-        addrHigh:          { type: integer, minimum: 0, maximum: 255 }
-        position:          { type: string }
-        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
-        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
-        obs:               { type: string, nullable: true }
-        currentMultiplier: { type: number, nullable: true }
-        voltageMultiplier: { type: number, nullable: true }
-
-    InstallRequest:
-      oneOf:
-        - $ref: '#/components/schemas/InstallByDeviceIdRequest'
-        - $ref: '#/components/schemas/InstallByAddressRequest'
-
-    UpdateInstallationRequest:
-      type: object
-      properties:
-        position:          { type: string }
-        tcType:            { type: string, enum: ['50A','100A','400A','1000A','2000A'], nullable: true }
-        status:            { type: string, enum: [instalado, impedimento, removido, defeito] }
-        obs:               { type: string, nullable: true }
-        currentMultiplier: { type: number, nullable: true }
-        voltageMultiplier: { type: number, nullable: true }
-
-    InstallationImage:
-      type: object
-      properties:
-        id:             { type: string, format: uuid }
-        tenantId:       { type: string, format: uuid }
-        installationId: { type: string, format: uuid }
-        fileAssetId:    { type: string, format: uuid }
-        imageOrder:     { type: integer, minimum: 0, maximum: 19 }
-        caption:        { type: string, nullable: true }
-        createdAt:      { type: string, format: date-time }
-
-    InstallationImageWithUrl:
+    WorkOrderDetail:
       allOf:
-        - $ref: '#/components/schemas/InstallationImage'
+        - $ref: '#/components/schemas/WorkOrder'
         - type: object
           properties:
-            fileAsset:   { $ref: '#/components/schemas/FileAsset' }
-            downloadUrl: { type: string, format: uri }
+            devices: { type: array, items: { $ref: '#/components/schemas/WorkOrderDevice' } }
+            events:  { type: array, items: { $ref: '#/components/schemas/WorkOrderEvent' } }
 
-    InstallationAudit:
+    WorkOrderDevice:
       type: object
       properties:
-        id:                { type: string, format: uuid }
-        tenantId:          { type: string, format: uuid }
-        installationId:    { type: string, format: uuid }
-        revision:          { type: integer }
-        changeType:        { type: string, enum: [created, updated, deleted, image_added, image_removed, task_created, task_completed] }
-        changeDescription: { type: string, nullable: true }
-        oldValue:          { type: object, additionalProperties: true, nullable: true }
-        newValue:          { type: object, additionalProperties: true, nullable: true }
-        changedBy:         { type: string, format: uuid }
-        changedAt:         { type: string, format: date-time }
+        workOrderId: { type: string, format: uuid }
+        deviceId:    { type: string, format: uuid }
+        addedBy:     { type: string, format: uuid }
+        addedAt:     { type: string, format: date-time }
 
-    MaintenanceTask:
+    WorkOrderEvent:
+      type: object
+      properties:
+        id:            { type: string, format: uuid }
+        tenantId:      { type: string, format: uuid }
+        workOrderId:   { type: string, format: uuid }
+        eventType:     { type: string, description: 'A code from work_orders_event_types (e.g. VISITA_TECNICA_INICIADA, AMBIENTE_CRIADO, OBSERVACAO_INSERIDA).' }
+        actorType:     { type: string, enum: [USER, SYSTEM, API_KEY] }
+        actorUserId:   { type: string, format: uuid, nullable: true }
+        actor:         { allOf: [ { $ref: '#/components/schemas/ActorSnapshot' } ], nullable: true }
+        assetId:       { type: string, format: uuid, nullable: true }
+        deviceId:      { type: string, format: uuid, nullable: true }
+        payload:       { type: object, additionalProperties: true }
+        createdAt:     { type: string, format: date-time }
+
+    WorkOrderFile:
+      type: object
+      properties:
+        id:               { type: string, format: uuid }
+        workOrderId:      { type: string, format: uuid }
+        workOrderEventId: { type: string, format: uuid, nullable: true }
+        fileAssetId:      { type: string, format: uuid }
+        imageOrder:       { type: integer }
+        caption:          { type: string, nullable: true }
+        createdAt:        { type: string, format: date-time }
+
+    CreateWorkOrderRequest:
+      type: object
+      required: [customerId, type]
+      properties:
+        customerId:  { type: string, format: uuid }
+        type:        { type: string, enum: [INSTALACAO, MANUTENCAO, VISITA_TECNICA] }
+        rootAssetId: { type: string, format: uuid, nullable: true }
+        code:        { type: string, nullable: true }
+        assignedTo:  { type: string, format: uuid, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        devices:
+          type: array
+          items: { type: string, format: uuid }
+          description: Optional initial device scope.
+
+    UpdateWorkOrderRequest:
+      type: object
+      properties:
+        rootAssetId: { type: string, format: uuid, nullable: true }
+        code:        { type: string, nullable: true }
+        assignedTo:  { type: string, format: uuid, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+
+    AppendWorkOrderEventRequest:
+      type: object
+      required: [eventType]
+      properties:
+        eventType: { type: string, description: 'Event-type code from the catalog.' }
+        assetId:   { type: string, format: uuid, nullable: true }
+        deviceId:  { type: string, format: uuid, nullable: true }
+        payload:   { type: object, additionalProperties: true }
+
+    AddWorkOrderDeviceRequest:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId: { type: string, format: uuid }
+
+    AddWorkOrderFileRequest:
+      type: object
+      required: [fileAssetId]
+      properties:
+        fileAssetId:      { type: string, format: uuid }
+        workOrderEventId: { type: string, format: uuid, nullable: true }
+        imageOrder:       { type: integer, default: 0 }
+        caption:          { type: string, nullable: true }
+
+    # =========================================================================
+    # RFC-0036 - Annotations (polymorphic) schemas
+    # =========================================================================
+    Annotation:
       type: object
       properties:
         id:              { type: string, format: uuid }
         tenantId:        { type: string, format: uuid }
-        installationId:  { type: string, format: uuid }
-        description:     { type: string }
-        status:          { type: string, enum: [pending, pending_review, resolved, removido] }
-        createdBy:       { type: string, format: uuid }
+        customerId:      { type: string, format: uuid }
+        entityType:      { type: string, enum: [device, work_order, work_order_event] }
+        entityId:        { type: string, format: uuid }
+        text:            { type: string, maxLength: 255 }
+        type:            { type: string, enum: [observation, pending, maintenance, activity] }
+        importance:      { type: integer, minimum: 1, maximum: 5 }
+        status:          { type: string, enum: [created, modified, archived] }
+        finalized:       { type: boolean }
+        finalizedReason: { type: string, enum: [approved, rejected, archived], nullable: true }
+        dueDate:         { type: string, format: date-time, nullable: true }
+        createdBy:       { $ref: '#/components/schemas/ActorSnapshot' }
+        updatedBy:       { allOf: [ { $ref: '#/components/schemas/ActorSnapshot' } ], nullable: true }
+        version:         { type: integer }
         createdAt:       { type: string, format: date-time }
-        completedBy:     { type: string, format: uuid, nullable: true }
-        completedAt:     { type: string, format: date-time, nullable: true }
-        completedNotes:  { type: string, nullable: true }
-        reviewedBy:      { type: string, format: uuid, nullable: true }
-        reviewedAt:      { type: string, format: date-time, nullable: true }
+        updatedAt:       { type: string, format: date-time }
 
-    CreateMaintenanceTaskRequest:
-      type: object
-      required: [description]
-      properties:
-        description: { type: string, minLength: 1, maxLength: 2000 }
+    AnnotationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Annotation'
+        - type: object
+          properties:
+            responses:   { type: array, items: { $ref: '#/components/schemas/AnnotationResponse' } }
+            events:      { type: array, items: { $ref: '#/components/schemas/AnnotationEvent' } }
+            mentions:    { type: array, items: { $ref: '#/components/schemas/AnnotationMention' } }
+            attachments: { type: array, items: { $ref: '#/components/schemas/AnnotationAttachment' } }
 
-    UpdateMaintenanceTaskRequest:
-      type: object
-      properties:
-        description:    { type: string }
-        status:         { type: string, enum: [pending, pending_review, resolved, removido] }
-        completedNotes: { type: string, nullable: true }
-
-    CustomerObservation:
+    AnnotationResponse:
       type: object
       properties:
-        id:           { type: string, format: uuid }
-        tenantId:     { type: string, format: uuid }
-        customerId:   { type: string, format: uuid }
-        observation:  { type: string }
-        fileAssetId:  { type: string, format: uuid, nullable: true }
-        createdBy:    { type: string, format: uuid }
-        createdAt:    { type: string, format: date-time }
+        id:            { type: string, format: uuid }
+        annotationId:  { type: string, format: uuid }
+        type:          { type: string, enum: [approved, rejected, comment, archived] }
+        text:          { type: string, nullable: true, maxLength: 255 }
+        createdBy:     { $ref: '#/components/schemas/ActorSnapshot' }
+        createdAt:     { type: string, format: date-time }
 
-    CreateCustomerObservationRequest:
-      type: object
-      required: [observation]
-      properties:
-        observation: { type: string, minLength: 1, maxLength: 5000 }
-        fileAssetId: { type: string, format: uuid, nullable: true }
-
-    Visita:
+    AnnotationEvent:
       type: object
       properties:
-        id:           { type: string, format: uuid }
-        tenantId:     { type: string, format: uuid }
-        customerId:   { type: string, format: uuid, nullable: true }
-        name:         { type: string }
-        observation:  { type: string, nullable: true }
-        status:       { type: string, enum: [pending, in_progress, done] }
-        createdBy:    { type: string, format: uuid }
-        createdAt:    { type: string, format: date-time }
-        updatedAt:    { type: string, format: date-time }
-        deletedAt:    { type: string, format: date-time, nullable: true }
+        id:              { type: string, format: uuid }
+        annotationId:    { type: string, format: uuid }
+        responseId:      { type: string, format: uuid, nullable: true }
+        action:          { type: string, enum: [created, modified, archived, approved, rejected, commented, acknowledged] }
+        previousVersion: { type: integer, nullable: true }
+        changes:         { type: object, additionalProperties: true, nullable: true }
+        actor:           { $ref: '#/components/schemas/ActorSnapshot' }
+        createdAt:       { type: string, format: date-time }
 
-    CreateVisitaRequest:
-      type: object
-      required: [name]
-      properties:
-        customerId:  { type: string, format: uuid, nullable: true }
-        name:        { type: string, minLength: 1, maxLength: 200 }
-        observation: { type: string, nullable: true }
-
-    UpdateVisitaRequest:
+    AnnotationMention:
       type: object
       properties:
-        customerId:  { type: string, format: uuid, nullable: true }
-        name:        { type: string }
-        observation: { type: string, nullable: true }
-        status:      { type: string, enum: [pending, in_progress, done] }
+        id:                { type: string, format: uuid }
+        annotationId:      { type: string, format: uuid }
+        responseId:        { type: string, format: uuid, nullable: true }
+        mentionType:       { type: string, enum: [user, device] }
+        mentionedUserId:   { type: string, format: uuid, nullable: true }
+        mentionedDeviceId: { type: string, format: uuid, nullable: true }
+        actor:             { $ref: '#/components/schemas/ActorSnapshot' }
+        createdAt:         { type: string, format: date-time }
 
-    VisitaAmbiente:
+    AnnotationAttachment:
       type: object
       properties:
-        id:               { type: string, format: uuid }
-        tenantId:         { type: string, format: uuid }
-        visitaId:         { type: string, format: uuid }
-        name:             { type: string }
-        observation:      { type: string, nullable: true }
-        acQuantity:       { type: integer, nullable: true }
-        productQuantity:  { type: integer, nullable: true }
-        productType:      { type: string, nullable: true }
-        createdBy:        { type: string, format: uuid }
-        createdAt:        { type: string, format: date-time }
-        updatedAt:        { type: string, format: date-time }
+        id:            { type: string, format: uuid }
+        annotationId:  { type: string, format: uuid }
+        responseId:    { type: string, format: uuid, nullable: true }
+        fileAssetId:   { type: string, format: uuid }
+        createdBy:     { $ref: '#/components/schemas/ActorSnapshot' }
+        createdAt:     { type: string, format: date-time }
 
-    CreateVisitaAmbienteRequest:
+    CreateAnnotationRequest:
       type: object
-      required: [name]
+      required: [entityType, entityId, customerId, text]
       properties:
-        name:             { type: string, minLength: 1, maxLength: 200 }
-        observation:      { type: string, nullable: true }
-        acQuantity:       { type: integer, minimum: 0, nullable: true }
-        productQuantity:  { type: integer, minimum: 0, nullable: true }
-        productType:      { type: string, nullable: true }
+        entityType: { type: string, enum: [device, work_order, work_order_event] }
+        entityId:   { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        text:       { type: string, maxLength: 255 }
+        type:       { type: string, enum: [observation, pending, maintenance, activity], default: observation }
+        importance: { type: integer, minimum: 1, maximum: 5, default: 3 }
+        dueDate:    { type: string, format: date-time, nullable: true }
+        mentions:
+          type: array
+          items: { $ref: '#/components/schemas/CreateMentionRequest' }
 
-    UpdateVisitaAmbienteRequest:
-      $ref: '#/components/schemas/CreateVisitaAmbienteRequest'
-
-    VisitaProduct:
+    UpdateAnnotationRequest:
       type: object
       properties:
-        id:           { type: string, format: uuid }
-        tenantId:     { type: string, format: uuid }
-        ambienteId:   { type: string, format: uuid }
-        productType:  { type: string }
-        description:  { type: string, nullable: true }
-        quantity:     { type: integer, minimum: 1 }
-        createdBy:    { type: string, format: uuid }
-        createdAt:    { type: string, format: date-time }
+        text:       { type: string, maxLength: 255 }
+        type:       { type: string, enum: [observation, pending, maintenance, activity] }
+        importance: { type: integer, minimum: 1, maximum: 5 }
+        dueDate:    { type: string, format: date-time, nullable: true }
+        version:    { type: integer, description: 'Expected version for optimistic lock (or use If-Match).' }
 
-    CreateVisitaProductRequest:
+    CreateResponseRequest:
       type: object
-      required: [productType]
+      required: [type]
       properties:
-        productType: { type: string, minLength: 1, maxLength: 200 }
-        description: { type: string, nullable: true }
-        quantity:    { type: integer, minimum: 1, default: 1 }
+        type:    { type: string, enum: [approved, rejected, comment, archived] }
+        text:    { type: string, maxLength: 255, description: 'Required for all types except approved.' }
+        version: { type: integer }
 
-    UpdateVisitaProductRequest:
-      $ref: '#/components/schemas/CreateVisitaProductRequest'
-
-    VisitaObservation:
+    CreateMentionRequest:
       type: object
+      required: [mentionType]
       properties:
-        id:           { type: string, format: uuid }
-        tenantId:     { type: string, format: uuid }
-        visitaId:     { type: string, format: uuid }
-        observation:  { type: string }
-        fileAssetId:  { type: string, format: uuid, nullable: true }
-        createdBy:    { type: string, format: uuid }
-        createdAt:    { type: string, format: date-time }
+        mentionType:       { type: string, enum: [user, device] }
+        mentionedUserId:   { type: string, format: uuid, nullable: true }
+        mentionedDeviceId: { type: string, format: uuid, nullable: true }
+        responseId:        { type: string, format: uuid, nullable: true }
 
-    WoCustomerProgressReport:
+    CreateAttachmentRequest:
       type: object
+      required: [fileAssetId]
       properties:
-        customerId:        { type: string, format: uuid }
-        customerName:      { type: string }
-        customerCode:      { type: string }
-        totalDevices:      { type: integer }
-        installedCount:    { type: integer }
-        impedimentoCount:  { type: integer }
-        removidoCount:     { type: integer }
-        defeitoCount:      { type: integer }
-        pendingCount:      { type: integer }
-        progressPercent:   { type: number }
-        lastInstalledAt:   { type: string, format: date-time, nullable: true }
+        fileAssetId: { type: string, format: uuid }
+        responseId:  { type: string, format: uuid, nullable: true }
 
     SetOperatorPinRequest:
       type: object
@@ -12925,16 +12941,16 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
   # ===========================================================================
-  # RFC-0032 — QR Checker module
+  # RFC-0037 — Work Orders module (operator-pin + viewer-login are public)
   # ===========================================================================
 
   /auth/operator-pin:
     post:
-      tags: [QR Checker, Authentication]
+      tags: [Work Orders, Authentication]
       summary: Field-operator PIN login
       description: |
         Trades a 4-digit PIN + tenantId for a 24h JWT. Field operators on the
-        QR Checker mobile UX never see an email form. Two-column credential
+        Work Orders mobile UX never see an email form. Two-column credential
         design: HMAC lookup token + bcrypt hash. Rate-limited at 10 attempts
         / 5 min / IP.
       operationId: authOperatorPin
@@ -12962,23 +12978,23 @@ paths:
             Retry-After: { schema: { type: integer }, description: Seconds before next attempt }
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
-  # --- Customers (QR-enabled) -----------------------------------------------
+  # --- Customers (WO-enabled) ----------------------------------------------
 
   /wo/customers:
     get:
-      tags: [QR Checker]
-      summary: List QR-enabled customers
-      description: Returns only customers with a `wo_customer_settings` row.
+      tags: [Work Orders]
+      summary: List WO-enabled customers
+      description: Returns only customers with a `work_orders_customer_settings` row.
       operationId: woListCustomers
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: query
           name: include
           schema: { type: string, enum: [stats] }
-          description: When `stats`, attaches a `wo` progress block to each customer.
+          description: When `stats`, attaches a `wo` count block to each customer.
       responses:
         '200':
-          description: List of QR-enabled customers
+          description: WO-enabled customers
           content:
             application/json:
               schema:
@@ -12989,15 +13005,13 @@ paths:
                       data:
                         type: object
                         properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/Customer' }
+                          items: { type: array, items: { $ref: '#/components/schemas/Customer' } }
 
   /wo/customers/by-code/{code}:
     get:
-      tags: [QR Checker]
-      summary: Resolve a customer by code (legacy slug)
-      operationId: woGetCustomerByCode
+      tags: [Work Orders]
+      summary: Resolve a WO-enabled customer by code (slug)
+      operationId: woCustomerByCode
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - in: path
@@ -13015,26 +13029,24 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/Customer' }
-        '404': { description: Not found / not QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Not found or not WO-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
   /wo/customers/{customerId}/enable:
     post:
-      tags: [QR Checker]
-      summary: Mark a customer as QR-enabled
+      tags: [Work Orders]
+      summary: Enable Work Orders for a customer
       operationId: woEnableCustomer
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
       requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/EnableWoCustomerRequest' }
       responses:
         '201':
-          description: Settings created
+          description: Enabled
           content:
             application/json:
               schema:
@@ -13043,26 +13055,23 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/WoCustomerSettings' }
-        '409': { description: Already QR-enabled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
   /wo/customers/{customerId}/settings:
     patch:
-      tags: [QR Checker]
-      summary: Update QR-checker settings (viewer password, default central, metadata)
+      tags: [Work Orders]
+      summary: Update WO settings for a customer
       operationId: woUpdateCustomerSettings
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
       requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/UpdateWoCustomerSettingsRequest' }
       responses:
         '200':
-          description: Updated settings
+          description: Updated
           content:
             application/json:
               schema:
@@ -13074,34 +13083,27 @@ paths:
 
   /wo/customers/{customerId}/disable:
     post:
-      tags: [QR Checker]
-      summary: Soft-disable QR Checker for a customer (drops settings; data preserved)
+      tags: [Work Orders]
+      summary: Disable Work Orders for a customer (drops settings row)
       operationId: woDisableCustomer
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
       responses:
         '204': { description: Disabled }
 
   /wo/customers/{customerId}/viewer-login:
     post:
-      tags: [QR Checker]
-      summary: Viewer password login (read-only stakeholder)
+      tags: [Work Orders]
+      summary: Viewer password login (PUBLIC)
       description: |
-        Issues a 1h viewer JWT with `role:wo-viewer` + `scope:customer:<id>`
-        claims. Public — no JWT required to call this. Returns 401 on bad
-        password, 404 if customer not QR-enabled.
+        Trades a viewer password for a short-lived JWT scoped to a single
+        customer. No bearer token required — the password authenticates.
       operationId: woViewerLogin
       security: []
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -13109,7 +13111,7 @@ paths:
             schema: { $ref: '#/components/schemas/ViewerLoginRequest' }
       responses:
         '200':
-          description: Viewer JWT + customer
+          description: Login successful
           content:
             application/json:
               schema:
@@ -13118,42 +13120,19 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/ViewerLoginResponse' }
-        '401': { description: Senha de viewer inválida, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { description: Invalid viewer password, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
   /wo/customers/{customerId}/devices:
     get:
-      tags: [QR Checker]
-      summary: List devices for a QR-enabled customer (joins installation status)
-      operationId: woListCustomerDevices
+      tags: [Work Orders]
+      summary: List devices for a WO-enabled customer
+      operationId: woCustomerDevices
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
       responses:
         '200':
-          description: Devices with optional `woInstallation` join
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-
-  /wo/customers/{customerId}/observations:
-    get:
-      tags: [QR Checker]
-      summary: List customer-level observations
-      operationId: woListCustomerObservations
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Observations
+          description: Devices
           content:
             application/json:
               schema:
@@ -13164,176 +13143,20 @@ paths:
                       data:
                         type: object
                         properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/CustomerObservation' }
-    post:
-      tags: [QR Checker]
-      summary: Add a customer-level observation (with optional photo via fileAssetId)
-      operationId: woCreateCustomerObservation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateCustomerObservationRequest' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/CustomerObservation' }
-
-  /wo/customers/{customerId}/observations/{observationId}:
-    delete:
-      tags: [QR Checker]
-      summary: Delete a customer observation
-      operationId: woDeleteCustomerObservation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: observationId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
+                          items: { type: array, items: { $ref: '#/components/schemas/Device' } }
 
   /wo/customers/{customerId}/report:
     get:
-      tags: [QR Checker]
-      summary: Customer installation progress report
+      tags: [Work Orders]
+      summary: WO summary for a customer (counts by status/type)
       operationId: woCustomerReport
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: customerId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: query
-          name: format
-          schema: { type: string, enum: [json], default: json }
-          description: |
-            Only `json` is implemented in v1. `xlsx`/`pdf` ship in a later phase.
+        - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: format, schema: { type: string, enum: [json], default: json } }
       responses:
         '200':
-          description: Report
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/WoCustomerProgressReport' }
-
-  # --- Install + installations ----------------------------------------------
-
-  /wo/install:
-    post:
-      tags: [QR Checker]
-      summary: Record a device installation (idempotent on tenantId+deviceId)
-      description: |
-        Accepts `deviceId` directly OR `addrLow + addrHigh` (legacy QR payload).
-        If an installation already exists for the resolved device, the call is
-        treated as an update.
-      operationId: woInstall
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/InstallRequest' }
-      responses:
-        '201':
-          description: Installation created/updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Installation' }
-        '404': { description: Device or customer not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-
-  /wo/installations/{id}:
-    get:
-      tags: [QR Checker]
-      summary: Get an installation
-      operationId: woGetInstallation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Installation
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Installation' }
-    patch:
-      tags: [QR Checker]
-      summary: Update an installation (audit row emitted)
-      operationId: woUpdateInstallation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateInstallationRequest' }
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Installation' }
-
-  /wo/installations/{id}/audit:
-    get:
-      tags: [QR Checker]
-      summary: List the installation's revision audit
-      operationId: woInstallationAudit
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Audit entries (revision-ordered)
+          description: Summary
           content:
             application/json:
               schema:
@@ -13344,24 +13167,30 @@ paths:
                       data:
                         type: object
                         properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/InstallationAudit' }
+                          customerId: { type: string, format: uuid }
+                          total:      { type: integer }
+                          byStatus:   { type: object, additionalProperties: { type: integer } }
+                          byType:     { type: object, additionalProperties: { type: integer } }
 
-  /wo/installations/{id}/images:
+  # --- Work orders ----------------------------------------------------------
+
+  /wo/work-orders:
     get:
-      tags: [QR Checker]
-      summary: List installation images
-      operationId: woListInstallationImages
+      tags: [Work Orders]
+      summary: List work orders
+      operationId: woListWorkOrders
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: query, name: customerId, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: type, schema: { type: string, enum: [INSTALACAO, MANUTENCAO, VISITA_TECNICA] } }
+        - { in: query, name: assignedTo, schema: { type: string, format: uuid } }
+        - { in: query, name: deviceId, schema: { type: string, format: uuid } }
+        - { in: query, name: limit, schema: { type: integer } }
+        - { in: query, name: cursor, schema: { type: string } }
       responses:
         '200':
-          description: Images
+          description: Work orders
           content:
             application/json:
               schema:
@@ -13372,38 +13201,22 @@ paths:
                       data:
                         type: object
                         properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/InstallationImage' }
+                          items: { type: array, items: { $ref: '#/components/schemas/WorkOrder' } }
+                          pagination: { $ref: '#/components/schemas/Pagination' }
     post:
-      tags: [QR Checker]
-      summary: Upload an installation image (multipart) and write the join row
-      description: |
-        Multipart payload: field `file` (binary), optional `caption`, optional
-        `imageOrder`. Server-side cap of 20 images per installation. The
-        backend uploads to S3 via FileAssets and returns the join row + a
-        short-lived signed downloadUrl.
-      operationId: woUploadInstallationImage
+      tags: [Work Orders]
+      summary: Create a work order
+      operationId: woCreateWorkOrder
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:       { type: string, format: binary }
-                caption:    { type: string }
-                imageOrder: { type: integer, minimum: 0, maximum: 19 }
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWorkOrderRequest' }
       responses:
         '201':
-          description: Image uploaded + join row created + audit emitted
+          description: Created
           content:
             application/json:
               schema:
@@ -13411,32 +13224,40 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/InstallationImageWithUrl' }
-        '409': { description: Image limit reached (max 20 / installation), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+                      data: { $ref: '#/components/schemas/WorkOrderDetail' }
 
-  /wo/installations/{installationId}/images/{imageId}:
-    patch:
-      tags: [QR Checker]
-      summary: Update image caption/order
-      operationId: woUpdateInstallationImage
+  /wo/work-orders/{id}:
+    get:
+      tags: [Work Orders]
+      summary: Work order detail (status, device scope, events)
+      operationId: woGetWorkOrder
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: installationId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: imageId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkOrderDetail' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    patch:
+      tags: [Work Orders]
+      summary: Update a work order (assignee, schedule, root asset, code)
+      operationId: woUpdateWorkOrder
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                imageOrder: { type: integer }
-                caption:    { type: string, nullable: true }
+            schema: { $ref: '#/components/schemas/UpdateWorkOrderRequest' }
       responses:
         '200':
           description: Updated
@@ -13447,768 +13268,399 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/InstallationImage' }
+                      data: { $ref: '#/components/schemas/WorkOrder' }
     delete:
-      tags: [QR Checker]
-      summary: Detach an installation image (audit emitted)
-      operationId: woDeleteInstallationImage
+      tags: [Work Orders]
+      summary: Soft-delete a work order
+      operationId: woDeleteWorkOrder
       parameters:
         - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: installationId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: imageId
-          required: true
-          schema: { type: string, format: uuid }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted }
+
+  /wo/work-orders/{id}/events:
+    get:
+      tags: [Work Orders]
+      summary: Work order timeline (events)
+      operationId: woListEvents
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items: { type: array, items: { $ref: '#/components/schemas/WorkOrderEvent' } }
+    post:
+      tags: [Work Orders]
+      summary: Append an event (drives status projection)
+      operationId: woAppendEvent
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppendWorkOrderEventRequest' }
+      responses:
+        '201':
+          description: Appended
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkOrderEvent' }
+        '409': { description: Work order is terminal (locked), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /wo/work-orders/{id}/devices:
+    get:
+      tags: [Work Orders]
+      summary: List the device scope
+      operationId: woListDevices
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Devices
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items: { type: array, items: { $ref: '#/components/schemas/WorkOrderDevice' } }
+    post:
+      tags: [Work Orders]
+      summary: Add a device to the scope
+      operationId: woAddDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddWorkOrderDeviceRequest' }
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkOrderDevice' }
+
+  /wo/work-orders/{id}/devices/{deviceId}:
+    delete:
+      tags: [Work Orders]
+      summary: Remove a device from the scope
+      operationId: woRemoveDevice
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: deviceId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Removed }
+
+  /wo/work-orders/{id}/files:
+    get:
+      tags: [Work Orders]
+      summary: List files / evidence
+      operationId: woListFiles
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Files
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items: { type: array, items: { $ref: '#/components/schemas/WorkOrderFile' } }
+    post:
+      tags: [Work Orders]
+      summary: Link a file_asset to the work order
+      description: v1 links an existing fileAssetId; multipart upload is a follow-up.
+      operationId: woAddFile
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddWorkOrderFileRequest' }
+      responses:
+        '201':
+          description: Linked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkOrderFile' }
+
+  /wo/work-orders/{id}/files/{fileId}:
+    delete:
+      tags: [Work Orders]
+      summary: Unlink a file from the work order
+      operationId: woDeleteFile
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: fileId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Unlinked }
+
+  # ===========================================================================
+  # RFC-0036 - Annotations (polymorphic: device | work_order | work_order_event)
+  # ===========================================================================
+
+  /annotations:
+    get:
+      tags: [Annotations]
+      summary: List annotations (cross-entity)
+      description: |
+        Filters: `entityType` + `entityId` (e.g. all observations on a work
+        order or a single event), `customerId`, `type`, `status`, `importance`,
+        `mentionedUserId`, `mentionedDeviceId`, `hasAttachments`,
+        `includeArchived`, plus pagination.
+      operationId: listAnnotations
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: query, name: entityType, schema: { type: string, enum: [device, work_order, work_order_event] } }
+        - { in: query, name: entityId, schema: { type: string, format: uuid } }
+        - { in: query, name: customerId, schema: { type: string, format: uuid } }
+        - { in: query, name: type, schema: { type: string, enum: [observation, pending, maintenance, activity] } }
+        - { in: query, name: status, schema: { type: string, enum: [created, modified, archived] } }
+        - { in: query, name: importance, schema: { type: integer, minimum: 1, maximum: 5 } }
+        - { in: query, name: mentionedUserId, schema: { type: string, format: uuid } }
+        - { in: query, name: mentionedDeviceId, schema: { type: string, format: uuid } }
+        - { in: query, name: hasAttachments, schema: { type: boolean } }
+        - { in: query, name: includeArchived, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Annotations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items: { type: array, items: { $ref: '#/components/schemas/Annotation' } }
+                          pagination: { $ref: '#/components/schemas/Pagination' }
+    post:
+      tags: [Annotations]
+      summary: Create an annotation on a polymorphic target
+      operationId: createAnnotation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAnnotationRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationDetail' }
+
+  /annotations/{id}:
+    get:
+      tags: [Annotations]
+      summary: Full annotation (responses + events + mentions + attachments)
+      operationId: getAnnotation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Annotation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationDetail' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    patch:
+      tags: [Annotations]
+      summary: Edit text/type/importance/dueDate (optimistic lock)
+      description: Send the expected version via the `version` body field or the `If-Match` header. A mismatch returns 409.
+      operationId: updateAnnotation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: If-Match, schema: { type: string }, description: Expected version (optimistic lock). }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAnnotationRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationDetail' }
+        '409': { description: Version conflict (optimistic lock), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /annotations/{id}/archive:
+    post:
+      tags: [Annotations]
+      summary: Archive an annotation (finalizes it)
+      operationId: archiveAnnotation
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: If-Match, schema: { type: string } }
+      responses:
+        '200':
+          description: Archived
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationDetail' }
+        '409': { description: Already finalized or version conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /annotations/{id}/responses:
+    post:
+      tags: [Annotations]
+      summary: Add a comment or finalizing decision
+      description: comment does not finalize; approved/rejected/archived finalize the annotation.
+      operationId: addAnnotationResponse
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateResponseRequest' }
+      responses:
+        '201':
+          description: Response added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationResponse' }
+        '409': { description: Annotation already finalized, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /annotations/{id}/mentions:
+    post:
+      tags: [Annotations]
+      summary: Mention a user or device
+      operationId: addAnnotationMention
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMentionRequest' }
+      responses:
+        '201':
+          description: Mention added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationMention' }
+
+  /annotations/{id}/attachments:
+    post:
+      tags: [Annotations]
+      summary: Attach a file (links an existing fileAssetId)
+      operationId: addAnnotationAttachment
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAttachmentRequest' }
+      responses:
+        '201':
+          description: Attached
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AnnotationAttachment' }
+
+  /annotations/{id}/attachments/{attId}:
+    delete:
+      tags: [Annotations]
+      summary: Detach a file (active annotation only)
+      operationId: removeAnnotationAttachment
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: attId, required: true, schema: { type: string, format: uuid } }
       responses:
         '204': { description: Detached }
-
-  /wo/installations/{id}/tasks:
-    get:
-      tags: [QR Checker]
-      summary: List maintenance tasks for an installation
-      operationId: woListInstallationTasks
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Tasks
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/MaintenanceTask' }
-    post:
-      tags: [QR Checker]
-      summary: Create a maintenance task (audit row task_created)
-      operationId: woCreateInstallationTask
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateMaintenanceTaskRequest' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/MaintenanceTask' }
-
-  /wo/installations/{installationId}/tasks/{taskId}:
-    patch:
-      tags: [QR Checker]
-      summary: Update a task (status changes emit task_completed audit)
-      operationId: woUpdateInstallationTask
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: installationId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: taskId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateMaintenanceTaskRequest' }
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/MaintenanceTask' }
-
-  # --- Visitas ---------------------------------------------------------------
-
-  /wo/visitas:
-    get:
-      tags: [QR Checker]
-      summary: List visitas técnicas (paginated)
-      operationId: woListVisitas
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: query
-          name: customerId
-          schema: { type: string, format: uuid }
-        - in: query
-          name: status
-          schema: { type: string, enum: [pending, in_progress, done] }
-        - in: query
-          name: limit
-          schema: { type: integer, default: 50 }
-        - in: query
-          name: offset
-          schema: { type: integer, default: 0 }
-      responses:
-        '200':
-          description: Visitas + total count
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/Visita' }
-                          total: { type: integer }
-    post:
-      tags: [QR Checker]
-      summary: Create a visita técnica (audit row created)
-      operationId: woCreateVisita
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateVisitaRequest' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Visita' }
-
-  /wo/visitas/{id}:
-    get:
-      tags: [QR Checker]
-      summary: Get a visita
-      operationId: woGetVisita
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Visita
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Visita' }
-    patch:
-      tags: [QR Checker]
-      summary: Update a visita (audit emitted)
-      operationId: woUpdateVisita
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateVisitaRequest' }
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/Visita' }
-    delete:
-      tags: [QR Checker]
-      summary: Soft-delete a visita
-      operationId: woDeleteVisita
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Soft-deleted }
-
-  /wo/visitas/{id}/audit:
-    get:
-      tags: [QR Checker]
-      summary: List visita audit log
-      operationId: woVisitaAudit
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Audit entries
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-
-  /wo/visitas/{id}/report:
-    get:
-      tags: [QR Checker]
-      summary: Visita summary (counts of ambientes, products)
-      operationId: woVisitaReport
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Report
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-
-  /wo/visitas/{id}/observations:
-    get:
-      tags: [QR Checker]
-      summary: List visita-level observations
-      operationId: woListVisitaObservations
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Observations
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-    post:
-      tags: [QR Checker]
-      summary: Create a visita observation (with optional fileAssetId photo)
-      operationId: woCreateVisitaObservation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [observation]
-              properties:
-                observation: { type: string }
-                fileAssetId: { type: string, format: uuid, nullable: true }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/VisitaObservation' }
-
-  /wo/visitas/{id}/observations/{observationId}:
-    delete:
-      tags: [QR Checker]
-      summary: Delete a visita observation
-      operationId: woDeleteVisitaObservation
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: observationId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
-
-  # --- Visita ambientes ------------------------------------------------------
-
-  /wo/visitas/{id}/ambientes:
-    get:
-      tags: [QR Checker]
-      summary: List ambientes for a visita
-      operationId: woListAmbientes
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Ambientes
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/VisitaAmbiente' }
-    post:
-      tags: [QR Checker]
-      summary: Create an ambiente in a visita (audit emitted)
-      operationId: woCreateAmbiente
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateVisitaAmbienteRequest' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/VisitaAmbiente' }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}:
-    get:
-      tags: [QR Checker]
-      summary: Get an ambiente
-      operationId: woGetAmbiente
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Ambiente
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data: { $ref: '#/components/schemas/VisitaAmbiente' }
-    patch:
-      tags: [QR Checker]
-      summary: Update an ambiente (auto-save target — debounce on FE)
-      operationId: woUpdateAmbiente
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateVisitaAmbienteRequest' }
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-    delete:
-      tags: [QR Checker]
-      summary: Delete an ambiente (audit emitted; cascades to images/products)
-      operationId: woDeleteAmbiente
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/images:
-    get:
-      tags: [QR Checker]
-      summary: List ambiente images
-      operationId: woListAmbienteImages
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Images
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-    post:
-      tags: [QR Checker]
-      summary: Upload an ambiente image (multipart, max 50 / ambiente)
-      operationId: woUploadAmbienteImage
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:       { type: string, format: binary }
-                caption:    { type: string }
-                imageOrder: { type: integer, minimum: 0, maximum: 49 }
-      responses:
-        '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '409': { description: Image limit reached (50/ambiente), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/images/{imageId}:
-    patch:
-      tags: [QR Checker]
-      summary: Update ambiente image caption/order
-      operationId: woUpdateAmbienteImage
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: imageId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    delete:
-      tags: [QR Checker]
-      summary: Delete an ambiente image
-      operationId: woDeleteAmbienteImage
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: imageId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
-
-  # --- Visita products -------------------------------------------------------
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/products:
-    get:
-      tags: [QR Checker]
-      summary: List products in an ambiente
-      operationId: woListProducts
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200': { description: Products, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    post:
-      tags: [QR Checker]
-      summary: Create a product
-      operationId: woCreateProduct
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateVisitaProductRequest' }
-      responses:
-        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}:
-    patch:
-      tags: [QR Checker]
-      summary: Update a product
-      operationId: woUpdateProduct
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: productId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    delete:
-      tags: [QR Checker]
-      summary: Delete a product
-      operationId: woDeleteProduct
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: productId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images:
-    get:
-      tags: [QR Checker]
-      summary: List product images
-      operationId: woListProductImages
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: productId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200': { description: Images, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    post:
-      tags: [QR Checker]
-      summary: Upload a product image (multipart, max 5 / product)
-      operationId: woUploadProductImage
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: productId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file: { type: string, format: binary }
-      responses:
-        '201': { description: Uploaded, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '409': { description: Image limit reached (5/product), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-
-  /wo/visitas/{id}/ambientes/{ambienteId}/products/{productId}/images/{imageId}:
-    delete:
-      tags: [QR Checker]
-      summary: Delete a product image
-      operationId: woDeleteProductImage
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: ambienteId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: productId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: imageId
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '204': { description: Deleted }
-
-  # --- Users (PIN admin + audit history) ------------------------------------
-
-  /wo/users/{userId}/pin:
-    patch:
-      tags: [QR Checker]
-      summary: Set or clear a user's field-operator PIN
-      description: |
-        Body `{ pin: "1234" }` sets/replaces; `{ pin: null }` clears. Server
-        writes both `wo_field_pin_lookup` (HMAC) and `wo_field_pin_hash`
-        (bcrypt). PG `23505` violations on the partial UNIQUE index are
-        mapped to `409 PIN_TAKEN`.
-      operationId: woSetUserPin
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: userId
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/SetOperatorPinRequest' }
-      responses:
-        '204': { description: PIN set or cleared }
-        '409': { description: PIN already in use, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-
-  /wo/users/{userId}/audit:
-    get:
-      tags: [QR Checker]
-      summary: List installation-audit entries authored by this user
-      operationId: woUserAudit
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - in: path
-          name: userId
-          required: true
-          schema: { type: string, format: uuid }
-        - in: query
-          name: limit
-          schema: { type: integer, default: 50 }
-        - in: query
-          name: offset
-          schema: { type: integer, default: 0 }
-      responses:
-        '200':
-          description: Audit timeline
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          items:
-                            type: array
-                            items: { $ref: '#/components/schemas/InstallationAudit' }
-                          total: { type: integer }

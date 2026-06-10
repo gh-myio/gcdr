@@ -20,6 +20,7 @@ import {
   index,
   uniqueIndex,
   check,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -1648,16 +1649,20 @@ export const wikiPageRevisions = pgTable('wiki_page_revisions', {
 }));
 
 // =============================================================================
-// RFC-0032: QR Checker module — backend, data, MCP migration from
-// qrcode-check.git (Next.js + SQLite) into the GCDR platform.
+// RFC-0037: Work Orders — Event Model (+ RFC-0036 generalized annotations).
 //
-// Reuses the existing `customers`, `users`, `devices`, and `file_assets`
-// tables. The wo_* prefix marks tables that genuinely live only in the
-// QR Checker domain.
+// Replaces the rigid QR-Checker wo_* schema (migration 0026/0024) with an
+// event-log model: a Work Order has N events, each with an event_type and a
+// flexible jsonb payload. Observations reuse the (polymorphic) RFC-0036
+// annotation subsystem. Reuses the existing `customers`, `users`, `assets`,
+// `devices`, and `file_assets` tables.
+//
+// Migration: drizzle/migrations/0031_work_orders_event_model.sql
 // =============================================================================
 
-// Opt-in extension that marks a customer as "QR-enabled".
-export const woCustomerSettings = pgTable('wo_customer_settings', {
+// Opt-in extension that marks a customer as "Work-Orders-enabled".
+// Renamed from wo_customer_settings (migration 0031); shape unchanged.
+export const woCustomerSettings = pgTable('work_orders_customer_settings', {
   customerId:         uuid('customer_id').primaryKey().references(() => customers.id, { onDelete: 'cascade' }),
   tenantId:           uuid('tenant_id').notNull(),
   viewerPasswordHash: text('viewer_password_hash'),
@@ -1667,210 +1672,260 @@ export const woCustomerSettings = pgTable('wo_customer_settings', {
   createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  tenantIdx: index('idx_wo_cust_settings_tenant').on(table.tenantId),
+  tenantIdx: index('idx_work_orders_cust_settings_tenant').on(table.tenantId),
 }));
 
-export const woInstallations = pgTable('wo_installations', {
-  id:                 uuid('id').primaryKey().defaultRandom(),
-  tenantId:           uuid('tenant_id').notNull(),
-  deviceId:           uuid('device_id').notNull().references(() => devices.id, { onDelete: 'restrict' }),
-  customerId:         uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
-  position:           text('position').notNull(),
-  tcType:             text('tc_type'),
-  impedimentoText:    text('impedimento_text').notNull().default('instalado'),
-  obs:                text('obs'),
-  currentMultiplier:  numeric('current_multiplier'),
-  voltageMultiplier:  numeric('voltage_multiplier'),
-  installedBy:        uuid('installed_by').notNull(),
-  installedAt:        timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  deletedAt:          timestamp('deleted_at', { withTimezone: true }),
-}, (table) => ({
-  deviceUnique: uniqueIndex('wo_installations_device_unique').on(table.tenantId, table.deviceId),
-  tenantCustomerIdx: index('idx_wo_installations_tenant_customer').on(table.tenantId, table.customerId),
-  statusIdx:    index('idx_wo_installations_status').on(table.tenantId, table.impedimentoText),
-  deviceIdx:    index('idx_wo_installations_device').on(table.deviceId),
-  statusCheck: check(
-    'wo_installations_status_check',
-    sql`${table.impedimentoText} IN ('instalado','impedimento','removido','defeito')`
-  ),
-  tcTypeCheck: check(
-    'wo_installations_tc_type_check',
-    sql`${table.tcType} IS NULL OR ${table.tcType} IN ('50A','100A','400A','1000A','2000A')`
-  ),
-}));
-
-export const woInstallationImages = pgTable('wo_installation_images', {
-  id:             uuid('id').primaryKey().defaultRandom(),
-  tenantId:       uuid('tenant_id').notNull(),
-  installationId: uuid('installation_id').notNull().references(() => woInstallations.id, { onDelete: 'cascade' }),
-  fileAssetId:    uuid('file_asset_id').notNull(),
-  imageOrder:     integer('image_order').notNull().default(0),
-  caption:        text('caption'),
-  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  installImageUnique: uniqueIndex('wo_installation_images_unique').on(table.installationId, table.fileAssetId),
-  installIdx: index('idx_wo_installation_images_install').on(table.installationId, table.imageOrder),
-  orderRange: check(
-    'wo_installation_images_order_range',
-    sql`${table.imageOrder} >= 0 AND ${table.imageOrder} < 20`
-  ),
-}));
-
-export const woInstallationAudit = pgTable('wo_installation_audit', {
-  id:                 uuid('id').primaryKey().defaultRandom(),
-  tenantId:           uuid('tenant_id').notNull(),
-  installationId:     uuid('installation_id').notNull().references(() => woInstallations.id, { onDelete: 'cascade' }),
-  revision:           integer('revision').notNull(),
-  changeType:         text('change_type').notNull(),
-  changeDescription:  text('change_description'),
-  oldValue:           jsonb('old_value'),
-  newValue:           jsonb('new_value'),
-  changedBy:          uuid('changed_by').notNull(),
-  changedAt:          timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  revisionUnique: uniqueIndex('wo_installation_audit_revision_unique').on(table.installationId, table.revision),
-  chronoIdx:      index('idx_wo_installation_audit_chrono').on(table.installationId, table.changedAt),
-  changeTypeCheck: check(
-    'wo_installation_audit_change_type_check',
-    sql`${table.changeType} IN ('created','updated','deleted','image_added','image_removed','task_created','task_completed')`
-  ),
-}));
-
-export const woMaintenanceTasks = pgTable('wo_maintenance_tasks', {
-  id:               uuid('id').primaryKey().defaultRandom(),
-  tenantId:         uuid('tenant_id').notNull(),
-  installationId:   uuid('installation_id').notNull().references(() => woInstallations.id, { onDelete: 'cascade' }),
-  description:      text('description').notNull(),
-  status:           text('status').notNull().default('pending'),
-  createdBy:        uuid('created_by').notNull(),
-  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  completedBy:      uuid('completed_by'),
-  completedAt:      timestamp('completed_at', { withTimezone: true }),
-  completedNotes:   text('completed_notes'),
-  reviewedBy:       uuid('reviewed_by'),
-  reviewedAt:       timestamp('reviewed_at', { withTimezone: true }),
-}, (table) => ({
-  tenantStatusIdx: index('idx_wo_maintenance_tenant_status').on(table.tenantId, table.status),
-  installIdx:      index('idx_wo_maintenance_install').on(table.installationId, table.createdAt),
-  statusCheck: check(
-    'wo_maintenance_status_check',
-    sql`${table.status} IN ('pending','pending_review','resolved','removido')`
-  ),
-}));
-
-export const woCustomerObservations = pgTable('wo_customer_observations', {
+// -----------------------------------------------------------------------------
+// 1) Work Order (status is a service-maintained projection of lifecycle events)
+// -----------------------------------------------------------------------------
+export const workOrders = pgTable('work_orders', {
   id:           uuid('id').primaryKey().defaultRandom(),
   tenantId:     uuid('tenant_id').notNull(),
-  customerId:   uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
-  observation:  text('observation').notNull(),
-  fileAssetId:  uuid('file_asset_id'),
-  createdBy:    uuid('created_by').notNull(),
-  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  chronoIdx: index('idx_wo_cust_obs_chrono').on(table.customerId, table.createdAt),
-}));
-
-export const woVisitasTecnicas = pgTable('wo_visitas_tecnicas', {
-  id:           uuid('id').primaryKey().defaultRandom(),
-  tenantId:     uuid('tenant_id').notNull(),
-  customerId:   uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
-  name:         text('name').notNull(),
-  observation:  text('observation'),
-  status:       text('status').notNull().default('pending'),
+  customerId:   uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
+  rootAssetId:  uuid('root_asset_id').references(() => assets.id),
+  type:         text('type').notNull(),
+  status:       text('status').notNull().default('PLANEJADA'),
+  code:         text('code'),
+  assignedTo:   uuid('assigned_to').references(() => users.id),
+  scheduledAt:  timestamp('scheduled_at', { withTimezone: true }),
   createdBy:    uuid('created_by').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
-  tenantStatusIdx: index('idx_wo_visitas_tenant_status').on(table.tenantId, table.status),
-  customerIdx:     index('idx_wo_visitas_customer').on(table.customerId),
-  statusCheck: check(
-    'wo_visitas_status_check',
-    sql`${table.status} IN ('pending','in_progress','done')`
+  tenantCustomerIdx: index('work_orders_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantStatusIdx:   index('work_orders_tenant_status_idx').on(table.tenantId, table.status),
+  rootAssetIdx:      index('work_orders_root_asset_idx').on(table.rootAssetId),
+  typeCheck: check(
+    'work_orders_type_check',
+    sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA')`
   ),
 }));
 
-export const woVisitaAmbientes = pgTable('wo_visita_ambientes', {
+// -----------------------------------------------------------------------------
+// 2) Device scope (junction)
+// -----------------------------------------------------------------------------
+export const workOrdersDevices = pgTable('work_orders_devices', {
+  workOrderId: uuid('work_order_id').notNull().references(() => workOrders.id, { onDelete: 'cascade' }),
+  deviceId:    uuid('device_id').notNull().references(() => devices.id, { onDelete: 'restrict' }),
+  addedBy:     uuid('added_by').notNull(),
+  addedAt:     timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.workOrderId, table.deviceId] }),
+  deviceIdx: index('work_orders_devices_device_idx').on(table.deviceId),
+}));
+
+// -----------------------------------------------------------------------------
+// 3) Event types catalog (extensible — add a type without a migration)
+// -----------------------------------------------------------------------------
+export const workOrdersEventTypes = pgTable('work_orders_event_types', {
+  code:       text('code').primaryKey(),
+  category:   text('category').notNull(),
+  label:      text('label').notNull(),
+  isTerminal: boolean('is_terminal').notNull().default(false),
+  sortOrder:  integer('sort_order').notNull().default(0),
+  active:     boolean('active').notNull().default(true),
+});
+
+// -----------------------------------------------------------------------------
+// 4) Events (append-only "what happened, in order")
+// -----------------------------------------------------------------------------
+export const workOrdersEvents = pgTable('work_orders_events', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  workOrderId: uuid('work_order_id').notNull().references(() => workOrders.id, { onDelete: 'cascade' }),
+  eventType:   text('event_type').notNull().references(() => workOrdersEventTypes.code),
+  actorType:   text('actor_type').notNull(),
+  actorUserId: uuid('actor_user_id').references(() => users.id),
+  actor:       jsonb('actor'),
+  assetId:     uuid('asset_id').references(() => assets.id),
+  deviceId:    uuid('device_id').references(() => devices.id),
+  payload:     jsonb('payload').notNull().default({}),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  woChronoIdx: index('work_orders_events_wo_chrono_idx').on(table.workOrderId, table.createdAt),
+  typeIdx:     index('work_orders_events_type_idx').on(table.tenantId, table.eventType),
+  deviceIdx:   index('work_orders_events_device_idx').on(table.deviceId).where(sql`device_id IS NOT NULL`),
+  actorTypeCheck: check(
+    'work_orders_events_actor_type_check',
+    sql`${table.actorType} IN ('USER','SYSTEM','API_KEY')`
+  ),
+}));
+
+// -----------------------------------------------------------------------------
+// 5) Files / evidence (→ file_assets; optionally tied to the event that added it)
+// -----------------------------------------------------------------------------
+export const workOrderFiles = pgTable('work_order_files', {
   id:               uuid('id').primaryKey().defaultRandom(),
   tenantId:         uuid('tenant_id').notNull(),
-  visitaId:         uuid('visita_id').notNull().references(() => woVisitasTecnicas.id, { onDelete: 'cascade' }),
-  name:             text('name').notNull(),
-  observation:      text('observation'),
-  acQuantity:       integer('ac_quantity'),
-  productQuantity:  integer('product_quantity'),
-  productType:      text('product_type'),
-  createdBy:        uuid('created_by').notNull(),
+  workOrderId:      uuid('work_order_id').notNull().references(() => workOrders.id, { onDelete: 'cascade' }),
+  workOrderEventId: uuid('work_order_event_id').references(() => workOrdersEvents.id, { onDelete: 'set null' }),
+  fileAssetId:      uuid('file_asset_id').notNull().references(() => fileAssets.id),
+  imageOrder:       integer('image_order').notNull().default(0),
+  caption:          text('caption'),
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  visitaIdx: index('idx_wo_visita_ambientes_visita').on(table.visitaId, table.createdAt),
+  woFileUnique: uniqueIndex('work_order_files_wo_file_unique').on(table.workOrderId, table.fileAssetId),
+  woIdx:        index('work_order_files_wo_idx').on(table.workOrderId, table.imageOrder),
+  eventIdx:     index('work_order_files_event_idx').on(table.workOrderEventId),
 }));
 
-export const woVisitaAmbienteImages = pgTable('wo_visita_ambiente_images', {
-  id:           uuid('id').primaryKey().defaultRandom(),
-  tenantId:     uuid('tenant_id').notNull(),
-  ambienteId:   uuid('ambiente_id').notNull().references(() => woVisitaAmbientes.id, { onDelete: 'cascade' }),
-  fileAssetId:  uuid('file_asset_id').notNull(),
-  imageOrder:   integer('image_order').notNull().default(0),
-  caption:      text('caption'),
-  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  ambienteIdx: index('idx_wo_visita_ambiente_images_amb').on(table.ambienteId, table.imageOrder),
-}));
+// =============================================================================
+// RFC-0036 (generalized): Annotation subsystem. Polymorphic target via
+// entity_type ('device' | 'work_order' | 'work_order_event') + entity_id
+// (no DB FK across polymorphic targets; integrity enforced in the service).
+// Reuses customers / users / devices / file_assets.
+// =============================================================================
 
-export const woVisitaProducts = pgTable('wo_visita_products', {
-  id:           uuid('id').primaryKey().defaultRandom(),
-  tenantId:     uuid('tenant_id').notNull(),
-  ambienteId:   uuid('ambiente_id').notNull().references(() => woVisitaAmbientes.id, { onDelete: 'cascade' }),
-  productType:  text('product_type').notNull(),
-  description:  text('description'),
-  quantity:     integer('quantity').notNull().default(1),
-  createdBy:    uuid('created_by').notNull(),
-  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+// -----------------------------------------------------------------------------
+// annotations (aggregate root)
+// -----------------------------------------------------------------------------
+export const annotations = pgTable('annotations', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull(),
+  customerId:     uuid('customer_id').notNull().references(() => customers.id),
+  entityType:     text('entity_type').notNull(),
+  entityId:       uuid('entity_id').notNull(),
+  schemaVersion:  text('schema_version').notNull().default('1.0.0'),
+  text:           text('text').notNull(),
+  type:           text('type').notNull().default('observation'),
+  importance:     smallint('importance').notNull().default(3),
+  status:         text('status').notNull().default('created'),
+  finalized:        boolean('finalized').notNull().default(false),
+  finalizedReason:  text('finalized_reason'),
+  dueDate:          timestamp('due_date', { withTimezone: true }),
+  acknowledged:     boolean('acknowledged').notNull().default(false),
+  acknowledgedBy:   jsonb('acknowledged_by'),
+  acknowledgedAt:   timestamp('acknowledged_at', { withTimezone: true }),
+  createdBy:      jsonb('created_by').notNull(),
+  updatedBy:      jsonb('updated_by'),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  version:        integer('version').notNull().default(1),
+  legacyId:       uuid('legacy_id'),
 }, (table) => ({
-  ambienteIdx: index('idx_wo_visita_products_amb').on(table.ambienteId),
-  quantityPositive: check(
-    'wo_visita_products_quantity_positive',
-    sql`${table.quantity} > 0`
+  entityIdx:         index('annotations_entity_idx').on(table.tenantId, table.entityType, table.entityId),
+  tenantCustomerIdx: index('annotations_tenant_customer_idx').on(table.tenantId, table.customerId),
+  tenantStatusIdx:   index('annotations_tenant_status_idx').on(table.tenantId, table.status).where(sql`deleted_at IS NULL`),
+  tenantTypeIdx:     index('annotations_tenant_type_idx').on(table.tenantId, table.type).where(sql`deleted_at IS NULL`),
+  tenantLegacyIdUnique: uniqueIndex('annotations_tenant_legacy_id_unique').on(table.tenantId, table.legacyId).where(sql`legacy_id IS NOT NULL`),
+  entityTypeCheck: check(
+    'annotations_entity_type_check',
+    sql`${table.entityType} IN ('device','work_order','work_order_event')`
+  ),
+  typeCheck: check(
+    'annotations_type_check',
+    sql`${table.type} IN ('observation','pending','maintenance','activity')`
+  ),
+  statusCheck: check(
+    'annotations_status_check',
+    sql`${table.status} IN ('created','modified','archived')`
+  ),
+  importanceCheck: check(
+    'annotations_importance_check',
+    sql`${table.importance} BETWEEN 1 AND 5`
+  ),
+  finalizedReasonCheck: check(
+    'annotations_finalized_reason_check',
+    sql`${table.finalizedReason} IS NULL OR ${table.finalizedReason} IN ('approved','rejected','archived')`
+  ),
+  textLenCheck: check(
+    'annotations_text_len_check',
+    sql`char_length(${table.text}) <= 255`
   ),
 }));
 
-export const woVisitaProductImages = pgTable('wo_visita_product_images', {
+// -----------------------------------------------------------------------------
+// annotation_responses (comments + finalizing decisions)
+// -----------------------------------------------------------------------------
+export const annotationResponses = pgTable('annotation_responses', {
   id:           uuid('id').primaryKey().defaultRandom(),
   tenantId:     uuid('tenant_id').notNull(),
-  productId:    uuid('product_id').notNull().references(() => woVisitaProducts.id, { onDelete: 'cascade' }),
-  fileAssetId:  uuid('file_asset_id').notNull(),
-  imageOrder:   integer('image_order').notNull().default(0),
+  annotationId: uuid('annotation_id').notNull().references(() => annotations.id, { onDelete: 'cascade' }),
+  type:         text('type').notNull(),
+  text:         text('text'),
+  createdBy:    jsonb('created_by').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  legacyId:     uuid('legacy_id'),
 }, (table) => ({
-  productIdx: index('idx_wo_visita_product_images_prod').on(table.productId, table.imageOrder),
+  annotationIdx: index('annotation_responses_annotation_idx').on(table.annotationId, table.createdAt),
+  tenantLegacyIdUnique: uniqueIndex('annotation_responses_tenant_legacy_id_unique').on(table.tenantId, table.legacyId).where(sql`legacy_id IS NOT NULL`),
+  typeCheck: check(
+    'annotation_responses_type_check',
+    sql`${table.type} IN ('approved','rejected','comment','archived')`
+  ),
+  textRequiredCheck: check(
+    'annotation_responses_text_required_check',
+    sql`${table.type} = 'approved' OR (${table.text} IS NOT NULL AND char_length(${table.text}) > 0)`
+  ),
+  textLenCheck: check(
+    'annotation_responses_text_len_check',
+    sql`${table.text} IS NULL OR char_length(${table.text}) <= 255`
+  ),
 }));
 
-export const woVisitaObservations = pgTable('wo_visita_observations', {
+// -----------------------------------------------------------------------------
+// annotation_events (append-only history)
+// -----------------------------------------------------------------------------
+export const annotationEvents = pgTable('annotation_events', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull(),
+  annotationId:    uuid('annotation_id').notNull().references(() => annotations.id, { onDelete: 'cascade' }),
+  responseId:      uuid('response_id').references(() => annotationResponses.id, { onDelete: 'set null' }),
+  action:          text('action').notNull(),
+  previousVersion: integer('previous_version'),
+  changes:         jsonb('changes'),
+  actor:           jsonb('actor').notNull(),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  annotationIdx: index('annotation_events_annotation_idx').on(table.annotationId, table.createdAt),
+  actionCheck: check(
+    'annotation_events_action_check',
+    sql`${table.action} IN ('created','modified','archived','approved','rejected','commented','acknowledged')`
+  ),
+}));
+
+// -----------------------------------------------------------------------------
+// annotation_mentions (mention a user OR a device)
+// -----------------------------------------------------------------------------
+export const annotationMentions = pgTable('annotation_mentions', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  tenantId:          uuid('tenant_id').notNull(),
+  annotationId:      uuid('annotation_id').notNull().references(() => annotations.id, { onDelete: 'cascade' }),
+  responseId:        uuid('response_id').references(() => annotationResponses.id, { onDelete: 'cascade' }),
+  mentionType:       text('mention_type').notNull(),
+  mentionedUserId:   uuid('mentioned_user_id').references(() => users.id),
+  mentionedDeviceId: uuid('mentioned_device_id').references(() => devices.id),
+  actor:             jsonb('actor').notNull(),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  annotationIdx: index('annotation_mentions_annotation_idx').on(table.annotationId),
+  userIdx:       index('annotation_mentions_user_idx').on(table.tenantId, table.mentionedUserId).where(sql`mentioned_user_id IS NOT NULL`),
+  deviceIdx:     index('annotation_mentions_device_idx').on(table.tenantId, table.mentionedDeviceId).where(sql`mentioned_device_id IS NOT NULL`),
+  typeCheck: check(
+    'annotation_mentions_type_check',
+    sql`${table.mentionType} IN ('user','device')`
+  ),
+  targetCheck: check(
+    'annotation_mentions_target_check',
+    sql`(${table.mentionType} = 'user' AND ${table.mentionedUserId} IS NOT NULL AND ${table.mentionedDeviceId} IS NULL) OR (${table.mentionType} = 'device' AND ${table.mentionedDeviceId} IS NOT NULL AND ${table.mentionedUserId} IS NULL)`
+  ),
+}));
+
+// -----------------------------------------------------------------------------
+// annotation_attachments (reuse file_assets via a thin link table)
+// -----------------------------------------------------------------------------
+export const annotationAttachments = pgTable('annotation_attachments', {
   id:           uuid('id').primaryKey().defaultRandom(),
   tenantId:     uuid('tenant_id').notNull(),
-  visitaId:     uuid('visita_id').notNull().references(() => woVisitasTecnicas.id, { onDelete: 'cascade' }),
-  observation:  text('observation').notNull(),
-  fileAssetId:  uuid('file_asset_id'),
-  createdBy:    uuid('created_by').notNull(),
+  annotationId: uuid('annotation_id').notNull().references(() => annotations.id, { onDelete: 'cascade' }),
+  responseId:   uuid('response_id').references(() => annotationResponses.id, { onDelete: 'cascade' }),
+  fileAssetId:  uuid('file_asset_id').notNull().references(() => fileAssets.id),
+  createdBy:    jsonb('created_by').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  chronoIdx: index('idx_wo_visita_obs_chrono').on(table.visitaId, table.createdAt),
-}));
-
-export const woVisitaAudit = pgTable('wo_visita_audit', {
-  id:                 uuid('id').primaryKey().defaultRandom(),
-  tenantId:           uuid('tenant_id').notNull(),
-  visitaId:           uuid('visita_id').notNull().references(() => woVisitasTecnicas.id, { onDelete: 'cascade' }),
-  ambienteId:         uuid('ambiente_id'),
-  revision:           integer('revision').notNull(),
-  changeType:         text('change_type').notNull(),
-  changeDescription:  text('change_description'),
-  oldValue:           jsonb('old_value'),
-  newValue:           jsonb('new_value'),
-  changedBy:          uuid('changed_by').notNull(),
-  changedAt:          timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  chronoIdx: index('idx_wo_visita_audit_chrono').on(table.visitaId, table.changedAt),
+  annotationIdx: index('annotation_attachments_annotation_idx').on(table.annotationId),
+  responseIdx:   index('annotation_attachments_response_idx').on(table.responseId).where(sql`response_id IS NOT NULL`),
+  fileIdx:       index('annotation_attachments_file_idx').on(table.fileAssetId),
 }));

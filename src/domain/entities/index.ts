@@ -19,5 +19,5 @@ export * from './WikiPage';
 // Generic file/asset storage (S3-backed)
 export * from './FileAsset';
 
-// RFC-0032: QR Checker module (under wo/ subfolder)
-export * from './wo';
+// RFC-0037: Work Orders — event model (replaces the RFC-0032 QR-Checker entities)
+export * from './work-orders';

@@ -7,7 +7,7 @@ import { registrationService } from './RegistrationService';
 import { authorizationService } from './AuthorizationService';
 import { userRepository } from '../repositories/UserRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
-import { pinLookupToken, pinVerify } from './wo/WoPinService';
+import { pinLookupToken, pinVerify } from './work-orders/WoPinService';
 
 // RFC-0011: Configuration for account lockout
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;

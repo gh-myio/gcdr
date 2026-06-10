@@ -98,42 +98,21 @@ export type NewWikiPageLinkRow = typeof schema.wikiPageLinks.$inferInsert;
 export type FileAssetRow = typeof schema.fileAssets.$inferSelect;
 export type NewFileAssetRow = typeof schema.fileAssets.$inferInsert;
 
-// RFC-0032: QR Checker module
+// RFC-0037: Work Orders — event model (replaces the RFC-0032 QR-Checker tables).
 export type WoCustomerSettingsRow = typeof schema.woCustomerSettings.$inferSelect;
 export type NewWoCustomerSettingsRow = typeof schema.woCustomerSettings.$inferInsert;
 
-export type WoInstallationRow = typeof schema.woInstallations.$inferSelect;
-export type NewWoInstallationRow = typeof schema.woInstallations.$inferInsert;
+export type WorkOrderRow = typeof schema.workOrders.$inferSelect;
+export type NewWorkOrderRow = typeof schema.workOrders.$inferInsert;
 
-export type WoInstallationImageRow = typeof schema.woInstallationImages.$inferSelect;
-export type NewWoInstallationImageRow = typeof schema.woInstallationImages.$inferInsert;
+export type WorkOrderDeviceRow = typeof schema.workOrdersDevices.$inferSelect;
+export type NewWorkOrderDeviceRow = typeof schema.workOrdersDevices.$inferInsert;
 
-export type WoInstallationAuditRow = typeof schema.woInstallationAudit.$inferSelect;
-export type NewWoInstallationAuditRow = typeof schema.woInstallationAudit.$inferInsert;
+export type WorkOrderEventTypeRow = typeof schema.workOrdersEventTypes.$inferSelect;
+export type NewWorkOrderEventTypeRow = typeof schema.workOrdersEventTypes.$inferInsert;
 
-export type WoMaintenanceTaskRow = typeof schema.woMaintenanceTasks.$inferSelect;
-export type NewWoMaintenanceTaskRow = typeof schema.woMaintenanceTasks.$inferInsert;
+export type WorkOrderEventRow = typeof schema.workOrdersEvents.$inferSelect;
+export type NewWorkOrderEventRow = typeof schema.workOrdersEvents.$inferInsert;
 
-export type WoCustomerObservationRow = typeof schema.woCustomerObservations.$inferSelect;
-export type NewWoCustomerObservationRow = typeof schema.woCustomerObservations.$inferInsert;
-
-export type WoVisitaTecnicaRow = typeof schema.woVisitasTecnicas.$inferSelect;
-export type NewWoVisitaTecnicaRow = typeof schema.woVisitasTecnicas.$inferInsert;
-
-export type WoVisitaAmbienteRow = typeof schema.woVisitaAmbientes.$inferSelect;
-export type NewWoVisitaAmbienteRow = typeof schema.woVisitaAmbientes.$inferInsert;
-
-export type WoVisitaAmbienteImageRow = typeof schema.woVisitaAmbienteImages.$inferSelect;
-export type NewWoVisitaAmbienteImageRow = typeof schema.woVisitaAmbienteImages.$inferInsert;
-
-export type WoVisitaProductRow = typeof schema.woVisitaProducts.$inferSelect;
-export type NewWoVisitaProductRow = typeof schema.woVisitaProducts.$inferInsert;
-
-export type WoVisitaProductImageRow = typeof schema.woVisitaProductImages.$inferSelect;
-export type NewWoVisitaProductImageRow = typeof schema.woVisitaProductImages.$inferInsert;
-
-export type WoVisitaObservationRow = typeof schema.woVisitaObservations.$inferSelect;
-export type NewWoVisitaObservationRow = typeof schema.woVisitaObservations.$inferInsert;
-
-export type WoVisitaAuditRow = typeof schema.woVisitaAudit.$inferSelect;
-export type NewWoVisitaAuditRow = typeof schema.woVisitaAudit.$inferInsert;
+export type WorkOrderFileRow = typeof schema.workOrderFiles.$inferSelect;
+export type NewWorkOrderFileRow = typeof schema.workOrderFiles.$inferInsert;

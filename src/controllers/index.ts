@@ -48,13 +48,14 @@ export { default as wikiPublicController } from './wiki-public.controller';
 export { default as fileAssetsController } from './file-assets.controller';
 export { default as fileAssetsPublicController } from './file-assets-public.controller';
 
-// RFC-0032: QR Checker module
+// RFC-0037: Work Orders — Event Model (replaces the RFC-0032 QR Checker module)
 export {
+  workOrdersController,
   woCustomersController,
-  woInstallationsController,
-  woVisitasController,
-  woUsersController,
-} from './wo';
+} from './work-orders';
+
+// RFC-0036: Device/Work-Order Annotations (polymorphic)
+export { default as annotationsController } from './annotations.controller';
 
 // RFC-0023: Device Sync Jobs
 export { default as deviceSyncJobsController } from './device-sync-jobs.controller';

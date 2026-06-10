@@ -1,0 +1,5 @@
+// RFC-0037 — Work Orders controllers. Mounted by the Wiring phase:
+//   workOrdersController  → /api/v1/wo/work-orders
+//   woCustomersController  → /api/v1/wo/customers   (viewer-login is PUBLIC)
+export { default as workOrdersController } from './work-orders.controller';
+export { default as woCustomersController } from './wo-customers.controller';

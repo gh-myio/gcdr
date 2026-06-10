@@ -76,11 +76,11 @@ import {
   // Generic file/asset storage (S3)
   fileAssetsController,
   fileAssetsPublicController,
-  // RFC-0032: QR Checker module
+  // RFC-0037: Work Orders — Event Model
+  workOrdersController,
   woCustomersController,
-  woInstallationsController,
-  woVisitasController,
-  woUsersController,
+  // RFC-0036: Device/Work-Order Annotations (polymorphic)
+  annotationsController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -322,20 +322,25 @@ apiV1Router.use('/public/files', fileAssetsPublicController);
 apiV1Router.use('/files', authMiddleware, fileAssetsController);
 
 // =============================================================================
-// RFC-0032: QR Checker module
-// All routers handle their own auth — wo-customers exposes a public
-// /viewer-login route, the rest of the surface uses authMiddleware
-// internally.
+// RFC-0036: Device / Work-Order Annotations (polymorphic).
+// Reads req.context (tenantId, userId, requestId); needs the standard auth.
+// Observations on work orders are expressed via
+// /annotations?entityType=work_order|work_order_event&entityId=...
 // =============================================================================
-// /api/v1/wo/install                       (POST — upsert installation)
-// /api/v1/wo/installations/:id             (GET, PATCH, audit, images, tasks)
-apiV1Router.use('/wo', woInstallationsController);
-// /api/v1/wo/visitas/...                   (full CRUD + ambientes + products)
-apiV1Router.use('/wo/visitas', woVisitasController);
-// /api/v1/wo/users/:userId/{pin,audit}
-apiV1Router.use('/wo/users', woUsersController);
-// /api/v1/wo/customers/...                 (must be LAST — generic /:customerId
-//                                            matchers would shadow specific paths)
+apiV1Router.use('/annotations', authMiddleware, annotationsController);
+
+// =============================================================================
+// RFC-0037: Work Orders — Event Model (replaces the RFC-0032 QR Checker module).
+//
+// - /wo/work-orders applies NO auth internally → mount behind standard auth
+//   (JWT or Customer API-Key), like /centrals.
+// - /wo/customers applies authMiddleware PER-HANDLER and intentionally leaves
+//   POST /wo/customers/:customerId/viewer-login PUBLIC (self-authenticates via
+//   password). Do NOT blanket-auth this mount or viewer-login breaks.
+//   It is mounted LAST so its generic /:customerId matchers do not shadow the
+//   specific /wo/work-orders paths.
+// =============================================================================
+apiV1Router.use('/wo/work-orders', authMiddleware, workOrdersController);
 apiV1Router.use('/wo/customers', woCustomersController);
 
 // Mount API v1 router
