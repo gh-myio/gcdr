@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, desc } from 'drizzle-orm';
+import { eq, and, isNull, sql, desc, asc } from 'drizzle-orm';
 import { db, schema } from '../../infrastructure/database/drizzle/db';
 import {
   WorkOrder,
@@ -156,6 +156,15 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       .where(eq(workOrdersEventTypes.code, code))
       .limit(1);
     return row ? this.mapEventType(row) : null;
+  }
+
+  async listEventTypes(): Promise<WorkOrderEventType[]> {
+    const rows = await db
+      .select()
+      .from(workOrdersEventTypes)
+      .where(eq(workOrdersEventTypes.active, true))
+      .orderBy(asc(workOrdersEventTypes.sortOrder), asc(workOrdersEventTypes.code));
+    return rows.map((r) => this.mapEventType(r));
   }
 
   // ===========================================================================

@@ -2,6 +2,7 @@ import {
   WorkOrder,
   WorkOrderDevice,
   WorkOrderEvent,
+  WorkOrderEventType,
   WorkOrderFile,
   ActorSnapshot,
 } from '../../domain/entities/work-orders';
@@ -234,6 +235,11 @@ export class WorkOrderService {
   async listEvents(tenantId: string, workOrderId: string): Promise<WorkOrderEvent[]> {
     await this.getById(tenantId, workOrderId);
     return this.repo.listEvents(tenantId, workOrderId);
+  }
+
+  /** Active event-type catalog (codes, labels, categories) for the UI timeline. */
+  async listEventTypes(): Promise<WorkOrderEventType[]> {
+    return this.repo.listEventTypes();
   }
 
   // ===========================================================================

@@ -13174,6 +13174,39 @@ paths:
 
   # --- Work orders ----------------------------------------------------------
 
+  /wo/event-types:
+    get:
+      tags: [Work Orders]
+      summary: List the active work-order event-type catalog
+      description: >-
+        Global, read-only catalog of work-order event types (code, category,
+        label, isTerminal, sortOrder). Used by the UI to render the event
+        timeline and the "add event" picker. Ordered by sortOrder.
+      operationId: woListEventTypes
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Active event types
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            code:       { type: string, example: VISITA_TECNICA_FINALIZADA }
+                            category:   { type: string, example: VISITA_TECNICA }
+                            label:      { type: string, example: Visita finalizada }
+                            isTerminal: { type: boolean }
+                            sortOrder:  { type: integer }
+                            active:     { type: boolean }
+        '401': { description: Unauthorized }
   /wo/work-orders:
     get:
       tags: [Work Orders]

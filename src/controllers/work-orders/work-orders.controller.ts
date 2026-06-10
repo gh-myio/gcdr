@@ -187,4 +187,16 @@ router.delete('/:id/files/:fileId', async (req: Request, res: Response, next: Ne
   } catch (err) { next(err); }
 });
 
+// =============================================================================
+// GET /wo/event-types — active event-type catalog (mounted standalone in app.ts,
+// NOT under /wo/work-orders/:id, so it is not shadowed by the /:id matcher).
+// =============================================================================
+export async function listEventTypesHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { requestId } = req.context;
+    const types = await workOrderService.listEventTypes();
+    sendSuccess(res, types, 200, requestId);
+  } catch (err) { next(err); }
+}
+
 export default router;

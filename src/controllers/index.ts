@@ -52,6 +52,7 @@ export { default as fileAssetsPublicController } from './file-assets-public.cont
 export {
   workOrdersController,
   woCustomersController,
+  listEventTypesHandler as woEventTypesHandler,
 } from './work-orders';
 
 // RFC-0036: Device/Work-Order Annotations (polymorphic)

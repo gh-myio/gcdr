@@ -54,6 +54,7 @@ export interface IWorkOrderRepository {
 
   // ---- Event types catalog -------------------------------------------------
   getEventType(code: string): Promise<WorkOrderEventType | null>;
+  listEventTypes(): Promise<WorkOrderEventType[]>;
 
   // ---- Events --------------------------------------------------------------
   appendEvent(tenantId: string, workOrderId: string, data: AppendEventInput): Promise<WorkOrderEvent>;
