@@ -1,36 +1,39 @@
 -- =============================================================================
--- OS (QR Checker) demo data load — Customer "Mestre Álvaro"
+-- OS (Work Orders — RFC-0037 event model) demo data load — Customer "Mestre Álvaro"
 -- =============================================================================
 -- Customer : Mestre Álvaro (e04046d4-baa4-44e9-a378-4dfebe4140f1)
 -- Tenant   : 11111111-1111-1111-1111-111111111111
 --
--- "OS" in the UI (/os) is the QR Checker domain: it enables a customer for OS,
--- records field installations on devices, maintenance tasks, and technical
--- visits (visitas) with ambientes / products / observations.
+-- "OS" in the UI (/os) is the Work-Orders domain (RFC-0037): a work_order has a
+-- type (INSTALACAO | MANUTENCAO | VISITA_TECNICA), an append-only event log
+-- (work_orders_events) and a projected `status` derived from its latest
+-- lifecycle event. Field notes / observations are polymorphic `annotations`
+-- (RFC-0036) targeting entity_type='work_order'.
 --
--- This script:
---   1. Enables OS for the customer            -> wo_customer_settings
---   2. Creates installations on up to 6 of the customer's existing devices
---      (mixed statuses) + an audit row + a couple maintenance tasks
---   3. Creates one technical visit with 2 ambientes, products, an observation
---      and an audit row
---   4. Adds a customer-level OS observation
+-- This script (all data prefixed '[DEMO]', idempotent / safe to re-run):
+--   1. Enables OS for the customer                 -> work_orders_customer_settings
+--   2. Creates up to 6 INSTALACAO work orders on the customer's existing devices
+--      (one device each, mixed projected statuses) with a lifecycle event chain
+--      WO_CRIADA -> *_PLANEJADA -> *_INICIADA -> <final>. The two "problem"
+--      orders also get a 'maintenance' annotation (replaces wo_maintenance_tasks).
+--   3. Creates one VISITA_TECNICA work order with structural AMBIENTE_CRIADO /
+--      PRODUTO_INSTALADO events (replaces wo_visita_ambientes / wo_visita_products)
+--      and two 'observation' annotations.
 --
--- Idempotent & safe to re-run:
---   - installations use ON CONFLICT (tenant, device) DO NOTHING
---   - demo visitas and demo customer observations (marked '[DEMO]') are deleted
---     and recreated on each run
--- Everything user-visible is prefixed '[DEMO]' so it is easy to spot and remove.
--- It only references EXISTING devices (FK restrict) — discovered at run time.
+-- Status projection (mirrors WorkOrderService.lifecycleStateForCode):
+--   *_PLANEJADA -> PLANEJADA   *_INICIADA/_REINICIADA/_EXECUTADA_PARCIAL -> EM_ANDAMENTO
+--   *_INTERROMPIDA -> INTERROMPIDA   *_REAGENDADA -> REAGENDADA
+--   *_AGUARDANDO_* -> AGUARDANDO   *_FINALIZADA -> FINALIZADA   *_CANCELADA -> CANCELADA
+--   (OBSERVACAO / ANEXO / ESTRUTURA events never move status.)
 --
 -- Cleanup (remove all demo data):
---   DELETE FROM wo_visitas_tecnicas
---     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND name LIKE '[DEMO]%';
---   DELETE FROM wo_customer_observations
---     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND observation LIKE '[DEMO]%';
---   DELETE FROM wo_installations
---     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND obs LIKE '[DEMO]%';
---   -- (wo_customer_settings row can be left enabled, or deleted to disable OS)
+--   DELETE FROM annotations
+--     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND text LIKE '[DEMO]%';
+--   DELETE FROM work_orders
+--     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND code LIKE '[DEMO]%';
+--   -- (work_orders delete CASCADEs its events/devices/files; annotations are
+--   --  polymorphic with no FK to work_orders, so they are deleted separately.)
+--   -- work_orders_customer_settings row can be left enabled, or deleted to disable OS.
 -- =============================================================================
 
 DO $$
@@ -38,14 +41,20 @@ DECLARE
   v_tenant   uuid := '11111111-1111-1111-1111-111111111111';
   v_customer uuid := 'e04046d4-baa4-44e9-a378-4dfebe4140f1';
   v_user     uuid;
+  v_email    text;
+  v_actor    jsonb;
   v_central  uuid;
   v_dev      RECORD;
-  v_inst     uuid;
+  v_wo       uuid;
+  v_ann      uuid;
   v_visita   uuid;
-  v_amb      uuid;
   v_installs int := 0;
-  v_tc_types  text[] := ARRAY['100A','400A','50A','1000A','100A','400A'];
-  v_statuses  text[] := ARRAY['instalado','instalado','impedimento','instalado','defeito','removido'];
+  v_rn       int;
+  v_dname    text;
+  -- per-device-index (1..6) scenario tables
+  v_final_event  text[] := ARRAY['INSTALACAO_FINALIZADA','INSTALACAO_FINALIZADA','INSTALACAO_AGUARDANDO_OUTROS_MOTIVOS','INSTALACAO_FINALIZADA','INSTALACAO_INTERROMPIDA','INSTALACAO_CANCELADA'];
+  v_final_status text[] := ARRAY['FINALIZADA','FINALIZADA','AGUARDANDO','FINALIZADA','INTERROMPIDA','CANCELADA'];
+  v_tc_types     text[] := ARRAY['100A','400A','50A','1000A','100A','400A'];
 BEGIN
   -- Guard: customer must exist
   IF NOT EXISTS (SELECT 1 FROM customers WHERE id = v_customer AND tenant_id = v_tenant) THEN
@@ -53,24 +62,35 @@ BEGIN
   END IF;
 
   -- Resolve an actor user (any user in the tenant), fallback to the master system user
-  SELECT id INTO v_user FROM users WHERE tenant_id = v_tenant ORDER BY created_at LIMIT 1;
+  SELECT id, email INTO v_user, v_email
+    FROM users WHERE tenant_id = v_tenant ORDER BY created_at LIMIT 1;
   IF v_user IS NULL THEN
-    v_user := '00000000-0000-0000-0000-000000000002';  -- master/system user
+    v_user  := '00000000-0000-0000-0000-000000000002';  -- master/system user
+    v_email := 'system@myio';
   END IF;
+  v_email := COALESCE(v_email, 'system@myio');
+  v_actor := jsonb_build_object('id', v_user, 'email', v_email,
+                                'name', initcap(split_part(v_email, '@', 1)));
 
   -- Resolve a default central for the customer (optional)
   SELECT id INTO v_central FROM centrals
    WHERE tenant_id = v_tenant AND customer_id = v_customer
    LIMIT 1;
 
+  -- Idempotency: drop any prior demo data first ---------------------------------
+  DELETE FROM annotations
+   WHERE tenant_id = v_tenant AND customer_id = v_customer AND text LIKE '[DEMO]%';
+  DELETE FROM work_orders
+   WHERE tenant_id = v_tenant AND customer_id = v_customer AND code LIKE '[DEMO]%';
+
   -- 1) Enable OS for the customer ------------------------------------------------
-  INSERT INTO wo_customer_settings (customer_id, tenant_id, default_central_id, wo_metadata, created_by)
+  INSERT INTO work_orders_customer_settings (customer_id, tenant_id, default_central_id, wo_metadata, created_by)
   VALUES (v_customer, v_tenant, v_central, '{"demo": true}'::jsonb, v_user)
   ON CONFLICT (customer_id) DO UPDATE
-    SET default_central_id = COALESCE(wo_customer_settings.default_central_id, EXCLUDED.default_central_id),
+    SET default_central_id = COALESCE(work_orders_customer_settings.default_central_id, EXCLUDED.default_central_id),
         updated_at = now();
 
-  -- 2) Installations on up to 6 existing devices --------------------------------
+  -- 2) INSTALACAO work orders on up to 6 existing devices -----------------------
   FOR v_dev IN
     SELECT id,
            COALESCE(display_name, name) AS dname,
@@ -83,120 +103,120 @@ BEGIN
      ORDER BY created_at
      LIMIT 6
   LOOP
-    v_inst := NULL;
+    v_rn    := v_dev.rn;
+    v_dname := v_dev.dname;
 
-    INSERT INTO wo_installations (
-      id, tenant_id, device_id, customer_id, position, tc_type,
-      impedimento_text, obs, current_multiplier, voltage_multiplier, installed_by
-    )
-    VALUES (
-      gen_random_uuid(), v_tenant, v_dev.id, v_customer,
-      'Quadro ' || v_dev.rn,
-      v_tc_types[v_dev.rn],
-      v_statuses[v_dev.rn],
-      '[DEMO] ' || v_dev.dname,
-      1.0, 1.0, v_user
-    )
-    ON CONFLICT (tenant_id, device_id) DO NOTHING
-    RETURNING id INTO v_inst;
+    -- work order (status set to the projected value of its final lifecycle event)
+    INSERT INTO work_orders (id, tenant_id, customer_id, type, status, code, assigned_to, scheduled_at, created_by)
+    VALUES (gen_random_uuid(), v_tenant, v_customer, 'INSTALACAO',
+            v_final_status[v_rn], '[DEMO] Instalação — ' || v_dname,
+            v_user, now(), v_user)
+    RETURNING id INTO v_wo;
+    v_installs := v_installs + 1;
 
-    IF v_inst IS NOT NULL THEN
-      v_installs := v_installs + 1;
+    -- device scope
+    INSERT INTO work_orders_devices (work_order_id, device_id, added_by)
+    VALUES (v_wo, v_dev.id, v_user);
 
-      -- audit: created
-      INSERT INTO wo_installation_audit (
-        tenant_id, installation_id, revision, change_type, change_description, changed_by
-      )
-      VALUES (v_tenant, v_inst, 1, 'created', '[DEMO] Instalação registrada em campo', v_user);
+    -- lifecycle event chain (clock_timestamp() => strictly increasing created_at,
+    -- so the final row is the "latest" the projection would pick)
+    INSERT INTO work_orders_events
+      (tenant_id, work_order_id, event_type, actor_type, actor_user_id, actor, device_id, payload, created_at)
+    VALUES
+      (v_tenant, v_wo, 'WO_CRIADA',            'USER', v_user, v_actor, v_dev.id,
+       jsonb_build_object('type','INSTALACAO','tc', v_tc_types[v_rn]),      clock_timestamp()),
+      (v_tenant, v_wo, 'INSTALACAO_PLANEJADA', 'USER', v_user, v_actor, v_dev.id,
+       jsonb_build_object('position','Quadro ' || v_rn),                    clock_timestamp()),
+      (v_tenant, v_wo, 'INSTALACAO_INICIADA',  'USER', v_user, v_actor, v_dev.id,
+       jsonb_build_object('currentMultiplier',1.0,'voltageMultiplier',1.0), clock_timestamp()),
+      (v_tenant, v_wo, v_final_event[v_rn],    'USER', v_user, v_actor, v_dev.id,
+       jsonb_build_object('note','[DEMO] ' || v_dname),                     clock_timestamp());
 
-      -- maintenance task on the problem ones (impedimento / defeito)
-      IF v_dev.rn IN (3, 5) THEN
-        INSERT INTO wo_maintenance_tasks (
-          tenant_id, installation_id, description, status, created_by
-        )
-        VALUES (
-          v_tenant, v_inst,
-          '[DEMO] Verificar conexão / TC e refazer leitura',
-          'pending', v_user
-        );
+    -- problem orders (impedimento / defeito): maintenance annotation on the WO
+    IF v_rn IN (3, 5) THEN
+      INSERT INTO annotations
+        (tenant_id, customer_id, entity_type, entity_id, text, type, importance, created_by)
+      VALUES
+        (v_tenant, v_customer, 'work_order', v_wo,
+         '[DEMO] Verificar conexão / TC e refazer leitura — ' || v_dname,
+         'maintenance', 4, v_actor)
+      RETURNING id INTO v_ann;
 
-        INSERT INTO wo_installation_audit (
-          tenant_id, installation_id, revision, change_type, change_description, changed_by
-        )
-        VALUES (v_tenant, v_inst, 2, 'task_created', '[DEMO] Tarefa de manutenção aberta', v_user);
-      END IF;
+      INSERT INTO annotation_events (tenant_id, annotation_id, action, actor)
+      VALUES (v_tenant, v_ann, 'created', v_actor);
     END IF;
   END LOOP;
 
-  -- 3) Technical visit (idempotent: drop prior demo visitas, cascade) -----------
-  DELETE FROM wo_visitas_tecnicas
-   WHERE tenant_id = v_tenant AND customer_id = v_customer AND name LIKE '[DEMO]%';
-
-  INSERT INTO wo_visitas_tecnicas (id, tenant_id, customer_id, name, observation, status, created_by)
-  VALUES (
-    gen_random_uuid(), v_tenant, v_customer,
-    '[DEMO] Visita técnica inicial',
-    'Levantamento de campo para instalação dos medidores.',
-    'in_progress', v_user
-  )
+  -- 3) VISITA_TECNICA work order (structural ambiente/produto events) -----------
+  INSERT INTO work_orders (id, tenant_id, customer_id, type, status, code, scheduled_at, created_by)
+  VALUES (gen_random_uuid(), v_tenant, v_customer, 'VISITA_TECNICA',
+          'EM_ANDAMENTO', '[DEMO] Visita técnica inicial', now(), v_user)
   RETURNING id INTO v_visita;
 
-  -- ambiente 1 + product
-  INSERT INTO wo_visita_ambientes (
-    id, tenant_id, visita_id, name, observation, ac_quantity, product_quantity, product_type, created_by
-  )
-  VALUES (
-    gen_random_uuid(), v_tenant, v_visita, 'Sala de Máquinas',
-    'Acesso pelo subsolo; quadro geral fica à esquerda.', 2, 3, 'sensor', v_user
-  )
-  RETURNING id INTO v_amb;
+  INSERT INTO work_orders_events
+    (tenant_id, work_order_id, event_type, actor_type, actor_user_id, actor, payload, created_at)
+  VALUES
+    (v_tenant, v_visita, 'WO_CRIADA',                 'USER', v_user, v_actor,
+     jsonb_build_object('type','VISITA_TECNICA'),                                   clock_timestamp()),
+    (v_tenant, v_visita, 'VISITA_TECNICA_PLANEJADA',  'USER', v_user, v_actor,
+     '{}'::jsonb,                                                                   clock_timestamp()),
+    (v_tenant, v_visita, 'VISITA_TECNICA_INICIADA',   'USER', v_user, v_actor,
+     jsonb_build_object('note','Levantamento de campo para instalação dos medidores.'), clock_timestamp()),
+    (v_tenant, v_visita, 'AMBIENTE_CRIADO',           'USER', v_user, v_actor,
+     jsonb_build_object('name','Sala de Máquinas','acQuantity',2,'productQuantity',3,
+                        'observation','Acesso pelo subsolo; quadro geral à esquerda.'), clock_timestamp()),
+    (v_tenant, v_visita, 'PRODUTO_INSTALADO',         'USER', v_user, v_actor,
+     jsonb_build_object('ambiente','Sala de Máquinas','productType','sensor',
+                        'description','[DEMO] Sensor de corrente (TC)','quantity',3), clock_timestamp()),
+    (v_tenant, v_visita, 'AMBIENTE_CRIADO',           'USER', v_user, v_actor,
+     jsonb_build_object('name','Hall de Entrada','acQuantity',1,'productQuantity',1), clock_timestamp()),
+    (v_tenant, v_visita, 'PRODUTO_INSTALADO',         'USER', v_user, v_actor,
+     jsonb_build_object('ambiente','Hall de Entrada','productType','gateway',
+                        'description','[DEMO] Central NodeHub','quantity',1),         clock_timestamp());
 
-  INSERT INTO wo_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
-  VALUES (v_tenant, v_amb, 'sensor', '[DEMO] Sensor de corrente (TC)', 3, v_user);
+  -- visit observation annotation
+  INSERT INTO annotations
+    (tenant_id, customer_id, entity_type, entity_id, text, type, importance, created_by)
+  VALUES
+    (v_tenant, v_customer, 'work_order', v_visita,
+     '[DEMO] Cliente solicitou retorno na próxima semana para concluir.',
+     'observation', 3, v_actor)
+  RETURNING id INTO v_ann;
+  INSERT INTO annotation_events (tenant_id, annotation_id, action, actor)
+  VALUES (v_tenant, v_ann, 'created', v_actor);
 
-  -- ambiente 2 + product
-  INSERT INTO wo_visita_ambientes (
-    id, tenant_id, visita_id, name, observation, ac_quantity, product_quantity, product_type, created_by
-  )
-  VALUES (
-    gen_random_uuid(), v_tenant, v_visita, 'Hall de Entrada',
-    NULL, 1, 1, 'gateway', v_user
-  )
-  RETURNING id INTO v_amb;
+  -- general observation (customer-level note; modeled on the visita WO since the
+  -- annotation entity_type domain is device | work_order | work_order_event)
+  INSERT INTO annotations
+    (tenant_id, customer_id, entity_type, entity_id, text, type, importance, created_by)
+  VALUES
+    (v_tenant, v_customer, 'work_order', v_visita,
+     '[DEMO] Observação geral de OS do cliente (carga demo).',
+     'observation', 2, v_actor)
+  RETURNING id INTO v_ann;
+  INSERT INTO annotation_events (tenant_id, annotation_id, action, actor)
+  VALUES (v_tenant, v_ann, 'created', v_actor);
 
-  INSERT INTO wo_visita_products (tenant_id, ambiente_id, product_type, description, quantity, created_by)
-  VALUES (v_tenant, v_amb, 'gateway', '[DEMO] Central NodeHub', 1, v_user);
-
-  -- visit observation + audit
-  INSERT INTO wo_visita_observations (tenant_id, visita_id, observation, created_by)
-  VALUES (v_tenant, v_visita, '[DEMO] Cliente solicitou retorno na próxima semana para concluir.', v_user);
-
-  INSERT INTO wo_visita_audit (tenant_id, visita_id, revision, change_type, change_description, changed_by)
-  VALUES (v_tenant, v_visita, 1, 'created', '[DEMO] Visita técnica criada', v_user);
-
-  -- 4) Customer-level OS observation (idempotent) -------------------------------
-  DELETE FROM wo_customer_observations
-   WHERE tenant_id = v_tenant AND customer_id = v_customer AND observation LIKE '[DEMO]%';
-
-  INSERT INTO wo_customer_observations (tenant_id, customer_id, observation, created_by)
-  VALUES (v_tenant, v_customer, '[DEMO] Observação geral de OS do cliente (carga demo).', v_user);
-
-  RAISE NOTICE 'OS demo load OK — customer %, installations created/kept this run: %, visita: %',
+  RAISE NOTICE 'OS demo load OK — customer %, INSTALACAO work orders: %, visita: %',
     v_customer, v_installs, v_visita;
 END $$;
 
 -- =============================================================================
 -- Verification
 -- =============================================================================
-SELECT 'os_enabled'   AS what, count(*) AS n FROM wo_customer_settings   WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'os_enabled'    AS what, count(*) AS n FROM work_orders_customer_settings WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
 UNION ALL
-SELECT 'installations', count(*)            FROM wo_installations        WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'work_orders',  count(*) FROM work_orders        WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND code LIKE '[DEMO]%'
 UNION ALL
-SELECT 'maint_tasks',   count(*)            FROM wo_maintenance_tasks    WHERE tenant_id = '11111111-1111-1111-1111-111111111111'
-   AND installation_id IN (SELECT id FROM wo_installations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
+SELECT 'wo_events',    count(*) FROM work_orders_events WHERE work_order_id IN (SELECT id FROM work_orders WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND code LIKE '[DEMO]%')
 UNION ALL
-SELECT 'visitas',       count(*)            FROM wo_visitas_tecnicas     WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1'
+SELECT 'wo_devices',   count(*) FROM work_orders_devices WHERE work_order_id IN (SELECT id FROM work_orders WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND code LIKE '[DEMO]%')
 UNION ALL
-SELECT 'ambientes',     count(*)            FROM wo_visita_ambientes     WHERE visita_id IN (SELECT id FROM wo_visitas_tecnicas WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1')
-UNION ALL
-SELECT 'cust_obs',      count(*)            FROM wo_customer_observations WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1';
+SELECT 'annotations',  count(*) FROM annotations        WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND text LIKE '[DEMO]%';
+
+-- status breakdown of the demo work orders
+SELECT type, status, count(*) AS n
+  FROM work_orders
+ WHERE customer_id = 'e04046d4-baa4-44e9-a378-4dfebe4140f1' AND code LIKE '[DEMO]%'
+ GROUP BY type, status
+ ORDER BY type, status;
