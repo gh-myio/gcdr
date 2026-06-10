@@ -14,12 +14,18 @@ export type FileAssetOwnerType =
   | 'wo_customer_observation'   // photo on a customer-level QR observation
   | 'wo_visita_ambiente'        // photo of an environment in a Visita Técnica
   | 'wo_visita_product'         // photo of an inventoried product in a Visita
-  | 'wo_visita_observation';    // photo on a visita-level observation
+  | 'wo_visita_observation'     // photo on a visita-level observation
+  // RFC-0037 event model + RFC-0036 annotations (migration 0033 extends the CHECK).
+  | 'work_order'                // evidence linked to a work order
+  | 'work_order_event'          // evidence linked to a specific WO event
+  | 'annotation'                // attachment on an annotation
+  | 'annotation_response';      // attachment on an annotation response
 
 export const ALL_FILE_ASSET_OWNER_TYPES: readonly FileAssetOwnerType[] = [
   'wiki_page', 'wiki_pdf', 'free',
   'wo_installation', 'wo_customer_observation',
   'wo_visita_ambiente', 'wo_visita_product', 'wo_visita_observation',
+  'work_order', 'work_order_event', 'annotation', 'annotation_response',
 ] as const;
 
 export type FileAssetStatus =

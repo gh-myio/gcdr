@@ -5,7 +5,13 @@ import { PaginationParams } from '../../shared/types';
 // File asset DTOs (RFC-0030 / RFC-0031 — generic file storage)
 // =============================================================================
 
-export const FileAssetOwnerTypeSchema = z.enum(['wiki_page', 'wiki_pdf', 'free']);
+export const FileAssetOwnerTypeSchema = z.enum([
+  'wiki_page', 'wiki_pdf', 'free',
+  'wo_installation', 'wo_customer_observation',
+  'wo_visita_ambiente', 'wo_visita_product', 'wo_visita_observation',
+  // RFC-0037 / RFC-0036 owners (CHECK extended by migration 0033)
+  'work_order', 'work_order_event', 'annotation', 'annotation_response',
+]);
 export const FileAssetStatusSchema     = z.enum(['PENDING_UPLOAD', 'ACTIVE', 'QUARANTINED', 'DELETED']);
 export const FileAssetScanStatusSchema = z.enum(['PENDING', 'CLEAN', 'INFECTED', 'SKIPPED']);
 
@@ -50,7 +56,7 @@ export const UpdateFileAssetMetaSchema = z.object({
 export type UpdateFileAssetMetaDTO = z.infer<typeof UpdateFileAssetMetaSchema>;
 
 export interface ListFileAssetsParams extends PaginationParams {
-  ownerType?:  'wiki_page' | 'wiki_pdf' | 'free';
+  ownerType?:  z.infer<typeof FileAssetOwnerTypeSchema>;
   ownerId?:    string;
   customerId?: string;
   status?:     'PENDING_UPLOAD' | 'ACTIVE' | 'QUARANTINED' | 'DELETED';
