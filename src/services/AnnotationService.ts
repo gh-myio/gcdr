@@ -40,6 +40,7 @@ import { IAnnotationRepository } from '../repositories/annotations/interfaces/IA
 import { userRepository } from '../repositories/UserRepository';
 import { deviceRepository } from '../repositories/DeviceRepository';
 import { fileAssetService } from './FileAssetService';
+import { workOrderService } from './work-orders/WorkOrderService';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 
@@ -57,6 +58,33 @@ export class AnnotationService {
 
   constructor(repo?: IAnnotationRepository) {
     this.repo = repo || new AnnotationRepository();
+  }
+
+  // ===========================================================================
+  // Mirror an annotation lifecycle change as a marker event on the work order
+  // timeline (RFC-0037 OBSERVACAO_* markers). Best-effort: a missing/inactive
+  // marker type or work order must never fail the annotation operation. Only
+  // 'work_order' targets map directly; 'work_order_event' and 'device' don't.
+  // ===========================================================================
+  private async mirrorObservationToWorkOrder(
+    ctx: ActorContext,
+    target: { entityType: string; entityId: string },
+    actor: ActorSnapshot,
+    eventType: 'OBSERVACAO_INSERIDA' | 'OBSERVACAO_EDITADA' | 'OBSERVACAO_DELETADA' | 'OBSERVACAO_ARQUIVADA',
+    annotationId: string,
+  ): Promise<void> {
+    if (target.entityType !== 'work_order') return;
+    try {
+      await workOrderService.appendObservationMarker(
+        ctx.tenantId,
+        target.entityId,
+        eventType,
+        annotationId,
+        { userId: ctx.userId, actorType: 'USER', actor: { id: actor.id, email: actor.email, name: actor.name } },
+      );
+    } catch {
+      // swallow — the annotation itself already succeeded
+    }
   }
 
   // ===========================================================================
@@ -113,6 +141,14 @@ export class AnnotationService {
       }
     }
 
+    await this.mirrorObservationToWorkOrder(
+      ctx,
+      { entityType: data.entityType, entityId: data.entityId },
+      actor,
+      'OBSERVACAO_INSERIDA',
+      annotation.id,
+    );
+
     const detail = await this.repo.getDetail(ctx.tenantId, annotation.id);
     if (!detail) throw new NotFoundError(`Annotation ${annotation.id} not found`);
     return detail;
@@ -162,6 +198,14 @@ export class AnnotationService {
       changes: Object.keys(changes).length ? changes : undefined,
     });
 
+    await this.mirrorObservationToWorkOrder(
+      ctx,
+      { entityType: existing.entityType, entityId: existing.entityId },
+      actor,
+      'OBSERVACAO_EDITADA',
+      id,
+    );
+
     return this.getById(ctx.tenantId, id);
   }
 
@@ -186,6 +230,15 @@ export class AnnotationService {
     }
 
     await this.repo.addEvent(ctx.tenantId, id, 'archived', actor, { previousVersion: existing.version });
+
+    await this.mirrorObservationToWorkOrder(
+      ctx,
+      { entityType: existing.entityType, entityId: existing.entityId },
+      actor,
+      'OBSERVACAO_ARQUIVADA',
+      id,
+    );
+
     return this.getById(ctx.tenantId, id);
   }
 
