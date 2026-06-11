@@ -26,6 +26,7 @@ import { IAssetRepository } from '../../repositories/interfaces/IAssetRepository
 import { AssetRepository } from '../../repositories/AssetRepository';
 import { PaginatedResult } from '../../shared/types';
 import { NotFoundError, ValidationError, ConflictError } from '../../shared/errors/AppError';
+import { generateWorkOrderCode } from './woCode';
 
 export interface ActorContext {
   userId: string;
@@ -97,11 +98,13 @@ export class WorkOrderService {
       if (!asset) throw new NotFoundError(`Asset ${data.rootAssetId} not found`);
     }
 
+    const code = await this.resolveCode(tenantId, data.code);
+
     const wo = await this.repo.create(tenantId, {
       customerId:  data.customerId,
       type:        data.type,
       rootAssetId: data.rootAssetId ?? null,
-      code:        data.code ?? null,
+      code,
       assignedTo:  data.assignedTo ?? null,
       scheduledAt: data.scheduledAt ?? null,
       status:      'PLANEJADA',
@@ -152,6 +155,12 @@ export class WorkOrderService {
     if (data.rootAssetId) {
       const asset = await this.assetRepo.getById(tenantId, data.rootAssetId);
       if (!asset) throw new NotFoundError(`Asset ${data.rootAssetId} not found`);
+    }
+
+    if (data.code !== undefined && data.code !== existing.code) {
+      if (await this.repo.codeExists(tenantId, data.code, id)) {
+        throw new ConflictError(`Work order code "${data.code}" is already in use`);
+      }
     }
 
     const updated = await this.repo.update(tenantId, id, {
@@ -322,6 +331,23 @@ export class WorkOrderService {
   // ===========================================================================
   // Helpers
   // ===========================================================================
+  /** Explicit codes must be free; absent codes are generated (OS-<Mercosul plate>). */
+  private async resolveCode(tenantId: string, requested?: string): Promise<string> {
+    if (requested) {
+      if (await this.repo.codeExists(tenantId, requested)) {
+        throw new ConflictError(`Work order code "${requested}" is already in use`);
+      }
+      return requested;
+    }
+    // 24^4 * 8^3 ≈ 170M combinations — collisions are effectively impossible,
+    // the retry cap is just a guard against a pathological tenant.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = generateWorkOrderCode();
+      if (!(await this.repo.codeExists(tenantId, candidate))) return candidate;
+    }
+    throw new ConflictError('Could not allocate a unique work order code');
+  }
+
   private actorEvent(ctx: ActorContext, base: Omit<AppendEventInput, 'actorType' | 'actorUserId' | 'actor'>): AppendEventInput {
     const actorType = ctx.actorType ?? 'USER';
     return {

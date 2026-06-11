@@ -39,7 +39,7 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       rootAssetId: data.rootAssetId ?? null,
       type:        data.type,
       status:      data.status ?? 'PLANEJADA',
-      code:        data.code ?? null,
+      code:        data.code,
       assignedTo:  data.assignedTo ?? null,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
       createdBy,
@@ -95,6 +95,21 @@ export class WorkOrderRepository implements IWorkOrderRepository {
 
     if (!row) throw new AppError('WORK_ORDER_NOT_FOUND', 'Work order not found', 404);
     return this.mapWorkOrder(row);
+  }
+
+  async codeExists(tenantId: string, code: string, excludeId?: string): Promise<boolean> {
+    const conditions = [
+      eq(workOrders.tenantId, tenantId),
+      eq(workOrders.code, code),
+      isNull(workOrders.deletedAt),
+    ];
+    if (excludeId) conditions.push(sql`${workOrders.id} <> ${excludeId}`);
+    const [row] = await db
+      .select({ id: workOrders.id })
+      .from(workOrders)
+      .where(and(...conditions))
+      .limit(1);
+    return !!row;
   }
 
   async softDelete(tenantId: string, id: string): Promise<void> {
@@ -311,7 +326,7 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       rootAssetId: row.rootAssetId ?? null,
       type:        row.type as WorkOrder['type'],
       status:      row.status,
-      code:        row.code ?? null,
+      code:        row.code,
       assignedTo:  row.assignedTo ?? null,
       scheduledAt: row.scheduledAt ? row.scheduledAt.toISOString() : null,
       createdBy:   row.createdBy,

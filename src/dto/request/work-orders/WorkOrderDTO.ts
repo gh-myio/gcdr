@@ -21,7 +21,9 @@ export const CreateWorkOrderSchema = z.object({
   customerId:  z.string().uuid(),
   type:        z.enum(WORK_ORDER_TYPES),
   rootAssetId: z.string().uuid().nullable().optional(),
-  code:        z.string().max(100).nullable().optional(),
+  // Optional in the request — when absent the service generates a unique
+  // OS-<Mercosul plate> code (no I/O/1/0).
+  code:        z.string().trim().min(1).max(100).optional(),
   assignedTo:  z.string().uuid().nullable().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
   // Optional initial device scope.
@@ -34,7 +36,7 @@ export type CreateWorkOrderDTO = z.infer<typeof CreateWorkOrderSchema>;
 // ---------------------------------------------------------------------------
 export const UpdateWorkOrderSchema = z.object({
   rootAssetId: z.string().uuid().nullable().optional(),
-  code:        z.string().max(100).nullable().optional(),
+  code:        z.string().trim().min(1).max(100).optional(),
   assignedTo:  z.string().uuid().nullable().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
 });

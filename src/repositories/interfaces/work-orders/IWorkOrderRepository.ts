@@ -13,7 +13,7 @@ export interface CreateWorkOrderInput {
   customerId: string;
   type: string;
   rootAssetId?: string | null;
-  code?: string | null;
+  code: string;
   assignedTo?: string | null;
   scheduledAt?: string | null;
   status?: string;
@@ -21,7 +21,7 @@ export interface CreateWorkOrderInput {
 
 export interface UpdateWorkOrderInput {
   rootAssetId?: string | null;
-  code?: string | null;
+  code?: string;
   assignedTo?: string | null;
   scheduledAt?: string | null;
 }
@@ -51,6 +51,8 @@ export interface IWorkOrderRepository {
   updateStatus(tenantId: string, id: string, status: string): Promise<WorkOrder>;
   softDelete(tenantId: string, id: string): Promise<void>;
   list(tenantId: string, params: ListWorkOrdersDTO): Promise<PaginatedResult<WorkOrder>>;
+  /** True when a non-deleted WO of the tenant already uses this code. */
+  codeExists(tenantId: string, code: string, excludeId?: string): Promise<boolean>;
 
   // ---- Event types catalog -------------------------------------------------
   getEventType(code: string): Promise<WorkOrderEventType | null>;

@@ -1685,7 +1685,7 @@ export const workOrders = pgTable('work_orders', {
   rootAssetId:  uuid('root_asset_id').references(() => assets.id),
   type:         text('type').notNull(),
   status:       text('status').notNull().default('PLANEJADA'),
-  code:         text('code'),
+  code:         text('code').notNull(),
   assignedTo:   uuid('assigned_to').references(() => users.id),
   scheduledAt:  timestamp('scheduled_at', { withTimezone: true }),
   createdBy:    uuid('created_by').notNull(),
@@ -1696,6 +1696,7 @@ export const workOrders = pgTable('work_orders', {
   tenantCustomerIdx: index('work_orders_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantStatusIdx:   index('work_orders_tenant_status_idx').on(table.tenantId, table.status),
   rootAssetIdx:      index('work_orders_root_asset_idx').on(table.rootAssetId),
+  tenantCodeUnique:  uniqueIndex('work_orders_tenant_code_unique').on(table.tenantId, table.code).where(sql`${table.deletedAt} IS NULL`),
   typeCheck: check(
     'work_orders_type_check',
     sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA')`

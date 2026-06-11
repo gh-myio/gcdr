@@ -42,7 +42,8 @@ export interface WorkOrder {
   rootAssetId: string | null;
   type: WorkOrderType;
   status: WorkOrderStatus | string;
-  code: string | null;
+  /** Mandatory, unique per tenant — generated as OS-<Mercosul plate> when absent. */
+  code: string;
   assignedTo: string | null;
   scheduledAt: string | null;
   createdBy: string;

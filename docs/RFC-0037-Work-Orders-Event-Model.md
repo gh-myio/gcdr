@@ -117,7 +117,7 @@ CREATE TABLE work_orders (
   root_asset_id   uuid REFERENCES assets(id),            -- anchor (prédio/loja); nullable
   type            text NOT NULL,                          -- INSTALACAO | MANUTENCAO | VISITA_TECNICA
   status          text NOT NULL DEFAULT 'PLANEJADA',      -- PROJECTION of the latest lifecycle event
-  code            text,                                   -- human number (optional)
+  code            text NOT NULL,                          -- human number, unique per tenant (migration 0035); auto-generated OS-<Mercosul plate> (no I/O/1/0) when omitted
   assigned_to     uuid REFERENCES users(id),
   scheduled_at    timestamptz,
   created_by      uuid NOT NULL,
@@ -129,6 +129,7 @@ CREATE TABLE work_orders (
 CREATE INDEX work_orders_tenant_customer_idx ON work_orders (tenant_id, customer_id);
 CREATE INDEX work_orders_tenant_status_idx   ON work_orders (tenant_id, status);
 CREATE INDEX work_orders_root_asset_idx      ON work_orders (root_asset_id);
+CREATE UNIQUE INDEX work_orders_tenant_code_unique ON work_orders (tenant_id, code) WHERE deleted_at IS NULL;
 
 -- 2) Device scope (junction) ----------------------------------------------
 CREATE TABLE work_orders_devices (
