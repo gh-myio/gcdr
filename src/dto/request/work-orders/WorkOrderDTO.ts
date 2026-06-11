@@ -45,14 +45,28 @@ export type UpdateWorkOrderDTO = z.infer<typeof UpdateWorkOrderSchema>;
 // ---------------------------------------------------------------------------
 // List / filter work orders
 // ---------------------------------------------------------------------------
+export const WORK_ORDER_SORTS = [
+  'createdAt_desc',
+  'createdAt_asc',
+  'updatedAt_desc',
+  'updatedAt_asc',
+  'scheduledAt_asc',
+  'scheduledAt_desc',
+] as const;
+export type WorkOrderSort = (typeof WORK_ORDER_SORTS)[number];
+
 export const ListWorkOrdersSchema = z.object({
-  customerId: z.string().uuid().optional(),
-  status:     z.enum(WORK_ORDER_STATUSES).optional(),
-  type:       z.enum(WORK_ORDER_TYPES).optional(),
-  assignedTo: z.string().uuid().optional(),
-  deviceId:   z.string().uuid().optional(),
-  limit:      z.number().int().min(1).max(100).optional(),
-  cursor:     z.string().optional(),
+  customerId:  z.string().uuid().optional(),
+  status:      z.enum(WORK_ORDER_STATUSES).optional(),
+  type:        z.enum(WORK_ORDER_TYPES).optional(),
+  assignedTo:  z.string().uuid().optional(),
+  deviceId:    z.string().uuid().optional(),
+  // Opening (createdAt) range — inclusive ISO timestamps.
+  createdFrom: z.string().datetime({ offset: true }).optional(),
+  createdTo:   z.string().datetime({ offset: true }).optional(),
+  sort:        z.enum(WORK_ORDER_SORTS).optional(),
+  limit:       z.number().int().min(1).max(100).optional(),
+  cursor:      z.string().optional(),
 });
 export type ListWorkOrdersDTO = z.infer<typeof ListWorkOrdersSchema>;
 

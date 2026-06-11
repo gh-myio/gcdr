@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, isNull, sql, desc, asc, gte, lte } from 'drizzle-orm';
 import { db, schema } from '../../infrastructure/database/drizzle/db';
 import {
   WorkOrder,
@@ -123,10 +123,12 @@ export class WorkOrderRepository implements IWorkOrderRepository {
     const offset = params.cursor ? parseInt(params.cursor, 10) : 0;
 
     const conditions = [eq(workOrders.tenantId, tenantId), isNull(workOrders.deletedAt)];
-    if (params.customerId) conditions.push(eq(workOrders.customerId, params.customerId));
-    if (params.status)     conditions.push(eq(workOrders.status, params.status));
-    if (params.type)       conditions.push(eq(workOrders.type, params.type));
-    if (params.assignedTo) conditions.push(eq(workOrders.assignedTo, params.assignedTo));
+    if (params.customerId)  conditions.push(eq(workOrders.customerId, params.customerId));
+    if (params.status)      conditions.push(eq(workOrders.status, params.status));
+    if (params.type)        conditions.push(eq(workOrders.type, params.type));
+    if (params.assignedTo)  conditions.push(eq(workOrders.assignedTo, params.assignedTo));
+    if (params.createdFrom) conditions.push(gte(workOrders.createdAt, new Date(params.createdFrom)));
+    if (params.createdTo)   conditions.push(lte(workOrders.createdAt, new Date(params.createdTo)));
 
     // device filter: restrict to work orders whose scope contains the device.
     if (params.deviceId) {
@@ -137,11 +139,22 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       )`);
     }
 
+    // PG defaults put NULLs last on ASC / first on DESC — acceptable for
+    // scheduledAt, where unscheduled WOs sink to the edges.
+    const sortOrders = {
+      createdAt_desc:   desc(workOrders.createdAt),
+      createdAt_asc:    asc(workOrders.createdAt),
+      updatedAt_desc:   desc(workOrders.updatedAt),
+      updatedAt_asc:    asc(workOrders.updatedAt),
+      scheduledAt_asc:  asc(workOrders.scheduledAt),
+      scheduledAt_desc: desc(workOrders.scheduledAt),
+    } as const;
+
     const [results, total] = await Promise.all([
       db.select()
         .from(workOrders)
         .where(and(...conditions))
-        .orderBy(desc(workOrders.createdAt))
+        .orderBy(sortOrders[params.sort ?? 'createdAt_desc'])
         .limit(limit + 1)
         .offset(offset),
       countWhere(workOrders, conditions),

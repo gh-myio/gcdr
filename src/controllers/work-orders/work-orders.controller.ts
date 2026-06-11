@@ -34,20 +34,26 @@ function actorOf(req: Request): ActorContext {
 // /wo/work-orders
 // =============================================================================
 
-/** GET /wo/work-orders — list (filter: customer, status, type, assignee, device) */
+/** GET /wo/work-orders — list (filter: customer, status, type, assignee, device, createdAt range; sortable) */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { customerId, status, type, assignedTo, deviceId, limit, cursor } = req.query;
+    const {
+      customerId, status, type, assignedTo, deviceId,
+      createdFrom, createdTo, sort, limit, cursor,
+    } = req.query;
 
     const params: ListWorkOrdersDTO = ListWorkOrdersSchema.parse({
-      customerId: customerId as string | undefined,
-      status:     status as string | undefined,
-      type:       type as string | undefined,
-      assignedTo: assignedTo as string | undefined,
-      deviceId:   deviceId as string | undefined,
-      limit:      limit ? parseInt(limit as string, 10) : undefined,
-      cursor:     cursor as string | undefined,
+      customerId:  customerId as string | undefined,
+      status:      status as string | undefined,
+      type:        type as string | undefined,
+      assignedTo:  assignedTo as string | undefined,
+      deviceId:    deviceId as string | undefined,
+      createdFrom: createdFrom as string | undefined,
+      createdTo:   createdTo as string | undefined,
+      sort:        sort as string | undefined,
+      limit:       limit ? parseInt(limit as string, 10) : undefined,
+      cursor:      cursor as string | undefined,
     });
 
     const result = await workOrderService.list(tenantId, params);
