@@ -4,6 +4,7 @@ import { IAssetRepository } from '../../../src/repositories/interfaces/IAssetRep
 import { IDeviceRepository } from '../../../src/repositories/interfaces/IDeviceRepository';
 import { IRuleRepository } from '../../../src/repositories/interfaces/IRuleRepository';
 import { ICentralRepository } from '../../../src/repositories/interfaces/ICentralRepository';
+import { ICustomerApiKeyRepository } from '../../../src/repositories/interfaces/ICustomerApiKeyRepository';
 import { Customer } from '../../../src/domain/entities/Customer';
 import { Asset } from '../../../src/domain/entities/Asset';
 import { Device } from '../../../src/domain/entities/Device';
@@ -47,6 +48,7 @@ describe('CustomerService', () => {
   let mockDeviceRepository: jest.Mocked<IDeviceRepository>;
   let mockRuleRepository: jest.Mocked<IRuleRepository>;
   let mockCentralRepository: jest.Mocked<ICentralRepository>;
+  let mockApiKeyRepository: jest.Mocked<ICustomerApiKeyRepository>;
 
   const tenantId = 'tenant-test';
   const userId = 'user-test';
@@ -108,6 +110,12 @@ describe('CustomerService', () => {
       listByCustomer: jest.fn(),
     } as unknown as jest.Mocked<ICentralRepository>;
     mockRuleRepository = {} as unknown as jest.Mocked<IRuleRepository>;
+    mockApiKeyRepository = {
+      listByCustomer: jest.fn().mockResolvedValue({
+        items: [],
+        pagination: { total: 0, hasMore: false },
+      }),
+    } as unknown as jest.Mocked<ICustomerApiKeyRepository>;
 
     service = new CustomerService(
       mockRepository,
@@ -115,6 +123,7 @@ describe('CustomerService', () => {
       mockDeviceRepository,
       mockRuleRepository,
       mockCentralRepository,
+      mockApiKeyRepository,
     );
   });
 
@@ -431,9 +440,12 @@ describe('CustomerService', () => {
       expect(result.centrals).toEqual([central]);
       expect(result.devices).toEqual([device]);
       expect(result.children).toBeUndefined();
+      expect(result.apiKeys).toEqual([]);
+      expect(result.apiKeyCount).toBe(0);
       expect(mockAssetRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001', { limit: 1000 });
       expect(mockCentralRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001');
       expect(mockDeviceRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001', { limit: 1000 });
+      expect(mockApiKeyRepository.listByCustomer).toHaveBeenCalledWith(tenantId, 'cust-001', { limit: 100 });
     });
 
     it('should recursively enrich descendants', async () => {

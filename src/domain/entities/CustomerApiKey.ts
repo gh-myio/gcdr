@@ -36,11 +36,18 @@ export interface CustomerApiKey extends BaseEntity {
   /** Customer this key belongs to */
   customerId: string;
 
-  /** SHA-256 hash of the API key (never store plain text) */
+  /** SHA-256 hash of the API key (validation/lookup path) */
   keyHash: string;
 
   /** First 8 characters of the key for identification (gcdr_cust_XXXXXXXX) */
   keyPrefix: string;
+
+  /**
+   * Plaintext key, recoverable via the audit-logged reveal endpoint —
+   * operators copy it into ThingsBoard SERVER_SCOPE attributes after
+   * creation. NULL for keys minted before migration 0036.
+   */
+  keyPlain?: string | null;
 
   /** Human-readable name for this key */
   name: string;

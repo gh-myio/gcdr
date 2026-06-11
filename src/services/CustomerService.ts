@@ -20,6 +20,8 @@ import { RuleRepository } from '../repositories/RuleRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { CentralRepository } from '../repositories/CentralRepository';
 import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
+import { CustomerApiKeyRepository } from '../repositories/CustomerApiKeyRepository';
+import { ICustomerApiKeyRepository } from '../repositories/interfaces/ICustomerApiKeyRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
@@ -45,12 +47,26 @@ export interface RuleMeta {
   keyMulti?: number;
 }
 
+/** API key metadata exposed on the enriched tree — never key_hash/key_plain. */
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scopes: string[];
+  isActive: boolean;
+  expiresAt?: string | null;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
 export interface EnrichedCustomer {
   customer: Customer;
   assets: Asset[];
   devices: (Device & { ruleIds?: string[] })[];
   centrals?: Central[];
   rules?: Record<string, RuleMeta>;
+  apiKeys?: ApiKeySummary[];
+  apiKeyCount?: number;
   children?: EnrichedCustomer[];
 }
 
@@ -60,6 +76,7 @@ export class CustomerService {
   private deviceRepository: IDeviceRepository;
   private ruleRepository: IRuleRepository;
   private centralRepository: ICentralRepository;
+  private apiKeyRepository: ICustomerApiKeyRepository;
 
   constructor(
     repository?: ICustomerRepository,
@@ -67,12 +84,14 @@ export class CustomerService {
     deviceRepository?: IDeviceRepository,
     ruleRepository?: IRuleRepository,
     centralRepository?: ICentralRepository,
+    apiKeyRepository?: ICustomerApiKeyRepository,
   ) {
     this.repository = repository || new CustomerRepository();
     this.assetRepository = assetRepository || new AssetRepository();
     this.deviceRepository = deviceRepository || new DeviceRepository();
     this.ruleRepository = ruleRepository || new RuleRepository();
     this.centralRepository = centralRepository || new CentralRepository();
+    this.apiKeyRepository = apiKeyRepository || new CustomerApiKeyRepository();
   }
 
   private buildRuleMeta(rule: Rule): RuleMeta {
@@ -376,10 +395,11 @@ export class CustomerService {
   }
 
   private async enrichRecursive(tenantId: string, customer: Customer): Promise<EnrichedCustomer> {
-    const [assetsResult, centrals, devicesResult, children] = await Promise.all([
+    const [assetsResult, centrals, devicesResult, apiKeysResult, children] = await Promise.all([
       this.assetRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
       this.centralRepository.listByCustomer(tenantId, customer.id),
       this.deviceRepository.listByCustomer(tenantId, customer.id, { limit: 1000 }),
+      this.apiKeyRepository.listByCustomer(tenantId, customer.id, { limit: 100 }),
       this.repository.getChildren(tenantId, customer.id),
     ]);
 
@@ -387,11 +407,25 @@ export class CustomerService {
       children.map((child) => this.enrichRecursive(tenantId, child)),
     );
 
+    // Metadata only — key_hash/key_plain never leave through the tree.
+    const apiKeys: ApiKeySummary[] = apiKeysResult.items.map((k) => ({
+      id: k.id,
+      name: k.name,
+      keyPrefix: k.keyPrefix,
+      scopes: k.scopes,
+      isActive: k.isActive,
+      expiresAt: k.expiresAt ?? null,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    }));
+
     return {
       customer,
       assets: assetsResult.items,
       centrals,
       devices: devicesResult.items,
+      apiKeys,
+      apiKeyCount: apiKeysResult.pagination.total ?? apiKeys.length,
       ...(enrichedChildren.length > 0 && { children: enrichedChildren }),
     };
   }

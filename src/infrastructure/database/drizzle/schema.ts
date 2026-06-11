@@ -844,9 +844,12 @@ export const customerApiKeys = pgTable('customer_api_keys', {
   tenantId: uuid('tenant_id').notNull(),
   customerId: uuid('customer_id').notNull().references(() => customers.id),
 
-  // Key data
+  // Key data. key_plain makes the key recoverable after creation (operators
+  // copy it into ThingsBoard SERVER_SCOPE attributes later) — retrieval only
+  // via the audit-logged reveal endpoint; NULL for pre-0036 legacy keys.
   keyHash: varchar('key_hash', { length: 255 }).notNull(),
   keyPrefix: varchar('key_prefix', { length: 20 }).notNull(),
+  keyPlain: text('key_plain'),
 
   // Info
   name: varchar('name', { length: 255 }).notNull(),

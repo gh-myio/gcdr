@@ -33,8 +33,10 @@ export class CustomerApiKeyService {
   }
 
   /**
-   * Create a new API key for a customer
-   * Returns the plaintext key ONLY ONCE - it cannot be retrieved later
+   * Create a new API key for a customer.
+   * The plaintext is also persisted (key_plain) so it can be recovered later
+   * through the audit-logged reveal endpoint — operators copy it into
+   * ThingsBoard SERVER_SCOPE attributes after creation.
    */
   async createApiKey(
     tenantId: string,
@@ -65,6 +67,7 @@ export class CustomerApiKeyService {
       customerId,
       keyHash,
       keyPrefix,
+      keyPlain: plaintextKey,
       name: data.name,
       description: data.description,
       scopes: data.scopes as ApiKeyScope[],
@@ -222,6 +225,21 @@ export class CustomerApiKeyService {
     options?: PaginationParams & { isActive?: boolean }
   ): Promise<PaginatedResult<CustomerApiKey>> {
     return this.apiKeyRepository.listByCustomer(tenantId, customerId, options);
+  }
+
+  /**
+   * Reveal the plaintext of an API key. Callers must audit-log every call
+   * (API_KEY_REVEALED). Keys created before migration 0036 have no recorded
+   * plaintext and cannot be revealed — recreate them.
+   */
+  async revealApiKey(tenantId: string, id: string): Promise<string> {
+    const apiKey = await this.getApiKey(tenantId, id);
+    if (!apiKey.keyPlain) {
+      throw new NotFoundError(
+        `API key ${id} was created before plaintext retention and cannot be revealed — recreate it`
+      );
+    }
+    return apiKey.keyPlain;
   }
 
   /**

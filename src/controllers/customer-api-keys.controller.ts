@@ -16,8 +16,9 @@ const router = Router({ mergeParams: true });
  * POST /customers/:customerId/api-keys
  * Create a new API key for a customer
  *
- * IMPORTANT: The plaintext key is only returned once at creation.
- * Store it securely - it cannot be retrieved later!
+ * The plaintext key is returned at creation and can also be recovered later
+ * via POST /:keyId/reveal (audit-logged) — operators copy it into ThingsBoard
+ * SERVER_SCOPE attributes.
  */
 router.post('/',
   logEvent({
@@ -45,10 +46,11 @@ router.post('/',
       userId
     );
 
+    // Strip stored key material from the spread — `key` carries the plaintext.
+    const { keyHash: _hash, keyPlain: _plain, ...publicFields } = result.apiKey;
     sendCreated(res, {
-      ...result.apiKey,
+      ...publicFields,
       key: result.plaintextKey,
-      _warning: 'Store this key securely. It will not be shown again.',
     }, requestId);
   } catch (err) {
     next(err);
@@ -146,6 +148,45 @@ router.get('/:keyId', async (req: Request, res: Response, next: NextFunction) =>
       createdAt: apiKey.createdAt,
       createdBy: apiKey.createdBy,
     }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /customers/:customerId/api-keys/:keyId/reveal
+ * Reveal the plaintext key — needed to (re)configure ThingsBoard customer
+ * SERVER_SCOPE attributes after creation. Audit-logged on every call
+ * (API_KEY_REVEALED, no plaintext in the audit row). Keys created before
+ * migration 0036 have no stored plaintext and return 404.
+ */
+router.post('/:keyId/reveal',
+  logEvent({
+    eventType: EventType.API_KEY_REVEALED,
+    description: (req) => `API key ${req.params.keyId} revealed for customer ${req.params.customerId}`,
+    getEntityId: (req) => req.params.keyId,
+    getCustomerId: (req) => req.params.customerId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId, keyId } = req.params;
+
+    if (!customerId) {
+      throw new ValidationError('Customer ID is required');
+    }
+    if (!keyId) {
+      throw new ValidationError('API Key ID is required');
+    }
+
+    // Verify the key belongs to the customer
+    const apiKey = await customerApiKeyService.getApiKey(tenantId, keyId);
+    if (apiKey.customerId !== customerId) {
+      throw new ValidationError('API key does not belong to this customer');
+    }
+
+    const key = await customerApiKeyService.revealApiKey(tenantId, keyId);
+    sendSuccess(res, { id: keyId, key }, 200, requestId);
   } catch (err) {
     next(err);
   }

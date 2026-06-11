@@ -73,6 +73,7 @@ export enum EventType {
   // === API Keys ===
   API_KEY_CREATED = 'API_KEY_CREATED',
   API_KEY_REVOKED = 'API_KEY_REVOKED',
+  API_KEY_REVEALED = 'API_KEY_REVEALED',
   API_KEY_USED = 'API_KEY_USED',
 
   // === Integrations ===
