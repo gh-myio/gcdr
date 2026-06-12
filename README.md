@@ -182,6 +182,56 @@ npm test                 # Run tests
 npm run test:coverage    # Tests with coverage
 ```
 
+`npm run dev` auto-loads `.env` and `.env.local` (`--env-file-if-exists`).
+The `db:*` scripts do **not** — export the env vars in your shell first.
+
+### Database migrations & seeding
+
+Migrations are tracked by a custom runner (`schema_migrations` table) — the
+single source of truth for what ran where. The `db:*` scripts need
+`DATABASE_URL` in the environment.
+
+```bash
+npm run db:mig:status    # list applied / pending / drift
+npm run db:mig:up        # apply pending migrations
+npm run db:seed          # populate dev data
+npm run db:seed:clear    # wipe seeded data (asks for confirmation)
+```
+
+**Seeding against a Docker Postgres.** The seed runner shells into the DB
+via `docker exec ${DB_CONTAINER:-gcdr-postgres} psql …`. If your local
+Postgres container has a different name (e.g. the dedicated dev DB
+`gcdr-db-local` from `docker-compose.db-local.yml`, host port `5544`), set
+`DB_CONTAINER`:
+
+```powershell
+# PowerShell
+$env:DB_CONTAINER = "gcdr-db-local"
+npm run db:seed
+```
+
+```bash
+# bash
+DB_CONTAINER=gcdr-db-local npm run db:seed
+```
+
+Caveats:
+
+- Seeds are **not idempotent** and run with `ON_ERROR_STOP=1` — re-running
+  against an already-populated DB fails with duplicate-key / FK errors.
+  Always `clear` before re-seeding.
+- `db:seed:clear` (`00-clear-all.sql`) does **not** truncate
+  `public_single_apps` / `public_single_app_responses`, so seed
+  `18-public-single-apps.sql` can still collide after a clear. For a clean
+  reset:
+
+  ```bash
+  DB_CONTAINER=gcdr-db-local "yes" | npx tsx scripts/db/seed-runner.ts clear
+  docker exec -i gcdr-db-local psql -U postgres -d db_gcdr \
+    -c "DELETE FROM public_single_app_responses; DELETE FROM public_single_apps;"
+  DB_CONTAINER=gcdr-db-local npm run db:seed
+  ```
+
 ### Environment Variables
 
 | Variable | Description | Default |
