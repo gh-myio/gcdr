@@ -19,13 +19,17 @@ const router = Router();
 // no userId) record actorType API_KEY; otherwise USER.
 function actorOf(req: Request): ActorContext {
   const ctx = req.context as typeof req.context & { userEmail?: string };
-  const isApiKey = Boolean(ctx.apiKeyId);
+  // Customer API key seta ctx.apiKeyId; master key / dev bypass autenticam
+  // como SERVICE_ACCOUNT com userId sentinela (00000000-…-0001/0002) que NÃO
+  // existe na tabela users — precisa virar API_KEY para o actorEvent gravar
+  // actor_user_id = null (FK work_orders_events_actor_user_id_fkey).
+  const isApiKey = Boolean(ctx.apiKeyId) || req.user?.type === 'SERVICE_ACCOUNT';
   return {
     userId: ctx.userId,
     actorType: isApiKey ? 'API_KEY' : 'USER',
     actor: {
       id:    ctx.userId,
-      email: ctx.userEmail,
+      email: req.user?.email ?? ctx.userEmail,
     },
   };
 }
