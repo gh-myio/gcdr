@@ -96,6 +96,16 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
   } catch (err) { next(err); }
 });
 
+/** GET /wo/work-orders/:id/transitions — RFC-0041 rules engine: allowed/blocked event-types */
+router.get('/:id/transitions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    if (!req.params.id) throw new ValidationError('Work order ID is required');
+    const result = await workOrderService.getTransitions(tenantId, req.params.id);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) { next(err); }
+});
+
 /** DELETE /wo/work-orders/:id — soft delete */
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

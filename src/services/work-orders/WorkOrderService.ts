@@ -27,6 +27,13 @@ import { AssetRepository } from '../../repositories/AssetRepository';
 import { PaginatedResult } from '../../shared/types';
 import { NotFoundError, ValidationError, ConflictError } from '../../shared/errors/AppError';
 import { generateWorkOrderCode } from './woCode';
+import {
+  LIFECYCLE_CATEGORIES,
+  isTerminal,
+  lifecycleStateForCode,
+  evaluateTransitions,
+  TransitionEvaluation,
+} from './workOrderRules';
 
 export interface ActorContext {
   userId: string;
@@ -41,42 +48,15 @@ export interface WorkOrderDetail extends WorkOrder {
 
 // ---------------------------------------------------------------------------
 // Status projection. The projected `work_orders.status` is derived from the
-// latest lifecycle event of the WO's type. We map the lifecycle SUFFIX of a
-// `<CATEGORY>_<STATE>` event code to one of the projected states. Non-lifecycle
-// categories (OBSERVACAO/ANEXO/ESTRUTURA) never move status.
+// latest lifecycle event of the WO's type. The state-machine rules (projection
+// + transition guards) live in the Work Order Rules Engine (RFC-0041); this
+// service delegates to it and stays focused on persistence/orchestration.
 // ---------------------------------------------------------------------------
-const LIFECYCLE_CATEGORIES = new Set(['VISITA_TECNICA', 'INSTALACAO', 'MANUTENCAO']);
 
-function lifecycleStateForCode(code: string, category: string): string | null {
-  if (!LIFECYCLE_CATEGORIES.has(category)) return null;
-  // suffix = code minus the "<CATEGORY>_" prefix
-  const suffix = code.startsWith(`${category}_`) ? code.slice(category.length + 1) : code;
-
-  switch (suffix) {
-    case 'PLANEJADA':
-      return 'PLANEJADA';
-    case 'INICIADA':
-    case 'REINICIADA':
-    case 'EXECUTADA_PARCIAL':
-      return 'EM_ANDAMENTO';
-    case 'INTERROMPIDA':
-      return 'INTERROMPIDA';
-    case 'REAGENDADA':
-      return 'REAGENDADA';
-    case 'AGUARDANDO_AGENDA_CLIENTE':
-    case 'AGUARDANDO_AGENDA_TECNICO':
-    case 'AGUARDANDO_OUTROS_MOTIVOS':
-      return 'AGUARDANDO';
-    case 'FINALIZADA':
-      return 'FINALIZADA';
-    case 'CANCELADA':
-      return 'CANCELADA';
-    default:
-      return null;
-  }
+export interface TransitionsResult {
+  status: string;
+  transitions: TransitionEvaluation[];
 }
-
-const TERMINAL_STATUSES = new Set(['FINALIZADA', 'CANCELADA']);
 
 export class WorkOrderService {
   constructor(
@@ -149,6 +129,20 @@ export class WorkOrderService {
     return { ...wo, devices, events };
   }
 
+  /**
+   * RFC-0041: evaluate which event-types can/can't be appended now (and why),
+   * given the WO's current (already-projected) status. The composer renders
+   * blocked ones struck-through with the reason.
+   */
+  async getTransitions(tenantId: string, id: string): Promise<TransitionsResult> {
+    const wo = await this.getById(tenantId, id);
+    const catalog = await this.listEventTypes();
+    return {
+      status: wo.status,
+      transitions: evaluateTransitions({ type: wo.type, status: wo.status }, catalog),
+    };
+  }
+
   async update(tenantId: string, id: string, data: UpdateWorkOrderDTO, ctx: ActorContext): Promise<WorkOrder> {
     const existing = await this.getById(tenantId, id);
 
@@ -208,7 +202,7 @@ export class WorkOrderService {
 
     // Terminal WOs are locked for further LIFECYCLE events.
     const projected = lifecycleStateForCode(eventType.code, eventType.category);
-    if (projected && TERMINAL_STATUSES.has(wo.status)) {
+    if (projected && isTerminal(wo.status)) {
       throw new ConflictError(`Work order ${workOrderId} is ${wo.status} and cannot accept further lifecycle events`);
     }
 
