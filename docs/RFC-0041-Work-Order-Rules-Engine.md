@@ -1,4 +1,4 @@
-# RFC-0041 — Work Order Rules Engine
+# RFC-0041 — Work Order Rules Engine (data-driven, per-tenant lifecycle)
 
 - **Status:** Draft
 - **Date:** 2026-06-14
@@ -8,162 +8,173 @@
 
 ## 1. Summary
 
-Introduce a single **Work Order Rules Engine** as the *one* place that knows the
-WO state machine. It owns two responsibilities that today are split (status on
-the backend, transition guards hardcoded in the frontend):
+Make the WO state machine **data-driven and editable per tenant**. A
+`work_orders_lifecycle_rules` table describes, for each event-type, its
+**predecessors**, the **rule** over them (none / at least one / all), the
+**types it activates next**, and the **status it projects**. A single Work Order
+Rules Engine reads this table + a WO's event history to:
 
-1. **Status projection** — derive `work_orders.status` from the latest lifecycle
-   event (moves the existing `lifecycleStateForCode` into the engine).
-2. **Transition evaluation** — given a WO's current status, decide which
-   event-types **can** be appended and which are **blocked**, each blocked one
-   carrying a machine `reasonCode` (+ context) explaining *why*.
+1. **project the WO status** (data-driven, no hardcoded mapping), and
+2. **evaluate transitions** — which event-types are currently *allowed* and which
+   are *blocked*, each blocked one carrying a machine reason (missing
+   predecessors / not yet active / terminal).
 
-A new read endpoint exposes the evaluation so the UI can render **every** type
-but show the non-actionable ones struck-through with a subtle reason — without
-duplicating any rule.
+A read endpoint exposes the evaluation so the UI shows the **full catalog** with
+non-actionable types struck-through and a subtle reason — without duplicating any
+rule. Because the flow lives in data, a tenant can reshape it (add steps, change
+predecessors, allow repeats) without a deploy.
 
 ## 2. Motivation
 
-- **Single source of truth.** The transition guards currently live in the
-  frontend (`QUICK_ACTION_DEFS` with `when: [...]` arrays in
-  `WorkOrderDetail.tsx`). Any drift between that and the backend's projection is
-  a correctness bug. The engine removes the duplication.
-- **Explainable UI.** Today blocked actions are simply hidden. Product wants the
-  full catalog always visible, with disabled items struck-through and a reason
-  ("disponível apenas quando a OS está EM_ANDAMENTO", "OS finalizada não aceita
-  novos eventos", …).
-- **Server-authoritative.** Status must never be computed in the client. The
-  engine guarantees the same result on load and after every appended event.
+- **Flexibility.** Different operations have different flows. A hardcoded
+  suffix→status matrix (the Phase-1 engine) can't express "this customer
+  requires a vistoria before finishing" or "allow partial executions to repeat".
+  A per-tenant table gives the user full control of the flow.
+- **Single source of truth.** Today the transition guards are duplicated in the
+  frontend (`QUICK_ACTION_DEFS`). The engine + table removes the duplication and
+  the client never computes status.
+- **Explainability.** Blocked steps stay visible with a reason derived from the
+  rule ("requer: Instalação iniciada", "aguarda ao menos um de …").
 
-## 3. The state machine
+## 3. Data model
 
-States (terminal marked †): `PLANEJADA`, `EM_ANDAMENTO`, `INTERROMPIDA`,
-`AGUARDANDO`, `REAGENDADA`, `FINALIZADA †`, `CANCELADA †`.
+### 3.1 `work_orders_lifecycle_rules`
 
-Lifecycle event **suffix → target status** (a code is `<TYPE>_<SUFFIX>`):
+One row = one **node** of a tenant's flow (a governed event-type within a WO
+type). Seeded with the current defaults so behavior is unchanged out of the box.
 
-| Suffix | Target |
-|---|---|
-| `PLANEJADA` | PLANEJADA |
-| `INICIADA` · `REINICIADA` · `EXECUTADA_PARCIAL` | EM_ANDAMENTO |
-| `INTERROMPIDA` | INTERROMPIDA |
-| `REAGENDADA` | REAGENDADA |
-| `AGUARDANDO_AGENDA_CLIENTE` · `AGUARDANDO_AGENDA_TECNICO` · `AGUARDANDO_OUTROS_MOTIVOS` | AGUARDANDO |
-| `FINALIZADA` | FINALIZADA † |
-| `CANCELADA` | CANCELADA † |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `tenant_id` | uuid | per-tenant flow |
+| `wo_type` | text NULL | `INSTALACAO` / `MANUTENCAO` / `VISITA_TECNICA`; **NULL = applies to every type** |
+| `event_type` | text → `work_orders_event_types.code` | the node this rule governs |
+| `predecessors` | text[] (default `{}`) | event-type codes that may gate this node |
+| `predecessor_rule` | text | `NONE` · `ANY` · `ALL` (see §4) |
+| `activates` | text[] (default `{}`) | event-types that become active **after** this node fires (forward edges; repeats allowed) |
+| `projects_status` | text NULL | the WO status this event projects; **NULL = marker** (never moves status) |
+| `is_entry` | boolean (default false) | true = available from the start (no predecessor needed) |
+| `sort_order` | int (default 0) | display order in the composer |
+| `active` | boolean (default true) | soft toggle |
 
-**Allowed source statuses per suffix** (the transition guard matrix):
+Constraints: `UNIQUE(tenant_id, wo_type, event_type)`,
+`predecessor_rule IN ('NONE','ANY','ALL')`. Resolution precedence: a row with a
+specific `wo_type` overrides a `wo_type IS NULL` row for the same
+`(tenant, event_type)`.
 
-| Suffix | Allowed from |
-|---|---|
-| `INICIADA` | PLANEJADA, REAGENDADA, AGUARDANDO |
-| `REINICIADA` | INTERROMPIDA |
-| `EXECUTADA_PARCIAL` | EM_ANDAMENTO |
-| `INTERROMPIDA` | EM_ANDAMENTO |
-| `REAGENDADA` | PLANEJADA, EM_ANDAMENTO, AGUARDANDO, INTERROMPIDA |
-| `AGUARDANDO_*` | PLANEJADA, EM_ANDAMENTO, REAGENDADA, INTERROMPIDA |
-| `FINALIZADA` | PLANEJADA, EM_ANDAMENTO, REAGENDADA, AGUARDANDO, INTERROMPIDA |
-| `CANCELADA` | PLANEJADA, EM_ANDAMENTO, REAGENDADA, AGUARDANDO, INTERROMPIDA |
+> Terminal states reuse the existing `work_orders_event_types.is_terminal` flag —
+> a node whose event-type is terminal closes the WO (no further lifecycle nodes
+> become active).
 
-Cross-cutting rules:
+### 3.2 Example (default INSTALACAO flow, abbreviated)
 
-- **Terminal lock.** From `FINALIZADA`/`CANCELADA`, *no* lifecycle event is
-  allowed → `reasonCode: TERMINAL`.
-- **Type match.** A lifecycle event-type's category must equal the WO `type`
-  (an `INSTALACAO` WO only accepts `INSTALACAO_*` lifecycle events) →
-  `reasonCode: TYPE_MISMATCH`.
-- **Non-lifecycle always allowed.** `ESTRUTURA`, `OBSERVACAO`, `ANEXO` are
-  markers — never gated by status (they don't move it).
-- **Wrong source.** A lifecycle event whose suffix isn't allowed from the
-  current status → `reasonCode: WRONG_STATE` (+ `allowedFrom`).
+| event_type | predecessors | rule | activates | projects_status | entry |
+|---|---|---|---|---|---|
+| `INSTALACAO_PLANEJADA` | `{}` | NONE | `{INSTALACAO_INICIADA, INSTALACAO_REAGENDADA, INSTALACAO_CANCELADA}` | PLANEJADA | ✓ |
+| `INSTALACAO_INICIADA` | `{INSTALACAO_PLANEJADA, INSTALACAO_REAGENDADA}` | ANY | `{PRODUTO_INSTALADO, INSTALACAO_INTERROMPIDA, INSTALACAO_FINALIZADA}` | EM_ANDAMENTO | |
+| `PRODUTO_INSTALADO` | `{INSTALACAO_INICIADA}` | ALL | `{PRODUTO_INSTALADO, INSTALACAO_FINALIZADA}` | *(null marker)* | |
+| `INSTALACAO_INTERROMPIDA` | `{INSTALACAO_INICIADA}` | ANY | `{INSTALACAO_REINICIADA}` | INTERROMPIDA | |
+| `INSTALACAO_FINALIZADA` | `{INSTALACAO_INICIADA}` | ANY | `{}` | FINALIZADA | |
 
-## 4. Engine API (backend)
+Note `PRODUTO_INSTALADO` lists itself in `activates` — **repeats are allowed**.
 
-New pure module `src/services/work-orders/workOrderRules.ts`:
+## 4. Engine semantics
+
+Let `occurred` = the set of event-type codes already present on the WO.
+
+**Allowed?** For a node `n` (resolved row for the WO's type):
+
+- `NONE` → allowed (entry / ungated).
+- `ANY` → allowed iff `predecessors ∩ occurred ≠ ∅`.
+- `ALL` → allowed iff `predecessors ⊆ occurred`.
+
+Additionally, if the WO is **terminal** (latest projecting event is terminal),
+all lifecycle nodes are blocked (`reasonCode: TERMINAL`). Non-lifecycle markers
+(`ESTRUTURA`/`OBSERVACAO`/`ANEXO`) without a governing row are always allowed.
+
+`activates` is the **forward set** a node enables; it powers the flow diagram and
+lets the UI preview "what becomes available next". (The authoritative gate is
+`predecessors`+`rule`; `activates` is the explicit forward declaration and may be
+validated against it.)
+
+**Status projection.** Walk the WO events newest→oldest; the status is the
+`projects_status` of the most recent event whose node has a non-null
+`projects_status`. Fallback `PLANEJADA`.
+
+**Blocked reasons** (machine, UI localizes):
+
+| reasonCode | when | context |
+|---|---|---|
+| `TERMINAL` | WO already finalizada/cancelada | — |
+| `MISSING_PREDECESSORS` | `ANY`/`ALL` rule unmet | `predecessors`, `rule`, `missing[]` |
+| `TYPE_MISMATCH` | lifecycle event of another WO type | — |
+
+## 5. Engine API
+
+`src/services/work-orders/workOrderRules.ts` (pure functions; the rule rows are
+injected so the engine has no I/O):
 
 ```ts
-type Status = 'PLANEJADA' | 'EM_ANDAMENTO' | 'INTERROMPIDA' | 'AGUARDANDO'
-            | 'REAGENDADA' | 'FINALIZADA' | 'CANCELADA';
-
-// Status projection (moved from WorkOrderService).
-function lifecycleStateForCode(code: string, category: string): Status | null;
-function projectStatus(events: {eventType:string; category:string}[]): Status;  // latest wins
-function isTerminal(status: Status): boolean;
-
-type ReasonCode = 'TERMINAL' | 'TYPE_MISMATCH' | 'WRONG_STATE';
-interface Evaluation {
-  code: string;
-  category: string;
-  label: string;
-  targetStatus: Status | null;   // null for non-lifecycle markers
-  allowed: boolean;
-  reasonCode?: ReasonCode;
-  allowedFrom?: Status[];        // present when reasonCode = WRONG_STATE
+interface LifecycleRule {
+  woType: string | null;
+  eventType: string;
+  predecessors: string[];
+  predecessorRule: 'NONE' | 'ANY' | 'ALL';
+  activates: string[];
+  projectsStatus: string | null;
+  isEntry: boolean;
 }
 
-// Evaluate one event-type against a WO.
-function evaluateEventType(et: EventType, wo: {type:string; status:Status}): Evaluation;
-
-// Evaluate the whole catalog (filtered to the WO type + ESTRUTURA, as the
-// composer offers) → ordered list of allowed + blocked.
-function evaluateTransitions(wo, catalog: EventType[]): Evaluation[];
+function projectStatus(events, rules): Status;
+function evaluateTransitions(wo, catalog, occurred, rules): TransitionEvaluation[];
 ```
 
-`WorkOrderService` is refactored to **delegate** status projection to the engine
-(`appendEvent` keeps doing the write; it just calls `engine.lifecycleStateForCode`).
-No behavioral change to existing writes.
+`WorkOrderService` loads the tenant's rules (cached) and delegates. A
+`WorkOrderLifecycleRepository` reads `work_orders_lifecycle_rules`; when a tenant
+has **no** rows, the engine falls back to the **built-in default flow** (the
+Phase-1 matrix, kept as the seed), so the table is optional.
 
-## 5. Endpoint
+## 6. Endpoint
 
 ```
 GET /api/v1/wo/work-orders/:id/transitions
+→ { status, transitions: [ { code, category, label, targetStatus, allowed,
+                             reasonCode?, predecessors?, missing?, activates? } ] }
 ```
 
-Auth: same as the rest of `/wo/work-orders` (JWT or API key). Response:
+WO detail keeps returning the already-projected `status`. The UI re-fetches
+`/transitions` after appending an event (the server recomputes everything).
 
-```json
-{
-  "success": true,
-  "data": {
-    "status": "EM_ANDAMENTO",
-    "transitions": [
-      { "code": "INSTALACAO_FINALIZADA", "category": "INSTALACAO", "label": "Instalação finalizada",
-        "targetStatus": "FINALIZADA", "allowed": true },
-      { "code": "INSTALACAO_INICIADA", "category": "INSTALACAO", "label": "Instalação iniciada",
-        "targetStatus": "EM_ANDAMENTO", "allowed": false,
-        "reasonCode": "WRONG_STATE", "allowedFrom": ["PLANEJADA","REAGENDADA","AGUARDANDO"] },
-      { "code": "PRODUTO_INSTALADO", "category": "ESTRUTURA", "label": "Produto instalado",
-        "targetStatus": null, "allowed": true }
-    ]
-  }
-}
+Admin (managing the flow) — Phase 3:
+
+```
+GET    /wo/lifecycle-rules           # tenant's rows
+PUT    /wo/lifecycle-rules           # replace the tenant's flow (validated DAG-ish)
 ```
 
-The WO detail (`GET /wo/work-orders/:id`) keeps returning the already-projected
-`status` — no client computation. The transitions list is fetched separately
-(and re-fetched by the UI after appending an event).
+## 7. Frontend usage
 
-## 6. Frontend usage
+- **Record-event picker** shows the whole catalog; `allowed:false` cards render
+  struck-through with a subtle reason from `reasonCode` (+ `missing`). Selecting
+  a blocked type is disabled.
+- **Quick actions** derive from `transitions` (allowed lifecycle moves) — the
+  hardcoded `QUICK_ACTION_DEFS` guards are removed.
+- No status math in the client.
 
-- **Record-event card.** The event-type picker shows the full catalog; entries
-  with `allowed:false` render **struck-through** with a subtle reason derived
-  from `reasonCode`/`allowedFrom` (i18n). Selecting a blocked type is disabled.
-- **Quick actions.** `QUICK_ACTION_DEFS` guard arrays are removed; the quick
-  actions are derived from `transitions` (allowed lifecycle termin�/state moves).
-- **After append.** The UI appends the event (server recomputes status), then
-  refetches the WO + `/transitions`. No status math in the client.
+## 8. Rollout
 
-## 7. Rollout
+1. **Phase 1 (shipped):** built-in default engine (suffix matrix) +
+   `getTransitions` + endpoint. Behavior baseline.
+2. **Phase 2:** `work_orders_lifecycle_rules` table + repository + seed of the
+   defaults; engine reads rules, falls back to the built-in default when empty.
+   `projects_status` makes status data-driven.
+3. **Phase 3:** admin endpoints + UI to edit a tenant's flow; validation
+   (no orphan predecessors, reachable terminals).
+4. Tests: engine matrix (status × rule), predecessor rules (NONE/ANY/ALL),
+   terminal lock, repeats.
 
-1. Backend: engine module + `WorkOrderService` delegation + endpoint. Pure
-   refactor of status projection (no migration, no data change).
-2. Frontend: consume `/transitions` in the composer/picker; drop the local
-   guard arrays.
-3. Tests: unit-test the engine matrix (every status × suffix), plus the terminal
-   and type-mismatch rules.
+## 9. Out of scope
 
-## 8. Out of scope
-
-- Per-customer/custom rule overrides (future: rules could be data-driven).
 - Role-based gating (who *may* trigger a transition) — orthogonal to *what* is
   state-valid.
+- Time/SLA-based automatic transitions.
