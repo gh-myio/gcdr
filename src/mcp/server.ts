@@ -38,6 +38,12 @@ import {
 } from './tools/devices';
 import { getMaintenanceSchema, getMaintenance } from './tools/maintenance';
 import {
+  findTechnicianSchema,
+  listTechnicianWorkOrdersSchema,
+  findTechnician,
+  listTechnicianWorkOrders,
+} from './tools/technicians';
+import {
   getProgressSchema,
   getAverageTimeSchema,
   getTechnicianPerformanceSchema,
@@ -86,6 +92,23 @@ const TOOLS = [
         limit: { type: 'number' },
       },
       ['customer'],
+    ),
+  },
+  {
+    name: 'find_technician',
+    description: 'Resolve a technician (the responsible person of work orders) by fuzzy name or email.',
+    inputSchema: obj({ name: { type: 'string', description: 'Technician name or email' } }, ['name']),
+  },
+  {
+    name: 'list_technician_work_orders',
+    description:
+      'List the work orders a technician is responsible for (assignedTo), optionally by status. Answers "which OS belong to <person>".',
+    inputSchema: obj(
+      {
+        technician: { type: 'string', description: 'Technician name or email (fuzzy)' },
+        status: { type: 'string' },
+      },
+      ['technician'],
     ),
   },
   {
@@ -171,6 +194,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'list_work_orders':
         result = await listWorkOrders(ctx, listWorkOrdersSchema.parse(args));
+        break;
+      case 'find_technician':
+        result = await findTechnician(ctx, findTechnicianSchema.parse(args));
+        break;
+      case 'list_technician_work_orders':
+        result = await listTechnicianWorkOrders(ctx, listTechnicianWorkOrdersSchema.parse(args));
         break;
       case 'get_work_order':
         result = await getWorkOrder(ctx, getWorkOrderSchema.parse(args));

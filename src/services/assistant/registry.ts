@@ -8,6 +8,7 @@ import * as wo from '../../mcp/tools/workOrders';
 import * as devices from '../../mcp/tools/devices';
 import * as maintenance from '../../mcp/tools/maintenance';
 import * as analytics from '../../mcp/tools/analytics';
+import * as technicians from '../../mcp/tools/technicians';
 
 export interface AssistantTool {
   name: string;
@@ -51,6 +52,23 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
       ['customer'],
     ),
     run: (ctx, a) => wo.listWorkOrders(ctx, wo.listWorkOrdersSchema.parse(a)),
+  },
+  {
+    name: 'find_technician',
+    description: 'Resolve a technician (the responsible person of work orders) by fuzzy name or email.',
+    inputSchema: obj({ name: { type: 'string', description: 'Technician name or email' } }, ['name']),
+    run: (ctx, a) => technicians.findTechnician(ctx, technicians.findTechnicianSchema.parse(a)),
+  },
+  {
+    name: 'list_technician_work_orders',
+    description:
+      'List the work orders a technician is responsible for (assignedTo), optionally by status. Use this to answer "which OS belong to <person>".',
+    inputSchema: obj(
+      { technician: { type: 'string' }, status: { type: 'string' } },
+      ['technician'],
+    ),
+    run: (ctx, a) =>
+      technicians.listTechnicianWorkOrders(ctx, technicians.listTechnicianWorkOrdersSchema.parse(a)),
   },
   {
     name: 'get_work_order',
