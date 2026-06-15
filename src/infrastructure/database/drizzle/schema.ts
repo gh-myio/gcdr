@@ -16,7 +16,6 @@ import {
   boolean,
   timestamp,
   jsonb,
-  numeric,
   index,
   uniqueIndex,
   check,

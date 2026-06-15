@@ -212,16 +212,14 @@ export function evaluateEventTypeFromRules(
     (rules.find((r) => r.eventType === pred && (r.woType === wo.type || r.woType === null))
       ?.projectsStatus ?? null) === wo.status;
 
-  if (rule.predecessorRule === 'ANY' && rule.predecessors.length) {
-    if (!rule.predecessors.some(satisfies)) {
-      return {
-        ...base,
-        allowed: false,
-        reasonCode: 'MISSING_PREDECESSORS',
-        predecessors: rule.predecessors,
-        missing: rule.predecessors.filter((p) => !satisfies(p)),
-      };
-    }
+  if (rule.predecessorRule === 'ANY' && rule.predecessors.length && !rule.predecessors.some(satisfies)) {
+    return {
+      ...base,
+      allowed: false,
+      reasonCode: 'MISSING_PREDECESSORS',
+      predecessors: rule.predecessors,
+      missing: rule.predecessors.filter((p) => !satisfies(p)),
+    };
   }
   if (rule.predecessorRule === 'ALL' && rule.predecessors.length) {
     const missing = rule.predecessors.filter((p) => !satisfies(p));

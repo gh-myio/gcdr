@@ -163,6 +163,10 @@ app.use('/health', healthController);
 
 const apiV1Router = Router();
 
+// Frequently-reused permission scopes (sonarjs/no-duplicate-string).
+const PERM_BUNDLES_READ = 'bundles:read';
+const PERM_CUSTOMERS_READ = 'customers:read';
+
 // -----------------------------------------------------------------------------
 // Authentication (public)
 // -----------------------------------------------------------------------------
@@ -179,17 +183,17 @@ apiV1Router.use('/auth', authController);
 apiV1Router.get('/customers/:customerId/alarm-rules/bundle/to-verify-service', authMiddleware, getAlarmBundleVerifyHandler);
 
 // Bundle Cache Invalidation (must come before /bundle routes)
-apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware('bundles:read'), invalidateAlarmBundleCacheHandler);
+apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware(PERM_BUNDLES_READ), invalidateAlarmBundleCacheHandler);
 
 // Bundle Versions (must come before /bundle/simple and /bundle)
-apiV1Router.get('/customers/:customerId/alarm-rules/bundle/versions', hybridAuthMiddleware('bundles:read'), getAlarmBundleVersionsHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/versions', hybridAuthMiddleware(PERM_BUNDLES_READ), getAlarmBundleVersionsHandler);
 
 // Customer Alarm Bundle - Simplified (supports JWT or API Key auth for M2M integration)
 // More specific route MUST come first
-apiV1Router.get('/customers/:customerId/alarm-rules/bundle/simple', hybridAuthMiddleware('bundles:read'), getSimplifiedAlarmBundleHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle/simple', hybridAuthMiddleware(PERM_BUNDLES_READ), getSimplifiedAlarmBundleHandler);
 
 // Customer Alarm Bundle - Full (supports JWT or API Key auth for M2M integration)
-apiV1Router.get('/customers/:customerId/alarm-rules/bundle', hybridAuthMiddleware('bundles:read'), getAlarmBundleHandler);
+apiV1Router.get('/customers/:customerId/alarm-rules/bundle', hybridAuthMiddleware(PERM_BUNDLES_READ), getAlarmBundleHandler);
 
 // Customer API Keys (nested under customers)
 apiV1Router.use('/customers/:customerId/api-keys', authMiddleware, customerApiKeysController);
@@ -201,8 +205,8 @@ apiV1Router.get('/customers/:customerId/users', authMiddleware, usersListByCusto
 apiV1Router.get('/customers/:customerId/devices', authMiddleware, devicesListByCustomerHandler);
 
 // Customer Rules (nested route)
-apiV1Router.get('/customers/:customerId/rules', hybridAuthMiddleware('customers:read'), rulesListByCustomerHandler);
-apiV1Router.get('/customers/:customerId/internal-support-rules', hybridAuthMiddleware('customers:read'), listInternalSupportRulesHandler);
+apiV1Router.get('/customers/:customerId/rules', hybridAuthMiddleware(PERM_CUSTOMERS_READ), rulesListByCustomerHandler);
+apiV1Router.get('/customers/:customerId/internal-support-rules', hybridAuthMiddleware(PERM_CUSTOMERS_READ), listInternalSupportRulesHandler);
 apiV1Router.delete('/customers/:customerId/rules/devices', authMiddleware, clearCustomerRuleDevicesHandler);
 
 // Customer Centrals (nested route)
@@ -217,15 +221,15 @@ apiV1Router.use('/users/:userId/contacts', authMiddleware, userContactsControlle
 
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
-apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod('customers:read', 'customers:write'), customerChannelsController);
+apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerChannelsController);
 
 // RFC-0033: Customer integration sync state (nested — must come before general /customers router)
 // hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
-apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod('customers:read', 'customers:write'), customerIntegrationsController);
+apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerIntegrationsController);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
-apiV1Router.use('/customers', hybridAuthByMethod('customers:read', 'customers:write'), customersController);
+apiV1Router.use('/customers', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customersController);
 
 // Devices (hybridAuth for ThingsBoard integration)
 apiV1Router.use('/devices', hybridAuthByMethod('devices:read', 'devices:write'), devicesController);
@@ -273,7 +277,7 @@ apiV1Router.use('/partners', authMiddleware, partnersController);
 
 // RFC-0024: Group dispatch matrix (nested — must come before general /groups router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
-apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod('customers:read', 'customers:write'), groupDispatchController);
+apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), groupDispatchController);
 
 // RFC-0024: Group channel targets (nested — must come before general /groups router)
 apiV1Router.use('/groups/:groupId/channels', authMiddleware, groupChannelsController);
@@ -383,6 +387,7 @@ if (require.main === module) {
   app.listen(PORT, HOST, async () => {
     const isDev = process.env.NODE_ENV !== 'production';
     const baseUrl = `http://${HOST}:${PORT}`;
+    // eslint-disable-next-line no-console -- startup banner
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                    GCDR API Server                         ║
@@ -403,6 +408,7 @@ if (require.main === module) {
       await initializeSimulator();
       registerShutdownHandlers();
     } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to initialize simulator subsystem:', error);
     }
   });

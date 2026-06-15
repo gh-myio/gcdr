@@ -1,3 +1,17 @@
+// Pure unit tests of the status-projection flow. appendEvent also touches
+// module-singleton repos (lifecycle rules + the RFC-0044 chamado roll-up) that
+// aren't constructor-injected; mock them so the suite never hits a database and
+// exercises the built-in default flow (no tenant rules).
+jest.mock('../../../src/repositories/work-orders/WorkOrderLifecycleRepository', () => ({
+  workOrderLifecycleRepository: {
+    listByTenant: jest.fn().mockResolvedValue([]),
+    listAllByTenant: jest.fn().mockResolvedValue([]),
+  },
+}));
+jest.mock('../../../src/repositories/work-orders/TicketRepository', () => ({
+  ticketRepository: { getTicketIdOf: jest.fn().mockResolvedValue(null) },
+}));
+
 import { WorkOrderService } from '../../../src/services/work-orders/WorkOrderService';
 import { ConflictError, ValidationError } from '../../../src/shared/errors/AppError';
 import type { IWorkOrderRepository } from '../../../src/repositories/interfaces/work-orders/IWorkOrderRepository';

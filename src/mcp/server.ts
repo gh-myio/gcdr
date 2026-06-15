@@ -87,6 +87,8 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   required,
 });
 
+const CUSTOMER_FUZZY = 'Customer name or code (fuzzy)';
+
 const TOOLS = [
   {
     name: 'list_customers',
@@ -104,7 +106,7 @@ const TOOLS = [
     description: 'List a customer work orders, optionally filtered by status and type.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         status: { type: 'string' },
         type: { type: 'string' },
         limit: { type: 'number' },
@@ -147,7 +149,7 @@ const TOOLS = [
     description: 'Devices in a customer work-order scope, filterable by install state.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         filter: { type: 'string', enum: ['all', 'installed', 'pending'] },
       },
       ['customer'],
@@ -158,7 +160,7 @@ const TOOLS = [
     description: 'A device (fuzzy by name/serial/code) with its event history.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         device: { type: 'string', description: 'Device name, serial or code (fuzzy)' },
       },
       ['customer', 'device'],
@@ -174,7 +176,7 @@ const TOOLS = [
     description: 'List a customer alarm rules (name, type, priority, enabled, scope, device count).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         type: {
           type: 'string',
           enum: ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE'],
@@ -190,7 +192,7 @@ const TOOLS = [
       'A customer alarm rule in detail: Condition, Behavior (guards/escalation/channels), Schedule and Scope (with devices).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         rule: { type: 'string', description: 'Rule name (fuzzy)' },
       },
       ['customer', 'rule'],
@@ -201,7 +203,7 @@ const TOOLS = [
     description: 'The devices a given alarm rule applies to (scope).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         rule: { type: 'string', description: 'Rule name (fuzzy)' },
       },
       ['customer', 'rule'],

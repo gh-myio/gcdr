@@ -2,10 +2,10 @@
 // Orchestrates the existing WorkOrderService (create/detail/appendEvent, rules
 // engine) plus TicketRepository (meta, watchers, parent edge, derived OS,
 // aggregated timeline). Read/write, tenant-scoped.
-import { and, eq, or, type SQL } from 'drizzle-orm';
+import { eq, or, type SQL } from 'drizzle-orm';
 import { schema } from '../../infrastructure/database/drizzle/db';
 import { workOrderService, ActorContext } from './WorkOrderService';
-import { ticketRepository, ViewerIdentity } from '../../repositories/work-orders/TicketRepository';
+import { ticketRepository } from '../../repositories/work-orders/TicketRepository';
 import { NotFoundError, ConflictError, ValidationError } from '../../shared/errors/AppError';
 
 const EXEC_TERMINAL = new Set(['FINALIZADA', 'CANCELADA']);
