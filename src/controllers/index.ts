@@ -70,3 +70,6 @@ export { default as userContactsController } from './user-contacts.controller';
 
 // RFC-0033: Customer Integration Sync State
 export { default as customerIntegrationsController } from './customer-integrations.controller';
+
+// RFC-0043: GCDR Copiloto (assistant)
+export { default as assistantController } from './assistant.controller';

@@ -23,13 +23,8 @@ export interface McpContext {
   schema: typeof schema;
 }
 
-export function loadContext(): McpContext {
-  const tenantId = process.env.GCDR_TENANT_ID;
-  if (!tenantId) {
-    throw new Error(
-      'GCDR_TENANT_ID is required to run the Work Orders MCP server (RFC-0042).',
-    );
-  }
+/** Build a context for a given tenant (used by the HTTP assistant, RFC-0043). */
+export function makeContext(tenantId: string): McpContext {
   return {
     tenantId,
     workOrders: workOrderService,
@@ -38,4 +33,15 @@ export function loadContext(): McpContext {
     db,
     schema,
   };
+}
+
+/** Env-pinned context for the stdio MCP server (RFC-0042). */
+export function loadContext(): McpContext {
+  const tenantId = process.env.GCDR_TENANT_ID;
+  if (!tenantId) {
+    throw new Error(
+      'GCDR_TENANT_ID is required to run the Work Orders MCP server (RFC-0042).',
+    );
+  }
+  return makeContext(tenantId);
 }

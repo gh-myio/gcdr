@@ -115,8 +115,37 @@ One implementation, three surfaces — no logic drift, numbers always match the 
 - Keep **Option B** for *external* MCP integrators; use **Option C** only for
   specific embedded summaries.
 
-## 9. Out of scope
+## 9. POC status (branch `feat/gcdr-assistant`)
+
+Option A is implemented as a POC, but as a **general GCDR Copiloto** (not OS-only):
+
+**Backend (`gcdr.git`)**
+- `src/services/assistant/registry.ts` — a domain-agnostic tool registry,
+  currently seeded with the 13 Work Orders tools (RFC-0042). New domains plug in
+  here.
+- `src/services/assistant/AssistantService.ts` — Anthropic tool-use loop, scoped
+  to the caller's tenant via `makeContext(tenantId)`; read-only.
+- `src/controllers/assistant.controller.ts` — `POST /assistant` (ask) and
+  `GET /assistant/status` (is it configured), behind `authMiddleware`.
+- Env: `ANTHROPIC_API_KEY` (required to enable) and optional `ASSISTANT_MODEL`
+  (defaults `claude-sonnet-4-6`). If the key is absent the endpoint returns 503
+  and the UI degrades gracefully.
+
+**Frontend (`gcdr-frontend.git`)**
+- A **global floating "Copiloto"** widget (`components/assistant/CopilotWidget.tsx`)
+  mounted in `Layout`, available on every authenticated page — so it's a
+  product-wide assistant, OS being the first domain it can answer about.
+- `services/api/assistantService.ts`, `i18n` namespace `assistant` (pt-BR/en).
+
+POC limitations (vs sections 5/8): no token streaming (single response),
+ephemeral history (not persisted), and the tool set is still WO-first. Next:
+extract a shared `wo-insights` layer if/when REST widgets (Option C) are also
+wanted, add streaming, and register tools from other domains (customers,
+devices, assets).
+
+## 10. Out of scope
 
 - Write actions from the assistant (creating WOs / appending events) — read-only
   for now; a future RFC could add guarded, confirmed, audited writes.
-- A full multi-domain copilot (this RFC is OS-first).
+- A full multi-domain copilot — the POC is a general shell but only WO tools are
+  wired so far.

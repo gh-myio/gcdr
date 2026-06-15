@@ -81,6 +81,7 @@ import {
   woCustomersController,
   woLifecycleController,
   woEventTypesHandler,
+  assistantController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
 } from './controllers';
@@ -350,6 +351,9 @@ apiV1Router.get('/wo/event-types', authMiddleware, woEventTypesHandler);
 apiV1Router.use('/wo/lifecycle-rules', authMiddleware, woLifecycleController);
 apiV1Router.use('/wo/work-orders', authMiddleware, workOrdersController);
 apiV1Router.use('/wo/customers', woCustomersController);
+
+// RFC-0043: GCDR Copiloto (read-only LLM assistant over the WO tools).
+apiV1Router.use('/assistant', authMiddleware, assistantController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
