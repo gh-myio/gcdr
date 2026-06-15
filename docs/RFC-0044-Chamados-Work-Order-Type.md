@@ -205,8 +205,41 @@ a later decision; see `docs/integracao_freshdesk_myio.md`.
   child transition auto-cancels the chamado when all linked OS are cancelled),
   and the aggregated timeline. Endpoints under `/wo/tickets`. Comments still map
   to the annotations domain (not duplicated here).
-- **Phase 3:** the "Chamados" UI surface + Copiloto tools.
-- **Phase 4:** Freshdesk importer (+ optional sync).
+- **Phase 3 (PARTIAL):** the "Chamados" UI surface + Copiloto tools.
+  - DONE: `/chamados` menu + tabbed page (Chamados / Indicadores / Guia) in the
+    OS pattern (PageHeader+breadcrumbs, full width, OsCard collapsible/maximizable,
+    WoFacetFilter with counts, period filter, CSV/JSON report export, card grid in
+    the WorkOrderCard style). Detail with the OS 65/35 grid, aggregated timeline on
+    the right, derive/attach/detach + transitions. Reused **annotations + anexos**
+    (AnnotationsPanel) and **evidências/documentos** (shared `FilesCard` extracted
+    to `pages/os/workOrderCards.tsx`). Copiloto/MCP tools `list_tickets` /
+    `get_ticket` / `get_ticket_timeline`. Backend `GET /wo/tickets/team`
+    (deduped chamados team pool).
+  - PENDING (detail parity with OS — event-sourced cards; the chamado must also
+    load the WorkOrderDetail via `woService.getWorkOrder(ticket.id)`):
+    1. **Equipe** (interactive) — extract `UserRoleCard`; candidate pool =
+       `/wo/tickets/team` (deduped) **+ the chamado's current members**
+       (`WO_ATRIBUIDA`/`WO_DESATRIBUIDA`).
+    2. **Aprovador MYIO** — `UserRoleCard` with `WO_VALIDADOR_ATRIBUIDO`/`_DESATRIBUIDO`.
+    3. **Aprovador Cliente** — extract `ClientValidatorsCard`
+       (`WO_CLIENTE_VALIDADOR_DEFINIDO`/`_REMOVIDO`).
+    4. **Registrar eventos** — extract `EventComposer` + `EventTypePicker`
+       (`woService.appendEvent`, gated by the RFC-0041 transitions).
+    - Decisions taken: reuse the existing `WO_VALIDADOR_*` / `WO_CLIENTE_VALIDADOR_*`
+      events (no new event types); extract OS inline cards into shared components
+      (reused by both OS and chamado) rather than duplicate.
+- **Phase 4 (SCAFFOLDING ONLY — Freshdesk importer):**
+  - DONE: read-only `FreshdeskClient` + types (`src/integrations/freshdesk/`),
+    and the `CHAMADO_IMPORTADO` marker event (migration 0044).
+  - PENDING: the orchestrator `scripts/import/freshdesk-import.ts` (dry-run +
+    `--apply`), `src/integrations/freshdesk/mappings.ts` (status/priority maps +
+    Company→Customer resolver), a timestamp-preserving idempotent
+    `TicketImportService.upsertFromFreshdesk` (head + meta + watchers +
+    `CHAMADO_IMPORTADO` marker, bypassing the lifecycle engine), and the
+    **full-depth** stages (conversations → annotations, attachments → file_assets).
+  - DECISIONS DEFERRED (per product): cutover vs coexistence (webhook
+    `POST /wo/tickets/sync`); the Company→Customer de-para; the Freshdesk custom
+    status list. Target depth confirmed: **full (thread + attachments)**.
 
 ## 10. Out of scope
 
