@@ -54,6 +54,14 @@ import {
   compareAlarmRules,
 } from './tools/rules';
 import {
+  listTicketsSchema,
+  getTicketSchema,
+  getTicketTimelineSchema,
+  listTickets,
+  getTicket,
+  getTicketTimeline,
+} from './tools/tickets';
+import {
   getProgressSchema,
   getAverageTimeSchema,
   getTechnicianPerformanceSchema,
@@ -79,6 +87,8 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   required,
 });
 
+const CUSTOMER_FUZZY = 'Customer name or code (fuzzy)';
+
 const TOOLS = [
   {
     name: 'list_customers',
@@ -96,7 +106,7 @@ const TOOLS = [
     description: 'List a customer work orders, optionally filtered by status and type.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         status: { type: 'string' },
         type: { type: 'string' },
         limit: { type: 'number' },
@@ -139,7 +149,7 @@ const TOOLS = [
     description: 'Devices in a customer work-order scope, filterable by install state.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         filter: { type: 'string', enum: ['all', 'installed', 'pending'] },
       },
       ['customer'],
@@ -150,7 +160,7 @@ const TOOLS = [
     description: 'A device (fuzzy by name/serial/code) with its event history.',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         device: { type: 'string', description: 'Device name, serial or code (fuzzy)' },
       },
       ['customer', 'device'],
@@ -166,7 +176,7 @@ const TOOLS = [
     description: 'List a customer alarm rules (name, type, priority, enabled, scope, device count).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         type: {
           type: 'string',
           enum: ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE'],
@@ -182,7 +192,7 @@ const TOOLS = [
       'A customer alarm rule in detail: Condition, Behavior (guards/escalation/channels), Schedule and Scope (with devices).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         rule: { type: 'string', description: 'Rule name (fuzzy)' },
       },
       ['customer', 'rule'],
@@ -193,7 +203,7 @@ const TOOLS = [
     description: 'The devices a given alarm rule applies to (scope).',
     inputSchema: obj(
       {
-        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        customer: { type: 'string', description: CUSTOMER_FUZZY },
         rule: { type: 'string', description: 'Rule name (fuzzy)' },
       },
       ['customer', 'rule'],
@@ -210,6 +220,21 @@ const TOOLS = [
       },
       ['customerA', 'customerB'],
     ),
+  },
+  {
+    name: 'list_tickets',
+    description: 'List support tickets (chamados) with the status board, optionally by customer/status.',
+    inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
+  },
+  {
+    name: 'get_ticket',
+    description: 'A ticket (chamado) by code: subject, status, requester and its derived work orders with progress.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
+  },
+  {
+    name: 'get_ticket_timeline',
+    description: 'The aggregated timeline of a ticket: its own events plus all events of its derived work orders.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
   },
   {
     name: 'get_progress',
@@ -287,6 +312,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'compare_alarm_rules':
         result = await compareAlarmRules(ctx, compareAlarmRulesSchema.parse(args));
+        break;
+      case 'list_tickets':
+        result = await listTickets(ctx, listTicketsSchema.parse(args ?? {}));
+        break;
+      case 'get_ticket':
+        result = await getTicket(ctx, getTicketSchema.parse(args));
+        break;
+      case 'get_ticket_timeline':
+        result = await getTicketTimeline(ctx, getTicketTimelineSchema.parse(args));
         break;
       case 'get_progress':
         result = await getProgress(ctx, getProgressSchema.parse(args ?? {}));

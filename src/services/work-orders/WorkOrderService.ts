@@ -39,6 +39,7 @@ import {
 } from './workOrderRules';
 import { workOrderLifecycleRepository } from '../../repositories/work-orders/WorkOrderLifecycleRepository';
 import { LifecycleRuleDTO } from '../../dto/request/work-orders/LifecycleRuleDTO';
+import { ticketRepository } from '../../repositories/work-orders/TicketRepository';
 
 export interface ActorContext {
   userId: string;
@@ -235,10 +236,12 @@ export class WorkOrderService {
       if (!asset) throw new NotFoundError(`Asset ${data.rootAssetId} not found`);
     }
 
-    if (data.code !== undefined && data.code !== existing.code) {
-      if (await this.repo.codeExists(tenantId, data.code, id)) {
-        throw new ConflictError(`Work order code "${data.code}" is already in use`);
-      }
+    if (
+      data.code !== undefined &&
+      data.code !== existing.code &&
+      (await this.repo.codeExists(tenantId, data.code, id))
+    ) {
+      throw new ConflictError(`Work order code "${data.code}" is already in use`);
     }
 
     const updated = await this.repo.update(tenantId, id, {
@@ -336,9 +339,31 @@ export class WorkOrderService {
     // STATUS PROJECTION: a lifecycle event of the WO's type moves status.
     if (projected && projected !== wo.status) {
       await this.repo.updateStatus(tenantId, workOrderId, projected);
+      // RFC-0044: if this OS hangs on a chamado, recompute the parent roll-up.
+      if (wo.type !== 'CHAMADO') await this.recomputeParentTicket(tenantId, workOrderId, ctx);
     }
 
     return event;
+  }
+
+  /**
+   * RFC-0044 roll-up: when a derived OS transitions, recompute its parent chamado
+   * (e.g. the sole derived OS was cancelled -> the chamado auto-cancels).
+   * Best-effort + lazy import to avoid a module cycle; never blocks the event.
+   */
+  private async recomputeParentTicket(
+    tenantId: string,
+    workOrderId: string,
+    ctx: ActorContext,
+  ): Promise<void> {
+    try {
+      const ticketId = await ticketRepository.getTicketIdOf(tenantId, workOrderId);
+      if (!ticketId) return;
+      const { ticketService } = await import('./TicketService');
+      await ticketService.recomputeAggregate(tenantId, ticketId, ctx);
+    } catch {
+      /* roll-up is best-effort */
+    }
   }
 
   async listEvents(tenantId: string, workOrderId: string): Promise<WorkOrderEvent[]> {

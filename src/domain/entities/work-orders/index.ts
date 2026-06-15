@@ -5,7 +5,7 @@
 // and (via the generalized RFC-0036 annotation subsystem) observations.
 // `status` is a service-maintained PROJECTION of the latest lifecycle event.
 
-export type WorkOrderType = 'INSTALACAO' | 'MANUTENCAO' | 'VISITA_TECNICA';
+export type WorkOrderType = 'INSTALACAO' | 'MANUTENCAO' | 'VISITA_TECNICA' | 'CHAMADO';
 
 // Projected lifecycle status (maintained by the service, not stored per-event).
 export type WorkOrderStatus =

@@ -18,7 +18,12 @@ export type WorkOrderStatusValue =
   | 'CANCELADA';
 
 /** Categories that drive the status projection (must match the WO's own type). */
-export const LIFECYCLE_CATEGORIES = new Set(['VISITA_TECNICA', 'INSTALACAO', 'MANUTENCAO']);
+export const LIFECYCLE_CATEGORIES = new Set([
+  'VISITA_TECNICA',
+  'INSTALACAO',
+  'MANUTENCAO',
+  'CHAMADO', // RFC-0044 — tickets; status flow is table-driven (no built-in suffix matrix)
+]);
 
 export const TERMINAL_STATUSES = new Set<WorkOrderStatusValue>(['FINALIZADA', 'CANCELADA']);
 
@@ -207,16 +212,14 @@ export function evaluateEventTypeFromRules(
     (rules.find((r) => r.eventType === pred && (r.woType === wo.type || r.woType === null))
       ?.projectsStatus ?? null) === wo.status;
 
-  if (rule.predecessorRule === 'ANY' && rule.predecessors.length) {
-    if (!rule.predecessors.some(satisfies)) {
-      return {
-        ...base,
-        allowed: false,
-        reasonCode: 'MISSING_PREDECESSORS',
-        predecessors: rule.predecessors,
-        missing: rule.predecessors.filter((p) => !satisfies(p)),
-      };
-    }
+  if (rule.predecessorRule === 'ANY' && rule.predecessors.length && !rule.predecessors.some(satisfies)) {
+    return {
+      ...base,
+      allowed: false,
+      reasonCode: 'MISSING_PREDECESSORS',
+      predecessors: rule.predecessors,
+      missing: rule.predecessors.filter((p) => !satisfies(p)),
+    };
   }
   if (rule.predecessorRule === 'ALL' && rule.predecessors.length) {
     const missing = rule.predecessors.filter((p) => !satisfies(p));

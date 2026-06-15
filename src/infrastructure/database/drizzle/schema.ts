@@ -16,7 +16,6 @@ import {
   boolean,
   timestamp,
   jsonb,
-  numeric,
   index,
   uniqueIndex,
   check,
@@ -1691,6 +1690,8 @@ export const workOrders = pgTable('work_orders', {
   code:         text('code').notNull(),
   assignedTo:   uuid('assigned_to').references(() => users.id),
   scheduledAt:  timestamp('scheduled_at', { withTimezone: true }),
+  // RFC-0044: the CHAMADO (type=CHAMADO) work order this OS hangs on (mutable).
+  ticketId:     uuid('ticket_id'),
   createdBy:    uuid('created_by').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1699,10 +1700,11 @@ export const workOrders = pgTable('work_orders', {
   tenantCustomerIdx: index('work_orders_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantStatusIdx:   index('work_orders_tenant_status_idx').on(table.tenantId, table.status),
   rootAssetIdx:      index('work_orders_root_asset_idx').on(table.rootAssetId),
+  ticketIdx:         index('work_orders_ticket_idx').on(table.tenantId, table.ticketId).where(sql`${table.ticketId} IS NOT NULL`),
   tenantCodeUnique:  uniqueIndex('work_orders_tenant_code_unique').on(table.tenantId, table.code).where(sql`${table.deletedAt} IS NULL`),
   typeCheck: check(
     'work_orders_type_check',
-    sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA')`
+    sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA','CHAMADO')`
   ),
 }));
 
@@ -1971,4 +1973,45 @@ export const assistantConversations = pgTable('assistant_conversations', {
 }, (table) => ({
   ownerIdx:  index('assistant_conversations_owner_idx').on(table.tenantId, table.userId, table.updatedAt),
   sharedIdx: index('assistant_conversations_shared_idx').on(table.tenantId, table.shared, table.updatedAt),
+}));
+
+// -----------------------------------------------------------------------------
+// work_orders_ticket_meta (RFC-0044) — ticket-specific 1:1 extension of a
+// work_order with type = CHAMADO. Keeps the main work_orders table lean.
+// -----------------------------------------------------------------------------
+export const workOrdersTicketMeta = pgTable('work_orders_ticket_meta', {
+  workOrderId:     uuid('work_order_id').primaryKey().references(() => workOrders.id, { onDelete: 'cascade' }),
+  tenantId:        uuid('tenant_id').notNull(),
+  subject:         varchar('subject', { length: 255 }).notNull(),
+  priority:        text('priority').notNull().default('MEDIA'),
+  reason:          text('reason'),
+  source:          text('source').notNull().default('PAINEL'),
+  requesterEmail:  varchar('requester_email', { length: 255 }).notNull(),
+  requesterUserId: uuid('requester_user_id').references(() => users.id),
+  requesterDomain: text('requester_domain'),
+  externalId:      text('external_id'),
+  firstResponseAt: timestamp('first_response_at', { withTimezone: true }),
+  resolvedAt:      timestamp('resolved_at', { withTimezone: true }),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  requesterIdx: index('work_orders_ticket_meta_requester_idx').on(table.tenantId, table.requesterEmail),
+  domainIdx:    index('work_orders_ticket_meta_domain_idx').on(table.tenantId, table.requesterDomain),
+  externalIdx:  index('work_orders_ticket_meta_external_idx').on(table.tenantId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
+  priorityCheck: check('work_orders_ticket_meta_priority_check', sql`${table.priority} IN ('BAIXA','MEDIA','ALTA','URGENTE')`),
+  sourceCheck:   check('work_orders_ticket_meta_source_check', sql`${table.source} IN ('PAINEL','EMAIL','FRESHDESK','API')`),
+}));
+
+// -----------------------------------------------------------------------------
+// work_orders_watchers (RFC-0044) — CC list for a chamado.
+// -----------------------------------------------------------------------------
+export const workOrdersWatchers = pgTable('work_orders_watchers', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  workOrderId: uuid('work_order_id').notNull().references(() => workOrders.id, { onDelete: 'cascade' }),
+  email:       varchar('email', { length: 255 }).notNull(),
+  userId:      uuid('user_id').references(() => users.id),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  woEmailUnique: uniqueIndex('work_orders_watchers_unique').on(table.workOrderId, table.email),
 }));

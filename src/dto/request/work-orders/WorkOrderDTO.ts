@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 // RFC-0037 — Work Orders (event-log model) request DTOs.
 
-export const WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA'] as const;
+export const WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA', 'CHAMADO'] as const;
+
+// Execution WO types a chamado can derive into (excludes CHAMADO itself).
+export const EXECUTION_WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA'] as const;
 
 export const WORK_ORDER_STATUSES = [
   'PLANEJADA',

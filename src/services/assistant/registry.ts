@@ -10,6 +10,7 @@ import * as maintenance from '../../mcp/tools/maintenance';
 import * as analytics from '../../mcp/tools/analytics';
 import * as technicians from '../../mcp/tools/technicians';
 import * as rules from '../../mcp/tools/rules';
+import * as tickets from '../../mcp/tools/tickets';
 
 export interface AssistantTool {
   name: string;
@@ -76,6 +77,25 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
     description: 'Full work order by code: type, status, device scope and recent timeline.',
     inputSchema: obj({ code: { type: 'string' } }, ['code']),
     run: (ctx, a) => wo.getWorkOrder(ctx, wo.getWorkOrderSchema.parse(a)),
+  },
+  // ── Chamados / Tickets (RFC-0044) ────────────────────────────────────────
+  {
+    name: 'list_tickets',
+    description: 'List support tickets (chamados) with the status board (open/pending/awaiting), optionally by customer/status.',
+    inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
+    run: (ctx, a) => tickets.listTickets(ctx, tickets.listTicketsSchema.parse(a)),
+  },
+  {
+    name: 'get_ticket',
+    description: 'A ticket (chamado) by code: subject, status, requester and its derived work orders with progress.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
+    run: (ctx, a) => tickets.getTicket(ctx, tickets.getTicketSchema.parse(a)),
+  },
+  {
+    name: 'get_ticket_timeline',
+    description: 'The aggregated timeline of a ticket: its own events plus all events of its derived work orders.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
+    run: (ctx, a) => tickets.getTicketTimeline(ctx, tickets.getTicketTimelineSchema.parse(a)),
   },
   {
     name: 'get_transitions',
