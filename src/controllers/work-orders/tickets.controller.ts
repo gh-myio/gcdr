@@ -42,6 +42,15 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (err) { next(err); }
 });
 
+/** GET /wo/tickets/team — the chamados team (deduped) for assignment pickers. */
+router.get('/team', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const items = await ticketService.team(tenantId);
+    sendSuccess(res, { items }, 200, requestId);
+  } catch (err) { next(err); }
+});
+
 /** POST /wo/tickets — open a chamado. */
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {

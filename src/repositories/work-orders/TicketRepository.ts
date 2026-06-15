@@ -1,10 +1,21 @@
 // RFC-0044 — persistence for chamado-specific data (work_orders of type CHAMADO):
 // the 1:1 meta, CC/watchers, the parent edge (work_orders.ticket_id), derived OS
 // listing and the aggregated event feed. Plain Drizzle; read-mostly.
-import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { db, schema } from '../../infrastructure/database/drizzle/db';
 
 const { workOrders, workOrdersTicketMeta, workOrdersWatchers, workOrdersEvents, users } = schema;
+
+interface ProfileNameShape {
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+}
+function ticketUserName(profile: unknown, username: string | null, email: string): string {
+  const p = (profile ?? {}) as ProfileNameShape;
+  const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim();
+  return p.displayName || full || username || email || 'Usuário';
+}
 
 export interface TicketMetaInput {
   subject: string;
@@ -55,6 +66,40 @@ export class TicketRepository {
       .where(and(eq(users.tenantId, tenantId), eq(users.id, userId)))
       .limit(1);
     return u ?? null;
+  }
+
+  /**
+   * The "chamados team": distinct users who are responsible for (assignedTo) or
+   * have acted on (event actor) any CHAMADO work order in the tenant. RFC-0044
+   * §team — the candidate pool for assigning a chamado, deduped.
+   */
+  async ticketTeam(tenantId: string): Promise<{ id: string; name: string; email: string | null }[]> {
+    const { workOrders, workOrdersEvents } = schema;
+    const [assigned, actors] = await Promise.all([
+      db
+        .selectDistinct({ id: workOrders.assignedTo })
+        .from(workOrders)
+        .where(and(eq(workOrders.tenantId, tenantId), eq(workOrders.type, 'CHAMADO'), isNotNull(workOrders.assignedTo))),
+      db
+        .selectDistinct({ id: workOrdersEvents.actorUserId })
+        .from(workOrdersEvents)
+        .innerJoin(workOrders, eq(workOrders.id, workOrdersEvents.workOrderId))
+        .where(and(eq(workOrders.tenantId, tenantId), eq(workOrders.type, 'CHAMADO'), isNotNull(workOrdersEvents.actorUserId))),
+    ]);
+    const ids = new Set<string>();
+    for (const r of assigned) if (r.id) ids.add(r.id as string);
+    for (const r of actors) if (r.id) ids.add(r.id as string);
+    if (ids.size === 0) return [];
+
+    const rows = await db
+      .select({ id: users.id, email: users.email, username: users.username, profile: users.profile })
+      .from(users)
+      .where(and(eq(users.tenantId, tenantId), inArray(users.id, [...ids])));
+    return rows.map((u) => ({
+      id: u.id,
+      name: ticketUserName(u.profile, u.username, u.email),
+      email: u.email ?? null,
+    }));
   }
 
   async findUserIdByEmail(tenantId: string, email: string): Promise<string | null> {

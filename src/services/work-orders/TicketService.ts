@@ -92,6 +92,11 @@ export class TicketService {
     return this.get(tenantId, wo.id);
   }
 
+  /** The chamados team (deduped) — candidate pool for assigning a chamado. */
+  async team(tenantId: string) {
+    return ticketRepository.ticketTeam(tenantId);
+  }
+
   // ── detail ─────────────────────────────────────────────────────────────────────
   async get(tenantId: string, id: string) {
     const wo = await workOrderService.getById(tenantId, id);
