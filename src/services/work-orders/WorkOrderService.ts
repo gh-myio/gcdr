@@ -38,6 +38,7 @@ import {
   LifecycleRule,
 } from './workOrderRules';
 import { workOrderLifecycleRepository } from '../../repositories/work-orders/WorkOrderLifecycleRepository';
+import { LifecycleRuleDTO } from '../../dto/request/work-orders/LifecycleRuleDTO';
 
 export interface ActorContext {
   userId: string;
@@ -170,6 +171,58 @@ export class WorkOrderService {
   private async occurredSet(tenantId: string, workOrderId: string): Promise<Set<string>> {
     const events = await this.repo.listEvents(tenantId, workOrderId);
     return new Set(events.map((e) => e.eventType));
+  }
+
+  // ===========================================================================
+  // Lifecycle flow admin (RFC-0041 Phase 3)
+  // ===========================================================================
+
+  /** All lifecycle rules for the tenant (incl. inactive) — admin editor. */
+  async listLifecycleRules(tenantId: string) {
+    return workOrderLifecycleRepository.listAllByTenant(tenantId);
+  }
+
+  /** Replace the tenant's whole flow. Validates referenced codes + uniqueness. */
+  async replaceLifecycleRules(tenantId: string, rules: LifecycleRuleDTO[]): Promise<void> {
+    const catalog = await this.listEventTypes();
+    const codes = new Set(catalog.map((c) => c.code));
+    const seen = new Set<string>();
+
+    for (const r of rules) {
+      if (!codes.has(r.eventType)) {
+        throw new ValidationError(`Unknown event_type "${r.eventType}"`);
+      }
+      for (const p of r.predecessors) {
+        if (!codes.has(p)) {
+          throw new ValidationError(`Unknown predecessor "${p}" in rule ${r.eventType}`);
+        }
+      }
+      for (const a of r.activates) {
+        if (!codes.has(a)) {
+          throw new ValidationError(`Unknown activates code "${a}" in rule ${r.eventType}`);
+        }
+      }
+      const key = `${r.woType ?? ''}::${r.eventType}`;
+      if (seen.has(key)) {
+        throw new ConflictError(`Duplicate rule for ${r.eventType} (${r.woType ?? 'ALL'})`);
+      }
+      seen.add(key);
+    }
+
+    await workOrderLifecycleRepository.replaceForTenant(
+      tenantId,
+      rules.map((r) => ({
+        woType: r.woType ?? null,
+        eventType: r.eventType,
+        predecessors: r.predecessors,
+        predecessorRule: r.predecessorRule,
+        activates: r.activates,
+        projectsStatus: r.projectsStatus ?? null,
+        isEntry: r.isEntry,
+        sortOrder: r.sortOrder,
+        active: r.active,
+      })),
+    );
   }
 
   async update(tenantId: string, id: string, data: UpdateWorkOrderDTO, ctx: ActorContext): Promise<WorkOrder> {

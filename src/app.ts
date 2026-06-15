@@ -79,6 +79,7 @@ import {
   // RFC-0037: Work Orders — Event Model
   workOrdersController,
   woCustomersController,
+  woLifecycleController,
   woEventTypesHandler,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
@@ -344,6 +345,9 @@ apiV1Router.use('/annotations', authMiddleware, annotationsController);
 // Event-type catalog (global, read-only) — mounted BEFORE /wo/work-orders so the
 // specific path is not captured by the work-orders /:id matcher.
 apiV1Router.get('/wo/event-types', authMiddleware, woEventTypesHandler);
+// Lifecycle-rules admin (RFC-0041) — mounted BEFORE /wo/work-orders so it's not
+// shadowed by the work-orders /:id matcher.
+apiV1Router.use('/wo/lifecycle-rules', authMiddleware, woLifecycleController);
 apiV1Router.use('/wo/work-orders', authMiddleware, workOrdersController);
 apiV1Router.use('/wo/customers', woCustomersController);
 

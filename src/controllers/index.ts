@@ -52,6 +52,7 @@ export { default as fileAssetsPublicController } from './file-assets-public.cont
 export {
   workOrdersController,
   woCustomersController,
+  woLifecycleController,
   listEventTypesHandler as woEventTypesHandler,
 } from './work-orders';
 
