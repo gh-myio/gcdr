@@ -9,6 +9,7 @@ import * as devices from '../../mcp/tools/devices';
 import * as maintenance from '../../mcp/tools/maintenance';
 import * as analytics from '../../mcp/tools/analytics';
 import * as technicians from '../../mcp/tools/technicians';
+import * as rules from '../../mcp/tools/rules';
 
 export interface AssistantTool {
   name: string;
@@ -102,6 +103,39 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
     description: 'Maintenance (MANUTENCAO) work orders, optionally by customer/status.',
     inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
     run: (ctx, a) => maintenance.getMaintenance(ctx, maintenance.getMaintenanceSchema.parse(a)),
+  },
+  // ── Alarm Rules (/rules) ────────────────────────────────────────────────
+  {
+    name: 'list_alarm_rules',
+    description: 'List a customer alarm rules (name, type, priority, enabled, scope, device count).',
+    inputSchema: obj(
+      { customer: { type: 'string' }, type: { type: 'string' }, enabled: { type: 'boolean' } },
+      ['customer'],
+    ),
+    run: (ctx, a) => rules.listAlarmRules(ctx, rules.listAlarmRulesSchema.parse(a)),
+  },
+  {
+    name: 'get_alarm_rule',
+    description:
+      'A customer alarm rule in detail: Condition, Behavior (guards/escalation/channels), Schedule and Scope (with devices).',
+    inputSchema: obj({ customer: { type: 'string' }, rule: { type: 'string' } }, ['customer', 'rule']),
+    run: (ctx, a) => rules.getAlarmRule(ctx, rules.getAlarmRuleSchema.parse(a)),
+  },
+  {
+    name: 'get_rule_devices',
+    description: 'The devices a given alarm rule applies to (scope).',
+    inputSchema: obj({ customer: { type: 'string' }, rule: { type: 'string' } }, ['customer', 'rule']),
+    run: (ctx, a) => rules.getRuleDevices(ctx, rules.getRuleDevicesSchema.parse(a)),
+  },
+  {
+    name: 'compare_alarm_rules',
+    description:
+      'Compare two customers alarm rule sets: same-named rules and whether Condition, Behavior, Schedule and Scope match, plus rules unique to each.',
+    inputSchema: obj(
+      { customerA: { type: 'string' }, customerB: { type: 'string' } },
+      ['customerA', 'customerB'],
+    ),
+    run: (ctx, a) => rules.compareAlarmRules(ctx, rules.compareAlarmRulesSchema.parse(a)),
   },
   {
     name: 'get_progress',

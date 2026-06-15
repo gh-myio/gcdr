@@ -4,6 +4,7 @@
 
 import { workOrderService } from '../services/work-orders/WorkOrderService';
 import { workOrdersCustomerSettingsService } from '../services/work-orders/WorkOrdersCustomerSettingsService';
+import { ruleService } from '../services/RuleService';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 
@@ -18,6 +19,7 @@ export interface McpContext {
   tenantId: string;
   workOrders: typeof workOrderService;
   settings: typeof workOrdersCustomerSettingsService;
+  rules: typeof ruleService;
   customers: CustomerRepository;
   db: typeof db;
   schema: typeof schema;
@@ -29,6 +31,7 @@ export function makeContext(tenantId: string): McpContext {
     tenantId,
     workOrders: workOrderService,
     settings: workOrdersCustomerSettingsService,
+    rules: ruleService,
     customers: new CustomerRepository(),
     db,
     schema,

@@ -44,6 +44,16 @@ import {
   listTechnicianWorkOrders,
 } from './tools/technicians';
 import {
+  listAlarmRulesSchema,
+  getAlarmRuleSchema,
+  getRuleDevicesSchema,
+  compareAlarmRulesSchema,
+  listAlarmRules,
+  getAlarmRule,
+  getRuleDevices,
+  compareAlarmRules,
+} from './tools/rules';
+import {
   getProgressSchema,
   getAverageTimeSchema,
   getTechnicianPerformanceSchema,
@@ -152,6 +162,56 @@ const TOOLS = [
     inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
   },
   {
+    name: 'list_alarm_rules',
+    description: 'List a customer alarm rules (name, type, priority, enabled, scope, device count).',
+    inputSchema: obj(
+      {
+        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        type: {
+          type: 'string',
+          enum: ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE'],
+        },
+        enabled: { type: 'boolean' },
+      },
+      ['customer'],
+    ),
+  },
+  {
+    name: 'get_alarm_rule',
+    description:
+      'A customer alarm rule in detail: Condition, Behavior (guards/escalation/channels), Schedule and Scope (with devices).',
+    inputSchema: obj(
+      {
+        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        rule: { type: 'string', description: 'Rule name (fuzzy)' },
+      },
+      ['customer', 'rule'],
+    ),
+  },
+  {
+    name: 'get_rule_devices',
+    description: 'The devices a given alarm rule applies to (scope).',
+    inputSchema: obj(
+      {
+        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        rule: { type: 'string', description: 'Rule name (fuzzy)' },
+      },
+      ['customer', 'rule'],
+    ),
+  },
+  {
+    name: 'compare_alarm_rules',
+    description:
+      'Compare the alarm rule sets of two customers: same-named rules and whether their Condition, Behavior, Schedule and Scope match, plus rules unique to each.',
+    inputSchema: obj(
+      {
+        customerA: { type: 'string', description: 'First customer name or code (fuzzy)' },
+        customerB: { type: 'string', description: 'Second customer name or code (fuzzy)' },
+      },
+      ['customerA', 'customerB'],
+    ),
+  },
+  {
     name: 'get_progress',
     description: 'Installation progress % for a customer or tenant-wide.',
     inputSchema: obj({ customer: { type: 'string' } }),
@@ -215,6 +275,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'get_maintenance':
         result = await getMaintenance(ctx, getMaintenanceSchema.parse(args ?? {}));
+        break;
+      case 'list_alarm_rules':
+        result = await listAlarmRules(ctx, listAlarmRulesSchema.parse(args));
+        break;
+      case 'get_alarm_rule':
+        result = await getAlarmRule(ctx, getAlarmRuleSchema.parse(args));
+        break;
+      case 'get_rule_devices':
+        result = await getRuleDevices(ctx, getRuleDevicesSchema.parse(args));
+        break;
+      case 'compare_alarm_rules':
+        result = await compareAlarmRules(ctx, compareAlarmRulesSchema.parse(args));
         break;
       case 'get_progress':
         result = await getProgress(ctx, getProgressSchema.parse(args ?? {}));
