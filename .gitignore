@@ -73,6 +73,10 @@ web_modules/
 .env.*
 !.env.example
 
+# MCP local config may hold a DATABASE_URL with credentials — keep it local.
+.mcp.json
+!.mcp.json.example
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

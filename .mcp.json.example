@@ -1,0 +1,13 @@
+{
+  "//": "RFC-0042 Work Orders MCP. Copy to .mcp.json (gitignored) and fill DATABASE_URL + GCDR_TENANT_ID. NEVER commit real credentials. Prefer a READ-ONLY role / read replica.",
+  "mcpServers": {
+    "gcdr-wo": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "env": {
+        "DATABASE_URL": "postgresql://<readonly_user>:<password>@<host>:5432/<db>",
+        "GCDR_TENANT_ID": "<tenant-uuid>"
+      }
+    }
+  }
+}
