@@ -54,6 +54,14 @@ import {
   compareAlarmRules,
 } from './tools/rules';
 import {
+  listTicketsSchema,
+  getTicketSchema,
+  getTicketTimelineSchema,
+  listTickets,
+  getTicket,
+  getTicketTimeline,
+} from './tools/tickets';
+import {
   getProgressSchema,
   getAverageTimeSchema,
   getTechnicianPerformanceSchema,
@@ -212,6 +220,21 @@ const TOOLS = [
     ),
   },
   {
+    name: 'list_tickets',
+    description: 'List support tickets (chamados) with the status board, optionally by customer/status.',
+    inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
+  },
+  {
+    name: 'get_ticket',
+    description: 'A ticket (chamado) by code: subject, status, requester and its derived work orders with progress.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
+  },
+  {
+    name: 'get_ticket_timeline',
+    description: 'The aggregated timeline of a ticket: its own events plus all events of its derived work orders.',
+    inputSchema: obj({ code: { type: 'string' } }, ['code']),
+  },
+  {
     name: 'get_progress',
     description: 'Installation progress % for a customer or tenant-wide.',
     inputSchema: obj({ customer: { type: 'string' } }),
@@ -287,6 +310,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'compare_alarm_rules':
         result = await compareAlarmRules(ctx, compareAlarmRulesSchema.parse(args));
+        break;
+      case 'list_tickets':
+        result = await listTickets(ctx, listTicketsSchema.parse(args ?? {}));
+        break;
+      case 'get_ticket':
+        result = await getTicket(ctx, getTicketSchema.parse(args));
+        break;
+      case 'get_ticket_timeline':
+        result = await getTicketTimeline(ctx, getTicketTimelineSchema.parse(args));
         break;
       case 'get_progress':
         result = await getProgress(ctx, getProgressSchema.parse(args ?? {}));
