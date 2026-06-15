@@ -32,8 +32,12 @@ import {
   isTerminal,
   lifecycleStateForCode,
   evaluateTransitions,
+  evaluateTransitionsFromRules,
+  evaluateEventTypeFromRules,
   TransitionEvaluation,
+  LifecycleRule,
 } from './workOrderRules';
+import { workOrderLifecycleRepository } from '../../repositories/work-orders/WorkOrderLifecycleRepository';
 
 export interface ActorContext {
   userId: string;
@@ -137,10 +141,35 @@ export class WorkOrderService {
   async getTransitions(tenantId: string, id: string): Promise<TransitionsResult> {
     const wo = await this.getById(tenantId, id);
     const catalog = await this.listEventTypes();
-    return {
-      status: wo.status,
-      transitions: evaluateTransitions({ type: wo.type, status: wo.status }, catalog),
-    };
+    const rules = await this.loadLifecycleRules(tenantId);
+    const woRef = { type: wo.type, status: wo.status };
+
+    // Table-driven flow when the tenant defines one; else built-in default.
+    const transitions = rules.length
+      ? evaluateTransitionsFromRules(woRef, catalog, await this.occurredSet(tenantId, id), rules)
+      : evaluateTransitions(woRef, catalog);
+
+    return { status: wo.status, transitions };
+  }
+
+  /** Map the tenant's lifecycle rule rows to the engine's shape (empty = default). */
+  private async loadLifecycleRules(tenantId: string): Promise<LifecycleRule[]> {
+    const rows = await workOrderLifecycleRepository.listByTenant(tenantId);
+    return rows.map((r) => ({
+      woType: r.woType,
+      eventType: r.eventType,
+      predecessors: r.predecessors ?? [],
+      predecessorRule: (r.predecessorRule as 'NONE' | 'ANY' | 'ALL') ?? 'NONE',
+      activates: r.activates ?? [],
+      projectsStatus: r.projectsStatus,
+      isEntry: r.isEntry,
+    }));
+  }
+
+  /** Set of event-type codes already on the WO (for predecessor checks). */
+  private async occurredSet(tenantId: string, workOrderId: string): Promise<Set<string>> {
+    const events = await this.repo.listEvents(tenantId, workOrderId);
+    return new Set(events.map((e) => e.eventType));
   }
 
   async update(tenantId: string, id: string, data: UpdateWorkOrderDTO, ctx: ActorContext): Promise<WorkOrder> {
@@ -200,17 +229,39 @@ export class WorkOrderService {
       throw new ValidationError(`Unknown or inactive event_type "${data.eventType}"`);
     }
 
-    // Terminal WOs are locked for further LIFECYCLE events.
-    const projected = lifecycleStateForCode(eventType.code, eventType.category);
-    if (projected && isTerminal(wo.status)) {
-      throw new ConflictError(`Work order ${workOrderId} is ${wo.status} and cannot accept further lifecycle events`);
-    }
-
-    // A lifecycle event must belong to the WO's own type.
-    if (LIFECYCLE_CATEGORIES.has(eventType.category) && eventType.category !== wo.type) {
-      throw new ValidationError(
-        `Event "${eventType.code}" (${eventType.category}) does not match work order type ${wo.type}`,
+    // Status this event projects + validity, via the Rules Engine. When the
+    // tenant has a lifecycle table it's authoritative; otherwise the built-in
+    // default flow (suffix matrix) applies.
+    const rules = await this.loadLifecycleRules(tenantId);
+    let projected: string | null;
+    if (rules.length) {
+      const occurred = await this.occurredSet(tenantId, workOrderId);
+      const evaluation = evaluateEventTypeFromRules(
+        eventType,
+        { type: wo.type, status: wo.status },
+        occurred,
+        rules,
       );
+      if (!evaluation.allowed) {
+        throw new ConflictError(
+          `Event "${eventType.code}" cannot be appended now (${evaluation.reasonCode})`,
+        );
+      }
+      projected = evaluation.targetStatus;
+    } else {
+      projected = lifecycleStateForCode(eventType.code, eventType.category);
+      // Terminal WOs are locked for further LIFECYCLE events.
+      if (projected && isTerminal(wo.status)) {
+        throw new ConflictError(
+          `Work order ${workOrderId} is ${wo.status} and cannot accept further lifecycle events`,
+        );
+      }
+      // A lifecycle event must belong to the WO's own type.
+      if (LIFECYCLE_CATEGORIES.has(eventType.category) && eventType.category !== wo.type) {
+        throw new ValidationError(
+          `Event "${eventType.code}" (${eventType.category}) does not match work order type ${wo.type}`,
+        );
+      }
     }
 
     // Reference integrity for asset/device.

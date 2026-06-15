@@ -81,7 +81,11 @@ const ALLOWED_FROM: Record<string, WorkOrderStatusValue[]> = {
   CANCELADA: ['PLANEJADA', 'EM_ANDAMENTO', 'REAGENDADA', 'AGUARDANDO', 'INTERROMPIDA'],
 };
 
-export type TransitionReasonCode = 'TERMINAL' | 'TYPE_MISMATCH' | 'WRONG_STATE';
+export type TransitionReasonCode =
+  | 'TERMINAL'
+  | 'TYPE_MISMATCH'
+  | 'WRONG_STATE'
+  | 'MISSING_PREDECESSORS';
 
 export interface EventTypeLike {
   code: string;
@@ -98,8 +102,137 @@ export interface TransitionEvaluation {
   targetStatus: WorkOrderStatusValue | null;
   allowed: boolean;
   reasonCode?: TransitionReasonCode;
-  /** Present when reasonCode === 'WRONG_STATE'. */
+  /** Present when reasonCode === 'WRONG_STATE' (built-in default flow). */
   allowedFrom?: WorkOrderStatusValue[];
+  /** Present when reasonCode === 'MISSING_PREDECESSORS' (table-driven flow). */
+  predecessors?: string[];
+  missing?: string[];
+  /** Event-types this node activates next (table-driven flow). */
+  activates?: string[];
+}
+
+// ── Table-driven flow (RFC-0041 §3–4) ──────────────────────────────────────
+
+export interface LifecycleRule {
+  woType: string | null; // null = applies to every WO type
+  eventType: string;
+  predecessors: string[];
+  predecessorRule: 'NONE' | 'ANY' | 'ALL';
+  activates: string[];
+  projectsStatus: string | null; // null = marker
+  isEntry: boolean;
+}
+
+/** Most specific rule for (woType, eventType): exact wo_type wins over NULL. */
+function resolveRule(
+  rules: LifecycleRule[],
+  woType: string,
+  eventType: string,
+): LifecycleRule | undefined {
+  return (
+    rules.find((r) => r.eventType === eventType && r.woType === woType) ??
+    rules.find((r) => r.eventType === eventType && r.woType === null)
+  );
+}
+
+/** Status projection from the table: latest event whose rule projects a status. */
+export function projectStatusFromRules(
+  woType: string,
+  events: Array<{ eventType: string; createdAt?: string | Date }>,
+  rules: LifecycleRule[],
+  fallback: WorkOrderStatusValue = 'PLANEJADA',
+): WorkOrderStatusValue {
+  const sorted = [...events].sort(
+    (a, b) =>
+      (b.createdAt ? new Date(b.createdAt).getTime() : 0) -
+      (a.createdAt ? new Date(a.createdAt).getTime() : 0),
+  );
+  for (const ev of sorted) {
+    const rule = resolveRule(rules, woType, ev.eventType);
+    if (rule?.projectsStatus) return rule.projectsStatus as WorkOrderStatusValue;
+  }
+  return fallback;
+}
+
+/** Evaluate one event-type against a WO using the tenant's lifecycle rules. */
+export function evaluateEventTypeFromRules(
+  et: EventTypeLike,
+  wo: { type: string; status: string },
+  occurred: Set<string>,
+  rules: LifecycleRule[],
+): TransitionEvaluation {
+  const rule = resolveRule(rules, wo.type, et.code);
+  const target = (rule?.projectsStatus ?? null) as WorkOrderStatusValue | null;
+  const base: TransitionEvaluation = {
+    code: et.code,
+    category: et.category,
+    label: et.label,
+    targetStatus: target,
+    allowed: true,
+    activates: rule?.activates,
+  };
+
+  const isLifecycle = LIFECYCLE_CATEGORIES.has(et.category) || Boolean(target);
+
+  // Lifecycle event of another WO type.
+  if (LIFECYCLE_CATEGORIES.has(et.category) && et.category !== wo.type) {
+    return { ...base, allowed: false, reasonCode: 'TYPE_MISMATCH' };
+  }
+  // Terminal WO accepts no further status-moving events.
+  if (isLifecycle && isTerminal(wo.status)) {
+    return { ...base, allowed: false, reasonCode: 'TERMINAL' };
+  }
+  // No governing row → ungated (markers, or lifecycle types the tenant left open).
+  if (!rule) return base;
+
+  // A predecessor is satisfied if its event already occurred OR if the rule for
+  // that predecessor projects the WO's *current* status. The latter bridges the
+  // initial state: a WO starts with status PLANEJADA but no PLANEJADA event, so
+  // the entry transition is still enabled.
+  const satisfies = (pred: string): boolean =>
+    occurred.has(pred) ||
+    (rules.find((r) => r.eventType === pred && (r.woType === wo.type || r.woType === null))
+      ?.projectsStatus ?? null) === wo.status;
+
+  if (rule.predecessorRule === 'ANY' && rule.predecessors.length) {
+    if (!rule.predecessors.some(satisfies)) {
+      return {
+        ...base,
+        allowed: false,
+        reasonCode: 'MISSING_PREDECESSORS',
+        predecessors: rule.predecessors,
+        missing: rule.predecessors.filter((p) => !satisfies(p)),
+      };
+    }
+  }
+  if (rule.predecessorRule === 'ALL' && rule.predecessors.length) {
+    const missing = rule.predecessors.filter((p) => !satisfies(p));
+    if (missing.length) {
+      return {
+        ...base,
+        allowed: false,
+        reasonCode: 'MISSING_PREDECESSORS',
+        predecessors: rule.predecessors,
+        missing,
+      };
+    }
+  }
+  return base;
+}
+
+/** Evaluate the composer's catalog against the tenant's lifecycle rules. */
+export function evaluateTransitionsFromRules(
+  wo: { type: string; status: string },
+  catalog: EventTypeLike[],
+  occurred: Set<string>,
+  rules: LifecycleRule[],
+): TransitionEvaluation[] {
+  const relevant = catalog.filter(
+    (et) => et.active !== false && (et.category === wo.type || et.category === 'ESTRUTURA'),
+  );
+  return relevant
+    .map((et) => evaluateEventTypeFromRules(et, wo, occurred, rules))
+    .sort((a, b) => Number(b.allowed) - Number(a.allowed));
 }
 
 /**

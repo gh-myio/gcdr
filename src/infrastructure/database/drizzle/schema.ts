@@ -1731,6 +1731,26 @@ export const workOrdersEventTypes = pgTable('work_orders_event_types', {
   active:     boolean('active').notNull().default(true),
 });
 
+// RFC-0041 — per-tenant data-driven WO flow. The Rules Engine reads these rows;
+// when a tenant has none it falls back to the built-in default flow.
+export const workOrdersLifecycleRules = pgTable('work_orders_lifecycle_rules', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull(),
+  woType:          text('wo_type'),                                  // NULL = all types
+  eventType:       text('event_type').notNull().references(() => workOrdersEventTypes.code),
+  predecessors:    text('predecessors').array().notNull().default(sql`'{}'::text[]`),
+  predecessorRule: text('predecessor_rule').notNull().default('NONE'),
+  activates:       text('activates').array().notNull().default(sql`'{}'::text[]`),
+  projectsStatus:  text('projects_status'),                         // NULL = marker
+  isEntry:         boolean('is_entry').notNull().default(false),
+  sortOrder:       integer('sort_order').notNull().default(0),
+  active:          boolean('active').notNull().default(true),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantIdx: index('work_orders_lifecycle_rules_tenant_idx').on(table.tenantId),
+}));
+
 // -----------------------------------------------------------------------------
 // 4) Events (append-only "what happened, in order")
 // -----------------------------------------------------------------------------
