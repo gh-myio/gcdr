@@ -160,15 +160,70 @@ the `summary` to help the LLM retry.
 
 ## 8. Rollout
 
-1. **Phase 1:** `context.ts` (tenant/customer scope + read-only repos) + the
-   `customers`/`work_orders` tools + stdio server + `.mcp.json`. Validate with a
-   local LLM client.
-2. **Phase 2:** `devices`, `maintenance`, `analytics` tools (reuse the
-   Desempenho aggregations so MCP numbers equal the UI).
-3. **Phase 3:** packaging/ops — read-replica wiring, a thin auth wrapper so a
-   `gcdr_cust_*` key auto-scopes the customer, and docs for consumers.
+1. **Phase 1 — DONE.** `context.ts` (tenant scope + read-only repos), the
+   `customers` + `work_orders` tools (`list_customers`, `find_customer`,
+   `list_work_orders`, `get_work_order`, `get_transitions`), stdio server and
+   `.mcp.json`.
+2. **Phase 2 — DONE.** `devices`, `maintenance` and `analytics` tools
+   (`get_devices`, `get_device_details`, `get_maintenance`, `get_progress`,
+   `get_average_time`, `get_technician_performance`, `get_activity_log`,
+   `get_daily_summary`). Analytics query the WO tables directly and reuse the
+   Desempenho gap-based time model so numbers equal the UI.
+3. **Phase 3 — production hardening (not new tools).** Three things, only needed
+   to expose this in production / to third parties:
+   1. **DB-level read-only.** Run the server with a SELECT-only Postgres role
+      (and/or a read replica). The tools are already read-only in code; this is
+      the safety net at the database level.
+   2. **Auto-scope by API key.** Today a server is pinned to a *tenant* and sees
+      *all* its customers. Phase 3 resolves an optional `gcdr_cust_*` key to its
+      customer and restricts every tool to it — so a customer can be given an
+      MCP without seeing other customers' OS. (This is the only code part:
+      resolve the key → `allowedCustomerIds` in `context.ts` and filter in the
+      tools.)
+   3. **Ops/docs.** Running the server inside the network that reaches the prod
+      Postgres (the prod host is internal), `.mcp.json` config and a consumer
+      guide for the tools.
 
-## 9. Out of scope
+   For **local/internal** use with a trusted single tenant, Phase 3 is **not**
+   required — Phases 1–2 are fully functional.
+
+## 9. Migrations, seeds & environment
+
+- **No migrations and no seeds are required by the MCP itself** — it only
+  *reads* existing tables (`work_orders*`, `work_orders_events`,
+  `work_orders_devices`, `work_orders_lifecycle_rules`, `customers`, `users`,
+  `devices`). The RFC-0041 migrations (`0040`, `0041`) and the demo seeds
+  (`27`/`28`/`29`) are independent; they just provide data to query.
+- **Environment** (set in `.mcp.json` → `env`, never committed):
+  - `DATABASE_URL` — points at the GCDR database. **Prod: use a read-only role
+    / read replica**, on a host the server can reach (the prod DB host is
+    internal, so run the MCP from inside that network).
+  - `GCDR_TENANT_ID` — pins the tenant (required).
+  - `GCDR_MCP_API_KEY` *(Phase 3)* — optional customer-scoping key.
+- No changes to the API's own `.env` are needed; the MCP is a separate process.
+
+## 10. How to test
+
+Run a JSON-RPC handshake over stdio and call a tool (no LLM client needed):
+
+```bash
+# from gcdr.git, with the local DB up (docker container gcdr-db-local on :5544)
+{
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}'
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_progress","arguments":{}}}'
+  sleep 5
+} | DATABASE_URL="postgresql://postgres:postgres@localhost:5544/db_gcdr" \
+    GCDR_TENANT_ID="11111111-1111-1111-1111-111111111111" \
+    npx tsx src/mcp/server.ts
+```
+
+A real MCP client (Claude Desktop / Claude Code) just needs the `.mcp.json`
+above; it spawns `npx tsx src/mcp/server.ts` and lists the 13 tools.
+Prerequisite: `npm install` (pulls `@modelcontextprotocol/sdk`).
+
+## 11. Out of scope
 
 - **Write tools** (creating WOs / appending events) — this server is read-only.
   A future RFC could add a guarded, audited write surface.
