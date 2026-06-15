@@ -1954,3 +1954,21 @@ export const annotationAttachments = pgTable('annotation_attachments', {
   responseIdx:   index('annotation_attachments_response_idx').on(table.responseId).where(sql`response_id IS NOT NULL`),
   fileIdx:       index('annotation_attachments_file_idx').on(table.fileAssetId),
 }));
+
+// -----------------------------------------------------------------------------
+// assistant_conversations (RFC-0043) — persisted GCDR Copiloto chat history.
+// Private to the owner unless `shared` = true (then readable by the tenant).
+// -----------------------------------------------------------------------------
+export const assistantConversations = pgTable('assistant_conversations', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  userId:    uuid('user_id').notNull(),
+  title:     varchar('title', { length: 200 }).notNull().default('Conversa'),
+  messages:  jsonb('messages').notNull().default(sql`'[]'::jsonb`),
+  shared:    boolean('shared').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ownerIdx:  index('assistant_conversations_owner_idx').on(table.tenantId, table.userId, table.updatedAt),
+  sharedIdx: index('assistant_conversations_shared_idx').on(table.tenantId, table.shared, table.updatedAt),
+}));
