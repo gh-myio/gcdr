@@ -54,6 +54,7 @@ type). Seeded with the current defaults so behavior is unchanged out of the box.
 | `activates` | text[] (default `{}`) | event-types that become active **after** this node fires (forward edges; repeats allowed) |
 | `projects_status` | text NULL | the WO status this event projects; **NULL = marker** (never moves status) |
 | `is_entry` | boolean (default false) | true = available from the start (no predecessor needed) |
+| `is_terminal` | boolean (default false) | true = firing this node **closes** the WO (no further lifecycle events) |
 | `sort_order` | int (default 0) | display order in the composer |
 | `active` | boolean (default true) | soft toggle |
 
@@ -62,9 +63,11 @@ Constraints: `UNIQUE(tenant_id, wo_type, event_type)`,
 specific `wo_type` overrides a `wo_type IS NULL` row for the same
 `(tenant, event_type)`.
 
-> Terminal states reuse the existing `work_orders_event_types.is_terminal` flag —
-> a node whose event-type is terminal closes the WO (no further lifecycle nodes
-> become active).
+> **Terminal handling.** A rule's `is_terminal` flag marks a closing node: once
+> it fires, the WO is closed and no further lifecycle events are allowed. The
+> tenant's terminal *statuses* are derived from the `projects_status` of its
+> terminal rules; when none is flagged, the engine falls back to the built-in
+> `FINALIZADA`/`CANCELADA`.
 
 ### 3.2 Example (default INSTALACAO flow, abbreviated)
 

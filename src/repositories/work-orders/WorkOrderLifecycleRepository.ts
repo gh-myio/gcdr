@@ -14,6 +14,7 @@ export interface LifecycleRuleInput {
   activates: string[];
   projectsStatus: string | null;
   isEntry: boolean;
+  isTerminal: boolean;
   sortOrder: number;
   active: boolean;
 }
@@ -62,6 +63,7 @@ export const workOrderLifecycleRepository = {
             activates: r.activates,
             projectsStatus: r.projectsStatus,
             isEntry: r.isEntry,
+            isTerminal: r.isTerminal,
             sortOrder: r.sortOrder,
             active: r.active,
           })),

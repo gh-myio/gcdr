@@ -1743,6 +1743,7 @@ export const workOrdersLifecycleRules = pgTable('work_orders_lifecycle_rules', {
   activates:       text('activates').array().notNull().default(sql`'{}'::text[]`),
   projectsStatus:  text('projects_status'),                         // NULL = marker
   isEntry:         boolean('is_entry').notNull().default(false),
+  isTerminal:      boolean('is_terminal').notNull().default(false), // closes the WO
   sortOrder:       integer('sort_order').notNull().default(0),
   active:          boolean('active').notNull().default(true),
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

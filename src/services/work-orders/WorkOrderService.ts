@@ -164,6 +164,7 @@ export class WorkOrderService {
       activates: r.activates ?? [],
       projectsStatus: r.projectsStatus,
       isEntry: r.isEntry,
+      isTerminal: r.isTerminal,
     }));
   }
 
@@ -219,6 +220,7 @@ export class WorkOrderService {
         activates: r.activates,
         projectsStatus: r.projectsStatus ?? null,
         isEntry: r.isEntry,
+        isTerminal: r.isTerminal,
         sortOrder: r.sortOrder,
         active: r.active,
       })),

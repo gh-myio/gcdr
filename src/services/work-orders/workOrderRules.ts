@@ -121,6 +121,19 @@ export interface LifecycleRule {
   activates: string[];
   projectsStatus: string | null; // null = marker
   isEntry: boolean;
+  isTerminal: boolean; // closes the WO when fired
+}
+
+/**
+ * Terminal statuses for a tenant's flow: statuses projected by rules flagged
+ * terminal. Falls back to the built-in FINALIZADA/CANCELADA when none is set.
+ */
+function terminalStatusesOf(rules: LifecycleRule[]): Set<string> {
+  const set = new Set<string>();
+  for (const r of rules) {
+    if (r.isTerminal && r.projectsStatus) set.add(r.projectsStatus);
+  }
+  return set.size ? set : new Set<string>(TERMINAL_STATUSES);
 }
 
 /** Most specific rule for (woType, eventType): exact wo_type wins over NULL. */
@@ -178,8 +191,8 @@ export function evaluateEventTypeFromRules(
   if (LIFECYCLE_CATEGORIES.has(et.category) && et.category !== wo.type) {
     return { ...base, allowed: false, reasonCode: 'TYPE_MISMATCH' };
   }
-  // Terminal WO accepts no further status-moving events.
-  if (isLifecycle && isTerminal(wo.status)) {
+  // Terminal WO accepts no further status-moving events (data-driven set).
+  if (isLifecycle && terminalStatusesOf(rules).has(wo.status)) {
     return { ...base, allowed: false, reasonCode: 'TERMINAL' };
   }
   // No governing row → ungated (markers, or lifecycle types the tenant left open).

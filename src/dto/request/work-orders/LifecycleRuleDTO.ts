@@ -21,6 +21,7 @@ export const LifecycleRuleSchema = z.object({
   activates: z.array(z.string().min(1).max(100)).max(100).optional().default([]),
   projectsStatus: z.enum(WO_STATUSES).nullable().optional().default(null),
   isEntry: z.boolean().optional().default(false),
+  isTerminal: z.boolean().optional().default(false),
   sortOrder: z.number().int().min(0).max(100000).optional().default(0),
   active: z.boolean().optional().default(true),
 });

@@ -91,18 +91,18 @@ BEGIN
 
     -- FINALIZADA (terminal)
     INSERT INTO work_orders_lifecycle_rules
-      (tenant_id, wo_type, event_type, predecessors, predecessor_rule, activates, projects_status, sort_order)
+      (tenant_id, wo_type, event_type, predecessors, predecessor_rule, activates, projects_status, is_terminal, sort_order)
     SELECT v_tenant, v_t, v_t||'_FINALIZADA',
       ARRAY(SELECT v_t||'_'||s FROM unnest(s_progress) s), 'ANY',
-      ARRAY[]::text[], 'FINALIZADA', 70
+      ARRAY[]::text[], 'FINALIZADA', true, 70
     WHERE EXISTS (SELECT 1 FROM work_orders_event_types WHERE code = v_t||'_FINALIZADA');
 
     -- CANCELADA (terminal)
     INSERT INTO work_orders_lifecycle_rules
-      (tenant_id, wo_type, event_type, predecessors, predecessor_rule, activates, projects_status, sort_order)
+      (tenant_id, wo_type, event_type, predecessors, predecessor_rule, activates, projects_status, is_terminal, sort_order)
     SELECT v_tenant, v_t, v_t||'_CANCELADA',
       ARRAY(SELECT v_t||'_'||s FROM unnest(ARRAY['PLANEJADA','INTERROMPIDA','REAGENDADA'] || s_progress || s_await) s), 'ANY',
-      ARRAY[]::text[], 'CANCELADA', 80
+      ARRAY[]::text[], 'CANCELADA', true, 80
     WHERE EXISTS (SELECT 1 FROM work_orders_event_types WHERE code = v_t||'_CANCELADA');
   END LOOP;
 
