@@ -30,6 +30,25 @@ import {
   getWorkOrder,
   getTransitions,
 } from './tools/workOrders';
+import {
+  getDevicesSchema,
+  getDeviceDetailsSchema,
+  getDevices,
+  getDeviceDetails,
+} from './tools/devices';
+import { getMaintenanceSchema, getMaintenance } from './tools/maintenance';
+import {
+  getProgressSchema,
+  getAverageTimeSchema,
+  getTechnicianPerformanceSchema,
+  getActivityLogSchema,
+  getDailySummarySchema,
+  getProgress,
+  getAverageTime,
+  getTechnicianPerformance,
+  getActivityLog,
+  getDailySummary,
+} from './tools/analytics';
 
 const ctx = loadContext();
 
@@ -82,6 +101,58 @@ const TOOLS = [
       'Rules-engine evaluation (RFC-0041): which events can/cannot be appended next and why.',
     inputSchema: obj({ code: { type: 'string', description: 'Work order code' } }, ['code']),
   },
+  {
+    name: 'get_devices',
+    description: 'Devices in a customer work-order scope, filterable by install state.',
+    inputSchema: obj(
+      {
+        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        filter: { type: 'string', enum: ['all', 'installed', 'pending'] },
+      },
+      ['customer'],
+    ),
+  },
+  {
+    name: 'get_device_details',
+    description: 'A device (fuzzy by name/serial/code) with its event history.',
+    inputSchema: obj(
+      {
+        customer: { type: 'string', description: 'Customer name or code (fuzzy)' },
+        device: { type: 'string', description: 'Device name, serial or code (fuzzy)' },
+      },
+      ['customer', 'device'],
+    ),
+  },
+  {
+    name: 'get_maintenance',
+    description: 'Maintenance (MANUTENCAO) work orders, optionally by customer/status.',
+    inputSchema: obj({ customer: { type: 'string' }, status: { type: 'string' } }),
+  },
+  {
+    name: 'get_progress',
+    description: 'Installation progress % for a customer or tenant-wide.',
+    inputSchema: obj({ customer: { type: 'string' } }),
+  },
+  {
+    name: 'get_average_time',
+    description: 'Average installation time (gap model) for a customer or tenant-wide.',
+    inputSchema: obj({ customer: { type: 'string' } }),
+  },
+  {
+    name: 'get_technician_performance',
+    description: 'Technician ranking by installs with total/average time.',
+    inputSchema: obj({ customer: { type: 'string' } }),
+  },
+  {
+    name: 'get_activity_log',
+    description: 'Recent work-order events (timeline feed).',
+    inputSchema: obj({ customer: { type: 'string' }, limit: { type: 'number' } }),
+  },
+  {
+    name: 'get_daily_summary',
+    description: "Today's installs and the open work-order backlog.",
+    inputSchema: obj({ customer: { type: 'string' } }),
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -106,6 +177,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'get_transitions':
         result = await getTransitions(ctx, getTransitionsSchema.parse(args));
+        break;
+      case 'get_devices':
+        result = await getDevices(ctx, getDevicesSchema.parse(args));
+        break;
+      case 'get_device_details':
+        result = await getDeviceDetails(ctx, getDeviceDetailsSchema.parse(args));
+        break;
+      case 'get_maintenance':
+        result = await getMaintenance(ctx, getMaintenanceSchema.parse(args ?? {}));
+        break;
+      case 'get_progress':
+        result = await getProgress(ctx, getProgressSchema.parse(args ?? {}));
+        break;
+      case 'get_average_time':
+        result = await getAverageTime(ctx, getAverageTimeSchema.parse(args ?? {}));
+        break;
+      case 'get_technician_performance':
+        result = await getTechnicianPerformance(ctx, getTechnicianPerformanceSchema.parse(args ?? {}));
+        break;
+      case 'get_activity_log':
+        result = await getActivityLog(ctx, getActivityLogSchema.parse(args ?? {}));
+        break;
+      case 'get_daily_summary':
+        result = await getDailySummary(ctx, getDailySummarySchema.parse(args ?? {}));
         break;
       default:
         return {
