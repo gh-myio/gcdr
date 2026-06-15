@@ -47,11 +47,24 @@ export async function runAssistant(
 
   const client = new Anthropic({ apiKey });
   const ctx = makeContext(tenantId);
-  const tools: Anthropic.Tool[] = ASSISTANT_TOOLS.map((t) => ({
+
+  // Prompt caching (5-min ephemeral): the tools + system prefix is identical on
+  // every call, so cache it. Within one ask the tool-use loop re-sends it up to
+  // MAX_STEPS times, and quick follow-ups reuse it too — cache reads cost 0.1x.
+  // Breakpoints MUST sit on stable content (no per-request data here). Order is
+  // tools -> system -> messages, so a breakpoint on the last tool + on system
+  // covers the whole static prefix.
+  const tools: Anthropic.Tool[] = ASSISTANT_TOOLS.map((t, i) => ({
     name: t.name,
     description: t.description,
     input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    ...(i === ASSISTANT_TOOLS.length - 1
+      ? { cache_control: { type: 'ephemeral' as const } }
+      : {}),
   }));
+  const system: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
+  ];
 
   const messages: Anthropic.MessageParam[] = [
     ...history.map((h) => ({ role: h.role, content: h.content })),
@@ -64,7 +77,7 @@ export async function runAssistant(
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: 1500,
-      system: SYSTEM,
+      system,
       tools,
       messages,
     });

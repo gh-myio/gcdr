@@ -125,23 +125,43 @@ Option A is implemented as a POC, but as a **general GCDR Copiloto** (not OS-onl
   here.
 - `src/services/assistant/AssistantService.ts` — Anthropic tool-use loop, scoped
   to the caller's tenant via `makeContext(tenantId)`; read-only.
-- `src/controllers/assistant.controller.ts` — `POST /assistant` (ask) and
-  `GET /assistant/status` (is it configured), behind `authMiddleware`.
+- `src/controllers/assistant.controller.ts` — `POST /assistant` (ask),
+  `GET /assistant/status`, and persisted-history CRUD under
+  `/assistant/conversations` (see below), behind `authMiddleware`.
+- Tools wired: Work Orders (13, RFC-0042), Technicians (`find_technician`,
+  `list_technician_work_orders`) and Alarm Rules (`list_alarm_rules`,
+  `get_alarm_rule`, `get_rule_devices`, `compare_alarm_rules`). The registry is
+  domain-agnostic; more domains plug in here.
+- **Prompt caching**: the tools + system prefix is identical on every call, so it
+  carries `cache_control: ephemeral` (5-min TTL). The tool-use loop re-sends it
+  up to MAX_STEPS times per ask and quick follow-ups reuse it; cache reads cost
+  0.1x. Breakpoints sit only on static content.
 - Env: `ANTHROPIC_API_KEY` (required to enable) and optional `ASSISTANT_MODEL`
   (defaults `claude-sonnet-4-6`). If the key is absent the endpoint returns 503
   and the UI degrades gracefully.
 
+**Persisted conversation history (shareable)**
+- Table `assistant_conversations` (migration 0042): per-user chat history stored
+  as JSONB turns, `shared` boolean. Private to the owner unless shared, when
+  other users in the same tenant can read it (owner-only edit/delete).
+- `src/services/assistant/conversationStore.ts` + endpoints:
+  `GET /assistant/conversations?scope=mine|shared|all`, `GET/POST/PATCH/DELETE
+  /assistant/conversations[/:id]`. The transient `ask` stays stateless; saving
+  is opt-in from the UI.
+
 **Frontend (`gcdr-frontend.git`)**
 - A **global floating "Copiloto"** widget (`components/assistant/CopilotWidget.tsx`)
-  mounted in `Layout`, available on every authenticated page — so it's a
-  product-wide assistant, OS being the first domain it can answer about.
+  in `Layout`, with maximize/restore, available on every authenticated page.
+  Can be hidden/re-shown (localStorage pref).
+- A dedicated **"Assistente"** menu + page (`/assistant`) with tabs **Chat**,
+  **Histórico** (mine / shared-by-others, open/save/share/delete) and **Guia**
+  (capabilities + example prompts per domain + assistant status + launcher
+  toggle). Shared chat logic in `hooks/useCopilotChat.ts`.
 - `services/api/assistantService.ts`, `i18n` namespace `assistant` (pt-BR/en).
 
-POC limitations (vs sections 5/8): no token streaming (single response),
-ephemeral history (not persisted), and the tool set is still WO-first. Next:
-extract a shared `wo-insights` layer if/when REST widgets (Option C) are also
-wanted, add streaming, and register tools from other domains (customers,
-devices, assets).
+Remaining (vs sections 5/8): no token streaming yet (single response); a shared
+`wo-insights` layer would be extracted only if/when REST widgets (Option C) are
+also wanted; more tool domains (assets, centrals) can be registered.
 
 ## 10. Out of scope
 
