@@ -4,3 +4,4 @@
 export { default as workOrdersController, listEventTypesHandler } from './work-orders.controller';
 export { default as woCustomersController } from './wo-customers.controller';
 export { default as woLifecycleController } from './wo-lifecycle.controller';
+export { default as woTicketsController } from './tickets.controller';

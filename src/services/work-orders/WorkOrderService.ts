@@ -39,6 +39,7 @@ import {
 } from './workOrderRules';
 import { workOrderLifecycleRepository } from '../../repositories/work-orders/WorkOrderLifecycleRepository';
 import { LifecycleRuleDTO } from '../../dto/request/work-orders/LifecycleRuleDTO';
+import { ticketRepository } from '../../repositories/work-orders/TicketRepository';
 
 export interface ActorContext {
   userId: string;
@@ -336,6 +337,21 @@ export class WorkOrderService {
     // STATUS PROJECTION: a lifecycle event of the WO's type moves status.
     if (projected && projected !== wo.status) {
       await this.repo.updateStatus(tenantId, workOrderId, projected);
+
+      // RFC-0044: if this OS hangs on a chamado, recompute the parent roll-up
+      // (e.g. the sole derived OS was cancelled -> the chamado auto-cancels).
+      // Best-effort + lazy import to avoid a module cycle; never blocks the event.
+      if (wo.type !== 'CHAMADO') {
+        try {
+          const ticketId = await ticketRepository.getTicketIdOf(tenantId, workOrderId);
+          if (ticketId) {
+            const { ticketService } = await import('./TicketService');
+            await ticketService.recomputeAggregate(tenantId, ticketId, ctx);
+          }
+        } catch {
+          /* roll-up is best-effort */
+        }
+      }
     }
 
     return event;

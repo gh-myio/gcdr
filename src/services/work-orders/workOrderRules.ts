@@ -18,7 +18,12 @@ export type WorkOrderStatusValue =
   | 'CANCELADA';
 
 /** Categories that drive the status projection (must match the WO's own type). */
-export const LIFECYCLE_CATEGORIES = new Set(['VISITA_TECNICA', 'INSTALACAO', 'MANUTENCAO']);
+export const LIFECYCLE_CATEGORIES = new Set([
+  'VISITA_TECNICA',
+  'INSTALACAO',
+  'MANUTENCAO',
+  'CHAMADO', // RFC-0044 — tickets; status flow is table-driven (no built-in suffix matrix)
+]);
 
 export const TERMINAL_STATUSES = new Set<WorkOrderStatusValue>(['FINALIZADA', 'CANCELADA']);
 

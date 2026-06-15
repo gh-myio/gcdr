@@ -80,6 +80,7 @@ import {
   workOrdersController,
   woCustomersController,
   woLifecycleController,
+  woTicketsController,
   woEventTypesHandler,
   assistantController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
@@ -349,6 +350,9 @@ apiV1Router.get('/wo/event-types', authMiddleware, woEventTypesHandler);
 // Lifecycle-rules admin (RFC-0041) — mounted BEFORE /wo/work-orders so it's not
 // shadowed by the work-orders /:id matcher.
 apiV1Router.use('/wo/lifecycle-rules', authMiddleware, woLifecycleController);
+// RFC-0044: Chamados (WO type CHAMADO) — mounted BEFORE /wo/work-orders so its
+// specific paths are not shadowed by the work-orders /:id matcher.
+apiV1Router.use('/wo/tickets', authMiddleware, woTicketsController);
 apiV1Router.use('/wo/work-orders', authMiddleware, workOrdersController);
 apiV1Router.use('/wo/customers', woCustomersController);
 

@@ -196,10 +196,15 @@ a later decision; see `docs/integracao_freshdesk_myio.md`.
   `work_orders_watchers`, `work_orders.ticket_id`, widen the type CHECK, seed the
   `CHAMADO` event types; default lifecycle seed for the test tenant. No behavior
   change to existing OS.
-- **Phase 2:** add `CHAMADO` to `LIFECYCLE_CATEGORIES`; ticket service/controller
-  (open/detail/messages/derive/attach/cancel/resolve/close), the
-  `WorkOrderVisibilityService`, the `WorkOrderAggregationService`, and the
-  aggregated timeline query.
+- **Phase 2 (DONE):** `CHAMADO` added to `LIFECYCLE_CATEGORIES`; `TicketService`
+  (open / detail / list+board / derive / attach / detach / transition
+  cancel·resolve·close·reopen·pending·awaiting), `TicketRepository` (meta,
+  watchers, parent edge, derived, aggregated events), the visibility resolver
+  (`TicketService.buildScope`, view = TECNICO/SUPERVISOR/HOLDING/ALL), the
+  roll-up (`recomputeAggregate`, hooked into `WorkOrderService.appendEvent` so a
+  child transition auto-cancels the chamado when all linked OS are cancelled),
+  and the aggregated timeline. Endpoints under `/wo/tickets`. Comments still map
+  to the annotations domain (not duplicated here).
 - **Phase 3:** the "Chamados" UI surface + Copiloto tools.
 - **Phase 4:** Freshdesk importer (+ optional sync).
 

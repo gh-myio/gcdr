@@ -53,6 +53,7 @@ export {
   workOrdersController,
   woCustomersController,
   woLifecycleController,
+  woTicketsController,
   listEventTypesHandler as woEventTypesHandler,
 } from './work-orders';
 
