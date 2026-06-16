@@ -2015,3 +2015,27 @@ export const workOrdersWatchers = pgTable('work_orders_watchers', {
 }, (table) => ({
   woEmailUnique: uniqueIndex('work_orders_watchers_unique').on(table.workOrderId, table.email),
 }));
+
+// -----------------------------------------------------------------------------
+// email_ingestion_log (RFC-0045) — inbound email -> chamado: idempotency
+// (unique message_id per tenant) + thread anchor (message_id -> chamado).
+// -----------------------------------------------------------------------------
+export const emailIngestionLog = pgTable('email_ingestion_log', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  messageId:   text('message_id').notNull(),
+  workOrderId: uuid('work_order_id').references(() => workOrders.id, { onDelete: 'set null' }),
+  direction:   text('direction').notNull().default('inbound'),
+  fromAddress: varchar('from_address', { length: 320 }),
+  toAddress:   varchar('to_address', { length: 320 }),
+  subject:     varchar('subject', { length: 512 }),
+  inReplyTo:   text('in_reply_to'),
+  status:      text('status').notNull(),
+  error:       text('error'),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantMessageUnique: uniqueIndex('email_ingestion_log_tenant_message_unique').on(table.tenantId, table.messageId),
+  workOrderIdx:        index('email_ingestion_log_work_order_idx').on(table.tenantId, table.workOrderId),
+  directionCheck: check('email_ingestion_log_direction_check', sql`${table.direction} IN ('inbound','outbound')`),
+  statusCheck:    check('email_ingestion_log_status_check', sql`${table.status} IN ('created','appended','skipped','error')`),
+}));

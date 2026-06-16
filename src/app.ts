@@ -81,6 +81,7 @@ import {
   woCustomersController,
   woLifecycleController,
   woTicketsController,
+  woEmailInboundController,
   woEventTypesHandler,
   assistantController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
@@ -354,6 +355,10 @@ apiV1Router.get('/wo/event-types', authMiddleware, woEventTypesHandler);
 // Lifecycle-rules admin (RFC-0041) — mounted BEFORE /wo/work-orders so it's not
 // shadowed by the work-orders /:id matcher.
 apiV1Router.use('/wo/lifecycle-rules', authMiddleware, woLifecycleController);
+// RFC-0045: inbound email webhook — PUBLIC (no JWT), guarded by EMAIL_INBOUND_SECRET.
+// Mounted BEFORE the authed /wo/tickets router so the provider/M2M path is not
+// captured by authMiddleware or the /:id matcher.
+apiV1Router.use('/wo/tickets/email-inbound', woEmailInboundController);
 // RFC-0044: Chamados (WO type CHAMADO) — mounted BEFORE /wo/work-orders so its
 // specific paths are not shadowed by the work-orders /:id matcher.
 apiV1Router.use('/wo/tickets', authMiddleware, woTicketsController);

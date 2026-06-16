@@ -8,6 +8,7 @@ import {
 } from '../../dto/request/work-orders/TicketDTO';
 import { sendSuccess, sendCreated } from '../../middleware';
 import { ValidationError } from '../../shared/errors/AppError';
+import { emailIngestionRepository } from '../../repositories/work-orders/EmailIngestionRepository';
 import type { ActorContext } from '../../services/work-orders/WorkOrderService';
 
 const router = Router();
@@ -47,6 +48,16 @@ router.get('/team', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const items = await ticketService.team(tenantId);
+    sendSuccess(res, { items }, 200, requestId);
+  } catch (err) { next(err); }
+});
+
+/** GET /wo/tickets/email-log?limit= — recent inbound-email ingestion (RFC-0045). */
+router.get('/email-log', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit as string, 10) || 50, 200) : 50;
+    const items = await emailIngestionRepository.listRecent(tenantId, limit);
     sendSuccess(res, { items }, 200, requestId);
   } catch (err) { next(err); }
 });

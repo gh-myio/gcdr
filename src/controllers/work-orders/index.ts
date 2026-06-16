@@ -5,3 +5,5 @@ export { default as workOrdersController, listEventTypesHandler } from './work-o
 export { default as woCustomersController } from './wo-customers.controller';
 export { default as woLifecycleController } from './wo-lifecycle.controller';
 export { default as woTicketsController } from './tickets.controller';
+// RFC-0045 — inbound email webhook (PUBLIC, secret-guarded) -> /wo/tickets/email-inbound
+export { default as woEmailInboundController } from './email-inbound.controller';
