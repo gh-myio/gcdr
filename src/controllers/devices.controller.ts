@@ -114,6 +114,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  *
  * Query params:
  *   - name           (required, trimmed, max 255 chars)
+ *   - customerId     (optional, uuid) — narrow the check to a single customer,
+ *                     matching the real unique constraint (tenant, customer,
+ *                     name). Honored within any deepCustomers restriction.
  *   - caseSensitive  (optional, default `true` — matches the unique-index
  *                     behavior; pass `false` to treat `Foo` / `FOO` / `foo`
  *                     as the same name)
@@ -131,13 +134,23 @@ router.get('/exists', async (req: Request, res: Response, next: NextFunction) =>
       throw new ValidationError('Query param "name" must be <= 255 chars');
     }
 
+    // Optional explicit customer scope. If the caller is already restricted by
+    // deepCustomers, intersect so an explicit id can't widen the scope.
+    const explicitCustomerId = (req.query.customerId as string | undefined)?.trim();
+    let customerIds = allowedCustomerIds;
+    if (explicitCustomerId) {
+      customerIds = allowedCustomerIds
+        ? allowedCustomerIds.filter((id) => id === explicitCustomerId)
+        : [explicitCustomerId];
+    }
+
     // caseSensitive: 'false' or '0' disables; everything else (including
     // missing) defaults to true. Aligned with the unique-index behavior.
     const csRaw = (req.query.caseSensitive as string | undefined)?.toLowerCase();
     const caseSensitive = !(csRaw === 'false' || csRaw === '0');
 
     const result = await deviceService.existsByName(tenantId, name, {
-      customerIds: allowedCustomerIds,
+      customerIds,
       caseSensitive,
     });
     sendSuccess(res, result, 200, requestId);

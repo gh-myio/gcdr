@@ -64,6 +64,33 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /customers/exists?code=<value>
+ *
+ * Existence check for a customer code (unique per tenant_id, code). Lets the FE
+ * validate a code before submitting a create/edit form. Mirrors
+ * GET /devices/exists and GET /assets/exists.
+ *
+ * Query params: code (required, trimmed, max 50 chars)
+ * Response: { exists: boolean, count: number }
+ */
+router.get('/exists', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const code = (req.query.code as string | undefined)?.trim();
+    if (!code) {
+      throw new ValidationError('Query param "code" is required');
+    }
+    if (code.length > 50) {
+      throw new ValidationError('Query param "code" must be <= 50 chars');
+    }
+    const result = await customerService.codeExists(tenantId, code);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /customers/external/:externalId
  *   ?deep=0|1                    (default 0) — include assets + devices
  *   &allRules=0|1                (default 0) — attach rule meta to each device

@@ -93,6 +93,37 @@ router.get('/tree', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /assets/exists?customerId=<uuid>&code=<value>
+ *
+ * Existence check for an asset code (unique per tenant_id, customer_id, code).
+ * Scoped to one customer, so customerId is required. Lets the FE validate a code
+ * before submitting a create/edit form. Mirrors GET /devices/exists.
+ *
+ * Query params: customerId (required, uuid), code (required, trimmed, max 50 chars)
+ * Response: { exists: boolean, count: number }
+ */
+router.get('/exists', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const customerId = (req.query.customerId as string | undefined)?.trim();
+    const code = (req.query.code as string | undefined)?.trim();
+    if (!customerId) {
+      throw new ValidationError('Query param "customerId" is required');
+    }
+    if (!code) {
+      throw new ValidationError('Query param "code" is required');
+    }
+    if (code.length > 50) {
+      throw new ValidationError('Query param "code" must be <= 50 chars');
+    }
+    const result = await assetService.codeExists(tenantId, customerId, code);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /assets/:id
  * Get asset by ID
  */

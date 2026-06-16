@@ -163,6 +163,20 @@ export class CustomerService {
     return customer;
   }
 
+  /**
+   * Existence check for a customer code (unique per tenant_id, code). Lets the FE
+   * validate a code before submitting a create/edit form. Mirrors
+   * DeviceService.existsByName. Code comparison is exact (matches the unique index).
+   */
+  async codeExists(tenantId: string, code: string): Promise<{ exists: boolean; count: number }> {
+    const trimmed = code.trim();
+    if (trimmed.length === 0) {
+      return { exists: false, count: 0 };
+    }
+    const existing = await this.repository.getByCode(tenantId, trimmed);
+    return { exists: Boolean(existing), count: existing ? 1 : 0 };
+  }
+
   async getByExternalId(tenantId: string, externalId: string): Promise<Customer> {
     const customer = await this.repository.getByExternalId(tenantId, externalId);
     if (!customer) {

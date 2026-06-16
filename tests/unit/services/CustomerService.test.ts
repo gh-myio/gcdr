@@ -127,6 +127,27 @@ describe('CustomerService', () => {
     );
   });
 
+  describe('codeExists', () => {
+    it('reports exists:true when a customer already has the code', async () => {
+      mockRepository.getByCode.mockResolvedValue(mockCustomer);
+      const r = await service.codeExists(tenantId, 'TEST-001');
+      expect(mockRepository.getByCode).toHaveBeenCalledWith(tenantId, 'TEST-001');
+      expect(r).toEqual({ exists: true, count: 1 });
+    });
+
+    it('reports exists:false when no customer has the code', async () => {
+      mockRepository.getByCode.mockResolvedValue(null);
+      const r = await service.codeExists(tenantId, 'FREE-CODE');
+      expect(r).toEqual({ exists: false, count: 0 });
+    });
+
+    it('trims and short-circuits on a blank code without hitting the repo', async () => {
+      const r = await service.codeExists(tenantId, '   ');
+      expect(r).toEqual({ exists: false, count: 0 });
+      expect(mockRepository.getByCode).not.toHaveBeenCalled();
+    });
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });

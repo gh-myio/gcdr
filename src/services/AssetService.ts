@@ -70,6 +70,24 @@ export class AssetService {
     return asset;
   }
 
+  /**
+   * Existence check for an asset code (unique per tenant_id, customer_id, code).
+   * Lets the FE validate a code before submitting a create/edit form. Scoped to
+   * one customer, mirroring the unique index. Code comparison is exact.
+   */
+  async codeExists(
+    tenantId: string,
+    customerId: string,
+    code: string,
+  ): Promise<{ exists: boolean; count: number }> {
+    const trimmed = code.trim();
+    if (trimmed.length === 0) {
+      return { exists: false, count: 0 };
+    }
+    const existing = await this.repository.getByCode(tenantId, customerId, trimmed);
+    return { exists: Boolean(existing), count: existing ? 1 : 0 };
+  }
+
   async update(tenantId: string, id: string, data: UpdateAssetDTO, userId: string): Promise<Asset> {
     const existing = await this.getById(tenantId, id);
 
