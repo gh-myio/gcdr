@@ -224,6 +224,11 @@ export class S3Storage {
     }
   }
 
+  /** The configured bucket name. Persisted on rows (e.g. central_backups) as audit metadata. */
+  get bucket(): string {
+    return this.config.bucket;
+  }
+
   /**
    * Generate a short-lived signed URL the client can hit directly to download
    * the object. Default expiry is 5 minutes — enough for a browser to start
