@@ -747,6 +747,35 @@ export const centralBackups = pgTable('central_backups', {
   tenantStatusIdx: index('central_backups_tenant_status_idx').on(table.tenantId, table.status),
 }));
 
+// Central restore jobs (field-swap restore). The CENTRAL runs pg_restore on its
+// own Postgres; gcdr tracks this job state machine, driven by the central's
+// progress reports. See migration 0048_central_restore_jobs.sql.
+export const centralRestoreJobStatusEnum = pgEnum('central_restore_job_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED', 'CANCELED']);
+export const centralRestoreJobPhaseEnum = pgEnum('central_restore_job_phase', ['QUEUED', 'DOWNLOAD', 'VERIFY', 'STOP_SERVICES', 'RESTORE_DB', 'START_SERVICES', 'DONE']);
+
+export const centralRestoreJobs = pgTable('central_restore_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  centralId: uuid('central_id').notNull().references(() => centrals.id),
+  sourceBackupId: uuid('source_backup_id').notNull().references(() => centralBackups.id),
+  status: centralRestoreJobStatusEnum('status').notNull().default('QUEUED'),
+  currentPhase: centralRestoreJobPhaseEnum('current_phase').notNull().default('QUEUED'),
+  dryRun: boolean('dry_run').notNull().default(false),
+  logEntries: jsonb('log_entries')
+    .$type<{ ts: string; phase: string; level: string; message: string }[]>()
+    .notNull()
+    .default([]),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+  version: integer('version').notNull().default(1),
+}, (table) => ({
+  tenantCentralIdx: index('central_restore_jobs_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
+  tenantStatusIdx: index('central_restore_jobs_tenant_status_idx').on(table.tenantId, table.status),
+}));
+
 // =============================================================================
 // GROUPS
 // =============================================================================
