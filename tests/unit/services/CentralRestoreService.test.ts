@@ -1,0 +1,149 @@
+import { CentralRestoreService } from '../../../src/services/CentralRestoreService';
+import { NotFoundError, ValidationError } from '../../../src/shared/errors/AppError';
+
+const SHA = 'a'.repeat(64);
+
+function makeService(
+  opts: { central?: unknown; backup?: unknown; job?: unknown; listResult?: unknown[] } = {},
+) {
+  const jobs = {
+    create: jest.fn(async (i: { id?: string; dryRun?: boolean }) => ({
+      id: i.id ?? 'job-1',
+      status: 'QUEUED',
+      currentPhase: 'QUEUED',
+      dryRun: i.dryRun ?? false,
+      logEntries: [],
+      ...i,
+    })),
+    getById: jest.fn(async () => ('job' in opts ? opts.job : null)),
+    listByCentral: jest.fn(async () => opts.listResult ?? []),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: jest.fn(async (_t: string, id: string, patch: any) => ({ id, ...patch })),
+  };
+  const backups = {
+    getById: jest.fn(async () =>
+      'backup' in opts
+        ? opts.backup
+        : {
+            id: 'bkp-1',
+            status: 'AVAILABLE',
+            storageKey: 'backups/t1/c1/bkp-1.pgdump.custom',
+            sha256: SHA,
+            byteSize: 10,
+          },
+    ),
+  };
+  const storage = { getPresignedDownloadUrl: jest.fn(async () => 'https://s3.test/get?sig=xyz') };
+  const centrals = {
+    getById: jest.fn(async () =>
+      'central' in opts ? opts.central : { id: 'c1', serialNumber: '1.2.3.4' },
+    ),
+  };
+  const svc = new CentralRestoreService(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jobs as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    backups as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    storage as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    centrals as any,
+  );
+  return { svc, jobs, backups, storage, centrals };
+}
+
+describe('CentralRestoreService', () => {
+  describe('startRestore', () => {
+    it('creates a QUEUED job and returns a presigned download URL', async () => {
+      const { svc, jobs, storage } = makeService();
+      const res = await svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' });
+      expect(res.status).toBe('QUEUED');
+      expect(res.currentPhase).toBe('QUEUED');
+      expect(res.downloadUrl).toBe('https://s3.test/get?sig=xyz');
+      expect(res.sha256).toBe(SHA);
+      expect(res.expiresIn).toBe(3600);
+      expect(jobs.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 't1', centralId: 'c1', sourceBackupId: 'bkp-1' }),
+      );
+      expect(storage.getPresignedDownloadUrl).toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError when the central is missing', async () => {
+      const { svc, jobs } = makeService({ central: null });
+      await expect(svc.startRestore('t1', 'x', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
+        NotFoundError,
+      );
+      expect(jobs.create).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError when the backup is missing', async () => {
+      const { svc } = makeService({ backup: null });
+      await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'nope' })).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+
+    it('throws ValidationError when the backup is not AVAILABLE (no job created)', async () => {
+      const { svc, jobs } = makeService({ backup: { id: 'bkp-1', status: 'PENDING' } });
+      await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
+        ValidationError,
+      );
+      expect(jobs.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateProgress', () => {
+    it('appends a log entry and advances the phase', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'DOWNLOAD', logEntries: [] },
+      });
+      await svc.updateProgress('t1', 'c1', 'job-1', {
+        currentPhase: 'RESTORE_DB',
+        message: 'restoring db',
+      });
+      const patch = jobs.update.mock.calls[0][2];
+      expect(patch.currentPhase).toBe('RESTORE_DB');
+      expect(patch.logEntries).toHaveLength(1);
+      expect(patch.completedAt).toBeUndefined();
+    });
+
+    it('stamps completedAt on a terminal status', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'START_SERVICES', logEntries: [] },
+      });
+      await svc.updateProgress('t1', 'c1', 'job-1', { status: 'DONE', message: 'finished' });
+      const patch = jobs.update.mock.calls[0][2];
+      expect(patch.status).toBe('DONE');
+      expect(patch.completedAt).toBeInstanceOf(Date);
+    });
+
+    it('rejects updates to an already-finished job', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'DONE', currentPhase: 'DONE', logEntries: [] },
+      });
+      await expect(
+        svc.updateProgress('t1', 'c1', 'job-1', { message: 'late' }),
+      ).rejects.toThrow(ValidationError);
+      expect(jobs.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError when the job is missing', async () => {
+      const { svc } = makeService({ job: null });
+      await expect(svc.updateProgress('t1', 'c1', 'nope', { message: 'x' })).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+  });
+
+  describe('getJob / listJobs', () => {
+    it('getJob throws NotFoundError when missing', async () => {
+      const { svc } = makeService({ job: null });
+      await expect(svc.getJob('t1', 'c1', 'nope')).rejects.toThrow(NotFoundError);
+    });
+
+    it('listJobs throws NotFoundError when the central is missing', async () => {
+      const { svc } = makeService({ central: null });
+      await expect(svc.listJobs('t1', 'x')).rejects.toThrow(NotFoundError);
+    });
+  });
+});
