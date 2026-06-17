@@ -27,6 +27,8 @@ import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 import { EventType, ActorType } from '../shared/types';
 
+const ERR_CENTRAL_ID_REQUIRED = 'Central ID is required';
+
 const router = Router();
 
 /**
@@ -89,7 +91,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const central = await centralService.getById(tenantId, id);
@@ -109,7 +111,7 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const central = await centralRepository.getById(tenantId, id);
@@ -160,7 +162,7 @@ router.put('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const data = UpdateCentralSchema.parse(req.body);
@@ -189,7 +191,7 @@ router.patch('/:id/status',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const data = UpdateCentralStatusSchema.parse(req.body);
@@ -211,7 +213,7 @@ router.patch('/:id/connection', async (req: Request, res: Response, next: NextFu
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const data = UpdateConnectionStatusSchema.parse(req.body);
@@ -232,7 +234,7 @@ router.post('/:id/heartbeat', async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const stats = req.body.stats || {};
@@ -257,7 +259,7 @@ router.put('/:id/mqtt-passwords/:integrationId',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -298,7 +300,7 @@ router.delete('/:id/mqtt-passwords/:integrationId',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -342,7 +344,7 @@ router.post('/:id/mqtt-passwords/:integrationId/reveal',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -384,7 +386,7 @@ router.delete('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       await centralRepository.delete(tenantId, id);
