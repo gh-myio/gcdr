@@ -54,6 +54,9 @@ export type NewRule = typeof schema.rules.$inferInsert;
 export type Central = typeof schema.centrals.$inferSelect;
 export type NewCentral = typeof schema.centrals.$inferInsert;
 
+export type CentralBackup = typeof schema.centralBackups.$inferSelect;
+export type NewCentralBackup = typeof schema.centralBackups.$inferInsert;
+
 export type Group = typeof schema.groups.$inferSelect;
 export type NewGroup = typeof schema.groups.$inferInsert;
 

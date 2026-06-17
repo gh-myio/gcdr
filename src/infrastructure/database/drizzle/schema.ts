@@ -714,6 +714,39 @@ export const centrals = pgTable('centrals', {
   tenantAssetIdx: index('centrals_tenant_asset_idx').on(table.tenantId, table.assetId),
 }));
 
+// Central backups (field-swap backup/restore). The CENTRAL runs pg_dump on its
+// own embedded Postgres; gcdr only brokers the presigned S3 URL + tracks this
+// metadata. See migration 0047_central_backups.sql.
+export const centralBackupStatusEnum = pgEnum('central_backup_status', ['PENDING', 'AVAILABLE', 'EXPIRED', 'FAILED']);
+
+export const centralBackups = pgTable('central_backups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  centralId: uuid('central_id').notNull().references(() => centrals.id),
+
+  // S3 object (bytes never touch gcdr — central PUTs/GETs via presigned URL)
+  storageKey: text('storage_key').notNull(),
+  bucket: varchar('bucket', { length: 255 }).notNull(),
+  contentType: varchar('content_type', { length: 127 }).notNull().default('application/octet-stream'),
+
+  // Integrity (reported by the central on confirm)
+  sha256: varchar('sha256', { length: 64 }),
+  byteSize: bigint('byte_size', { mode: 'number' }),
+
+  status: centralBackupStatusEnum('status').notNull().default('PENDING'),
+  sourceLabel: varchar('source_label', { length: 32 }),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+  version: integer('version').notNull().default(1),
+}, (table) => ({
+  storageKeyUnique: uniqueIndex('central_backups_storage_key_unique').on(table.storageKey),
+  tenantCentralIdx: index('central_backups_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
+  tenantStatusIdx: index('central_backups_tenant_status_idx').on(table.tenantId, table.status),
+}));
+
 // =============================================================================
 // GROUPS
 // =============================================================================
