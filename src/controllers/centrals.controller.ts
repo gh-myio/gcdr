@@ -13,6 +13,11 @@ import {
   CreateCentralBackupSchema,
   ConfirmCentralBackupSchema,
 } from '../dto/request/CentralBackupDTO';
+import { centralRestoreService } from '../services/CentralRestoreService';
+import {
+  StartRestoreSchema,
+  UpdateRestoreProgressSchema,
+} from '../dto/request/CentralRestoreDTO';
 import { customerIntegrationService } from '../services/CustomerIntegrationService';
 import {
   SetMqttPasswordInputSchema,
@@ -547,5 +552,76 @@ router.get('/:id/backups/:backupId/download-url',
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Restore (field-swap). gcdr creates + tracks the job; the CENTRAL runs the
+// pg_restore on its own Postgres and reports progress back. Phase 2.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /centrals/:id/restore
+ * Start a restore of this central from one of its AVAILABLE backups. Returns
+ * the job + a presigned download URL for the dump.
+ */
+router.post('/:id/restore',
+  logEvent({
+    eventType: EventType.CENTRAL_RESTORE_INITIATED,
+    description: (req) => `Restore started for central ${req.params.id} from backup ${req.body?.sourceBackupId}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const dto = StartRestoreSchema.parse(req.body);
+      const result = await centralRestoreService.startRestore(tenantId, req.params.id, userId, dto);
+      sendCreated(res, result, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/restore
+ * List restore jobs for a central (newest first).
+ */
+router.get('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralRestoreService.listJobs(tenantId, req.params.id);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/restore/:jobId
+ * Restore job status / progress.
+ */
+router.get('/:id/restore/:jobId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralRestoreService.getJob(tenantId, req.params.id, req.params.jobId);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /centrals/:id/restore/:jobId
+ * Progress report from the central as it runs the restore.
+ */
+router.patch('/:id/restore/:jobId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const dto = UpdateRestoreProgressSchema.parse(req.body);
+    const result = await centralRestoreService.updateProgress(tenantId, req.params.id, req.params.jobId, dto);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
