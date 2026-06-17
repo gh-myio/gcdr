@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { centralRepository } from '../repositories/CentralRepository';
 import { centralService } from '../services/CentralService';
+import { centralBackupService } from '../services/CentralBackupService';
 import {
   CreateCentralSchema,
   UpdateCentralSchema,
@@ -8,6 +9,10 @@ import {
   UpdateConnectionStatusSchema,
   ListCentralsDTO,
 } from '../dto/request/CentralDTO';
+import {
+  CreateCentralBackupSchema,
+  ConfirmCentralBackupSchema,
+} from '../dto/request/CentralBackupDTO';
 import { customerIntegrationService } from '../services/CustomerIntegrationService';
 import {
   SetMqttPasswordInputSchema,
@@ -457,5 +462,90 @@ export const serialNextHandler = async (req: Request, res: Response, next: NextF
     next(err);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Backup / Restore (field-swap). The CENTRAL runs pg_dump/pg_restore on its own
+// embedded Postgres; these endpoints only broker presigned S3 URLs + track
+// central_backups. Phase 1: standalone backup + download.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /centrals/:id/backup
+ * Request a backup slot — returns a presigned PUT URL the central uploads to.
+ */
+router.post('/:id/backup',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_INITIATED,
+    description: (req) => `Backup requested for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const dto = CreateCentralBackupSchema.parse(req.body ?? {});
+      const result = await centralBackupService.createBackup(tenantId, req.params.id, userId, dto);
+      sendCreated(res, result, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/backups/:backupId/confirm
+ * Central confirms the upload finished (sha256 + byteSize) → status AVAILABLE.
+ */
+router.post('/:id/backups/:backupId/confirm',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_CONFIRMED,
+    description: (req) => `Backup ${req.params.backupId} confirmed for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const dto = ConfirmCentralBackupSchema.parse(req.body);
+      const result = await centralBackupService.confirmBackup(tenantId, req.params.id, req.params.backupId, dto);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/backups
+ * List backups for a central (newest first).
+ */
+router.get('/:id/backups', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralBackupService.listBackups(tenantId, req.params.id);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/backups/:backupId/download-url
+ * Presigned GET URL for an AVAILABLE backup (analysis or restore/swap).
+ */
+router.get('/:id/backups/:backupId/download-url',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_DOWNLOADED,
+    description: (req) => `Download URL issued for backup ${req.params.backupId} (central ${req.params.id})`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const result = await centralBackupService.getDownloadUrl(tenantId, req.params.id, req.params.backupId);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;
