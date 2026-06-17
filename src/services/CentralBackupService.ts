@@ -10,6 +10,15 @@ import { CreateCentralBackupDTO, ConfirmCentralBackupDTO } from '../dto/request/
 const UPLOAD_URL_TTL_SECONDS = 900; // 15 min
 const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h
 
+// Minimal structural deps so the service is unit-testable (mirrors CentralService's
+// constructor-injection). Defaults wire the real singletons for production use.
+type StorageDep = Pick<typeof s3Storage, 'bucket' | 'getPresignedUploadUrl' | 'getPresignedDownloadUrl'>;
+type BackupRepoDep = Pick<
+  typeof centralBackupRepository,
+  'create' | 'getById' | 'listByCentral' | 'markAvailable'
+>;
+type CentralRepoDep = Pick<typeof centralRepository, 'getById'>;
+
 /**
  * Backup/restore brokerage for centrals. gcdr does NOT run pg_dump/pg_restore:
  * the central runs them on its own embedded Postgres/TimescaleDB. This service
@@ -20,6 +29,12 @@ const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h
  * Phase 2 adds the restore job + identity hand-off (swap).
  */
 export class CentralBackupService {
+  constructor(
+    private readonly storage: StorageDep = s3Storage,
+    private readonly backups: BackupRepoDep = centralBackupRepository,
+    private readonly centrals: CentralRepoDep = centralRepository,
+  ) {}
+
   /**
    * Request a new backup slot: validates the central, mints a storage key +
    * presigned PUT URL, and records a PENDING row. The central uploads the dump
@@ -31,20 +46,20 @@ export class CentralBackupService {
     userId: string | undefined,
     dto: CreateCentralBackupDTO,
   ) {
-    const central = await centralRepository.getById(tenantId, centralId);
+    const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
     const backupId = generateId();
     const storageKey = `backups/${tenantId}/${centralId}/${backupId}.pgdump.custom`;
-    const bucket = s3Storage.bucket;
+    const bucket = this.storage.bucket;
 
-    const uploadUrl = await s3Storage.getPresignedUploadUrl({
+    const uploadUrl = await this.storage.getPresignedUploadUrl({
       key: storageKey,
       contentType: 'application/octet-stream',
       expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
     });
 
-    const row = await centralBackupRepository.create({
+    const row = await this.backups.create({
       id: backupId,
       tenantId,
       centralId,
@@ -76,24 +91,19 @@ export class CentralBackupService {
     backupId: string,
     dto: ConfirmCentralBackupDTO,
   ) {
-    const row = await centralBackupRepository.getById(tenantId, centralId, backupId);
+    const row = await this.backups.getById(tenantId, centralId, backupId);
     if (!row) throw new NotFoundError(`Backup ${backupId} not found for central ${centralId}`);
     if (row.status === 'AVAILABLE') return row;
 
-    const updated = await centralBackupRepository.markAvailable(
-      tenantId,
-      backupId,
-      dto.sha256,
-      dto.byteSize,
-    );
+    const updated = await this.backups.markAvailable(tenantId, backupId, dto.sha256, dto.byteSize);
     if (!updated) throw new NotFoundError(`Backup ${backupId} not found`);
     return updated;
   }
 
   async listBackups(tenantId: string, centralId: string) {
-    const central = await centralRepository.getById(tenantId, centralId);
+    const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
-    return centralBackupRepository.listByCentral(tenantId, centralId);
+    return this.backups.listByCentral(tenantId, centralId);
   }
 
   /**
@@ -101,13 +111,13 @@ export class CentralBackupService {
    * downloading for analysis and by a replacement central restoring (swap).
    */
   async getDownloadUrl(tenantId: string, centralId: string, backupId: string) {
-    const row = await centralBackupRepository.getById(tenantId, centralId, backupId);
+    const row = await this.backups.getById(tenantId, centralId, backupId);
     if (!row) throw new NotFoundError(`Backup ${backupId} not found for central ${centralId}`);
     if (row.status !== 'AVAILABLE') {
       throw new ValidationError(`Backup ${backupId} is not downloadable (status=${row.status})`);
     }
 
-    const downloadUrl = await s3Storage.getPresignedDownloadUrl({
+    const downloadUrl = await this.storage.getPresignedDownloadUrl({
       key: row.storageKey,
       responseContentType: 'application/octet-stream',
       responseContentDisposition: `attachment; filename="central-${centralId}-${backupId}.pgdump.custom"`,
