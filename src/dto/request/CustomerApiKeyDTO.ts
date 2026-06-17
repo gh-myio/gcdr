@@ -5,11 +5,16 @@ import { z } from 'zod';
  */
 export const ApiKeyScopeSchema = z.enum([
   'bundles:read',
+  'customers:read',
+  'customers:write',   // RFC-0016 integration
   'devices:read',
+  'devices:write',     // RFC-0016 / RFC-0023 device-sync
   'rules:read',
   'rules:write',
   'assets:read',
+  'assets:write',      // RFC-0016 integration
   'groups:read',
+  'sync:write',        // RFC-0016 integration mapping fields
   '*:read',
 ]);
 
