@@ -13,6 +13,7 @@ import {
   integer,
   smallint,
   bigint,
+  numeric,
   boolean,
   timestamp,
   jsonb,
@@ -2014,4 +2015,94 @@ export const workOrdersWatchers = pgTable('work_orders_watchers', {
   createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   woEmailUnique: uniqueIndex('work_orders_watchers_unique').on(table.workOrderId, table.email),
+}));
+
+// =============================================================================
+// CONSUMPTION GOALS (RFC-0046)
+// =============================================================================
+// Per-customer targets for ENERGY | WATER | TEMPERATURE, scoped by domain and
+// year, persisted at a single canonical grain — the hour. The parent row holds
+// the optimistic `version`; hours are derived-on-write / aggregated-on-read.
+
+// 1) Parent — one per (tenant, customer, domain, year); carries the version.
+export const consumptionGoals = pgTable('consumption_goals', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  tenantId:   uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+  domain:     text('domain').notNull(),                 // ENERGY | WATER | TEMPERATURE
+  year:       smallint('year').notNull(),
+  unit:       text('unit').notNull(),                    // kWh | m3 | C (from domain config)
+  version:    integer('version').notNull().default(1),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:  uuid('created_by'),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:  uuid('updated_by'),
+}, (table) => ({
+  uq:          uniqueIndex('consumption_goals_uq').on(table.tenantId, table.customerId, table.domain, table.year),
+  customerIdx: index('consumption_goals_customer_idx').on(table.tenantId, table.customerId),
+  domainCheck: check(
+    'consumption_goals_domain_check',
+    sql`${table.domain} IN ('ENERGY','WATER','TEMPERATURE')`
+  ),
+}));
+
+// 2) Canonical hourly grain. One row per (goal, month, day, hour).
+export const consumptionGoalHours = pgTable('consumption_goal_hours', {
+  goalId:      uuid('goal_id').notNull().references(() => consumptionGoals.id, { onDelete: 'cascade' }),
+  month:       smallint('month').notNull(),              // 1..12
+  day:         smallint('day').notNull(),                // 1..31 (valid for the month/year)
+  hour:        smallint('hour').notNull(),               // 0..23
+  value:       numeric('value').notNull(),
+  sourceLevel: text('source_level').notNull(),           // YEAR | MONTH | DAY | HOUR — level the user set
+  derived:     boolean('derived').notNull(),             // true = system-distributed
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:   uuid('updated_by'),
+}, (table) => ({
+  uq: uniqueIndex('consumption_goal_hours_uq').on(table.goalId, table.month, table.day, table.hour),
+  monthRange:  check('consumption_goal_hours_month_check', sql`${table.month} BETWEEN 1 AND 12`),
+  dayRange:    check('consumption_goal_hours_day_check',   sql`${table.day} BETWEEN 1 AND 31`),
+  hourRange:   check('consumption_goal_hours_hour_check',  sql`${table.hour} BETWEEN 0 AND 23`),
+  sourceLevelCheck: check(
+    'consumption_goal_hours_source_level_check',
+    sql`${table.sourceLevel} IN ('YEAR','MONTH','DAY','HOUR')`
+  ),
+}));
+
+// 3) Fixed aggregation config per (tenant, domain). Seeded; operator-immutable.
+export const consumptionGoalDomains = pgTable('consumption_goal_domains', {
+  tenantId:          uuid('tenant_id').notNull(),
+  domain:            text('domain').notNull(),           // ENERGY | WATER | TEMPERATURE
+  aggregationMethod: text('aggregation_method').notNull(), // SUM | AVERAGE
+  unit:              text('unit').notNull(),             // kWh | m3 | C
+}, (table) => ({
+  pk: primaryKey({ columns: [table.tenantId, table.domain] }),
+  aggregationMethodCheck: check(
+    'consumption_goal_domains_agg_method_check',
+    sql`${table.aggregationMethod} IN ('SUM','AVERAGE')`
+  ),
+  domainCheck: check(
+    'consumption_goal_domains_domain_check',
+    sql`${table.domain} IN ('ENERGY','WATER','TEMPERATURE')`
+  ),
+}));
+
+// 4) Append-only history. Records the level the user acted on (DEC-4).
+export const consumptionGoalHistory = pgTable('consumption_goal_history', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  goalId:        uuid('goal_id').notNull(),
+  actor:         uuid('actor'),                          // who changed it
+  actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — what the user touched
+  bucketRef:     text('bucket_ref').notNull(),           // "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
+  oldValue:      numeric('old_value'),                   // at the input level (NULL on create)
+  newValue:      numeric('new_value'),                   // at the input level (NULL on delete)
+  distributed:   boolean('distributed').notNull(),       // true = system spread to hours
+  hoursAffected: integer('hours_affected').notNull(),    // count of hour rows written by this change
+  version:       integer('version').notNull(),           // the version this change produced
+  changedAt:     timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  goalChronoIdx: index('consumption_goal_history_idx').on(table.goalId, table.changedAt.desc()),
+  actionLevelCheck: check(
+    'consumption_goal_history_action_level_check',
+    sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`
+  ),
 }));
