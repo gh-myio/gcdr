@@ -59,10 +59,12 @@ BEGIN
     DO UPDATE SET value = EXCLUDED.value, source_level = 'HOUR', derived = false, updated_at = now();
 
   INSERT INTO consumption_goal_history
-    (goal_id, actor, action_level, bucket_ref, old_value, new_value, distributed, hours_affected, version)
+    (goal_id, actor, source, action_level, bucket_ref, old_value, new_value, bucket_count, details, distributed, hours_affected, version)
   VALUES
-    (v_energy_goal, NULL, 'MONTH', '2026-01', NULL, v_energy_target, true,  v_jan_hours, 1),
-    (v_energy_goal, NULL, 'HOUR', '2026-01-15T08', NULL, 500, false, 1, 1);
+    (v_energy_goal, NULL, 'REPLACE', 'MONTH', '2026-01', NULL, v_energy_target, 1,
+       jsonb_build_array(jsonb_build_object('ref', '2026-01', 'value', v_energy_target)), true,  v_jan_hours, 1),
+    (v_energy_goal, NULL, 'MERGE',   'HOUR', '2026-01-15T08', NULL, 500, 1,
+       jsonb_build_array(jsonb_build_object('ref', '2026-01-15T08', 'value', 500)), false, 1, 1);
 
   -- ---------------------------------------------------------------------------
   -- TEMPERATURE 2026 (AVERAGE) -------------------------------------------------
@@ -82,9 +84,10 @@ BEGIN
   FROM generate_series(1, 31) AS d, generate_series(0, 23) AS h;
 
   INSERT INTO consumption_goal_history
-    (goal_id, actor, action_level, bucket_ref, old_value, new_value, distributed, hours_affected, version)
+    (goal_id, actor, source, action_level, bucket_ref, old_value, new_value, bucket_count, details, distributed, hours_affected, version)
   VALUES
-    (v_temp_goal, NULL, 'MONTH', '2026-01', NULL, v_temp_setpoint, true, v_jan_hours, 1);
+    (v_temp_goal, NULL, 'REPLACE', 'MONTH', '2026-01', NULL, v_temp_setpoint, 1,
+       jsonb_build_array(jsonb_build_object('ref', '2026-01', 'value', v_temp_setpoint)), true, v_jan_hours, 1);
 
   RAISE NOTICE 'RFC-0046 test seed applied: ENERGY goal %, TEMPERATURE goal %', v_energy_goal, v_temp_goal;
 END $$;

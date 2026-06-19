@@ -1,14 +1,14 @@
 # RFC-0046 — Customer Consumption Goals API
 
-**Contract document** shared by the GCDR backend and frontend (`GoalsPanel` / `openGoalsPanel`) teams.
-This is the authoritative wire contract derived from [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md).
-If this document and the RFC disagree, the RFC wins; open a PR to reconcile.
+**Contract document** shared by the GCDR backend and frontend teams.
+This is the authoritative wire contract derived from [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md), **kept in sync with the implementation** (`src/controllers/consumption-goals.controller.ts`, `src/dto/request/GoalsDTO.ts`, `src/services/consumptionGoalService.ts`). If this document and the code disagree, the code wins; open a PR to reconcile.
 
-- **Status:** Design closed (DEC-1…DEC-7). Implementation contract — first backend step.
+- **Status:** **Implemented** (branch `feat/rfc-0046-consumption-goals`, not yet merged/in prod).
 - **Base path:** `/api/v1`
 - **Auth:** hybrid (`hybridAuthByMethod`) — JWT Bearer *or* customer API key (`X-API-Key: gcdr_cust_*`).
 - **Scopes:** reads need `goals:read` (or `*:read`); writes need `goals:write`.
-- **Audit:** every write emits `CUSTOMER_GOALS_UPDATED` `{ customerId, domain, year, version, actionLevel }` (no goal values in the audit row).
+- **Audit:** every change appends a per-goal `consumption_goal_history` row (one per operation — see §1.7). A global `CUSTOMER_GOALS_UPDATED` event is designed but **not yet emitted**.
+- **Last updated:** 2026-06-19
 
 ---
 
@@ -36,7 +36,7 @@ The method is a property of the domain, not an operator choice and not stored on
 - Each generated hour row carries:
   - `sourceLevel` — the level the operator actually set (`YEAR | MONTH | DAY | HOUR`).
   - `derived` — `true` when system-distributed, `false` when the operator set that exact hour.
-- A later coarser edit re-distributes over `derived = true` hours **only** by default. Operator-confirmed (`derived = false`) hours are preserved unless the operator forces a reset. This backs the panel's "suggested vs confirmed" UX.
+- A later coarser edit re-distributes over `derived = true` hours **only** by default. Operator-confirmed (`derived = false`) hours are preserved unless the operator forces a reset. This backs the "suggested vs confirmed" UX.
 
 ### 1.4 Roll-up on read (coarser output ← hour rows)
 Computed on read:
@@ -46,17 +46,35 @@ Computed on read:
 - Every node in the returned tree declares its `method`, so a temperature average is never mistaken for a sum.
 
 ### 1.5 Write semantics — `PUT` (replace) vs `PATCH` (merge) — DEC-5
-- **`PUT` = replace** the whole `(year, domain)`. The payload *is* the year; buckets absent from the payload's scope are **removed**.
-- **`PATCH` = merge** only the sent buckets; everything else is preserved. CSV import uses PATCH/merge semantics and is idempotent per bucket.
+- **`PUT` = replace** the whole `(year, domain)`. The body is a **nested tree** (`{ annual?, monthly{ daily{ hourly }} }`); buckets absent from the payload's scope are **removed**.
+- **`PATCH` = merge** a sparse **`buckets[]`** list — only the named buckets are (re)distributed; everything else is preserved. Re-distribution overwrites `derived:true` hours only.
+- **Import** uses PATCH/merge semantics over a CSV and is **stateless**: post the CSV with `?dryRun=true` to preview, then re-post the *same* CSV with `?dryRun=false` to persist. There is **no `previewToken`**.
 
 ### 1.6 Versioning & optimistic concurrency — DEC-4
 - `version` lives on the parent `(tenant, customer, domain, year)` and **increments on every successful change**.
-- `PUT`/`PATCH`/`DELETE` MAY send the expected `version` (body field or `If-Match`-style). A mismatch → **`409 Conflict`** with the current `version` in the body (`error.currentVersion`).
+- `PUT`/`PATCH`/`DELETE`/import-confirm MAY send `expectedVersion` in the body. A mismatch → **`409 Conflict`** with the current version in the body (`error.currentVersion`, also `error.details.currentVersion`).
 - The front-end treats `409` as **reload-and-reapply**, not reload-and-discard.
 - The hourly upsert, the version bump, and the history append run in **one transaction**.
 
-### 1.7 History
-`?fetchHistory=true` adds a `history` array of **≤100 entries, newest-first**. Each entry records the **level the operator acted on** (not the 8,760 underlying hours): `actionLevel`, `bucketRef`, `oldValue`, `newValue`, `distributed`, `hoursAffected`, `version`, `actor`, `changedAt`.
+### 1.7 History — one row per operation
+`?fetchHistory=true` adds a `history` array of **≤100 entries, newest-first**. History is **one row per operation** (a mutation = a version = one entry), *not* one per bucket. Each entry:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `source` | enum | `IMPORT` \| `REPLACE` \| `MERGE` \| `DELETE` \| `EDIT` — the operation. (`REPLACE`/`MERGE` are operator edits.) |
+| `actionLevel` | enum | `YEAR \| MONTH \| DAY \| HOUR` — the coarsest level the operation touched. |
+| `bucketRef` | string | Representative ref (the single bucket's ref, else the year). |
+| `oldValue` | number\|null | Single-bucket previous value (null on create / multi-bucket op). |
+| `newValue` | number\|null | Single-bucket new value (null on delete / multi-bucket op). |
+| `bucketCount` | number | How many operator buckets the operation carried. |
+| `details` | array | Compact `[{ ref, value }]` sample (server-capped at 50) for the breakdown. |
+| `distributed` | boolean | `true` = system spread to hours. |
+| `hoursAffected` | number | Total hour rows written by the operation. |
+| `version` | number | The version this operation produced. |
+| `actor` | string\|null | User/actor id, or null for system/seed. |
+| `changedAt` | string | ISO-8601 timestamp. |
+
+> A 120-line hourly import becomes **one** `IMPORT` entry with `bucketCount: 120`, not 120 rows — so a single import never floods the ≤100-row window. Deleting a *whole year* cascades away the goal and its history (no entry); only sub-bucket deletes append a `DELETE` row.
 
 ### 1.8 Response & error envelope
 Success and error bodies follow the standard GCDR envelope.
@@ -80,19 +98,20 @@ In examples below the `meta` wrapper is omitted for brevity; only `data` (or `er
 | --- | --- | --- |
 | `id` | uuid | Customer id. Hierarchy access (`SELF`/`SUBTREE`/`TENANT`) is honoured. |
 
-### Query discriminators (write + single-domain read)
+### Query discriminators
 | Param | Type | Required | Description |
 | --- | --- | --- | --- |
 | `domain` | enum | yes | `ENERGY` \| `WATER` \| `TEMPERATURE`. |
-| `year` | smallint | yes | e.g. `2026`. |
+| `year` | smallint | yes | `2000..2100`. |
 | `granularity` | enum | no (read only) | `year` \| `month` \| `day` \| `hour`. Default `month`. |
 | `fetchHistory` | boolean | no (read only) | `true` → adds `history` (≤100, newest-first). Default `false`. |
+| `dryRun` | boolean | no (import only) | `true` (default) previews; `false` persists. |
 
 ### Validation rules (`400 VALIDATION_ERROR`)
-- `domain` must be one of the three; `unit` (if echoed in a body) must match the domain.
-- `year` plausible; `month` `1..12`; `day` valid for the month/year (**leap-year aware**); `hour` `0..23`.
+- `domain` must be one of the three; `year` `2000..2100`; `month` `1..12`; `day` valid for the month/year (**leap-year aware**); `hour` `0..23`.
 - `value` `.finite()`. SUM domains require `value >= 0`; TEMPERATURE may be negative.
-- `granularity` ∈ the four levels; `granularity=hour` is fully supported on read and write.
+- Bucket `ref` must match its `level` (`YEAR` `2026`, `MONTH` `2026-03`, `DAY` `2026-03-15`, `HOUR` `2026-03-15T08`); a merge bucket's ref-year must equal the query `year`.
+- PUT body must define at least an `annual` value or one month; PATCH `buckets[]` must be non-empty (≤ 8760).
 
 ---
 
@@ -104,7 +123,7 @@ In examples below the `meta` wrapper is omitted for brevity; only `data` (or `er
 | 3.2 | Get goals (derived tree) | `GET` | `/customers/:id/goals?domain=&year=&granularity=&fetchHistory=` | `goals:read` |
 | 3.3 | Replace a year+domain | `PUT` | `/customers/:id/goals?domain=&year=` | `goals:write` |
 | 3.4 | Merge buckets | `PATCH` | `/customers/:id/goals?domain=&year=` | `goals:write` |
-| 3.5 | Import CSV (dry-run/confirm) | `POST` | `/customers/:id/goals/import?domain=&year=` | `goals:write` |
+| 3.5 | Import CSV (dry-run/persist) | `POST` | `/customers/:id/goals/import?domain=&year=&dryRun=` | `goals:write` |
 | 3.6 | Delete a year (or sub-bucket) | `DELETE` | `/customers/:id/goals?domain=&year=` | `goals:write` |
 
 ---
@@ -115,13 +134,6 @@ In examples below the `meta` wrapper is omitted for brevity; only `data` (or `er
 GET /api/v1/customers/:id/goals
 ```
 **Auth:** `goals:read`. **Query:** none. Returns a summary per domain that has any goals (years present, current version, unit). A customer with no goals returns an empty `domains` array.
-
-**Request**
-```bash
-curl -X GET "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals" \
-  -H "Authorization: Bearer {TOKEN}" \
-  -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111"
-```
 
 **200 OK**
 ```json
@@ -152,7 +164,7 @@ GET /api/v1/customers/:id/goals?domain=ENERGY&year=2026&granularity=month
 ```
 **Auth:** `goals:read`.
 **Query:** `domain` (req), `year` (req), `granularity` (`year|month|day|hour`, default `month`), `fetchHistory` (default `false`).
-The `tree` is derived from hours at the requested granularity. Each node declares its `method`. A `(domain, year)` with no goals returns `version: 0` and an empty `tree`.
+The `tree` is derived from hours at the requested granularity (cumulative: `day` also returns `monthly`+`annual`). Each node declares its `method`. A `(domain, year)` with no goals returns `version: 0` and an empty `tree` (`{}`).
 
 **Request**
 ```bash
@@ -164,89 +176,42 @@ curl -X GET "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-3333
 
 `?granularity=year` — single annual node:
 ```json
-{
-  "customerId": "33333333-3333-3333-3333-333333333333",
-  "domain": "ENERGY", "unit": "kWh", "aggregationMethod": "SUM",
+{ "domain": "ENERGY", "unit": "kWh", "aggregationMethod": "SUM",
   "year": 2026, "version": 7,
-  "tree": { "annual": { "value": 1200000, "method": "SUM" } }
-}
+  "tree": { "annual": { "value": 1200000, "method": "SUM" } } }
 ```
 
-`?granularity=month` (default) — annual + 12 monthly nodes:
+`?granularity=month` (default) — annual + monthly nodes keyed `"01".."12"`:
 ```json
-{
-  "customerId": "33333333-3333-3333-3333-333333333333",
-  "domain": "ENERGY", "unit": "kWh", "aggregationMethod": "SUM",
-  "year": 2026, "version": 7,
+{ "year": 2026, "version": 7,
   "tree": {
     "annual": { "value": 1200000, "method": "SUM" },
     "monthly": {
       "01": { "value": 100000, "method": "SUM", "sourceLevel": "MONTH", "derived": false },
-      "02": { "value": 100000, "method": "SUM", "sourceLevel": "YEAR",  "derived": true  },
-      "03": { "value": 100000, "method": "SUM", "sourceLevel": "MONTH", "derived": false }
-    }
-  }
-}
+      "02": { "value": 100000, "method": "SUM", "sourceLevel": "YEAR",  "derived": true  }
+    } } }
 ```
-> `sourceLevel`/`derived` on an aggregated node reflect the **finest level the user set** within it: `derived:true` means every contributing hour was system-distributed; if any hour in the node was operator-confirmed (`derived:false`) the node reports `derived:false`.
+> `sourceLevel`/`derived` on an aggregated node reflect the **finest level the user set** within it: `derived:true` means every contributing hour was system-distributed; if any hour was operator-confirmed (`derived:false`) the node reports `derived:false`.
 
-`?granularity=day` — annual + monthly + daily nodes keyed `MM-DD`:
-```json
-{
-  "tree": {
-    "annual":  { "value": 1200000, "method": "SUM" },
-    "monthly": { "03": { "value": 100000, "method": "SUM", "sourceLevel": "MONTH", "derived": false } },
-    "daily": {
-      "03-15": { "value": 3500.0, "method": "SUM", "sourceLevel": "DAY",   "derived": false },
-      "03-16": { "value": 3225.8, "method": "SUM", "sourceLevel": "MONTH", "derived": true  }
-    }
-  }
-}
-```
-
-`?granularity=hour` — full hourly tree, keyed `MM-DDThh` (24 hour leaves per day):
-```json
-{
-  "tree": {
-    "annual":  { "value": 1200000, "method": "SUM" },
-    "monthly": { "03": { "value": 100000, "method": "SUM" } },
-    "daily":   { "03-15": { "value": 3500.0, "method": "SUM" } },
-    "hourly": {
-      "03-15T00": { "value": 145.83, "method": "SUM", "sourceLevel": "DAY", "derived": true },
-      "03-15T01": { "value": 145.83, "method": "SUM", "sourceLevel": "DAY", "derived": true }
-    }
-  }
-}
-```
-
-#### TEMPERATURE example (`AVERAGE`, weighted, negative allowed)
-```json
-{
-  "domain": "TEMPERATURE", "unit": "C", "aggregationMethod": "AVERAGE",
-  "year": 2026, "version": 3,
-  "tree": {
-    "annual": { "value": 23.0, "method": "AVERAGE" },
-    "monthly": {
-      "01": { "value": 23.0, "method": "AVERAGE", "sourceLevel": "YEAR", "derived": true },
-      "07": { "value": 25.0, "method": "AVERAGE", "sourceLevel": "MONTH", "derived": false }
-    }
-  }
-}
-```
+`?granularity=day` — + daily nodes keyed `MM-DD`; `?granularity=hour` — + hourly nodes keyed `MM-DDThh` (24 leaves/day).
 
 #### With `fetchHistory=true`
-Adds `history` (≤100, newest-first) alongside `tree`:
+Adds `history` (≤100, newest-first, **one row per operation** — see §1.7):
 ```json
 {
   "version": 7,
   "tree": { "annual": { "value": 1200000, "method": "SUM" } },
   "history": [
-    { "actionLevel": "DAY",   "bucketRef": "2026-03-15", "oldValue": 3225.8, "newValue": 3500.0,
-      "distributed": true, "hoursAffected": 24,  "version": 7,
-      "actor": "9a…", "changedAt": "2026-06-18T14:22:10.000Z" },
-    { "actionLevel": "MONTH", "bucketRef": "2026-03",    "oldValue": null,   "newValue": 100000,
-      "distributed": true, "hoursAffected": 744, "version": 6,
-      "actor": "9a…", "changedAt": "2026-06-18T14:00:00.000Z" }
+    { "source": "MERGE", "actionLevel": "DAY", "bucketRef": "2026-03-15",
+      "oldValue": null, "newValue": 3500.0, "bucketCount": 1,
+      "details": [ { "ref": "2026-03-15", "value": 3500.0 } ],
+      "distributed": true, "hoursAffected": 24, "version": 7,
+      "actor": "9a…", "changedAt": "2026-06-19T14:22:10.000Z" },
+    { "source": "IMPORT", "actionLevel": "HOUR", "bucketRef": "2026",
+      "oldValue": null, "newValue": null, "bucketCount": 120,
+      "details": [ { "ref": "2026-01-15T08", "value": 500 }, "…up to 50…" ],
+      "distributed": true, "hoursAffected": 120, "version": 6,
+      "actor": "9a…", "changedAt": "2026-06-19T14:00:00.000Z" }
   ]
 }
 ```
@@ -260,37 +225,50 @@ Adds `history` (≤100, newest-first) alongside `tree`:
 ```
 PUT /api/v1/customers/:id/goals?domain=ENERGY&year=2026
 ```
-**Auth:** `goals:write`. **Semantics:** REPLACE — the payload is the whole year for that domain; buckets absent from the payload's scope are **removed**. System distributes each leaf down to hours.
+**Auth:** `goals:write`. **Semantics:** REPLACE — the body is the whole year for that domain; buckets absent from the payload's scope are **removed**. The system distributes each leaf down to hours.
 
-**Body**
+**Body — a nested tree** (mirrors the read tree). At least `annual` or one `monthly` entry is required.
+
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `expectedVersion` | integer | no | Optimistic guard. Omit to force-write. `0` = "I expect no existing goal". |
-| `granularity` | enum | yes | The level the values are expressed at (`year`/`month`/`day`/`hour`). |
-| `values` | object | yes | Keyed by bucket at the chosen granularity (`"2026"`, `"03"`, `"03-15"`, `"03-15T08"`). |
+| `annual` | `{ value, sourceLevel? }` | no | Whole-year leaf. |
+| `monthly` | object | no | Keyed `"01".."12"`; each value is a **month node**. |
+| `expectedVersion` | integer (>0) | no | Optimistic guard. Omit on first write. |
 
-**Request — set a YEAR total**
+A **month node** is `{ value, sourceLevel?, daily? }`; a **day node** is `{ value, sourceLevel?, hourly? }`; an **hour node** is `{ value, sourceLevel? }`. Day keys `"01".."31"` (validated against the month/year), hour keys `"00".."23"`. `sourceLevel` is optional — inferred from depth when omitted.
+
+**Request — set 12 monthly totals**
 ```bash
 curl -X PUT "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals?domain=ENERGY&year=2026" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
   -d '{
     "expectedVersion": 6,
-    "granularity": "month",
-    "values": {
-      "01": 100000, "02": 100000, "03": 100000, "04": 100000,
-      "05": 100000, "06": 100000, "07": 100000, "08": 100000,
-      "09": 100000, "10": 100000, "11": 100000, "12": 100000
+    "monthly": {
+      "01": { "value": 100000 }, "02": { "value": 100000 }, "03": { "value": 100000 },
+      "04": { "value": 100000 }, "05": { "value": 100000 }, "06": { "value": 100000 },
+      "07": { "value": 100000 }, "08": { "value": 100000 }, "09": { "value": 100000 },
+      "10": { "value": 100000 }, "11": { "value": 100000 }, "12": { "value": 100000 }
     }
   }'
 ```
 
-**200 OK** — returns the resulting derived tree at the request granularity plus the new `version`:
+**Request — a month with a confirmed hour inside it (deep nesting)**
+```jsonc
+{
+  "monthly": {
+    "03": { "value": 100000, "daily": {
+      "15": { "value": 3500, "hourly": { "08": { "value": 500 } } }
+    } }
+  }
+}
+```
+
+**200 OK** — the derived tree at the action granularity + the new `version` + `distribution`:
 ```json
 {
   "success": true,
   "data": {
-    "customerId": "33333333-3333-3333-3333-333333333333",
     "domain": "ENERGY", "unit": "kWh", "aggregationMethod": "SUM",
     "year": 2026, "version": 7,
     "tree": {
@@ -302,7 +280,7 @@ curl -X PUT "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-3333
 }
 ```
 
-**Errors:** `400`, `401`/`403`, `404`, `409` (version conflict — §4), `422` (semantically valid JSON but un-persistable, e.g. monthly buckets do not cover/exceed the replaced year scope, or mixed-granularity conflict that cannot be resolved).
+**Errors:** `400` (validation — bad domain/value/calendar, or body defines neither annual nor a month), `401`/`403`, `404`, `409` (version conflict — §4.4).
 
 ---
 
@@ -311,19 +289,27 @@ curl -X PUT "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-3333
 ```
 PATCH /api/v1/customers/:id/goals?domain=ENERGY&year=2026
 ```
-**Auth:** `goals:write`. **Semantics:** MERGE — only the sent buckets are (re)distributed; all other buckets are preserved. Re-distribution overwrites `derived:true` hours only (operator-confirmed hours preserved).
+**Auth:** `goals:write`. **Semantics:** MERGE — only the listed buckets are (re)distributed; all other buckets are preserved. Re-distribution overwrites `derived:true` hours only.
 
-**Body** — same shape as PUT, but `values` contains only the buckets to change. Buckets may mix granularity in one call (`granularity` then declares the *finest* level present; each key's depth determines its own level).
+**Body**
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `buckets` | array | yes | 1..8760 entries of `{ level, ref, value }`. |
+| `expectedVersion` | integer (>0) | no | Optimistic guard. |
 
-**Request — edit one DAY**
+Each bucket: `level` ∈ `YEAR\|MONTH\|DAY\|HOUR`; `ref` year-aware and matching the level (`"2026"`, `"2026-03"`, `"2026-03-15"`, `"2026-03-15T08"`); `value` finite (sign per domain). Buckets may **mix levels** in one call; the ref-year must equal the query `year`.
+
+**Request — edit one DAY + one HOUR**
 ```bash
 curl -X PATCH "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals?domain=ENERGY&year=2026" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
   -d '{
     "expectedVersion": 6,
-    "granularity": "day",
-    "values": { "03-15": 3500.0 }
+    "buckets": [
+      { "level": "DAY",  "ref": "2026-03-15",    "value": 3500.0 },
+      { "level": "HOUR", "ref": "2026-03-15T08", "value": 500 }
+    ]
   }'
 ```
 
@@ -332,7 +318,6 @@ curl -X PATCH "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-33
 {
   "success": true,
   "data": {
-    "customerId": "33333333-3333-3333-3333-333333333333",
     "domain": "ENERGY", "unit": "kWh", "aggregationMethod": "SUM",
     "year": 2026, "version": 7,
     "tree": {
@@ -345,82 +330,78 @@ curl -X PATCH "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-33
 }
 ```
 
-**Errors:** `400`, `401`/`403`, `404`, `409` (§4), `422`.
+**Errors:** `400`, `401`/`403`, `404`, `409` (§4.4).
 
 ---
 
-### 3.5 Import CSV (dry-run / confirm)
+### 3.5 Import CSV (stateless dry-run / persist)
 
 ```
-POST /api/v1/customers/:id/goals/import?domain=ENERGY&year=2026
+POST /api/v1/customers/:id/goals/import?domain=ENERGY&year=2026&dryRun=true
 ```
-**Auth:** `goals:write`. **Semantics:** merge by bucket (PATCH), idempotent per bucket. **Always dry-run first** — nothing is saved until an explicit confirm. Finest-granularity wins on conflicting lines; partial import is explicit (valid lines import, invalid lines are listed with a downloadable error report).
+**Auth:** `goals:write`. **Semantics:** merge by bucket (PATCH), idempotent per bucket. **Stateless** — there is no `previewToken`/`mode`. To apply a previewed import, **re-post the identical body** with `dryRun=false`.
+
+**Query:** `domain`, `year`, `dryRun` (default `true`).
 
 **Body**
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `mode` | enum | yes | `dryRun` (preview, nothing saved) or `confirm` (persist). |
-| `csv` | string | yes (`dryRun`) | Raw CSV text. Header: `bucket,value` where `bucket` ∈ `2026` / `2026-03` / `2026-03-15` / `2026-03-15T08`. |
-| `token` | string | yes (`confirm`) | The `previewToken` returned by a prior `dryRun`, binding confirm to a previewed result. |
-| `expectedVersion` | integer | no (`confirm`) | Optimistic guard for the persist step. |
+| `csv` | string | yes | Raw CSV text. Header `bucket,value`; one line per bucket. `bucket` ∈ `2026` / `2026-03` / `2026-03-15` / `2026-03-15T08`. Separator `,` (pipe `\|` also accepted). Finest granularity wins on conflicts. |
+| `expectedVersion` | integer (>0) | no | Optimistic guard (applied on `dryRun=false`). |
 
-**Request — dry run**
+**Request — dry run (preview, nothing saved)**
 ```bash
-curl -X POST "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals/import?domain=ENERGY&year=2026" \
+curl -X POST "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals/import?domain=ENERGY&year=2026&dryRun=true" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
-  -d '{
-    "mode": "dryRun",
-    "csv": "bucket,value\n2026-01,100000\n2026-02,100000\n2026-03-15,3500\n2026-13,999\n"
-  }'
+  -d '{ "csv": "bucket,value\n2026-01,100000\n2026-02,100000\n2026-03-15,3500\n2026-13,999\n" }'
 ```
 
-**200 OK — dry-run preview** (nothing persisted)
+**200 OK — dry-run preview**
 ```json
 {
   "success": true,
   "data": {
-    "mode": "dryRun",
-    "previewToken": "imp_5f2c…",
-    "summary": { "linesTotal": 4, "ok": 3, "problems": 1,
-      "willApply": { "monthly": 2, "daily": 1, "hourly": 0 } },
-    "diagnostics": [
-      { "line": 4, "bucket": "2026-13", "value": 999,
-        "severity": "error", "code": "INVALID_MONTH",
-        "message": "month must be 1..12" }
-    ],
-    "ghostTree": {
+    "dryRun": true,
+    "preview": {
       "annual": { "value": 203500, "method": "SUM" },
       "monthly": { "01": { "value": 100000, "method": "SUM" }, "02": { "value": 100000, "method": "SUM" } },
       "daily": { "03-15": { "value": 3500, "method": "SUM" } }
     },
-    "errorReportUrl": "/api/v1/customers/33333333-…/goals/import/imp_5f2c…/errors.csv"
+    "diagnostics": [
+      { "line": 4, "bucket": "2026-13", "value": 999, "reason": "month must be 1..12" }
+    ],
+    "okCount": 3,
+    "errorCount": 1
   }
 }
 ```
 
-**Request — confirm**
+**Request — persist (re-post the same csv)**
 ```bash
-curl -X POST "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals/import?domain=ENERGY&year=2026" \
+curl -X POST "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals/import?domain=ENERGY&year=2026&dryRun=false" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
-  -d '{ "mode": "confirm", "token": "imp_5f2c…", "expectedVersion": 7 }'
+  -d '{ "csv": "bucket,value\n2026-01,100000\n2026-02,100000\n2026-03-15,3500\n2026-13,999\n", "expectedVersion": 7 }'
 ```
 
-**200 OK — confirmed**
+**200 OK — persisted** (adds `version` + a per-bucket `log`; one `IMPORT` history row is appended)
 ```json
 {
   "success": true,
   "data": {
-    "mode": "confirm",
-    "applied": { "monthly": 2, "daily": 1, "hourly": 0, "linesIgnored": 1 },
-    "year": 2026, "version": 8,
-    "logUrl": "/api/v1/customers/33333333-…/goals/import/imp_5f2c…/log.csv"
+    "dryRun": false,
+    "preview": { "annual": { "value": 203500, "method": "SUM" } },
+    "diagnostics": [ { "line": 4, "bucket": "2026-13", "value": 999, "reason": "month must be 1..12" } ],
+    "okCount": 3,
+    "errorCount": 1,
+    "version": 8,
+    "log": [ "applied MONTH 2026-01 = 100000", "applied MONTH 2026-02 = 100000", "applied DAY 2026-03-15 = 3500" ]
   }
 }
 ```
 
-**Errors:** `400` (malformed body/CSV header), `401`/`403`, `404`, `409` (version conflict on confirm — §4), `422` (e.g. all lines invalid, or `confirm` with an expired/unknown `token`).
+**Errors:** `400` (malformed body / empty CSV / **every line invalid** — "Import has no valid lines to apply"), `401`/`403`, `404`, `409` (version conflict on persist — §4.4). Partial import is explicit: valid lines apply, invalid lines are returned in `diagnostics`.
 
 ---
 
@@ -429,18 +410,20 @@ curl -X POST "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333
 ```
 DELETE /api/v1/customers/:id/goals?domain=ENERGY&year=2026
 ```
-**Auth:** `goals:write`. Removes the year for the domain. Optionally narrow the deletion to a sub-bucket. Logged + versioned (history entry with `newValue: null`).
+**Auth:** `goals:write`. Removes the year for the domain, or narrows to a sub-bucket. A sub-bucket delete is logged + versioned (a `DELETE` history row with `newValue: null`); a **whole-year** delete cascades the parent and all hours **and its history** (no history row remains).
 
-**Query (in addition to `domain`, `year`)**
-| Param | Type | Required | Description |
+**Body** (optional)
+| Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `bucket` | string | no | Narrow to a bucket: `03` (month) / `03-15` (day) / `03-15T08` (hour). Omit = delete the whole year. |
-| `expectedVersion` | integer | no | Optimistic guard. |
+| `bucket` | `{ level, ref }` | no | Narrow to a bucket: `{ "level": "MONTH", "ref": "2026-03" }` (or DAY/HOUR/YEAR). Omit = delete the whole year. |
+| `expectedVersion` | integer (>0) | no | Optimistic guard. |
 
-**Request**
+**Request — delete one month**
 ```bash
-curl -X DELETE "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals?domain=ENERGY&year=2026&bucket=03" \
-  -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026"
+curl -X DELETE "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-333333333333/goals?domain=ENERGY&year=2026" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
+  -d '{ "bucket": { "level": "MONTH", "ref": "2026-03" }, "expectedVersion": 8 }'
 ```
 
 **200 OK**
@@ -450,14 +433,15 @@ curl -X DELETE "http://localhost:3015/api/v1/customers/33333333-3333-3333-3333-3
   "data": {
     "customerId": "33333333-3333-3333-3333-333333333333",
     "domain": "ENERGY", "year": 2026,
-    "deleted": { "bucket": "03", "hoursRemoved": 744, "actionLevel": "MONTH" },
+    "deleted": { "bucket": "2026-03", "hoursRemoved": 744, "actionLevel": "MONTH" },
     "version": 9
   }
 }
 ```
-Deleting the **whole year** (no `bucket`) removes the parent row and all its hours; subsequent `GET` for that `(domain, year)` returns `version: 0` and an empty `tree`. Such a full delete MAY return `204 No Content` (no body) when the client sends no `expectedVersion`; with a guard it returns `200` and the body above.
 
-**Errors:** `400`, `401`/`403`, `404` (customer or `(domain, year)` not found), `409` (§4).
+Deleting the **whole year** (no `bucket`) removes the parent row and all its hours; a subsequent `GET` returns `version: 0` and an empty `tree`. A full-year delete with **no `expectedVersion`** returns **`204 No Content`** (no body); with a guard it returns `200` and `deleted.bucket: null, version: 0`.
+
+**Errors:** `400`, `401`/`403`, `404` (customer or `(domain, year)` not found), `409` (§4.4).
 
 ---
 
@@ -474,32 +458,24 @@ All errors use the standard envelope: `{ success: false, error: { message, code,
     "code": "VALIDATION_ERROR",
     "details": {
       "domain": ["Invalid enum value. Expected 'ENERGY' | 'WATER' | 'TEMPERATURE'"],
-      "values.03": ["value must be a finite number >= 0 for SUM domains"],
-      "values.02-30": ["day 30 is not valid for month 02 of year 2026"]
+      "monthly.03.value": ["value must be a finite number >= 0 for energy/water domains"],
+      "monthly.02.daily.30": ["day 30 is invalid for 2026-02 (max 28)"]
     }
   },
-  "meta": { "requestId": "…", "timestamp": "2026-06-18T14:22:10.000Z" }
+  "meta": { "requestId": "…", "timestamp": "2026-06-19T14:22:10.000Z" }
 }
 ```
+Semantic failures that other APIs might return as `422` (e.g. a PUT body with neither annual nor a month, an import where every line is invalid) surface here as `400 VALIDATION_ERROR` in this implementation.
 
 ### 4.2 `401 / 403` — auth & scope
 - `401 UNAUTHORIZED` — missing/invalid JWT or API key.
-- `403 FORBIDDEN` — authenticated but lacks the scope (`goals:read` for reads, `goals:write` for writes) or hierarchy access to the customer.
-```json
-{
-  "success": false,
-  "error": { "message": "Missing required scope: goals:write", "code": "FORBIDDEN", "details": { "requiredScope": "goals:write" } },
-  "meta": { "requestId": "…", "timestamp": "…" }
-}
-```
+- `403 FORBIDDEN` — authenticated but lacks the scope (`goals:read`/`goals:write`) or hierarchy access to the customer.
 
 ### 4.3 `404 Not Found` (`NOT_FOUND`)
 ```json
-{
-  "success": false,
+{ "success": false,
   "error": { "message": "Customer not found", "code": "NOT_FOUND", "details": { "customerId": "33333333-…" } },
-  "meta": { "requestId": "…", "timestamp": "…" }
-}
+  "meta": { "requestId": "…", "timestamp": "…" } }
 ```
 
 ### 4.4 `409 Conflict` — optimistic version mismatch (`VERSION_CONFLICT`)
@@ -517,106 +493,44 @@ Returned when `expectedVersion` does not match the stored `version`. **`currentV
 }
 ```
 
-### 4.5 `422 Unprocessable Entity` (`UNPROCESSABLE_ENTITY`)
-Syntactically valid request that cannot be applied as a goal:
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Import confirm token expired or unknown",
-    "code": "UNPROCESSABLE_ENTITY",
-    "details": { "token": "imp_5f2c…", "reason": "EXPIRED" }
-  },
-  "meta": { "requestId": "…", "timestamp": "…" }
-}
-```
-Other `422` cases: every CSV line invalid; a PUT whose buckets cannot tile the replaced year scope; unresolvable mixed-granularity conflict.
-
 ---
 
 ## 5. Worked example, end-to-end
 
-A concrete trace of the author's case: an operator sets a MONTH energy value, the system distributes it to that month's hours, then edits one DAY producing a history entry.
+An operator sets a MONTH energy value, the system distributes it to that month's hours, then edits one DAY — producing two `consumption_goal_history` operation rows.
 
 **Start:** customer `33333333-…` has no ENERGY 2026 goal. `GET …?domain=ENERGY&year=2026` → `version: 0`, empty `tree`.
 
-### Step 1 — operator sets MONTH (March) = 100,000 kWh
+### Step 1 — operator sets MONTH (March) = 100,000 kWh (PATCH)
 ```bash
-curl -X PATCH ".../customers/33333333-…/goals?domain=ENERGY&year=2026" \
-  -H "X-API-Key: gcdr_cust_test_bundle_key_myio2026" \
-  -H "Content-Type: application/json" \
-  -d '{ "granularity": "month", "values": { "03": 100000 } }'
+curl -X PATCH ".../goals?domain=ENERGY&year=2026" -H "X-API-Key: …" -H "Content-Type: application/json" \
+  -d '{ "buckets": [ { "level": "MONTH", "ref": "2026-03", "value": 100000 } ] }'
 ```
-- March 2026 has 31 days → **744 hours**. SUM domain → even split: `100000 / 744 = 134.4086… kWh/hour`.
-- 744 hour rows written with `sourceLevel: "MONTH", derived: true`.
-- `version` 0 → **1**. History row appended:
-  `{ actionLevel: "MONTH", bucketRef: "2026-03", oldValue: null, newValue: 100000, distributed: true, hoursAffected: 744, version: 1 }`.
-
-**Response `200`:**
-```json
-{ "year": 2026, "version": 1,
-  "tree": { "annual": { "value": 100000, "method": "SUM" },
-            "monthly": { "03": { "value": 100000, "method": "SUM", "sourceLevel": "MONTH", "derived": true } } },
-  "distribution": { "hoursWritten": 744, "actionLevel": "MONTH" } }
-```
+- March 2026 has 31 days → **744 hours**. SUM → even split: `100000 / 744 = 134.4086… kWh/hour`.
+- 744 hour rows written `sourceLevel: "MONTH", derived: true`.
+- `version` 0 → **1**. History row: `{ source: "MERGE", actionLevel: "MONTH", bucketRef: "2026-03", newValue: 100000, bucketCount: 1, hoursAffected: 744, version: 1 }`.
 
 ### Step 2 — GET month shows it (roll-up on read)
-```bash
-curl ".../customers/33333333-…/goals?domain=ENERGY&year=2026&granularity=month" -H "X-API-Key: …"
-```
-```json
-{ "year": 2026, "version": 1,
-  "tree": { "annual": { "value": 100000, "method": "SUM" },
-            "monthly": { "03": { "value": 100000, "method": "SUM", "sourceLevel": "MONTH", "derived": true } } } }
-```
-> `SUM(744 hours × 134.4086…) = 100000` — the roll-up reproduces the entered month total.
+`SUM(744 × 134.4086…) = 100000` — the roll-up reproduces the entered month total.
 
-### Step 3 — operator edits one DAY (2026-03-15) = 3,500 kWh
+### Step 3 — operator edits one DAY (2026-03-15) = 3,500 kWh (PATCH)
 ```bash
-curl -X PATCH ".../customers/33333333-…/goals?domain=ENERGY&year=2026" \
-  -H "X-API-Key: …" -H "Content-Type: application/json" \
-  -d '{ "expectedVersion": 1, "granularity": "day", "values": { "03-15": 3500 } }'
+curl -X PATCH ".../goals?domain=ENERGY&year=2026" -H "X-API-Key: …" -H "Content-Type: application/json" \
+  -d '{ "expectedVersion": 1, "buckets": [ { "level": "DAY", "ref": "2026-03-15", "value": 3500 } ] }'
 ```
-- 2026-03-15 has **24 hours**. SUM domain → `3500 / 24 = 145.8333… kWh/hour`.
-- 24 hour rows for `03-15` rewritten with `sourceLevel: "DAY", derived: false` (operator-set the day; its hours are now confirmed, no longer "suggested").
+- 2026-03-15 has **24 hours** → `3500 / 24 = 145.8333… kWh/hour`, written `sourceLevel: "DAY", derived: false` (operator-confirmed).
 - The other 720 March hours (`derived: true`) are untouched.
-- `version` 1 → **2**. History row appended — the author's exact case:
-```json
-{ "actionLevel": "DAY", "bucketRef": "2026-03-15",
-  "oldValue": 3225.806, "newValue": 3500.0,
-  "distributed": true, "hoursAffected": 24, "version": 2 }
-```
-(`oldValue ≈ 3225.806` = the previous day roll-up: `24 × 134.4086…`.)
+- `version` 1 → **2**. History row: `{ source: "MERGE", actionLevel: "DAY", bucketRef: "2026-03-15", newValue: 3500, bucketCount: 1, hoursAffected: 24, version: 2 }`.
 
-**New March total** = `720 × 134.4086… + 3500 = 96774.19… + 3500 = 100274.19… kWh`.
-
-### Step 4 — GET day confirms the edit
+### Step 4 — history (newest first)
 ```bash
-curl ".../customers/33333333-…/goals?domain=ENERGY&year=2026&granularity=day" -H "X-API-Key: …"
-```
-```json
-{ "year": 2026, "version": 2,
-  "tree": {
-    "annual":  { "value": 100274.19, "method": "SUM" },
-    "monthly": { "03": { "value": 100274.19, "method": "SUM", "sourceLevel": "DAY", "derived": false } },
-    "daily": {
-      "03-15": { "value": 3500.0,    "method": "SUM", "sourceLevel": "DAY",   "derived": false },
-      "03-14": { "value": 3225.806,  "method": "SUM", "sourceLevel": "MONTH", "derived": true  }
-    }
-  } }
-```
-
-### Step 5 — history (newest first)
-```bash
-curl ".../customers/33333333-…/goals?domain=ENERGY&year=2026&granularity=month&fetchHistory=true" -H "X-API-Key: …"
+curl ".../goals?domain=ENERGY&year=2026&granularity=month&fetchHistory=true" -H "X-API-Key: …"
 ```
 ```json
 { "version": 2,
   "history": [
-    { "actionLevel": "DAY",   "bucketRef": "2026-03-15", "oldValue": 3225.806, "newValue": 3500.0,
-      "distributed": true, "hoursAffected": 24,  "version": 2 },
-    { "actionLevel": "MONTH", "bucketRef": "2026-03",    "oldValue": null,     "newValue": 100000,
-      "distributed": true, "hoursAffected": 744, "version": 1 }
+    { "source": "MERGE", "actionLevel": "DAY",   "bucketRef": "2026-03-15", "newValue": 3500,   "bucketCount": 1, "details": [{ "ref": "2026-03-15", "value": 3500 }],   "distributed": true, "hoursAffected": 24,  "version": 2 },
+    { "source": "MERGE", "actionLevel": "MONTH", "bucketRef": "2026-03",    "newValue": 100000, "bucketCount": 1, "details": [{ "ref": "2026-03",    "value": 100000 }], "distributed": true, "hoursAffected": 744, "version": 1 }
   ] }
 ```
 
@@ -625,12 +539,13 @@ curl ".../customers/33333333-…/goals?domain=ENERGY&year=2026&granularity=month
 ## 6. Quick reference — invariants for the frontend adapter
 
 - Storage is hourly; you never send hours unless you mean to — coarse buckets are distributed for you.
+- **PUT** body is a **nested tree** (`annual`/`monthly{daily{hourly}}`); **PATCH** body is a flat **`buckets[]`** (`{level, ref, value}`).
+- Import is **stateless**: post with `?dryRun=true` to preview, re-post the same `csv` with `?dryRun=false` to persist. No previewToken.
 - Read `method` on every node; render AVERAGE (temperature) and SUM (energy/water) differently.
 - `derived:true` = system-suggested (safe to overwrite on coarse edits); `derived:false` = operator-confirmed (preserved).
-- `PUT` wipes the year to exactly your payload; `PATCH` only touches what you send.
-- On `409`, read `error.currentVersion`, re-`GET`, reapply the operator's intended change against the new version — do not silently discard.
-- `fetchHistory=true` is capped at 100 newest-first entries; paginate by time client-side if you need more (no server cursor in this version).
+- On `409`, read `error.currentVersion`, re-`GET`, reapply against the new version — do not silently discard.
+- `fetchHistory=true` is capped at 100 newest-first **operation** entries (one per version); paginate by time client-side if you need more (no server cursor in this version).
 
 ---
 
-**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) · **Last updated:** 2026-06-18
+**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) + the implementation. · **Last updated:** 2026-06-19

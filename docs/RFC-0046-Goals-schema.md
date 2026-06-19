@@ -9,10 +9,11 @@ four tables exactly as the RFC closes them:
 | `consumption_goals` | parent per `(tenant, customer, domain, year)`, holds the optimistic `version` |
 | `consumption_goal_hours` | the canonical hourly grain (≤ 8 760 rows/goal) |
 | `consumption_goal_domains` | fixed aggregation config (`aggregation_method` + `unit`) per `(tenant, domain)` |
-| `consumption_goal_history` | append-only audit at the input level the user acted on |
+| `consumption_goal_history` | append-only audit, **one row per operation** (source + input level + bucket count + details sample) |
 
-Companion migration: `drizzle/migrations/NNNN_consumption_goals.sql` (the `NNNN`
-number is assigned at integration time — see that file's header).
+Companion migrations:
+- `drizzle/migrations/0047_consumption_goals.sql` — the four tables + domain seed.
+- `drizzle/migrations/0048_consumption_goals_history_ops.sql` — additive `ALTER` adding the operation-level audit columns (`source`, `bucket_count`, `details`) + the `source` CHECK to `consumption_goal_history`. The Drizzle snippet below already includes these columns (the live `schema.ts` reflects post-0048).
 
 ---
 
@@ -106,18 +107,22 @@ export const consumptionGoalDomains = pgTable('consumption_goal_domains', {
   ),
 }));
 
-// 4) Append-only history. Records the level the user acted on (DEC-4).
+// 4) Append-only history. ONE row per operation (DEC-4): records the operation
+//    source, the coarsest level touched, the bucket count, and a details sample.
 export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   id:            uuid('id').primaryKey().defaultRandom(),
   goalId:        uuid('goal_id').notNull(),
   actor:         uuid('actor'),                          // who changed it
-  actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — what the user touched
-  bucketRef:     text('bucket_ref').notNull(),           // "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
-  oldValue:      numeric('old_value'),                   // at the input level (NULL on create)
-  newValue:      numeric('new_value'),                   // at the input level (NULL on delete)
+  source:        text('source').notNull().default('EDIT'), // IMPORT | REPLACE | MERGE | DELETE | EDIT
+  actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — coarsest level touched
+  bucketRef:     text('bucket_ref').notNull(),           // representative ref for the operation
+  oldValue:      numeric('old_value'),                   // at the input level (NULL on create / multi-bucket)
+  newValue:      numeric('new_value'),                   // single-bucket value, else NULL
+  bucketCount:   integer('bucket_count').notNull().default(1), // operator buckets this operation carried
+  details:       jsonb('details').notNull().default([]), // compact [{ ref, value }] sample (capped at 50)
   distributed:   boolean('distributed').notNull(),       // true = system spread to hours
-  hoursAffected: integer('hours_affected').notNull(),    // count of hour rows written by this change
-  version:       integer('version').notNull(),           // the version this change produced
+  hoursAffected: integer('hours_affected').notNull(),    // total hour rows written by this operation
+  version:       integer('version').notNull(),           // the version this operation produced
   changedAt:     timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   goalChronoIdx: index('consumption_goal_history_idx').on(table.goalId, table.changedAt.desc()),
@@ -125,8 +130,15 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
     'consumption_goal_history_action_level_check',
     sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`
   ),
+  sourceCheck: check(
+    'consumption_goal_history_source_check',
+    sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT')`
+  ),
 }));
 ```
+
+> **`jsonb` import.** `consumption_goal_history.details` needs `jsonb` from
+> `drizzle-orm/pg-core` (already imported in `schema.ts`).
 
 ---
 

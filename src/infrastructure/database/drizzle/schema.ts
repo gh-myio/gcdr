@@ -2091,10 +2091,13 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   id:            uuid('id').primaryKey().defaultRandom(),
   goalId:        uuid('goal_id').notNull(),
   actor:         uuid('actor'),                          // who changed it
+  source:        text('source').notNull().default('EDIT'), // IMPORT | REPLACE | MERGE | DELETE | EDIT — the operation
   actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — what the user touched
   bucketRef:     text('bucket_ref').notNull(),           // "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
   oldValue:      numeric('old_value'),                   // at the input level (NULL on create)
-  newValue:      numeric('new_value'),                   // at the input level (NULL on delete)
+  newValue:      numeric('new_value'),                   // at the input level (NULL on delete / multi-bucket op)
+  bucketCount:   integer('bucket_count').notNull().default(1), // operator buckets this operation carried
+  details:       jsonb('details').notNull().default([]), // compact [{ ref, value }] sample for the timeline
   distributed:   boolean('distributed').notNull(),       // true = system spread to hours
   hoursAffected: integer('hours_affected').notNull(),    // count of hour rows written by this change
   version:       integer('version').notNull(),           // the version this change produced
@@ -2104,5 +2107,9 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   actionLevelCheck: check(
     'consumption_goal_history_action_level_check',
     sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`
+  ),
+  sourceCheck: check(
+    'consumption_goal_history_source_check',
+    sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT')`
   ),
 }));

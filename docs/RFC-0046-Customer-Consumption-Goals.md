@@ -1,7 +1,9 @@
 # RFC-0046 — Customer Consumption Goals
 
-- **Status:** Draft — **design closed** (decisions DEC-1…DEC-7 resolved 2026-06-18); ready for implementation.
+- **Status:** **Implemented** (backend + frontend) on branch `feat/rfc-0046-consumption-goals` — not yet merged/in prod. Design closed (DEC-1…DEC-7, 2026-06-18).
 - **Created:** 2026-06-18
+- **Updated:** 2026-06-19
+- **Migrations:** `0047_consumption_goals.sql` (four tables + domain seed) · `0048_consumption_goals_history_ops.sql` (operation-level audit columns). Applied to local Docker; **pending prod**.
 - **Author:** MYIO Engineering
 - **Domain:** Customers / Consumption Goals (Energy · Water · Temperature)
 - **Reviews:** `docs/RFC-0046-Customer-Consumption-Goals-feedback.md` (round 1), `…-feedback-v2.md` (round 2).
@@ -28,9 +30,9 @@ Per-customer goals, scoped by **domain** (`ENERGY`, `WATER`, `TEMPERATURE`), per
 
 - **Canonical store:** hourly rows under a per-`(customer, domain, year)` parent that carries an optimistic `version`.
 - **Aggregation method is fixed per domain** (`SUM` energy/water, `AVERAGE` temperature) — not an operator choice.
-- **History** is a separate append-only table recording the **level the user acted on** (e.g. "edited a day → system distributed to 24 hours"); `?fetchHistory=true` returns ≤100 entries.
-- **Write semantics:** `PUT` replaces a whole `(year, domain)`; `PATCH`/import merges specific buckets.
-- New API-key scopes `goals:read` / `goals:write`; audit event `CUSTOMER_GOALS_UPDATED`.
+- **History** is a separate append-only audit, **one row per operation** (a mutation = a version = one entry): it records the `source` (IMPORT / REPLACE / MERGE / DELETE), the level acted on, the bucket count and a compact `details` sample. `?fetchHistory=true` returns ≤100 entries, newest-first. *(This per-goal history table is the implemented audit mechanism; the global `CUSTOMER_GOALS_UPDATED` event below is designed but not yet emitted.)*
+- **Write semantics:** `PUT` replaces a whole `(year, domain)` with a nested tree body; `PATCH` merges a sparse `buckets[]` list; import merges via a **stateless** `?dryRun=true|false` CSV post.
+- New API-key scopes `goals:read` / `goals:write`; audit event `CUSTOMER_GOALS_UPDATED` (planned).
 
 ---
 
@@ -125,25 +127,33 @@ CREATE TABLE consumption_goal_domains (
 ```
 Seeded per tenant: `ENERGY→SUM/kWh`, `WATER→SUM/m3`, `TEMPERATURE→AVERAGE/C`. Tenant-configurable override is future.
 
-### `consumption_goal_history` — append-only audit (DEC-4)
+### `consumption_goal_history` — append-only audit, **one row per operation** (DEC-4)
 ```sql
 CREATE TABLE consumption_goal_history (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   goal_id        uuid NOT NULL,
   actor          uuid,                  -- who changed it
-  action_level   text NOT NULL,         -- YEAR | MONTH | DAY | HOUR (what the user touched)
-  bucket_ref     text NOT NULL,         -- "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
-  old_value      numeric,               -- at the input level (NULL on create)
-  new_value      numeric,               -- at the input level (NULL on delete)
+  source         text NOT NULL DEFAULT 'EDIT',  -- IMPORT | REPLACE | MERGE | DELETE | EDIT (the operation)
+  action_level   text NOT NULL,         -- YEAR | MONTH | DAY | HOUR (coarsest level the operation touched)
+  bucket_ref     text NOT NULL,         -- representative ref: "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
+  old_value      numeric,               -- at the input level (NULL on create / multi-bucket op)
+  new_value      numeric,               -- single-bucket value, else NULL
+  bucket_count   integer NOT NULL DEFAULT 1,    -- how many operator buckets the operation carried
+  details        jsonb   NOT NULL DEFAULT '[]', -- compact [{ ref, value }] sample (capped at 50) for the timeline
   distributed    boolean NOT NULL,      -- true = system spread to hours
-  hours_affected integer NOT NULL,      -- count of hour rows written by this change
-  version        integer NOT NULL,      -- the version this change produced
+  hours_affected integer NOT NULL,      -- total hour rows written by this operation
+  version        integer NOT NULL,      -- the version this operation produced
   changed_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX consumption_goal_history_idx ON consumption_goal_history (goal_id, changed_at DESC);
 ```
 
-**Example (the author's case):** an operator edits day `2026-03-15` → one history row `{ action_level: DAY, bucket_ref: "2026-03-15", old_value, new_value, distributed: true, hours_affected: 24, actor, version }`; the 24 updated hour rows carry `source_level: DAY, derived: true`.
+> **One row per operation, not per bucket.** A mutation = a version = exactly one audit entry. This keeps the UI timeline clean and stops a large hourly import from flooding the ≤100-row window. The `details` array carries up to 50 of the operation's buckets so the timeline can show the breakdown ("`2026-01-15T08 → 500`").
+
+**Example A — operator edits day `2026-03-15` (PATCH/merge):** one row `{ source: MERGE, action_level: DAY, bucket_ref: "2026-03-15", new_value: 3500, bucket_count: 1, details: [{ref:"2026-03-15", value:3500}], distributed: true, hours_affected: 24, version }`; the 24 updated hour rows carry `source_level: DAY, derived: true`.
+**Example B — spreadsheet import of 120 hour buckets:** one row `{ source: IMPORT, action_level: HOUR, bucket_count: 120, new_value: null, details: [ …up to 50… ], hours_affected: 120, version }`.
+
+> **Note — whole-year DELETE.** Deleting an entire `(domain, year)` cascades and removes the parent *and its history* (a destructive reset), so it leaves no timeline entry. Only sub-bucket deletes append a `DELETE` audit row. A global, customer-level audit log (`CUSTOMER_GOALS_UPDATED`) would capture full-year deletes too — that remains future work.
 
 ---
 
@@ -178,10 +188,12 @@ CREATE INDEX consumption_goal_history_idx ON consumption_goal_history (goal_id, 
 | --- | --- | --- | --- |
 | List domains with goals | `GET` | `/customers/:id/goals` | Summary per domain (`unit`, `version`, years present). |
 | Get goals | `GET` | `/customers/:id/goals?domain=&year=&granularity=&fetchHistory=` | `granularity` ∈ `year\|month\|day\|hour` (default `month`); derived from hours. `fetchHistory=true` → ≤100 entries, newest first. |
-| Replace a year | `PUT` | `/customers/:id/goals?domain=&year=` | **Replace**: the payload is the whole year; buckets absent from the payload's scope are removed; system distributes to hours; `version` optimistic. |
-| Merge buckets | `PATCH` | `/customers/:id/goals?domain=&year=` | **Merge**: only the sent buckets are (re)distributed; the rest are preserved. |
-| Import (CSV) | `POST` | `/customers/:id/goals/import?domain=&year=` | Dry-run/preview by default; see §CSV. |
-| Delete | `DELETE` | `/customers/:id/goals?domain=&year=` | Removes the year (or a sub-bucket); logged + versioned. |
+| Replace a year | `PUT` | `/customers/:id/goals?domain=&year=` | **Replace**: body is a **nested tree** (`{ annual?, monthly{ daily{ hourly }}, expectedVersion? }`); buckets absent from the payload's scope are removed; system distributes to hours; `version` optimistic. |
+| Merge buckets | `PATCH` | `/customers/:id/goals?domain=&year=` | **Merge**: body is a sparse `{ buckets: [{ level, ref, value }], expectedVersion? }`; only the sent buckets are (re)distributed; the rest are preserved. |
+| Import (CSV) | `POST` | `/customers/:id/goals/import?domain=&year=&dryRun=true\|false` | **Stateless** — `dryRun=true` (default) previews; `dryRun=false` persists the SAME body; no previewToken. Body `{ csv, expectedVersion? }`. See §CSV. |
+| Delete | `DELETE` | `/customers/:id/goals?domain=&year=` | Body `{ bucket?{ level, ref }, expectedVersion? }`. Removes the year (or a sub-bucket); sub-bucket delete is logged + versioned. |
+
+> The exact wire bodies and worked examples live in [`RFC-0046-Goals-API.md`](./RFC-0046-Goals-API.md) (kept in sync with the implementation).
 
 - **Validation:** `granularity:"hour"` is fully supported; month `01..12`, day valid for the month/year (leap-year aware), hour `0..23`; values `.finite()`, `>= 0` for energy/water (temperature may be negative); `unit` matches the domain.
 
@@ -195,7 +207,30 @@ Always a **dry-run preview** before persisting:
 3. **Confirm** in numbers ("3 months become hourly, 5 daily, 4 monthly; 32 lines ignored").
 4. **Full log** — downloadable, auditable; the importer then lands on the imported tree for hourly tweaks.
 
-Import is **merge by bucket** (PATCH semantics) and idempotent per bucket.
+Import is **merge by bucket** (PATCH semantics) and idempotent per bucket. The implemented flow is **stateless**: the client posts the CSV with `?dryRun=true` for the preview, then re-posts the *same* CSV with `?dryRun=false` to persist (there is no `previewToken`).
+
+---
+
+## UI (as built)
+
+The goals UI is a **customer-detail tab** ("Metas"), not the standalone `GoalsPanel`. Implemented in the frontend repo:
+
+- `src/components/customers/CustomerGoalsTab.tsx` — the tab (selectors, summary, drill-editor, version chip).
+- `src/components/customers/GoalsCsvImportModal.tsx` — the CSV import modal.
+- `src/components/customers/GoalsHistoryTimeline.tsx` — the version-history timeline.
+- `src/types/goals.ts`, `src/services/api/goalsService.ts`, `src/hooks/useGoals.ts` — types/service/hooks.
+
+**Default view = read-only summary.** On open the tab shows a dashboard for the selected `(domain, year)`:
+- KPI cards: year, annual total (Σ) / annual average (x̄, per domain), months-with-a-goal (`X / 12`), days-with-a-goal ("total de registros"), average per month, average per day.
+- **Top 3 months** and **Top 3 days** (ranked, with their values).
+- A **"Versão atual: vN"** chip (the optimistic `version`).
+- An **"Habilitar edição"** button toggles into the editor.
+
+**Editor (drill).** Month grid → click a month → day grid → click a day → 24-hour grid. Coarser levels show a read-only computed total (Σ for SUM, x̄ for AVERAGE). Saving: the month grid does a **PUT replace**; day/hour grids do a **PATCH merge** with explicit year-aware buckets. 409 → reload-and-reapply.
+
+**CSV import.** A modal with dry-run preview → per-line diagnostics → confirm → applied log; includes a **"Baixar modelo CSV"** button that downloads a domain/year-aware template (`bucket,value`).
+
+**Version history.** Below the editor, a timeline (visual design mirrors the Work Order detail timeline) renders `goals.history` newest-first — one node per operation: an icon + label by `source` ("Importação de planilha" / "Edição de metas" / "Remoção de meta"), the actor and relative time, a `vN` badge, "`N registros · <level>`", and chips of the `details` (`ref → value`, capped with "+N mais").
 
 ---
 
@@ -210,7 +245,9 @@ Import is **merge by bucket** (PATCH semantics) and idempotent per bucket.
 
 ## Migration & backward compatibility
 
-- One additive migration creating the four tables (custom runner, no `BEGIN/COMMIT` in the file; number assigned at implementation time) + a seed of `consumption_goal_domains` per tenant.
+- **`0047_consumption_goals.sql`** — creates the four tables + indexes + seeds `consumption_goal_domains` per tenant (idempotent: `CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
+- **`0048_consumption_goals_history_ops.sql`** — additive `ALTER` adding `source`, `bucket_count`, `details` to `consumption_goal_history` (operation-level audit) + the `source` CHECK.
+- Both applied to local Docker; **prod pending** (ship with the rest of RFC-0046).
 - No backfill; customers start with no goals (`GET` returns an empty tree).
 - **Schema ownership = the domain (GCDR), not the `GoalsPanel`** (DEC-6). The panel adapts to this contract; an adapter maps the panel's `goalsData` to/from these endpoints. If the panel's JSON evolves, the adapter absorbs it — the stored model does not change.
 
@@ -223,8 +260,8 @@ Import is **merge by bucket** (PATCH semantics) and idempotent per bucket.
 | DEC-1 | Storage grain / roll-up | **Always hourly**; coarser derived on read (sum / weighted-avg). |
 | DEC-2 | Temperature reduction | **Weighted average** (by contributing hours/days). |
 | DEC-3 | Bucket representation | Uniform hourly rows (no granularity discriminator); ~8,760/yr accepted. |
-| DEC-4 | Version & history | `version` per `(customer, domain, year)`, bumped per change; history at hour grain but records the **input level** + distribution. |
-| DEC-5 | Write semantics | `PUT` = replace (year+domain); `PATCH`/import = merge (bucket). |
+| DEC-4 | Version & history | `version` per `(customer, domain, year)`, bumped per change; history is **one row per operation** recording `source` + input level + bucket count + a `details` sample. |
+| DEC-5 | Write semantics | `PUT` = replace (nested year tree); `PATCH` = merge (`buckets[]`); import = stateless `?dryRun` CSV merge. |
 | DEC-6 | Aggregation config | **Fixed per domain** (ENERGY/WATER `SUM`, TEMPERATURE `AVERAGE`); not operator-editable. |
 | DEC-7 | Excluded/operating-window hours | **Future** (not modelled now). |
 

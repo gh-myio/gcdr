@@ -32,6 +32,8 @@ import {
   type ConsumptionGoalHourRow,
   type ConsumptionGoalHistoryRow,
   type GoalHourUpsert,
+  type GoalHistorySource,
+  type GoalHistoryDetail,
   type GoalKey,
   type GoalTx,
 } from '../repositories/consumptionGoalRepository';
@@ -90,10 +92,13 @@ export interface GoalTree {
 }
 
 export interface GoalHistoryEntry {
+  source: GoalHistorySource;
   actionLevel: GoalSourceLevel;
   bucketRef: string;
   oldValue: number | null;
   newValue: number | null;
+  bucketCount: number;
+  details: GoalHistoryDetail[];
   distributed: boolean;
   hoursAffected: number;
   version: number;
@@ -177,6 +182,9 @@ interface ValueBucket {
 }
 
 const SUM_AGG: GoalAggregationMethod = 'SUM';
+
+/** Max bucket samples persisted in a history row's `details` (timeline breakdown). */
+const HISTORY_DETAIL_CAP = 50;
 
 // =============================================================================
 // Service
@@ -450,7 +458,7 @@ export class ConsumptionGoalService {
 
       const final = await this.commitVersion(goal, created, body.expectedVersion, actor, key, tx);
 
-      await this.appendHistoryForBuckets(goal.id, buckets, final.version, actor, tx);
+      await this.appendOperation(goal.id, 'REPLACE', buckets, final.version, actor, tx);
 
       return { goal: final, hoursWritten, actionLevel };
     });
@@ -493,7 +501,7 @@ export class ConsumptionGoalService {
 
       const final = await this.commitVersion(goal, created, body.expectedVersion, actor, key, tx);
 
-      await this.appendHistoryForBuckets(goal.id, buckets, final.version, actor, tx);
+      await this.appendOperation(goal.id, 'MERGE', buckets, final.version, actor, tx);
 
       return { goal: final, hoursWritten, actionLevel };
     });
@@ -561,7 +569,7 @@ export class ConsumptionGoalService {
       await this.repo.upsertHours(goal.id, hours, tx);
 
       const final = await this.commitVersion(goal, created, expectedVersion, actor, key, tx);
-      await this.appendHistoryForBuckets(goal.id, buckets, final.version, actor, tx);
+      await this.appendOperation(goal.id, 'IMPORT', buckets, final.version, actor, tx);
 
       const rows = await this.repo.findHours(goal.id, tx);
       return { goal: final, rows };
@@ -633,10 +641,13 @@ export class ConsumptionGoalService {
         {
           goalId: goal.id,
           actor,
+          source: 'DELETE',
           actionLevel: bucket.level,
           bucketRef: bucket.ref,
           oldValue: null,
           newValue: null,
+          bucketCount: 1,
+          details: [{ ref: bucket.ref, value: null }],
           distributed: true,
           hoursAffected: hoursRemoved,
           version: bumped.version,
@@ -810,31 +821,50 @@ export class ConsumptionGoalService {
     return rows.length === 0 ? {} : this.buildTree(rows, granularity, method);
   }
 
-  /** Appends one history row per distinct operator bucket of this change. */
-  private async appendHistoryForBuckets(
+  /**
+   * Appends ONE audit row per operation (a mutation = a version = one entry),
+   * so the UI timeline reads clean, human entries and a large import does not
+   * flood the ≤100-row history window. The row records the operation `source`,
+   * the coarsest level touched, the bucket count, the total hours affected, and
+   * a compact `details` sample ([{ ref, value }], capped) for the breakdown.
+   */
+  private async appendOperation(
     goalId: string,
+    source: GoalHistorySource,
     buckets: ValueBucket[],
     version: number,
     actor: string | null,
     tx: GoalTx,
   ): Promise<void> {
-    for (const b of buckets) {
+    if (buckets.length === 0) return;
+
+    const actionLevel = coarsestLevel(buckets.map((b) => b.level));
+    const hoursAffected = buckets.reduce((sum, b) => {
       const year = Number(b.ref.slice(0, 4));
-      await this.repo.appendHistory(
-        {
-          goalId,
-          actor,
-          actionLevel: b.level,
-          bucketRef: b.ref,
-          oldValue: null,
-          newValue: formatNumeric(b.value),
-          distributed: true,
-          hoursAffected: this.hoursInScope(b.level, year, b.month, b.day),
-          version,
-        },
-        tx,
-      );
-    }
+      return sum + this.hoursInScope(b.level, year, b.month, b.day);
+    }, 0);
+    const details: GoalHistoryDetail[] = buckets
+      .slice(0, HISTORY_DETAIL_CAP)
+      .map((b) => ({ ref: b.ref, value: b.value }));
+
+    await this.repo.appendHistory(
+      {
+        goalId,
+        actor,
+        source,
+        actionLevel,
+        // Representative ref: the single bucket's ref, or the coarsest scope.
+        bucketRef: buckets.length === 1 ? buckets[0].ref : String(Number(buckets[0].ref.slice(0, 4))),
+        oldValue: null,
+        newValue: buckets.length === 1 ? formatNumeric(buckets[0].value) : null,
+        bucketCount: buckets.length,
+        details,
+        distributed: true,
+        hoursAffected,
+        version,
+      },
+      tx,
+    );
   }
 
   // ===========================================================================
@@ -1138,10 +1168,13 @@ function stripAggMeta(node: GoalTreeNode): GoalTreeNode {
 
 function mapHistoryRow(row: ConsumptionGoalHistoryRow): GoalHistoryEntry {
   return {
+    source: (row.source ?? 'EDIT') as GoalHistorySource,
     actionLevel: row.actionLevel as GoalSourceLevel,
     bucketRef: row.bucketRef,
     oldValue: row.oldValue === null ? null : Number(row.oldValue),
     newValue: row.newValue === null ? null : Number(row.newValue),
+    bucketCount: row.bucketCount ?? 1,
+    details: Array.isArray(row.details) ? (row.details as GoalHistoryDetail[]) : [],
     distributed: row.distributed,
     hoursAffected: row.hoursAffected,
     version: row.version,

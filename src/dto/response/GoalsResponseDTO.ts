@@ -86,15 +86,29 @@ export interface GoalTree {
 // returns ≤100 of these, newest first.
 // -----------------------------------------------------------------------------
 
+/** One compact bucket sample for the timeline breakdown of a history entry. */
+export interface GoalHistoryDetail {
+  /** Bucket reference: "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08". */
+  ref: string;
+  /** Value at the bucket level (null on delete). */
+  value: number | null;
+}
+
 export interface GoalHistoryEntry {
+  /** Operation that produced this version (IMPORT | REPLACE | MERGE | DELETE | EDIT). */
+  source: 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT';
   /** Level the user touched (YEAR | MONTH | DAY | HOUR). */
   actionLevel: GoalSourceLevel;
-  /** Bucket reference: "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08". */
+  /** Representative bucket reference for the operation. */
   bucketRef: string;
   /** Value at the input level before the change (null on create). */
   oldValue: number | null;
-  /** Value at the input level after the change (null on delete). */
+  /** Value at the input level after the change (null on delete / multi-bucket op). */
   newValue: number | null;
+  /** How many operator buckets this operation carried. */
+  bucketCount: number;
+  /** Compact sample of the operation's buckets (capped server-side). */
+  details: GoalHistoryDetail[];
   /** True when the system spread the change down to hour rows. */
   distributed: boolean;
   /** Count of hour rows written by this change. */

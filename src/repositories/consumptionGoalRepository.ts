@@ -90,17 +90,28 @@ export interface GoalHourScope {
 }
 
 /** A history row to append (the version it produced is supplied by the caller). */
+/** One compact bucket sample stored in `details` for the timeline breakdown. */
+export interface GoalHistoryDetail {
+  ref: string; // "2026-03-15T08"
+  value: number | null; // value at the bucket level (null on delete)
+}
+
 export interface GoalHistoryAppend {
   goalId: string;
   actor?: string | null;
+  source: GoalHistorySource; // IMPORT | REPLACE | MERGE | DELETE | EDIT
   actionLevel: GoalSourceLevel; // YEAR | MONTH | DAY | HOUR
   bucketRef: string; // "2026" | "2026-03" | "2026-03-15" | "2026-03-15T08"
   oldValue?: string | null; // at the input level; NULL on create
-  newValue?: string | null; // at the input level; NULL on delete
+  newValue?: string | null; // at the input level; NULL on delete / multi-bucket op
+  bucketCount: number; // operator buckets this operation carried
+  details?: GoalHistoryDetail[]; // compact sample for the timeline
   distributed: boolean;
   hoursAffected: number;
   version: number; // the version this change produced
 }
+
+export type GoalHistorySource = 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT';
 
 /** Default aggregation config per domain (DEC: fixed; seed if missing). */
 const DEFAULT_DOMAIN_CONFIG: Record<GoalDomain, { aggregationMethod: GoalAggregationMethod; unit: string }> = {
@@ -327,10 +338,13 @@ export class ConsumptionGoalRepository {
       .values({
         goalId: entry.goalId,
         actor: entry.actor ?? null,
+        source: entry.source,
         actionLevel: entry.actionLevel,
         bucketRef: entry.bucketRef,
         oldValue: entry.oldValue ?? null,
         newValue: entry.newValue ?? null,
+        bucketCount: entry.bucketCount,
+        details: entry.details ?? [],
         distributed: entry.distributed,
         hoursAffected: entry.hoursAffected,
         version: entry.version,
