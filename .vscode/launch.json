@@ -1,0 +1,32 @@
+{
+  // Live debugging for the GCDR API.
+  //
+  // 1) Run the dev server with the inspector on:  npm run dev:debug
+  //    (hot-reload via tsx watch + Node inspector on 127.0.0.1:9229)
+  // 2) Then start "Attach to GCDR API (dev:debug)" here, set breakpoints,
+  //    hit an endpoint — execution stops at your breakpoints, live.
+  //
+  // Use "Launch GCDR API (dev:debug)" to start + attach in one step instead.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach to GCDR API (dev:debug)",
+      "port": 9229,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch GCDR API (dev:debug)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:debug"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true
+    }
+  ]
+}
