@@ -9,6 +9,7 @@ export { monitorAdminController } from './admin/monitor-admin.controller';
 
 // Protected routes
 export { default as customersController } from './customers.controller';
+export { default as consumptionGoalsController } from './consumption-goals.controller';
 export { default as assetsController } from './assets.controller';
 export { default as partnersController } from './partners.controller';
 export { default as groupsController } from './groups.controller';

@@ -17,6 +17,7 @@ import {
   healthController,
   docsController,
   customersController,
+  consumptionGoalsController,
   assetsController,
   partnersController,
   groupsController,
@@ -226,6 +227,10 @@ apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTO
 // RFC-0033: Customer integration sync state (nested — must come before general /customers router)
 // hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
 apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerIntegrationsController);
+
+// RFC-0046: Customer consumption goals (nested — must come before general /customers router)
+// hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.
+apiV1Router.use('/customers/:customerId/goals', hybridAuthByMethod('goals:read', 'goals:write'), consumptionGoalsController);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
