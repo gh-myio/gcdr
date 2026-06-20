@@ -68,6 +68,23 @@ export class CentralRepository implements ICentralRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  /**
+   * Cross-tenant lookup by the central's own UUID (its `id`, the value the
+   * device carries as the `UUID` claim in its poll-loop JWT). Tenant-agnostic:
+   * the central does NOT know its tenant — it is derived from the returned row.
+   * Returns the RAW row (incl. tenantId + agentSecret) for centralAuthMiddleware
+   * to verify the HMAC and build req.context. Returns null if no such central.
+   */
+  async getByUuid(uuid: string): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .select()
+      .from(centrals)
+      .where(eq(centrals.id, uuid))
+      .limit(1);
+
+    return row ?? null;
+  }
+
   async existsBySerialNumberGlobal(serialNumber: string): Promise<boolean> {
     const [row] = await db
       .select({ id: centrals.id })
