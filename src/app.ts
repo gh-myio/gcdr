@@ -45,6 +45,7 @@ import {
   dbAdminController,
   monitorAdminController,
   centralsController,
+  centralAgentController,
   centralsListByCustomerHandler,
   centralsListByAssetHandler,
   centralSerialAvailableHandler,
@@ -90,6 +91,7 @@ import {
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
+import { centralAuthMiddleware } from './middleware/centralAuth';
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
@@ -250,6 +252,11 @@ apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 
 // Centrals
 apiV1Router.use('/centrals', authMiddleware, centralsController);
+
+// Central-agent poll loop (field-swap restore). NOT operator-authed — the
+// central authenticates itself with its agent_secret-signed JWT
+// (centralAuthMiddleware sets req.centralContext + tenant from the central row).
+apiV1Router.use('/central-agent', centralAuthMiddleware, centralAgentController);
 
 // Themes (Look and Feel)
 apiV1Router.use('/themes', authMiddleware, themesController);
