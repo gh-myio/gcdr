@@ -95,6 +95,49 @@ export class CentralRestoreJobRepository {
       .limit(limit);
   }
 
+  /**
+   * Atomically claim the oldest QUEUED job for `centralId` and transition it
+   * QUEUED -> RUNNING (version-bumped) in a single statement. Used by the
+   * central-agent poll loop (GET /central-agent/jobs/next). `FOR UPDATE SKIP
+   * LOCKED` on the inner select makes concurrent polls hand out distinct jobs
+   * (or none) instead of blocking. Returns the claimed row, or null if the
+   * central has no QUEUED job.
+   */
+  claimNextQueuedQuery(tenantId: string, centralId: string) {
+    const ts = new Date(now());
+    return db
+      .update(centralRestoreJobs)
+      .set({
+        status: 'RUNNING',
+        updatedAt: ts,
+        version: sql`${centralRestoreJobs.version} + 1`,
+      })
+      .where(
+        eq(
+          centralRestoreJobs.id,
+          sql`(
+            SELECT ${centralRestoreJobs.id}
+            FROM ${centralRestoreJobs}
+            WHERE ${centralRestoreJobs.tenantId} = ${tenantId}
+              AND ${centralRestoreJobs.centralId} = ${centralId}
+              AND ${centralRestoreJobs.status} = 'QUEUED'
+            ORDER BY ${centralRestoreJobs.createdAt} ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )`,
+        ),
+      )
+      .returning();
+  }
+
+  async claimNextQueued(
+    tenantId: string,
+    centralId: string,
+  ): Promise<CentralRestoreJob | null> {
+    const [row] = await this.claimNextQueuedQuery(tenantId, centralId);
+    return row ?? null;
+  }
+
   async update(
     tenantId: string,
     id: string,
