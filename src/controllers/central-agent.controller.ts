@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { centralAgentService } from '../services/CentralAgentService';
+import { centralEnrollmentService } from '../services/CentralEnrollmentService';
 import { UpdateRestoreProgressSchema } from '../dto/request/CentralRestoreDTO';
+import { EnrollCentralSchema } from '../dto/request/CentralEnrollDTO';
 import { sendSuccess, sendNoContent } from '../middleware';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
 
@@ -69,3 +71,25 @@ router.patch('/restore/:jobId', async (req: Request, res: Response, next: NextFu
 });
 
 export default router;
+
+/**
+ * POST /central-agent/enroll   (zero-touch provisioning — Slice 1.5)
+ *
+ * Device-facing and deliberately UNAUTHENTICATED by centralAuthMiddleware: the
+ * central has no agent_secret yet, so the one-time enroll token IS the
+ * credential. Mounted in app.ts as its own route BEFORE the centralAuthMiddleware
+ * /central-agent mount, so it bypasses that gate.
+ *
+ * Body: { uuid, enrollToken }. On success returns { agentSecret } (returned
+ * once); the central then signs its poll-loop JWT (HS256) with that secret. The
+ * enroll token is single-use — it is cleared on success.
+ */
+export const enrollHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { uuid, enrollToken } = EnrollCentralSchema.parse(req.body);
+    const result = await centralEnrollmentService.enroll(uuid, enrollToken);
+    sendSuccess(res, result, 200, req.context.requestId);
+  } catch (err) {
+    next(err);
+  }
+};

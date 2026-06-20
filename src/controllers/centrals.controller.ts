@@ -18,6 +18,7 @@ import {
   StartRestoreSchema,
   UpdateRestoreProgressSchema,
 } from '../dto/request/CentralRestoreDTO';
+import { centralEnrollmentService } from '../services/CentralEnrollmentService';
 import { customerIntegrationService } from '../services/CustomerIntegrationService';
 import {
   SetMqttPasswordInputSchema,
@@ -197,6 +198,36 @@ router.patch('/:id/status',
       const data = UpdateCentralStatusSchema.parse(req.body);
       const central = await centralRepository.updateStatus(tenantId, id, data.status, userId);
       sendSuccess(res, central, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/enroll-token
+ * Issue a one-time enroll token for zero-touch provisioning (Slice 1.5). Stores
+ * only sha256(token) + a 24h expiry on the central; returns the PLAINTEXT token
+ * once (operator burns it into the central's .bootstrap at flash time). The
+ * central later exchanges it for its agent_secret via POST /central-agent/enroll.
+ */
+router.post('/:id/enroll-token',
+  logEvent({
+    eventType: EventType.CENTRAL_ENROLL_TOKEN_ISSUED,
+    description: (req) => `Enroll token issued for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+      }
+
+      const result = await centralEnrollmentService.issueEnrollToken(tenantId, id);
+      sendCreated(res, result, requestId);
     } catch (err) {
       next(err);
     }

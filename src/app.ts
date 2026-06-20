@@ -46,6 +46,7 @@ import {
   monitorAdminController,
   centralsController,
   centralAgentController,
+  centralAgentEnrollHandler,
   centralsListByCustomerHandler,
   centralsListByAssetHandler,
   centralSerialAvailableHandler,
@@ -252,6 +253,13 @@ apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 
 // Centrals
 apiV1Router.use('/centrals', authMiddleware, centralsController);
+
+// Zero-touch enrollment (Slice 1.5). PUBLIC and mounted BEFORE the
+// centralAuthMiddleware /central-agent mount: a freshly-flashed central has no
+// agent_secret yet, so its one-time enroll token IS the credential. It exchanges
+// { uuid, enrollToken } for its agent_secret here, then authenticates the poll
+// loop below.
+apiV1Router.post('/central-agent/enroll', centralAgentEnrollHandler);
 
 // Central-agent poll loop (field-swap restore). NOT operator-authed — the
 // central authenticates itself with its agent_secret-signed JWT
