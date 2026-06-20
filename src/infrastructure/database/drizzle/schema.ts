@@ -702,6 +702,11 @@ export const centrals = pgTable('centrals', {
   tags: jsonb('tags').notNull().default([]),
   metadata: jsonb('metadata').notNull().default({}),
 
+  // Central-agent auth (field-swap backup/restore): shared HMAC secret the
+  // central signs its poll-loop JWT (HS256) with. Provisioned in a later slice;
+  // nullable so existing centrals keep working. See migration 0049.
+  agentSecret: text('agent_secret'),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
