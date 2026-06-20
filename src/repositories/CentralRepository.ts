@@ -85,6 +85,57 @@ export class CentralRepository implements ICentralRepository {
     return row ?? null;
   }
 
+  /**
+   * Store a one-time enroll token (Slice 1.5). Operator path → tenant-aware.
+   * Persists ONLY the sha256 hash of the token + its expiry; the plaintext is
+   * never stored. Returns the updated row, or null if no such central in the
+   * tenant. Re-issuing simply overwrites any prior pending token.
+   */
+  async setEnrollToken(
+    tenantId: string,
+    id: string,
+    enrollTokenHash: string,
+    enrollTokenExpiresAt: Date,
+  ): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .update(centrals)
+      .set({
+        enrollTokenHash,
+        enrollTokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .returning();
+
+    return row ?? null;
+  }
+
+  /**
+   * Finalize enrollment (Slice 1.5). Device-facing → cross-tenant by `id` (the
+   * central only knows its own uuid). Persists the freshly-minted agent_secret,
+   * stamps enrolled_at, and CLEARS the enroll token (hash + expiry) so the token
+   * is single-use. Returns the updated row, or null if no such central.
+   */
+  async completeEnrollment(
+    id: string,
+    agentSecret: string,
+    enrolledAt: Date,
+  ): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .update(centrals)
+      .set({
+        agentSecret,
+        enrolledAt,
+        enrollTokenHash: null,
+        enrollTokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(centrals.id, id))
+      .returning();
+
+    return row ?? null;
+  }
+
   async existsBySerialNumberGlobal(serialNumber: string): Promise<boolean> {
     const [row] = await db
       .select({ id: centrals.id })
