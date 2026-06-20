@@ -707,6 +707,15 @@ export const centrals = pgTable('centrals', {
   // nullable so existing centrals keep working. See migration 0049.
   agentSecret: text('agent_secret'),
 
+  // Zero-touch enrollment (Slice 1.5). An operator issues a one-time enroll
+  // token; only its sha256 hash + expiry are stored. The central exchanges the
+  // plaintext token for its agent_secret via POST /central-agent/enroll, which
+  // clears the hash (single-use) and stamps enrolled_at. Re-issuing a fresh
+  // token re-enables enrollment (field-swap). All nullable. See migration 0050.
+  enrollTokenHash: text('enroll_token_hash'),
+  enrollTokenExpiresAt: timestamp('enroll_token_expires_at', { withTimezone: true }),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
