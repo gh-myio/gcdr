@@ -1,6 +1,6 @@
 # RFC-0046 — Metas de Consumo do Cliente · Feedback da Revisão
 
-- **Revisão de:** `docs/RFC-0046-Customer-Consumption-Goals.md`
+- **Revisão de:** `docs/rfcs/RFC-0046-Customer-Consumption-Goals.md`
 - **Data:** 2026-06-18
 - **Formato:** Roundtable BMAD (party-mode) — revisores independentes
 - **Revisores:** 🏗️ Winston (Arquiteto de Sistemas) · 📋 John (Product Manager) · 🎨 Sally (UX Designer) · 💻 Amelia (Engenheira de Software Sênior)

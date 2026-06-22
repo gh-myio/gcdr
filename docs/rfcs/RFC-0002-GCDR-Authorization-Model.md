@@ -15,7 +15,7 @@
 > evaluation routes are `POST /authorization/check` and
 > `POST /authorization/check/batch` (not `/evaluate`/`/evaluate-batch`).
 > For the canonical, code-verified reference, see
-> [`docs/GCDR-USER.md`](./GCDR-USER.md).
+> [`docs/GCDR-USER.md`](../GCDR-USER.md).
 
 ---
 

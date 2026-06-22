@@ -1,7 +1,7 @@
 # Feature: Override de Valor por Device em Rules
 
 > **Para:** Equipe de Frontend
-> **RFC:** [RFC-0018](./RFC-0018-Per-Device-Rule-Value-Overrides.md)
+> **RFC:** [RFC-0018](../rfcs/RFC-0018-Per-Device-Rule-Value-Overrides.md)
 > **Status:** Disponível
 
 ---

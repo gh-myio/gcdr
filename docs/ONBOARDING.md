@@ -94,7 +94,7 @@ Você também pode importar o `openapi.yaml` em ferramentas como:
 | **Devices** | 10 | Dispositivos IoT com conectividade (filtros por `centralId`, `slaveId`); `POST /devices/:id/move` para relocar entre customers/assets |
 | **Rules** | 10 | Regras de negócio (ALARM_THRESHOLD, SLA, ESCALATION, MAINTENANCE_WINDOW) com guard configs para Decision Engine |
 | **Alarm Bundles** | 3 | Bundle de regras para integração Node-RED (M2M) com versionamento |
-| **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./SIMULATOR-MANUAL.md)) |
+| **Alarm Simulator** | 6 | Simulador premium de alarmes ([Manual](./simulator/SIMULATOR-MANUAL.md)) |
 | **Customer API Keys** | 4 | Gerenciamento de API Keys por customer; campo `hierarchyAccess` (SELF/SUBTREE/TENANT) controla acesso à árvore de clientes |
 | **Audit Logs** | 2 | Logs de auditoria para compliance (RFC-0009) |
 | **Registration** | 6 | Auto-cadastro de usuários com aprovação (RFC-0011) |
@@ -537,7 +537,7 @@ curl -X POST https://api.gcdr.io/dev/customers/{customerId}/api-keys \
 - `groups:read` - Leitura de grupos
 - `*:read` - Leitura de todos os recursos
 
-Veja detalhes completos em: [ONBOARDING-NODERED-ALARM-BUNDLE.md](./ONBOARDING-NODERED-ALARM-BUNDLE.md)
+Veja detalhes completos em: [ONBOARDING-NODERED-ALARM-BUNDLE.md](./node-red/ONBOARDING-NODERED-ALARM-BUNDLE.md)
 
 ### Estado Atual da Autenticacao
 
@@ -705,7 +705,7 @@ JWT_ISSUER=gcdr
 JWT_AUDIENCE=alarm-orchestrator
 ```
 
-> **Nota**: Veja [RFC-0003-Refactoring-Multiple-Audience.md](./RFC-0003-Refactoring-Multiple-Audience.md) para detalhes da implementacao.
+> **Nota**: Veja [RFC-0003-Refactoring-Multiple-Audience.md](./rfcs/RFC-0003-Refactoring-Multiple-Audience.md) para detalhes da implementacao.
 
 ### Rate Limiting
 
@@ -735,7 +735,7 @@ JWT_AUDIENCE=alarm-orchestrator
 | **npm** | Gerenciador de pacotes |
 
 > **Nota**: O projeto foi migrado de AWS Lambda/DynamoDB para containers Docker com PostgreSQL.
-> Veja [RFC-0005](./RFC-0005-Container-Deployment-Migration.md) para detalhes.
+> Veja [RFC-0005](./rfcs/RFC-0005-Container-Deployment-Migration.md) para detalhes.
 
 ### Pré-requisitos
 
@@ -1401,9 +1401,9 @@ http://localhost:3015/admin/simulator
 
 **Quick Start:** Clique no botão **🚀 DEMO** para criar automaticamente um ambiente de teste completo com tenant, customer, devices e regras de alarme.
 
-Para documentação completa, veja: [SIMULATOR-MANUAL.md](./SIMULATOR-MANUAL.md)
+Para documentação completa, veja: [SIMULATOR-MANUAL.md](./simulator/SIMULATOR-MANUAL.md)
 
-Para mais detalhes, veja: [RFC-0006-Database-Seed-Scripts.md](./RFC-0006-Database-Seed-Scripts.md) e [RFC-0007-Database-Admin-UI.md](./RFC-0007-Database-Admin-UI.md)
+Para mais detalhes, veja: [RFC-0006-Database-Seed-Scripts.md](./rfcs/RFC-0006-Database-Seed-Scripts.md) e [RFC-0007-Database-Admin-UI.md](./rfcs/RFC-0007-Database-Admin-UI.md)
 
 ### Debug com VS Code
 
@@ -1830,27 +1830,27 @@ Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 
 ### Documentação Interna
 
-- [RFC-0001: GCDR Core & Marketplace](./RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Especificação completa
-- [RFC-0002: Authorization Model](./RFC-0002-GCDR-Authorization-Model.md) - Modelo de autorização
-- [RFC-0003: JWT Multiple Audience](./RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
-- [RFC-0004: Migration DynamoDB to PostgreSQL](./RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
-- [RFC-0005: Container Deployment](./RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
-- [RFC-0009: Events Audit Logs](./RFC-0009-Events-Audit-Logs.md) - Sistema de auditoria e logs de eventos
-- [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
-- [RFC-0011: User Registration Workflow](./RFC-0011-User-Registration-Approval-Workflow.md) - Auto-cadastro e aprovação de usuários
-- [RULE-ENTITY: Rules Engine](./RULE-ENTITY.md) - Documentação do motor de regras
-- [RFC-0015: Alarm Bundle Version History](./RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
-- [RFC-0016: ThingsBoard Entity Mapping](./RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
-- [RFC-0020: Public Single Apps](./RFC-0020-Public-Single-Apps.md) - Apps públicos de formulário com respostas versionadas
-- [RFC-0021: HTML Templates Engine](./BACKEND-RFC-0021-HTML-Templates.md) - Motor de templates HTML para email com preview e catálogo de tags (6 tipos)
-- [Frontend: Temas e Template Types](./FRONTEND-Themes-TemplateTypes.md) - Guia frontend para temas por tipo de email e endpoints `/template-types`
-- [Frontend: Usuários, Grupos e Roles](./FRONTEND-Users-Groups-Roles.md) - Guia frontend para modelo de usuário, RBAC e grupos
-- [SIMULATOR-MANUAL: Manual do Simulador](./SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
-- [NODE-RED Alarm Bundle Integration](./NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
+- [RFC-0001: GCDR Core & Marketplace](./rfcs/RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Especificação completa
+- [RFC-0002: Authorization Model](./rfcs/RFC-0002-GCDR-Authorization-Model.md) - Modelo de autorização
+- [RFC-0003: JWT Multiple Audience](./rfcs/RFC-0003-Refactoring-Multiple-Audience.md) - Autenticação entre serviços
+- [RFC-0004: Migration DynamoDB to PostgreSQL](./rfcs/RFC-0004-Migration-DynamoDB-to-Postgres.md) - Migração de banco de dados
+- [RFC-0005: Container Deployment](./rfcs/RFC-0005-Container-Deployment-Migration.md) - Migração para containers Docker
+- [RFC-0009: Events Audit Logs](./rfcs/RFC-0009-Events-Audit-Logs.md) - Sistema de auditoria e logs de eventos
+- [RFC-0010: Premium Alarm Simulator](./rfcs/RFC-0010-Premium-Alarm-Simulator.md) - Especificação do simulador
+- [RFC-0011: User Registration Workflow](./rfcs/RFC-0011-User-Registration-Approval-Workflow.md) - Auto-cadastro e aprovação de usuários
+- [RULE-ENTITY: Rules Engine](./alarms/RULE-ENTITY.md) - Documentação do motor de regras
+- [RFC-0015: Alarm Bundle Version History](./rfcs/RFC-0015-Alarm-Bundle-Version-History.md) - Versionamento de bundles
+- [RFC-0016: ThingsBoard Entity Mapping](./rfcs/RFC-0016-ThingsBoard-Entity-Mapping.md) - Mapeamento de entidades ThingsBoard
+- [RFC-0020: Public Single Apps](./rfcs/RFC-0020-Public-Single-Apps.md) - Apps públicos de formulário com respostas versionadas
+- [RFC-0021: HTML Templates Engine](./rfcs/BACKEND-RFC-0021-HTML-Templates.md) - Motor de templates HTML para email com preview e catálogo de tags (6 tipos)
+- [Frontend: Temas e Template Types](./frontend/FRONTEND-Themes-TemplateTypes.md) - Guia frontend para temas por tipo de email e endpoints `/template-types`
+- [Frontend: Usuários, Grupos e Roles](./frontend/FRONTEND-Users-Groups-Roles.md) - Guia frontend para modelo de usuário, RBAC e grupos
+- [SIMULATOR-MANUAL: Manual do Simulador](./simulator/SIMULATOR-MANUAL.md) - Guia de uso do simulador de alarmes
+- [NODE-RED Alarm Bundle Integration](./node-red/NODE-RED-Alarm-Bundle-Integration.md) - Integração Node-RED com bundles
 - [RFC-0022: Device Conformity Tooling](./RFC-0022-Device-Conformity-Tooling.md) - Scripts `engine-check-inconformidades`: pipeline de verificação, action plans, relocações e registry
-- [RFC-0023: Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md) - Spec do endpoint assíncrono que substitui os shell scripts por uma Job API com fases e log de execução
+- [RFC-0023: Device Sync Job API](./rfcs/RFC-0023-Device-Sync-Job-API.md) - Spec do endpoint assíncrono que substitui os shell scripts por uma Job API com fases e log de execução
 - [ARCHITECTURE: Device Sync Jobs](./ARCHITECTURE-Device-Sync-Jobs.md) - Arquitetura da implementação: pipeline de 6 fases, decisões de design, modelo de dados e limitações conhecidas
-- [Frontend: Device Sync Jobs](./FRONTEND-Device-Sync-Jobs.md) - Guia de integração frontend: payloads, exemplos de polling, badges de status e progresso
+- [Frontend: Device Sync Jobs](./frontend/FRONTEND-Device-Sync-Jobs.md) - Guia de integração frontend: payloads, exemplos de polling, badges de status e progresso
 
 ### Documentação Externa
 
@@ -1959,7 +1959,7 @@ Use este checklist para acompanhar seu progresso:
 - 6 fases: CHECK → ACTION_PLAN → DETECT_RELOCATIONS → RELOCATE → APPLY_UPDATES → CONSOLIDATE_CREATES
 - Polling via `GET /device-sync/jobs/:jobId` e log via `GET /device-sync/jobs/:jobId/log`
 - Tabela `device_sync_jobs` com `phases_summary` e `log_entries` JSONB
-- RFC: `docs/RFC-0023-Device-Sync-Job-API.md`
+- RFC: `docs/rfcs/RFC-0023-Device-Sync-Job-API.md`
 
 ### 2026-02-26
 
@@ -2034,8 +2034,8 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - `scripts/db/seeds/20-templates.sql` — reescrito em plain SQL (removido wrapper DO $$ ... END $$)
 
 *Frontend Guides adicionados:*
-- `docs/FRONTEND-Themes-TemplateTypes.md` — temas por tipo, endpoints template-types, fallback chain, sugestão UX
-- `docs/FRONTEND-Users-Groups-Roles.md` — modelo de usuário, RBAC (roles/policies/assignments/scope), grupos
+- `docs/frontend/FRONTEND-Themes-TemplateTypes.md` — temas por tipo, endpoints template-types, fallback chain, sugestão UX
+- `docs/frontend/FRONTEND-Users-Groups-Roles.md` — modelo de usuário, RBAC (roles/policies/assignments/scope), grupos
 
 ### 2026-03-05
 
@@ -2047,7 +2047,7 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - Catálogo de tags por tipo: `EMAIL_ALARM`, `EMAIL_REPORT`, `EMAIL_WELCOME`, `RELEASE_NOTE`, `NOTIFICATION`, `INSIGHT`
 - Soft delete via status `ARCHIVED` (sem exclusão física)
 - Migration: `scripts/db/migrations/html-templates.sql`
-- RFC: `docs/BACKEND-RFC-0021-HTML-Templates.md`
+- RFC: `docs/rfcs/BACKEND-RFC-0021-HTML-Templates.md`
 
 **GET /customers/:id/ancestors**
 - Endpoint para retornar a cadeia de ancestrais de um customer (do root até o pai imediato)
@@ -2063,7 +2063,7 @@ curl -X DELETE http://localhost:3015/api/v1/customers/84e0370e-636a-4741-9874-50
 - 12 endpoints: 5 de gestão de apps + 7 de respostas (submit, revise, history, status, etc.)
 - Auth: `authMiddleware` em todas as rotas (gestão e leitura de respostas protegidas)
 - Migration: `scripts/db/migrations/public-single-apps.sql`
-- RFC: `docs/RFC-0020-Public-Single-Apps.md`
+- RFC: `docs/rfcs/RFC-0020-Public-Single-Apps.md`
 
 **Force Delete Customer**
 - `DELETE /customers/:id/force` — deleta customer + toda a árvore de descendentes + dados associados em uma transação

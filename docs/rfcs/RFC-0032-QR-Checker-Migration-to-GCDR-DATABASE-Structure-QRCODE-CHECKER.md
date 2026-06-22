@@ -501,9 +501,9 @@ Notas avulsas anexadas a uma visita.
 > dos dados depois que **0026** (rename `qrc_*` → `wo_*`) e **0027**
 > (drop `wo_customer_settings`) forem aplicadas, mais o rename de código.
 > Referências:
-> [0024](../drizzle/migrations/0024_qrchecker_schema.sql) +
-> [0025](../drizzle/migrations/0025_devices_metering_columns.sql) +
-> [0026](../drizzle/migrations/0026_rename_qrc_to_wo.sql) +
+> [0024](../../drizzle/migrations/0024_qrchecker_schema.sql) +
+> [0025](../../drizzle/migrations/0025_devices_metering_columns.sql) +
+> [0026](../../drizzle/migrations/0026_rename_qrc_to_wo.sql) +
 > 0027 (a criar — drop table + migrar opt-in para `customer.config.wo`).
 
 ### 6.1 Visão geral
@@ -614,7 +614,7 @@ todos os filtros e índices úteis começam por ele.
 ### 6.3 Tabelas `wo_*` (12 tabelas + 5 colunas em tabelas core + 1 chave em `customers.config`)
 
 Resumo do que cada tabela carrega. Schemas completos: ver
-[0024](../drizzle/migrations/0024_qrchecker_schema.sql) (todas com prefixo
+[0024](../../drizzle/migrations/0024_qrchecker_schema.sql) (todas com prefixo
 `qrc_*` lá, renomeadas em 0026; `qrc_customer_settings` removida em 0027).
 
 #### Domínio Instalação (5)
@@ -681,9 +681,9 @@ O domínio Work Orders **não é uma ilha**. Ele se conecta com:
 | **Customers (RBAC root)** | Toda WO referencia `customer_id`. Opt-in via `customers.config.wo.enabled = true` (jsonb). | `src/domain/entities/Customer.ts` |
 | **Users** | PIN colunas em `users`; `installed_by`/`created_by`/`changed_by` apontam para `users.id`. | `src/domain/entities/User.ts` |
 | **Devices** | `wo_installations.device_id` FK; `devices.wo_addr_*` para resolução por QR. | `src/domain/entities/Device.ts` |
-| **FileAssets** | Toda imagem WO escreve em `file_assets` com `owner_type=wo_*`; signed URLs servidos pela API genérica `/api/v1/files/:id/url`. | `docs/FILE-ASSETS-FRONTEND.md` |
+| **FileAssets** | Toda imagem WO escreve em `file_assets` com `owner_type=wo_*`; signed URLs servidos pela API genérica `/api/v1/files/:id/url`. | `docs/frontend/FILE-ASSETS-FRONTEND.md` |
 | **Role assignments** | Roles `role:field-operator`, `role:wo-viewer`, `role:wo-admin`; scopes `customer:<uuid>`, `visita:<uuid>`, `tenant`. | `docs/GCDR-USER.md` (RBAC) |
-| **Audit logs (RFC-0009)** | Os `wo_*_audit` são **complementares** (forma específica do domínio). Eventos high-level também emitem em `audit_logs` global. | `docs/RFC-0009-Events-Audit-Logs.md` |
+| **Audit logs (RFC-0009)** | Os `wo_*_audit` são **complementares** (forma específica do domínio). Eventos high-level também emitem em `audit_logs` global. | `docs/rfcs/RFC-0009-Events-Audit-Logs.md` |
 | **Centrals** | Sem coluna dedicada. Se um QR scan precisar resolver central sem `centralId` explícito, a regra é: usar a única central do customer; se houver várias, retornar 400 com lista pra usuário escolher. (Decisão pendente — ver §7) | `src/domain/entities/Central.ts` |
 
 ---

@@ -1,6 +1,6 @@
 # RFC-0046 — Customer Consumption Goals · Review Feedback
 
-- **Reviews of:** `docs/RFC-0046-Customer-Consumption-Goals.md`
+- **Reviews of:** `docs/rfcs/RFC-0046-Customer-Consumption-Goals.md`
 - **Date:** 2026-06-18
 - **Format:** BMAD party-mode roundtable (independent reviewers)
 - **Reviewers:** 🏗️ Winston (System Architect) · 📋 John (Product Manager) · 🎨 Sally (UX Designer) · 💻 Amelia (Senior Software Engineer)

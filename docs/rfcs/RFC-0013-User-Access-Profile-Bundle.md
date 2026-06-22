@@ -987,7 +987,7 @@ Include permissions directly in JWT token.
 
 - [RFC-0002: Authorization Model](./RFC-0002-GCDR-Authorization-Model.md)
 - [RFC-0012: Features Registry](./RFC-0012-Features-Registry.md)
-- [AUTHORIZATION-MODEL.md](./AUTHORIZATION-MODEL.md)
+- [AUTHORIZATION-MODEL.md](../AUTHORIZATION-MODEL.md)
 - [AWS IAM Policy Evaluation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html)
 
 ---

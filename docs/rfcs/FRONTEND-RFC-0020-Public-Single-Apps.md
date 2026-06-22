@@ -683,7 +683,7 @@ await fetch(`${BASE}/public-apps/myio-migration-form-v6/responses/${groupId}/sta
 
 ## 10. Referências
 
-- **RFC completo:** [`docs/RFC-0020-Public-Single-Apps.md`](./RFC-0020-Public-Single-Apps.md)
+- **RFC completo:** [`docs/rfcs/RFC-0020-Public-Single-Apps.md`](./RFC-0020-Public-Single-Apps.md)
 - **Swagger UI (local):** `http://localhost:3015/docs`
 - **Controller:** `src/controllers/public-single-apps.controller.ts`
 - **Service:** `src/services/PublicSingleAppService.ts`

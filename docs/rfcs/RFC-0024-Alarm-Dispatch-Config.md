@@ -3,7 +3,7 @@
 - **Feature Name**: `alarm-dispatch-config`
 - **Start Date**: 2026-03-12
 - **RFC PR**: (pending)
-- **Related RFCs**: [RFC-0023 Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md), [RULE-ENTITY](./RULE-ENTITY.md)
+- **Related RFCs**: [RFC-0023 Device Sync Job API](./RFC-0023-Device-Sync-Job-API.md), [RULE-ENTITY](../alarms/RULE-ENTITY.md)
 
 ---
 

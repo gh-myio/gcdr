@@ -1,6 +1,6 @@
 # Frontend - Guia de Integração: Alarm Bundle Versions
 
-> **RFC:** [RFC-0015](./RFC-0015-Alarm-Bundle-Version-History.md)
+> **RFC:** [RFC-0015](../rfcs/RFC-0015-Alarm-Bundle-Version-History.md)
 > **Data:** 2026-02-19
 > **Audiencia:** Equipe Frontend
 

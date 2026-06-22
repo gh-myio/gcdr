@@ -4,7 +4,7 @@
 - Start Date: 2026-01-29
 - RFC PR: (leave blank)
 - Tracking Issue: (leave blank)
-- Quick Reference: [SOLVE-DOKPLOY.md](./SOLVE-DOKPLOY.md)
+- Quick Reference: [SOLVE-DOKPLOY.md](../server/SOLVE-DOKPLOY.md)
 
 ## Summary
 This RFC documents multiple issues encountered during Dokploy deployment on 2026-01-29,
@@ -305,5 +305,5 @@ docker system prune -f
 ---
 
 ## Related Documents
-- [SOLVE-DOKPLOY.md](./SOLVE-DOKPLOY.md) - Quick reference runbook
-- [FEEDBACK-DOKPLOY.md](./FEEDBACK-DOKPLOY.md) - Issue tracking template
+- [SOLVE-DOKPLOY.md](../server/SOLVE-DOKPLOY.md) - Quick reference runbook
+- [FEEDBACK-DOKPLOY.md](../server/FEEDBACK-DOKPLOY.md) - Issue tracking template

@@ -483,7 +483,7 @@ Two new tables, FK-deduplicated brokers. Best for cardinality (many centrals sha
     - [ ] `CentralService` enrich returns correct `mqttPasswordsSet` map.
     - [ ] Migration SQL: round-trip backfill of one customer × 2 centrals × 2 passwords each.
 - [ ] RFC-0033 marked as "partially superseded by RFC-0035" in its header; link added.
-- [ ] `docs/API-Rule-GetById.md` — stale `gatewayToken` references removed (side-quest, separate PR ok).
+- [ ] `docs/api/API-Rule-GetById.md` — stale `gatewayToken` references removed (side-quest, separate PR ok).
 - [ ] `docs/BACKLOG-RFCS.md` updated.
 - [ ] `docs/ONBOARDING.md` or `docs/GCDR-USER.md` cross-references updated if they pointed at the old `centrals.items[]` shape.
 - [ ] Verified in PR description: zero changes to `alarms-backend.git`, `data-ingestion.git`, or any external consumer. Internal-only refactor.

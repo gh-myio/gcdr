@@ -328,7 +328,7 @@ export const annotations = pgTable('annotations', {
 // annotationResponses, annotationEvents, annotationMentions, annotationAttachments follow the same conventions.
 ```
 
-> Note on governance (`docs/DB-MIGRATIONS.md`): the Drizzle journal froze at `0012` and the schema is not replayable from scratch. `schema.ts` and the hand-written migration must be kept in lockstep so a fresh `db:push` + `db:mig:baseline` produces the same shape.
+> Note on governance (`docs/database/DB-MIGRATIONS.md`): the Drizzle journal froze at `0012` and the schema is not replayable from scratch. `schema.ts` and the hand-written migration must be kept in lockstep so a fresh `db:push` + `db:mig:baseline` produces the same shape.
 
 ### 3. Migration
 

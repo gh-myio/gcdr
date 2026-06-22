@@ -1,7 +1,7 @@
 # FRONTEND — Device Sync Job API
 
 Guia de integração frontend para o endpoint de sincronização de devices (`/api/v1/device-sync/jobs`).
-Baseado em: [RFC-0023](./RFC-0023-Device-Sync-Job-API.md)
+Baseado em: [RFC-0023](../rfcs/RFC-0023-Device-Sync-Job-API.md)
 
 ---
 

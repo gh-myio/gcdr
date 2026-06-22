@@ -1,6 +1,6 @@
 # RFC-0032 — QR Checker Migration to GCDR (Backend, Data, MCP)
 
-> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical RFC keeps the original `qrc` naming throughout; see [WO-OS-MAP.md](./WO-OS-MAP.md) for the current domain map.
+> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical RFC keeps the original `qrc` naming throughout; see [WO-OS-MAP.md](../WO-OS-MAP.md) for the current domain map.
 
 - **Status:** Phases 1–4 ✅ done; **Phases 5–8 RETIRED** — greenfield validated, `qrcode-check.git` archived without data migration.
 - **Created:** 2026-04-27
@@ -11,7 +11,7 @@
   - [RFC-0009 — Events Audit Logs](./RFC-0009-Events-Audit-Logs.md)
   - [RFC-0030 — MYIO Wiki (file_assets, public_slug, S3 layout)](./RFC-0030-MYIO-Wiki-Knowledge-Base.md)
   - [RFC-0030 — S3 Bucket Setup](./RFC-0030-S3-Bucket-Setup.md)
-  - [FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md)
+  - [FILE-ASSETS-FRONTEND.md](../frontend/FILE-ASSETS-FRONTEND.md)
 
 ## Status snapshot (2026-04-30)
 

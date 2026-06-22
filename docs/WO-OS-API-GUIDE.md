@@ -6,7 +6,7 @@
 > *projection* of the latest lifecycle event.
 >
 > Companion docs: [`WO-OS-MAP.md`](./WO-OS-MAP.md) (domain map),
-> [`RFC-0037-Work-Orders-Event-Model.md`](./RFC-0037-Work-Orders-Event-Model.md)
+> [`RFC-0037-Work-Orders-Event-Model.md`](./rfcs/RFC-0037-Work-Orders-Event-Model.md)
 > (model rationale), [`openapi.yaml`](./openapi.yaml) (machine spec, Swagger at
 > `/docs`).
 

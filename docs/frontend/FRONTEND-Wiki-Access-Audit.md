@@ -5,8 +5,8 @@
 - **Audience:** Frontend developers building the **"Wiki access audit"** screen — a diagnostic UI that explains *why* a given user can or can't write/publish wiki pages.
 - **Companion docs:**
   - [FRONTEND-Wiki-Integrations-Form.md](./FRONTEND-Wiki-Integrations-Form.md) — the form that triggers `wiki.page.create` + `wiki.visibility.public`.
-  - [RFC-0030 — MYIO Wiki](./RFC-0030-MYIO-Wiki-Knowledge-Base.md) — RBAC + visibility model.
-  - [GCDR-USER.md](./GCDR-USER.md) — auth, tenant header, role/policy concepts.
+  - [RFC-0030 — MYIO Wiki](../rfcs/RFC-0030-MYIO-Wiki-Knowledge-Base.md) — RBAC + visibility model.
+  - [GCDR-USER.md](../GCDR-USER.md) — auth, tenant header, role/policy concepts.
 
 ---
 

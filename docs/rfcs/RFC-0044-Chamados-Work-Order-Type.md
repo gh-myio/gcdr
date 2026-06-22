@@ -4,7 +4,7 @@
 - **Date:** 2026-06-15
 - **Domain:** Work Orders (`wo` / OS) — extends RFC-0037
 - **Depends on:** [RFC-0037 WO Event Model], [RFC-0041 Rules Engine], [RFC-0036/0037 file_assets owner types]
-- **Related:** `docs/integracao_freshdesk_myio.md` (Freshdesk × Myio ticket views)
+- **Related:** `docs/integrations/integracao_freshdesk_myio.md` (Freshdesk × Myio ticket views)
 
 ## 1. Summary
 
@@ -188,7 +188,7 @@ aggregated timeline. Each derived OS detail shows "Origem: Chamado #…".
 idempotent importer upserts by `external_id`: Freshdesk status → CHAMADO flow,
 conversations → annotations, attachments → `file_assets`, `cc_emails` →
 watchers, `company_id` → `customer_id`. Cutover vs coexistence (webhook sync) is
-a later decision; see `docs/integracao_freshdesk_myio.md`.
+a later decision; see `docs/integrations/integracao_freshdesk_myio.md`.
 
 ## 9. Rollout
 

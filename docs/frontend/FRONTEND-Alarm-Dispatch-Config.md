@@ -1,7 +1,7 @@
 # FRONTEND — Alarm Dispatch Configuration (RFC-0024)
 
 Guia de integração frontend para o sistema de despacho de notificações de alarme em dois níveis.
-Baseado em: [RFC-0024](./RFC-0024-Alarm-Dispatch-Config.md)
+Baseado em: [RFC-0024](../rfcs/RFC-0024-Alarm-Dispatch-Config.md)
 
 ---
 
@@ -445,6 +445,6 @@ Salvar chama `PATCH /rules/:id` com o campo `notifications` atualizado.
 
 ## Referências
 
-- [RFC-0024 — Alarm Dispatch Configuration](./RFC-0024-Alarm-Dispatch-Config.md)
+- [RFC-0024 — Alarm Dispatch Configuration](../rfcs/RFC-0024-Alarm-Dispatch-Config.md)
 - [RULES-FRONTEND-GUIDE](./RULES-FRONTEND-GUIDE.md)
 - [FRONTEND-Users-Groups-Roles](./FRONTEND-Users-Groups-Roles.md)

@@ -38,7 +38,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0027 — Internal Support Rules in Bundle
 
 **Status**: 🔴 Not started (1-line fix + minimal logic)
-**File**: `docs/RFC-0027-Internal-Support-Rules-In-Bundle.md`
+**File**: `docs/rfcs/RFC-0027-Internal-Support-Rules-In-Bundle.md`
 **Estimated effort**: Low (hours)
 
 **What's missing:**
@@ -53,7 +53,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0018 — Per-Device Rule Value Overrides
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0018-Per-Device-Rule-Value-Overrides.md`
+**File**: `docs/rfcs/RFC-0018-Per-Device-Rule-Value-Overrides.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -72,7 +72,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0028 — Device Calibration Offsets
 
 **Status**: 🔴 Not started (advanced draft)
-**File**: `docs/RFC-0028-Device-Calibration-Offsets.md`
+**File**: `docs/rfcs/RFC-0028-Device-Calibration-Offsets.md`
 **Estimated effort**: High (weeks)
 
 **What's missing:**
@@ -92,7 +92,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0024 — Alarm Dispatch Configuration
 
 **Status**: 🔴 Not started (design complete, co-dependent with RFC-0025)
-**File**: `docs/RFC-0024-Alarm-Dispatch-Config.md`
+**File**: `docs/rfcs/RFC-0024-Alarm-Dispatch-Config.md`
 **Estimated effort**: High (weeks)
 
 **What's missing:**
@@ -109,7 +109,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0025 — User Notification Contacts
 
 **Status**: 🔴 Not started (co-dependency with RFC-0024)
-**File**: `docs/RFC-0025-User-Notification-Contacts.md`
+**File**: `docs/rfcs/RFC-0025-User-Notification-Contacts.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -126,7 +126,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0023 — Device Sync Job API
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0023-Device-Sync-Job-API.md`
+**File**: `docs/rfcs/RFC-0023-Device-Sync-Job-API.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -143,7 +143,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0016 — ThingsBoard Entity Mapping & Ingestion IDs
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0016-ThingsBoard-Entity-Mapping.md`
+**File**: `docs/rfcs/RFC-0016-ThingsBoard-Entity-Mapping.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -162,7 +162,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0012 — Features Registry
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0012-Features-Registry.md`
+**File**: `docs/rfcs/RFC-0012-Features-Registry.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -185,7 +185,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0013 — User Access Profile Bundle
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0013-User-Access-Profile-Bundle.md`
+**File**: `docs/rfcs/RFC-0013-User-Access-Profile-Bundle.md`
 **Estimated effort**: High (weeks)
 
 **What's missing:**
@@ -202,7 +202,7 @@ These RFCs have a detailed spec and can be started without any design blockers.
 ### RFC-0020 — Public Single Apps (Versioned Forms)
 
 **Status**: 🔴 Not started (spec complete)
-**File**: `docs/RFC-0020-Public-Single-Apps.md`
+**File**: `docs/rfcs/RFC-0020-Public-Single-Apps.md`
 **Estimated effort**: Medium (days)
 
 **What's missing:**
@@ -223,7 +223,7 @@ RFCs with existing code but relevant gaps.
 
 **Status**: 🟡 Partial (DTO and status enum implemented; approval flow
 incomplete)
-**File**: `docs/RFC-0011-User-Registration-Approval-Workflow.md`
+**File**: `docs/rfcs/RFC-0011-User-Registration-Approval-Workflow.md`
 
 **What's missing:**
 - `verification_tokens` table + `VerificationTokenService`.
@@ -241,7 +241,7 @@ incomplete)
 ### RFC-0015 — Alarm Bundle Version History
 
 **Status**: 🟡 Partial (table and cache invalidation implemented)
-**File**: `docs/RFC-0015-Alarm-Bundle-Version-History.md`
+**File**: `docs/rfcs/RFC-0015-Alarm-Bundle-Version-History.md`
 
 **What's missing:**
 - Endpoint `GET /customers/:id/alarm-rules/bundle/versions` (list version
@@ -256,7 +256,7 @@ incomplete)
 ### RFC-0017 — External ID Lookup Endpoints
 
 **Status**: 🟡 Partial (devices and customers implemented)
-**File**: `docs/RFC-0017-ExternalId-Lookup-Endpoints.md`
+**File**: `docs/rfcs/RFC-0017-ExternalId-Lookup-Endpoints.md`
 
 **What's missing:**
 - `GET /assets/external/:externalId` (asset-by-external-ID endpoint still does
@@ -269,7 +269,7 @@ incomplete)
 ### RFC-0010 — Premium Alarm Simulator
 
 **Status**: 🟡 Partial (MVP implemented; tests and docs missing)
-**File**: `docs/RFC-0010-Premium-Alarm-Simulator.md`
+**File**: `docs/rfcs/RFC-0010-Premium-Alarm-Simulator.md`
 
 **What's missing:**
 - Unit tests for `SimulatorService`.
@@ -283,7 +283,7 @@ incomplete)
 ### RFC-0022 — ThingsBoard ↔ GCDR Device Conformity
 
 **Status**: 🟡 Partial (inspection script exists; automation does not)
-**File**: `docs/RFC-0022-ThingsBoard-GCDR-Device-Conformity.md`
+**File**: `docs/rfcs/RFC-0022-ThingsBoard-GCDR-Device-Conformity.md`
 
 **What's missing:**
 - Automatic reconciliation API (detect + fix divergences without manual
@@ -295,7 +295,7 @@ incomplete)
 ### RFC-0008 — Device Attributes Extension
 
 **Status**: 🟡 Partial (main fields implemented; validations pending)
-**File**: `docs/RFC-0008-Device-Attributes-Extension.md`
+**File**: `docs/rfcs/RFC-0008-Device-Attributes-Extension.md`
 
 **What's missing:**
 - Reject `mapInstantaneousPower` > 100KB (service-level validation).
@@ -309,7 +309,7 @@ incomplete)
 
 **Status**: 🟡 Partial (structural RBAC exists; advanced evaluation engine
 does not)
-**File**: `docs/RFC-0002-GCDR-Authorization-Model.md`
+**File**: `docs/rfcs/RFC-0002-GCDR-Authorization-Model.md`
 
 **Future:**
 - Policy simulation and dry-run mode.

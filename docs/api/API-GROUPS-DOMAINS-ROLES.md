@@ -10,7 +10,7 @@
 > `RELEASE_NOTE`, `NOTIFICATION`, `ESCALATION`, `ACCESS_CONTROL`, `REPORTING`,
 > `MAINTENANCE`, `MONITORING`, `CUSTOM`.
 > For the canonical, code-verified reference, see
-> [`docs/GCDR-USER.md`](./GCDR-USER.md).
+> [`docs/GCDR-USER.md`](../GCDR-USER.md).
 
 ## Domains API (Metrics for Rules)
 

@@ -2,7 +2,7 @@
 
 > **Para:** Time de Frontend
 > **Versão:** 2.0 — 2026-03-16
-> **Relacionado:** `docs/BACKEND-RFC-0021-HTML-Templates-v2.md`, `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
+> **Relacionado:** `docs/rfcs/BACKEND-RFC-0021-HTML-Templates-v2.md`, `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
 
 ---
 
@@ -360,7 +360,7 @@ Use `var(--color-primary)` no HTML do template para que o theme seja aplicado.
 
 ## Referências
 
-- **Backend RFC:** `docs/BACKEND-RFC-0021-HTML-Templates-v2.md`
+- **Backend RFC:** `docs/rfcs/BACKEND-RFC-0021-HTML-Templates-v2.md`
 - **Payload contract EMAIL_SENDER:** `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
 - **Seeds de templates:** `scripts/db/seeds/20-templates.sql`, `21-release-note-template.sql`
 - **Seeds de themes:** `scripts/db/seeds/19-themes.sql`

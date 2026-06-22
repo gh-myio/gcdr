@@ -1,6 +1,6 @@
 # Node-RED - Guia: Alarm Bundle Version History & Cache Invalidation
 
-> **RFC:** [RFC-0015](./RFC-0015-Alarm-Bundle-Version-History.md)
+> **RFC:** [RFC-0015](../rfcs/RFC-0015-Alarm-Bundle-Version-History.md)
 > **Data:** 2026-02-19
 > **Audiencia:** Equipe Node-RED / IoT
 

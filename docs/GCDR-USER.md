@@ -350,8 +350,8 @@ report, send welcome emails, etc.).
 | *      | `/groups/:groupId/dispatch`           | group dispatch matrix                                |
 | *      | `/groups/:groupId/channels`           | group channel targets                                |
 
-See `docs/GROUPS-CHANNELS-NOTIFICATIONS.md` and
-`docs/RFC-0024-Alarm-Dispatch-Config.md` for dispatch payloads.
+See `docs/alarms/GROUPS-CHANNELS-NOTIFICATIONS.md` and
+`docs/rfcs/RFC-0024-Alarm-Dispatch-Config.md` for dispatch payloads.
 
 ---
 

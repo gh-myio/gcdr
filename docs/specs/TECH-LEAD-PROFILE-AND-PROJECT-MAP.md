@@ -194,7 +194,7 @@ npm run docker:up / docker:down / docker:logs
 
 - **Engine:** PostgreSQL 16. **ORM:** Drizzle. **Schema:** `src/infrastructure/database/drizzle/schema.ts` (~58 tables).
 - **Migrations:** SQL files under `drizzle/migrations/` (currently up to `0048`).
-- **Governance (important):** the Drizzle journal froze at `0012` and the raw chain does **not** rebuild the schema from scratch. Production uses a **custom runner** with a `schema_migrations` tracking table (`npm run db:mig:*`). See `docs/DB-MIGRATIONS.md` and the migration-governance notes. **Always confirm production migration state before assuming a column/table exists.**
+- **Governance (important):** the Drizzle journal froze at `0012` and the raw chain does **not** rebuild the schema from scratch. Production uses a **custom runner** with a `schema_migrations` tracking table (`npm run db:mig:*`). See `docs/database/DB-MIGRATIONS.md` and the migration-governance notes. **Always confirm production migration state before assuming a column/table exists.**
 
 ### 5.1 Table groups (selected)
 
@@ -252,14 +252,14 @@ npm run docker:up / docker:down / docker:logs
 | Onboarding (primary) | `docs/ONBOARDING.md` |
 | Users / auth / RBAC / groups / bundle / contacts (canonical) | `docs/GCDR-USER.md` |
 | Authorization model | `docs/AUTHORIZATION-MODEL.md` |
-| Rules engine | `docs/RULE-ENTITY.md` |
-| DB migrations & governance | `docs/DB-MIGRATIONS.md` |
+| Rules engine | `docs/alarms/RULE-ENTITY.md` |
+| DB migrations & governance | `docs/database/DB-MIGRATIONS.md` |
 | Work Orders ("OS") domain map | `docs/WO-OS-MAP.md` |
-| Alarm bundle version history | `docs/RFC-0015-Alarm-Bundle-Version-History.md` |
-| ThingsBoard entity mapping | `docs/RFC-0016-ThingsBoard-Entity-Mapping.md` |
-| API keys for consumers | `docs/API-KEYS-CONSUMERS.md` |
-| Alarm orchestrator backend API | `docs/alarm-orsquestrador-backend` |
-| Deploy (Dokploy) | `docs/DEPLOY-DOKPLOY.md` |
+| Alarm bundle version history | `docs/rfcs/RFC-0015-Alarm-Bundle-Version-History.md` |
+| ThingsBoard entity mapping | `docs/rfcs/RFC-0016-ThingsBoard-Entity-Mapping.md` |
+| API keys for consumers | `docs/api/API-KEYS-CONSUMERS.md` |
+| Alarm orchestrator backend API | `docs/alarms/alarm-orsquestrador-backend` |
+| Deploy (Dokploy) | `docs/server/DEPLOY-DOKPLOY.md` |
 | Consolidated RFC backlog | `docs/BACKLOG-RFCS.md` |
 
 ---

@@ -748,7 +748,7 @@ INSIGHT         → INSIGHT
 
 ## 9. Referências
 
-- **Spec completa do engine:** `docs/RFC-0021-HTML-Templates-Engine.md`
+- **Spec completa do engine:** `docs/rfcs/RFC-0021-HTML-Templates-Engine.md`
 - **Payload contract para EMAIL_SENDER:** `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
 - **Seeds:** `scripts/db/seeds/20-templates.sql`
 - **Migration:** `scripts/db/migrations/add-notification-insight-template-types.sql`

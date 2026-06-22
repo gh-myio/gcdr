@@ -197,8 +197,8 @@ This would move the comparison server-side, enabling scheduled conformity checks
 ## Prior Art
 
 - `scripts/db/ops/fix-moxuara-malformed-uuid.sql` — precedent for ops scripts targeting specific divergence fixes.
-- `docs/RFC-0016-ThingsBoard-Entity-Mapping.md` — defines `externalId` as the TB↔GCDR link for devices and customers.
-- `docs/GUIDE-THINGSBOARD-Get-Device-By-ExternalId.md` — documents the enriched lookup endpoint used internally by this script.
+- `docs/rfcs/RFC-0016-ThingsBoard-Entity-Mapping.md` — defines `externalId` as the TB↔GCDR link for devices and customers.
+- `docs/thingsboard/GUIDE-THINGSBOARD-Get-Device-By-ExternalId.md` — documents the enriched lookup endpoint used internally by this script.
 
 ---
 

@@ -255,25 +255,25 @@ Caveats:
 ## Documentation
 
 - [ONBOARDING.md](docs/ONBOARDING.md) - Developer onboarding guide
-- [RFC-0001](docs/RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Integration Marketplace
-- [RFC-0002](docs/RFC-0002-GCDR-Authorization-Model.md) - Authorization Model (RFC)
+- [RFC-0001](./docs/rfcs/RFC-0001-GCDR-MYIO-Integration-Marketplace.md) - Integration Marketplace
+- [RFC-0002](./docs/rfcs/RFC-0002-GCDR-Authorization-Model.md) - Authorization Model (RFC)
 - [AUTHORIZATION-MODEL.md](docs/AUTHORIZATION-MODEL.md) - Authorization Implementation Guide
-- [RFC-0003](docs/RFC-0003-Refactoring-Multiple-Audience.md) - JWT Multiple Audience
-- [RFC-0004](docs/RFC-0004-Migration-DynamoDB-to-Postgres.md) - PostgreSQL Migration
-- [RFC-0005](docs/RFC-0005-Container-Deployment-Migration.md) - Container Deployment
-- [RFC-0006](docs/RFC-0006-Database-Seed-Scripts.md) - Database Seed Scripts
-- [RFC-0007](docs/RFC-0007-Database-Admin-UI.md) - Database Admin UI
-- [RFC-0008](docs/RFC-0008-Device-Attributes-Extension.md) - Device Attributes Extension
-- [RFC-0009](docs/RFC-0009-Events-Audit-Logs.md) - Events & Audit Logs
-- [RFC-0010](docs/RFC-0010-Premium-Alarm-Simulator.md) - Premium Alarm Simulator
-- [RFC-0011](docs/RFC-0011-User-Registration-Approval-Workflow.md) - User Registration & Approval Workflow
-- [RFC-0012](docs/RFC-0012-Features-Registry.md) - Features Registry (Draft)
-- [RFC-0013](docs/RFC-0013-User-Access-Profile-Bundle.md) - User Access Profile Bundle
-- [RFC-0014](docs/RFC-0014-FixSimulator-Implementation-Plan.md) - Simulator UI/UX Overhaul (Scenario Builder + 2×3 Grid)
-- [RULE-ENTITY.md](docs/RULE-ENTITY.md) - Rules Engine Documentation
-- [SIMULATOR-MANUAL.md](docs/SIMULATOR-MANUAL.md) - Alarm Simulator Manual
-- [DEPLOY-DOKPLOY.md](docs/DEPLOY-DOKPLOY.md) - Dokploy Deployment Guide
-- [SOLVE-DOKPLOY.md](docs/SOLVE-DOKPLOY.md) - Dokploy Issues Runbook
+- [RFC-0003](./docs/rfcs/RFC-0003-Refactoring-Multiple-Audience.md) - JWT Multiple Audience
+- [RFC-0004](./docs/rfcs/RFC-0004-Migration-DynamoDB-to-Postgres.md) - PostgreSQL Migration
+- [RFC-0005](./docs/rfcs/RFC-0005-Container-Deployment-Migration.md) - Container Deployment
+- [RFC-0006](./docs/rfcs/RFC-0006-Database-Seed-Scripts.md) - Database Seed Scripts
+- [RFC-0007](./docs/rfcs/RFC-0007-Database-Admin-UI.md) - Database Admin UI
+- [RFC-0008](./docs/rfcs/RFC-0008-Device-Attributes-Extension.md) - Device Attributes Extension
+- [RFC-0009](./docs/rfcs/RFC-0009-Events-Audit-Logs.md) - Events & Audit Logs
+- [RFC-0010](./docs/rfcs/RFC-0010-Premium-Alarm-Simulator.md) - Premium Alarm Simulator
+- [RFC-0011](./docs/rfcs/RFC-0011-User-Registration-Approval-Workflow.md) - User Registration & Approval Workflow
+- [RFC-0012](./docs/rfcs/RFC-0012-Features-Registry.md) - Features Registry (Draft)
+- [RFC-0013](./docs/rfcs/RFC-0013-User-Access-Profile-Bundle.md) - User Access Profile Bundle
+- [RFC-0014](./docs/rfcs/RFC-0014-FixSimulator-Implementation-Plan.md) - Simulator UI/UX Overhaul (Scenario Builder + 2×3 Grid)
+- [RULE-ENTITY.md](./docs/alarms/RULE-ENTITY.md) - Rules Engine Documentation
+- [SIMULATOR-MANUAL.md](./docs/simulator/SIMULATOR-MANUAL.md) - Alarm Simulator Manual
+- [DEPLOY-DOKPLOY.md](./docs/server/DEPLOY-DOKPLOY.md) - Dokploy Deployment Guide
+- [SOLVE-DOKPLOY.md](./docs/server/SOLVE-DOKPLOY.md) - Dokploy Issues Runbook
 
 ## Deployment
 

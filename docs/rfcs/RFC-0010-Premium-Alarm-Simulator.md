@@ -5,7 +5,7 @@
 - **Updated**: 2026-02-05
 - **Author**: GCDR Team
 - **Review**: [RFC-0010-Premium-Alarm-Simulator.review.md](./RFC-0010-Premium-Alarm-Simulator.review.md)
-- **User Manual**: [SIMULATOR-MANUAL.md](./SIMULATOR-MANUAL.md)
+- **User Manual**: [SIMULATOR-MANUAL.md](../simulator/SIMULATOR-MANUAL.md)
 - **Enhancement**: [RFC-0014](./RFC-0014-FixSimulator-Implementation-Plan.md) — Scenario Builder wizard & 2×3 grid layout (Implemented)
 
 ## Summary

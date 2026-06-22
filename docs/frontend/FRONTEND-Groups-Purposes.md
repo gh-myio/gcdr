@@ -2,7 +2,7 @@
 
 > **Para:** Time de Frontend
 > **Versão:** 1.0 — 2026-03-16
-> **Relacionado:** `docs/FRONTEND-Templates-Engine.md`, `docs/RFC-0024-Alarm-Dispatch-Config.md`
+> **Relacionado:** `docs/frontend/FRONTEND-Templates-Engine.md`, `docs/rfcs/RFC-0024-Alarm-Dispatch-Config.md`
 
 ---
 
@@ -76,7 +76,7 @@ Rule: "Fancoil Ligado"
     → GROUP com purpose ALARMS_NOTIFY  ← re-notifica no escalonamento
 ```
 
-O grupo com `ALARMS_NOTIFY` define também, em `group_dispatch_configs`, **quais canais** disparam para **quais ações** — e se o envio é em grupo (`GROUP`) ou individualizado (`INDIVIDUAL`). Veja `docs/RFC-0024-Alarm-Dispatch-Config.md`.
+O grupo com `ALARMS_NOTIFY` define também, em `group_dispatch_configs`, **quais canais** disparam para **quais ações** — e se o envio é em grupo (`GROUP`) ou individualizado (`INDIVIDUAL`). Veja `docs/rfcs/RFC-0024-Alarm-Dispatch-Config.md`.
 
 ---
 
@@ -92,7 +92,7 @@ Quando o sistema dispara um email para um grupo, o template é resolvido conform
 | `WELCOME_USER` | `EMAIL_WELCOME` |
 | `RELEASE_NOTE` | `RELEASE_NOTE` |
 
-A resolução do template segue a hierarquia: customer próprio → customer pai → tenant padrão. Veja `docs/FRONTEND-Templates-Engine.md`.
+A resolução do template segue a hierarquia: customer próprio → customer pai → tenant padrão. Veja `docs/frontend/FRONTEND-Templates-Engine.md`.
 
 ---
 
@@ -115,6 +115,6 @@ GET /api/v1/groups/purposes   → lista todos os GroupPurpose com label e descri
 
 ## Referências
 
-- **RFC dispatch:** `docs/RFC-0024-Alarm-Dispatch-Config.md`
-- **Templates:** `docs/FRONTEND-Templates-Engine.md`
+- **RFC dispatch:** `docs/rfcs/RFC-0024-Alarm-Dispatch-Config.md`
+- **Templates:** `docs/frontend/FRONTEND-Templates-Engine.md`
 - **OpenAPI:** `docs/openapi.yaml` — schema `GroupPurpose` atualizado

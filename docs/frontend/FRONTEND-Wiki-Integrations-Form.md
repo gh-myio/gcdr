@@ -4,8 +4,8 @@
 - **Last updated:** 2026-05-04
 - **Audience:** Frontend developers building the **"Add Internal Integration"** form (premium UX, single-screen wizard).
 - **Companion docs:**
-  - [RFC-0030 — MYIO Wiki](./RFC-0030-MYIO-Wiki-Knowledge-Base.md)
-  - [GCDR-USER.md](./GCDR-USER.md) — auth, RBAC, tenant header
+  - [RFC-0030 — MYIO Wiki](../rfcs/RFC-0030-MYIO-Wiki-Knowledge-Base.md)
+  - [GCDR-USER.md](../GCDR-USER.md) — auth, RBAC, tenant header
   - **OpenAPI:** `/api/v1/docs` (Swagger UI, prod: `https://gcdr-api.a.myio-bas.com/docs/`)
 
 ---

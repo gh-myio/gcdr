@@ -4,7 +4,7 @@
 - **Date:** 2026-06-14
 - **Domain:** Work Orders (`wo` / OS)
 - **Depends on:** [RFC-0037 — Work Orders Event Model](./RFC-0037-Work-Orders-Event-Model.md)
-- **Companion:** [WO-OS-MAP.md](./WO-OS-MAP.md), [WO-OS-API-GUIDE.md](./WO-OS-API-GUIDE.md)
+- **Companion:** [WO-OS-MAP.md](../WO-OS-MAP.md), [WO-OS-API-GUIDE.md](../WO-OS-API-GUIDE.md)
 
 ## 1. Summary
 

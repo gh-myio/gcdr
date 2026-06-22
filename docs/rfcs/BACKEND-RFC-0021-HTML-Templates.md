@@ -429,4 +429,4 @@ CREATE INDEX idx_templates_tenant_type_status ON templates (tenant_id, type, sta
 ## 8. Referências
 
 - **Template de exemplo:** `logs/sample.html` (alarm notification com dados mock)
-- **RFC relacionado:** `docs/FRONTEND-RFC-0020-Public-Single-Apps.md`
+- **RFC relacionado:** `docs/rfcs/FRONTEND-RFC-0020-Public-Single-Apps.md`

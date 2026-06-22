@@ -1,7 +1,7 @@
 # RFC-0046 — Customer Consumption Goals · Review Feedback v2
 
-- **Reviews of:** `docs/RFC-0046-Customer-Consumption-Goals.md`
-- **Supersedes:** `docs/RFC-0046-Customer-Consumption-Goals-feedback.md` (v1) — see "What changed since v1".
+- **Reviews of:** `docs/rfcs/RFC-0046-Customer-Consumption-Goals.md`
+- **Supersedes:** `docs/rfcs/RFC-0046-Customer-Consumption-Goals-feedback.md` (v1) — see "What changed since v1".
 - **Date:** 2026-06-18
 - **Format:** BMAD party-mode roundtable, **round 2** — agents reacting to the author's written answers on the v1 feedback.
 - **Reviewers:** 🏗️ Winston (System Architect) · 📋 John (Product Manager) · 🎨 Sally (UX Designer) · 💻 Amelia (Senior Software Engineer)

@@ -2,7 +2,7 @@
 
 > **Audiência:** Equipe de Integração (Node-RED, Alarm Orchestrator, Gateway)
 > **Data:** 2026-03-06
-> **Relacionado:** [`/bundle/simple`](./NODE-RED-Alarm-Bundle-Integration.md), [RFC-0019](./RFC-0019-Customer-Config.md)
+> **Relacionado:** [`/bundle/simple`](../node-red/NODE-RED-Alarm-Bundle-Integration.md), [RFC-0019](../rfcs/RFC-0019-Customer-Config.md)
 
 ---
 

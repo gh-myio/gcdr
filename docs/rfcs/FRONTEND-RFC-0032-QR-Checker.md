@@ -1,6 +1,6 @@
 # QR Checker on GCDR — Frontend Integration Guide
 
-> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical guide keeps the original `qrc` route naming throughout; for current routes/paths see [WO-OS-MAP.md](./WO-OS-MAP.md).
+> **Note (2026-06-08):** The backend domain was renamed `qrc`→`wo` (Work Orders) — tables are now `wo_*` and routes are `/api/v1/wo/*`. This historical guide keeps the original `qrc` route naming throughout; for current routes/paths see [WO-OS-MAP.md](../WO-OS-MAP.md).
 
 - **Status:** Integration brief — backend Phases 1-4 live (controllers mounted); **Phases 5-8 RETIRED** (greenfield validated; `qrcode-check.git` archived without data migration).
 - **Last updated:** 2026-04-30
@@ -8,9 +8,9 @@
 - **Companion docs:**
   - [RFC-0032 — QR Checker Migration](./RFC-0032-QR-Checker-Migration-to-GCDR.md) (full backend spec, status snapshot)
   - [Source DB Structure (qrcode-check SQLite)](./RFC-0032-QR-Checker-Migration-to-GCDR-DATABASE-Structure-QRCODE-CHECKER.md) (only relevant if migration is reactivated)
-  - [FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md) (image upload contract)
-  - [GCDR-USER.md](./GCDR-USER.md) (auth, RBAC, customer hierarchy)
-  - **OpenAPI:** [docs/openapi.yaml](./openapi.yaml) — every endpoint below has a corresponding entry under tag `QR Checker` (50 operations indexed). Swagger UI at `/docs` (local + prod).
+  - [FILE-ASSETS-FRONTEND.md](../frontend/FILE-ASSETS-FRONTEND.md) (image upload contract)
+  - [GCDR-USER.md](../GCDR-USER.md) (auth, RBAC, customer hierarchy)
+  - **OpenAPI:** [docs/openapi.yaml](../openapi.yaml) — every endpoint below has a corresponding entry under tag `QR Checker` (50 operations indexed). Swagger UI at `/docs` (local + prod).
 
 ---
 
@@ -170,7 +170,7 @@ POST /api/v1/auth/login
 ```
 
 The post-login `GET /api/v1/auth/me` enrichment (effective permissions,
-denied patterns) is described in [GCDR-USER.md](./GCDR-USER.md).
+denied patterns) is described in [GCDR-USER.md](../GCDR-USER.md).
 
 ### 3. Viewer (read-only stakeholder)
 
@@ -465,7 +465,7 @@ No backend changes. The QR payload format stays the same; only the
 The legacy app had four upload paths (installation, ambiente, product,
 observation). All four now go through one polymorphic API:
 `POST /api/v1/qrc/<owner>/images`. Internally the QRC controllers proxy to
-the FileAssets API ([FILE-ASSETS-FRONTEND.md](./FILE-ASSETS-FRONTEND.md))
+the FileAssets API ([FILE-ASSETS-FRONTEND.md](../frontend/FILE-ASSETS-FRONTEND.md))
 and write a thin row in the appropriate `qrc_*_images` join table.
 
 Request:

@@ -3,8 +3,8 @@
 Sistema de sincronização assíncrona de devices entre ThingsBoard (TB) e GCDR, exposto como Job API REST.
 
 **Implementado em:** `src/services/DeviceSyncJobService.ts`
-**RFC:** [RFC-0023](./RFC-0023-Device-Sync-Job-API.md)
-**Guia Frontend:** [FRONTEND-Device-Sync-Jobs.md](./FRONTEND-Device-Sync-Jobs.md)
+**RFC:** [RFC-0023](./rfcs/RFC-0023-Device-Sync-Job-API.md)
+**Guia Frontend:** [FRONTEND-Device-Sync-Jobs.md](./frontend/FRONTEND-Device-Sync-Jobs.md)
 
 ---
 

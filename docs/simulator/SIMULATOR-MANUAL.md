@@ -525,10 +525,10 @@ curl -X POST http://localhost:3015/admin/simulator/api/sessions/{sessionId}/stop
 
 ## Referências
 
-- [RFC-0010: Premium Alarm Simulator](./RFC-0010-Premium-Alarm-Simulator.md) - Especificação técnica completa
-- [RFC-0014: Simulator UI/UX Overhaul](./RFC-0014-FixSimulator-Implementation-Plan.md) - Grid 2×3 + Scenario Builder
-- [ONBOARDING.md](./ONBOARDING.md) - Manual de onboarding do projeto
-- [RULE-ENTITY.md](./RULE-ENTITY.md) - Documentação do motor de regras
+- [RFC-0010: Premium Alarm Simulator](../rfcs/RFC-0010-Premium-Alarm-Simulator.md) - Especificação técnica completa
+- [RFC-0014: Simulator UI/UX Overhaul](../rfcs/RFC-0014-FixSimulator-Implementation-Plan.md) - Grid 2×3 + Scenario Builder
+- [ONBOARDING.md](../ONBOARDING.md) - Manual de onboarding do projeto
+- [RULE-ENTITY.md](../alarms/RULE-ENTITY.md) - Documentação do motor de regras
 
 ---
 

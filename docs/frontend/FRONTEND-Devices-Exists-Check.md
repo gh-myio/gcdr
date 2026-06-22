@@ -4,7 +4,7 @@
 - **Last updated:** 2026-05-05
 - **Audience:** Frontend / mobile developers que precisam validar se um nome de device já está em uso **antes** de submeter um form de criação/edição.
 - **Companion docs:**
-  - [GCDR-USER.md](./GCDR-USER.md) — auth (JWT + API Key), tenant header.
+  - [GCDR-USER.md](../GCDR-USER.md) — auth (JWT + API Key), tenant header.
   - [FRONTEND-Devices-Search.md](./FRONTEND-Devices-Search.md) — busca fuzzy (`?search=`), complementar a este endpoint.
   - **OpenAPI:** Swagger UI em `/docs` (local + prod).
 

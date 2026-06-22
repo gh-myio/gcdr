@@ -669,7 +669,7 @@ logAnnotations:
 | Arquivo | Mudanca | Prioridade |
 |---------|---------|------------|
 | `docs/ONBOARDING.md` | Documentar novos campos do device | P2 |
-| `docs/url-api-gcdr.md` | Atualizar exemplos de API se necessario | P2 |
+| `docs/api/url-api-gcdr.md` | Atualizar exemplos de API se necessario | P2 |
 
 ### 10. Testes
 
@@ -741,8 +741,8 @@ logAnnotations:
 | # | Tarefa | Arquivo |
 |---|--------|---------|
 | 7.1 | Atualizar onboarding | `docs/ONBOARDING.md` |
-| 7.2 | Atualizar guia de API | `docs/url-api-gcdr.md` |
-| 7.3 | Marcar RFC como Implemented | `docs/RFC-0008-Device-Attributes-Extension.md` |
+| 7.2 | Atualizar guia de API | `docs/api/url-api-gcdr.md` |
+| 7.3 | Marcar RFC como Implemented | `docs/rfcs/RFC-0008-Device-Attributes-Extension.md` |
 
 ---
 

@@ -4,7 +4,7 @@
 - **Date:** 2026-06-15
 - **Domain:** Work Orders (`wo` / OS)
 - **Depends on:** [RFC-0037 — Work Orders Event Model](./RFC-0037-Work-Orders-Event-Model.md), [RFC-0041 — Work Order Rules Engine](./RFC-0041-Work-Order-Rules-Engine.md)
-- **Companion:** [WO-OS-MAP.md](./WO-OS-MAP.md), [WO-OS-API-GUIDE.md](./WO-OS-API-GUIDE.md)
+- **Companion:** [WO-OS-MAP.md](../WO-OS-MAP.md), [WO-OS-API-GUIDE.md](../WO-OS-API-GUIDE.md)
 - **Prior art:** `qrcode-check.git` `src/mcp/` (the read-only `qr-checker` MCP server we are porting)
 
 ## 1. Summary

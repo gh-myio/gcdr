@@ -85,7 +85,7 @@ Single source of truth for MYIO master data. Manages customers (hierarchy), part
 ## Docs
 - docs/ONBOARDING.md (primary)
 - RFCs: docs/RFC-0001..RFC-0014
-- Simulator: docs/SIMULATOR-MANUAL.md
+- Simulator: docs/simulator/SIMULATOR-MANUAL.md
 - Metrics reference: docs/metricas.txt
 
 ## Contacts

@@ -2,7 +2,7 @@
 
 > **Audiencia:** Frontend, Integradores, Alarm Orchestrator
 > **Data:** 2026-03-06 · **Atualizado:** 2026-05-16
-> **Relacionado:** [RULE-ENTITY.md](./RULE-ENTITY.md), [API-Bundle-Verify.md](./API-Bundle-Verify.md)
+> **Relacionado:** [RULE-ENTITY.md](../alarms/RULE-ENTITY.md), [API-Bundle-Verify.md](./API-Bundle-Verify.md)
 
 > ⚠️ **Removido:** o campo `gatewayToken` foi removido do response da rule
 > (ver `GCDR-USER.md` §5.5). Consumidores que ainda fizerem `rawRule?.gatewayToken`

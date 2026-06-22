@@ -476,7 +476,7 @@ Add `X-Admin-Password` is already in the allowed headers. No additional CORS cha
 
 | File | Action |
 |------|--------|
-| `docs/RFC-0016-ThingsBoard-Entity-Mapping.md` | This document |
+| `docs/rfcs/RFC-0016-ThingsBoard-Entity-Mapping.md` | This document |
 | Swagger/OpenAPI docs | Update entity schemas to include new fields |
 
 ---

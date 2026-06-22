@@ -4,7 +4,7 @@
 - **Last updated:** 2026-05-07
 - **Audience:** Frontend que precisa mostrar/inspecionar as role assignments de um usuário específico (telas de admin de RBAC, perfil, gating de UI por permissão).
 - **Companion docs:**
-  - [GCDR-USER.md](./GCDR-USER.md) — auth (JWT + API Key), tenant header, ciclo de usuário.
+  - [GCDR-USER.md](../GCDR-USER.md) — auth (JWT + API Key), tenant header, ciclo de usuário.
   - [FRONTEND-Users-Groups-Roles.md](./FRONTEND-Users-Groups-Roles.md) — fluxo completo de RBAC.
   - **OpenAPI:** Swagger UI em `/docs` (local + prod).
 

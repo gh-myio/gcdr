@@ -707,8 +707,8 @@ Content-Type: application/json
 
 ## Related Documentation
 
-- [RFC-0002: GCDR Authorization Model](./RFC-0002-GCDR-Authorization-Model.md) - Full specification
-- [RFC-0011: User Registration Workflow](./RFC-0011-User-Registration-Approval-Workflow.md) - User lifecycle
+- [RFC-0002: GCDR Authorization Model](./rfcs/RFC-0002-GCDR-Authorization-Model.md) - Full specification
+- [RFC-0011: User Registration Workflow](./rfcs/RFC-0011-User-Registration-Approval-Workflow.md) - User lifecycle
 - [ONBOARDING.md](./ONBOARDING.md) - Developer guide
 
 ---

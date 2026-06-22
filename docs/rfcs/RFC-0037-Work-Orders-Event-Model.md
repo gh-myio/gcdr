@@ -289,7 +289,7 @@ activated). Therefore:
 
 A single numbered migration (`00NN_work_orders_event_model.sql`) does the
 drop + rename + create, applied via the `schema_migrations` runner
-([DB-MIGRATIONS](./DB-MIGRATIONS.md)).
+([DB-MIGRATIONS](../database/DB-MIGRATIONS.md)).
 
 ---
 

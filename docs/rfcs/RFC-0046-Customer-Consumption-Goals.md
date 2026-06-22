@@ -6,11 +6,11 @@
 - **Migrations:** `0047_consumption_goals.sql` (four tables + domain seed) · `0048_consumption_goals_history_ops.sql` (operation-level audit columns). Applied to local Docker; **pending prod**.
 - **Author:** MYIO Engineering
 - **Domain:** Customers / Consumption Goals (Energy · Water · Temperature)
-- **Reviews:** `docs/RFC-0046-Customer-Consumption-Goals-feedback.md` (round 1), `…-feedback-v2.md` (round 2).
+- **Reviews:** `docs/rfcs/RFC-0046-Customer-Consumption-Goals-feedback.md` (round 1), `…-feedback-v2.md` (round 2).
 - **Related:**
   - `myio-js-library/src/docs/GoalsPanel-DataModel.md` — the `GoalsPanel` (`openGoalsPanel`, RFC-0075) UI contract that consumes/produces goals.
   - RFC-0019 — Customer Config · RFC-0028 — Device Calibration Offsets (audit/history precedent) · RFC-0016 — TB Entity Mapping · RFC-0009 — Events/Audit Logs.
-  - `docs/DB-MIGRATIONS.md` — custom migration-runner conventions.
+  - `docs/database/DB-MIGRATIONS.md` — custom migration-runner conventions.
 
 ---
 
@@ -281,5 +281,5 @@ The goals UI is a **customer-detail tab** ("Metas"), not the standalone `GoalsPa
 ## References
 
 - `myio-js-library/src/docs/GoalsPanel-DataModel.md` — the `GoalsPanel` UI contract.
-- `docs/RFC-0046-Customer-Consumption-Goals-feedback.md` / `…-feedback-v2.md` — the two review rounds that shaped this design.
-- RFC-0019 (Customer Config) · RFC-0028 (Calibration history) · RFC-0016 (TB mapping) · RFC-0009 (Audit) · `docs/DB-MIGRATIONS.md`.
+- `docs/rfcs/RFC-0046-Customer-Consumption-Goals-feedback.md` / `…-feedback-v2.md` — the two review rounds that shaped this design.
+- RFC-0019 (Customer Config) · RFC-0028 (Calibration history) · RFC-0016 (TB mapping) · RFC-0009 (Audit) · `docs/database/DB-MIGRATIONS.md`.

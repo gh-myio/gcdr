@@ -4,7 +4,7 @@
 - **Date:** 2026-06-15
 - **Domain:** Work Orders (`wo` / OS) — Chamados
 - **Depends on:** [RFC-0044 — Chamados (Work Order type CHAMADO)], [RFC-0037 WO Event Model], [RFC-0036/0037 file_assets owner types], [RFC-0009 Audit Logs]
-- **Related:** `docs/integracao_freshdesk_myio.md` (today Freshdesk auto-creates a ticket from inbound email)
+- **Related:** `docs/integrations/integracao_freshdesk_myio.md` (today Freshdesk auto-creates a ticket from inbound email)
 
 ## 1. Summary
 

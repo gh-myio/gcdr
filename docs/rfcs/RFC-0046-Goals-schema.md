@@ -1,7 +1,7 @@
 # RFC-0046 — Consumption Goals · Drizzle schema snippet
 
 This is the data-model artifact for **RFC-0046 — Customer Consumption Goals**
-(`docs/RFC-0046-Customer-Consumption-Goals.md`, §"Data model"). It defines the
+(`docs/rfcs/RFC-0046-Customer-Consumption-Goals.md`, §"Data model"). It defines the
 four tables exactly as the RFC closes them:
 
 | Table | Role |

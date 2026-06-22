@@ -3,7 +3,7 @@
 // avatars, customer logos, device manuals) can register a file without a
 // per-feature table.
 //
-// Companion: docs/RFC-0030-S3-Bucket-Setup.md (bucket, IAM, key layout).
+// Companion: docs/rfcs/RFC-0030-S3-Bucket-Setup.md (bucket, IAM, key layout).
 
 export type FileAssetOwnerType =
   | 'wiki_page'                  // attachment of a wiki page (image, doc, etc.)

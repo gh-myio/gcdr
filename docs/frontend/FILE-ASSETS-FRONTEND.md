@@ -4,9 +4,9 @@
 - **Created:** 2026-04-25
 - **Audience:** Frontend / mobile developers integrating with `/api/v1/files`
 - **Companion docs:**
-  - [RFC-0030 — MYIO Wiki](./RFC-0030-MYIO-Wiki-Knowledge-Base.md) (Phase 4 attachments)
-  - [RFC-0030 — S3 Bucket Setup](./RFC-0030-S3-Bucket-Setup.md) (storage infrastructure)
-  - [RFC-0031 — Wiki Engagement & PDF Export](./RFC-0031-Wiki-Engagement-Export-and-Admin.md) (consumer of `wiki_pdf` owner type)
+  - [RFC-0030 — MYIO Wiki](../rfcs/RFC-0030-MYIO-Wiki-Knowledge-Base.md) (Phase 4 attachments)
+  - [RFC-0030 — S3 Bucket Setup](../rfcs/RFC-0030-S3-Bucket-Setup.md) (storage infrastructure)
+  - [RFC-0031 — Wiki Engagement & PDF Export](../rfcs/RFC-0031-Wiki-Engagement-Export-and-Admin.md) (consumer of `wiki_pdf` owner type)
 
 ---
 

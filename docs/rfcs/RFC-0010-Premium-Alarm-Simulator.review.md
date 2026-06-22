@@ -1,6 +1,6 @@
 # Review � RFC-0010: Premium Alarm Simulator
 
-- **Arquivo avaliado**: `docs/RFC-0010-Premium-Alarm-Simulator.md`
+- **Arquivo avaliado**: `docs/rfcs/RFC-0010-Premium-Alarm-Simulator.md`
 - **Data do review**: 2026-01-27
 - **Status do RFC**: Implemented (MVP)
 

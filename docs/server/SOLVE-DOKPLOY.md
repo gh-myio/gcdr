@@ -1,6 +1,6 @@
 # Problemas de Deploy no Dokploy - GCDR
 
-> **Quick Reference Runbook** - Para analise detalhada e post-mortem, veja [RFC-DOCKERFILE-DOKPLOY-LOOP.md](./RFC-DOCKERFILE-DOKPLOY-LOOP.md)
+> **Quick Reference Runbook** - Para analise detalhada e post-mortem, veja [RFC-DOCKERFILE-DOKPLOY-LOOP.md](../rfcs/RFC-DOCKERFILE-DOKPLOY-LOOP.md)
 
 ## Data: 2026-01-29
 

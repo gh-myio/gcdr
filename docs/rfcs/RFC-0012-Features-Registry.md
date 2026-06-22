@@ -860,7 +860,7 @@ Use a third-party feature flag service (LaunchDarkly, etc.).
 ## References
 
 - [RFC-0002: Authorization Model](./RFC-0002-GCDR-Authorization-Model.md)
-- [AUTHORIZATION-MODEL.md](./AUTHORIZATION-MODEL.md)
+- [AUTHORIZATION-MODEL.md](../AUTHORIZATION-MODEL.md)
 - [Feature Flags Best Practices](https://martinfowler.com/articles/feature-toggles.html)
 
 ---

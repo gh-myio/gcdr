@@ -1,7 +1,7 @@
 # Alarm Orchestrator — Dispatch Integration Guide (RFC-0024)
 
 Guia de integração para o **alarm-orchestrator** (backend de alarmes) consumir o sistema de despacho de notificações do GCDR.
-Baseado em: [RFC-0024](./RFC-0024-Alarm-Dispatch-Config.md)
+Baseado em: [RFC-0024](../rfcs/RFC-0024-Alarm-Dispatch-Config.md)
 
 ---
 
@@ -333,7 +333,7 @@ Quando incluídos no bundle, o orchestrator poderá resolver dispatch offline se
 
 ## Referências
 
-- [RFC-0024 — Alarm Dispatch Configuration](./RFC-0024-Alarm-Dispatch-Config.md)
-- [API Bundle Verify](./API-Bundle-Verify.md)
+- [RFC-0024 — Alarm Dispatch Configuration](../rfcs/RFC-0024-Alarm-Dispatch-Config.md)
+- [API Bundle Verify](../api/API-Bundle-Verify.md)
 - [RULE-ENTITY](./RULE-ENTITY.md)
-- [EMAIL-SENDER-PAYLOAD-CONTRACT](./EMAIL-SENDER-PAYLOAD-CONTRACT.md)
+- [EMAIL-SENDER-PAYLOAD-CONTRACT](../EMAIL-SENDER-PAYLOAD-CONTRACT.md)
