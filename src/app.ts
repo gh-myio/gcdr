@@ -11,6 +11,7 @@ import {
   errorHandler,
   notFoundHandler,
 } from './middleware';
+import { rateLimit, clientIp } from './middleware/rateLimit';
 
 import {
   authController,
@@ -230,7 +231,19 @@ apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_C
 
 // RFC-0046: Customer consumption goals (nested — must come before general /customers router)
 // hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.
-apiV1Router.use('/customers/:customerId/goals', hybridAuthByMethod('goals:read', 'goals:write'), consumptionGoalsController);
+// Rate-limited per IP+customer (auth'd, DB-backed route). Generous ceiling so
+// dashboards / M2M bundles are not throttled in normal use; blocks abusive floods.
+const goalsRateLimiter = rateLimit('customer-goals', {
+  windowMs: 60_000,
+  max: 240,
+  keyFn: (req) => `${clientIp(req)}:${req.params.customerId ?? ''}`,
+});
+apiV1Router.use(
+  '/customers/:customerId/goals',
+  goalsRateLimiter,
+  hybridAuthByMethod('goals:read', 'goals:write'),
+  consumptionGoalsController,
+);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
