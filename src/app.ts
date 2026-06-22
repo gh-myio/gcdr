@@ -11,12 +11,15 @@ import {
   errorHandler,
   notFoundHandler,
 } from './middleware';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
+import { clientIp } from './middleware/rateLimit';
 
 import {
   authController,
   healthController,
   docsController,
   customersController,
+  consumptionGoalsController,
   assetsController,
   partnersController,
   groupsController,
@@ -226,6 +229,33 @@ apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTO
 // RFC-0033: Customer integration sync state (nested — must come before general /customers router)
 // hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
 apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerIntegrationsController);
+
+// RFC-0046: Customer consumption goals (nested — must come before general /customers router)
+// hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.
+// Rate-limited per IP+customer (auth'd, DB-backed route). Uses express-rate-limit
+// (recognized by CodeQL's js/missing-rate-limiting). Generous ceiling so
+// dashboards / M2M bundles are not throttled in normal use; blocks abusive floods.
+// validate:false — we key on a custom XFF-aware string (single-instance), not req.ip.
+const goalsRateLimiter = expressRateLimit({
+  windowMs: 60_000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => `${clientIp(req)}:${req.params.customerId ?? ''}`,
+  handler: (req, res) =>
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many goals requests; please slow down' },
+      meta: { requestId: req.context?.requestId, timestamp: new Date().toISOString() },
+    }),
+});
+apiV1Router.use(
+  '/customers/:customerId/goals',
+  goalsRateLimiter,
+  hybridAuthByMethod('goals:read', 'goals:write'),
+  consumptionGoalsController,
+);
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)

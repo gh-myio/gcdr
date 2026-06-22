@@ -26,6 +26,8 @@ export type ApiKeyScope =
   | 'simulator:write'   // Start/stop simulations (RFC-0010)
   | 'simulator:admin'   // Manage all tenant simulations (RFC-0010)
   | 'sync:write'        // Write integration mapping fields (RFC-0016)
+  | 'goals:read'        // Read consumption goals (RFC-0046)
+  | 'goals:write'       // Write consumption goals (RFC-0046)
   | '*:read';           // Read all resources
 
 /**

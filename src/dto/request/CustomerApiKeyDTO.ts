@@ -15,6 +15,8 @@ export const ApiKeyScopeSchema = z.enum([
   'assets:write',      // RFC-0016 integration
   'groups:read',
   'sync:write',        // RFC-0016 integration mapping fields
+  'goals:read',        // RFC-0046 consumption goals
+  'goals:write',       // RFC-0046 consumption goals
   '*:read',
 ]);
 
