@@ -1,60 +1,44 @@
-# RFC-0047 — Generic Entity Registry (typed key/value tree with audit)
+# RFC-0047 — Generic Entity Registry (typed key/value tree + system defaults & per-customer clone)
 
-- **Status:** Draft
+- **Status:** Draft — **design closed** via a BMAD party-mode review (Winston · Amelia · John · Sally), 2026-06-23. Ready for implementation.
 - **Created:** 2026-06-23
+- **Updated:** 2026-06-23 (v2 — adds the `entity_types` registry, `is_system`, per-customer override via clone, and the must-fix/defer split; **v3 sync** — `sort_order` (deterministic sibling order), MYIO-only writes, membership-as-data, resolving the sibling-ordering open question)
 - **Author:** MYIO Engineering
 - **Domain:** Platform / Master Data (cross-cutting)
-- **Migration:** next free runner migration, e.g. `00NN_entities.sql` (≥ 0049 at time of
-  writing — 0047/0048 are taken by RFC-0046). See `docs/DB-MIGRATIONS.md`.
-- **Related:**
-  - RFC-0016 — ThingsBoard Entity Mapping (`external_id`, ingestion ids live in metadata).
-  - RFC-0028 — Device Calibration Offsets (JSONB envelope + bounded changelog precedent).
-  - RFC-0009 — Events / Audit Logs (who-changed-what precedent).
-  - Customers hierarchy (`ROOT→…→INDIVIDUAL`) — the closest existing adjacency-list tree.
+- **Migration:** next free runner migration, e.g. `00NN_entities.sql` (≥ 0049 — 0047/0048 are taken by RFC-0046). See `docs/DB-MIGRATIONS.md`.
+- **Companion docs:**
+  - `RFC-0047-Entity-API.md` — the authoritative wire contract (endpoints, filters, errors).
+  - `RFC-0047-Entity-schema.md` — the Drizzle/SQL schema snippet.
+- **Related:** RFC-0016 (TB Entity Mapping, integration ids in metadata) · RFC-0028 (JSONB envelope precedent) · RFC-0009 (audit logs) · RFC-0046 (system-default + per-customer pattern adjacency).
 
 ---
 
 ## Why this matters
 
-Across the MYIO ecosystem we keep inventing the *same shape* over and over: a small,
-typed, named record that (a) has stable audit columns, (b) can be soft-deleted and
-deactivated without losing history, (c) occasionally points at a *parent* record of the
-same kind, and (d) carries a little free-form JSON for integration ids. Energy-entry
-groups, measurement profiles, tariff buckets, environment tags, ad-hoc lookups for a
-new feature — each currently gets either a brand-new table (schema churn, a migration,
-a controller, a DTO, a repo, tests) or, worse, gets stuffed into someone's `metadata`
-blob where it can't be queried, related, or audited.
+Across the MYIO ecosystem we keep inventing the *same shape* over and over: a small, typed, named record that (a) has stable audit columns, (b) can be soft-deleted and deactivated without losing history, (c) occasionally points at a *parent* record of the same kind, and (d) carries a little free-form JSON for integration ids. Telemetry groups (energy-entry, energy-store, energy-commonarea, water-*, temperature-*, and later gas/humidity/pulses) with their **profile** children (CHILLER, FANCOIL, HVAC under energy-commonarea) are exactly this shape. Each new variant today gets either a brand-new table (migration + controller + DTO + repo + tests) or gets stuffed into a `metadata` blob where it can't be queried, related, or audited.
 
-This RFC proposes **one generic table** — `entities` — that models a *typed key/value
-node in a forest*. It is deliberately boring: a uuid, a `type`, a `key`, an optional
-`value`, a nullable `parent_entity_id` (self-reference), the standard audit/soft-delete
-columns, and a `metadata` JSONB. With it, a team can stand up a new lookup/grouping
-concept **without a migration** — just insert rows with a new `entity_type` — and get
-listing, filtering, hierarchy traversal (`deep`), soft-delete and full audit for free
-from a single shared controller/service.
+This RFC proposes **one generic table** — `entities` — that models a *typed key/value node in a forest*, governed by a small **type registry**, with **system defaults** that every customer inherits and an opt-in **per-customer clone** so a customer can diverge and customize. A team adds a new grouping/profile concept by inserting rows (and, for a genuinely new *type*, an admin adds one registry row) — no per-concept migration — and gets listing, filtering, hierarchy traversal, soft-delete, full audit, and the system-default/override resolution for free from a single shared controller/service.
 
-This is **not** a recommendation to collapse every domain table into EAV. It is a
-pragmatic home for the long tail of *configuration-shaped, low-cardinality, hierarchical
-lookup data* that today either causes schema churn or hides in JSON. First-class,
-high-traffic domain aggregates (devices, work orders, customers, alarm rules) stay in
-their own tables — see *Drawbacks* and *Alternatives*.
+This is **not** EAV and **not** a home for hot, high-cardinality domain aggregates (devices, work orders, customers keep their own tables). It is the pragmatic home for the long tail of *configuration-shaped, low-cardinality, hierarchical lookup data* — see *Drawbacks* and the explicit **promotion criterion**.
 
 ---
 
 ## Summary
 
-Introduces a single multi-tenant table `entities`:
+A single multi-tenant table `entities`:
 
 - **Identity** — `id` (uuid), plus a typed natural key `(entity_type, entity_key)`.
-- **Value** — an optional `entity_value` (the "value" half of key/value).
-- **Hierarchy** — `parent_entity_id` (nullable self-FK) forms an adjacency-list forest.
+- **Type registry** — `entity_type` is a FK into `entity_types` (a small seed/admin-governed table that also encodes allowed parent/child types). **Creating a type is admin-only**; operators only *choose* existing types.
+- **Value** — optional `entity_value` (the "value" half of key/value).
+- **Hierarchy** — `parent_entity_id` (nullable self-FK) forms an adjacency-list forest (shallow: domain×role → profile → equipment).
+- **Scope** — `customer_id` (nullable). **NULL = system default** (inherited by all customers); **set = a customer's own override** — `customer_id` says who the taxonomy is *for*, **never who may edit it**. `is_system` marks the protected, never-deletable system rows. `clone_scope_key` (default `'*'`) reserves the future per-axis override granularity without a v1 cost.
+- **Ordering** — `sort_order` (int) gives **deterministic sibling order**; system-locked on `is_system` rows.
+- **Who writes — MYIO only.** Every mutation (create/edit/delete/clone/revert) is **MYIO-operator-only**; a **customer API key is read/resolve-only** and never carries `entities:write`. No customer-editable surface, no "request reclassification" flow — whoever classifies, reclassifies: a MYIO operator edits the tree directly and it is done.
 - **Lifecycle** — `is_active` (toggle) and `is_deleted` (soft delete), independent.
-- **Audit** — `created_at/created_by`, `updated_at/updated_by`, `version` (optimistic).
-- **Extensibility** — `metadata` JSONB (e.g. `ingestionId`, external mapping ids).
+- **Audit** — `created_at/by`, `updated_at/by`, `version` (optimistic).
+- **Extensibility** — `metadata` JSONB (e.g. `ingestionId`).
 
-…plus a single REST surface under `/api/v1/entities` with rich list filters and a
-`deep=0|1` knob to fetch either the bare entity or the entity **with its children**,
-and a lightweight management UI to browse/edit the tree.
+…plus a REST surface under `/api/v1/entities` (CRUD, `deep` traversal, rich filters), an **effective-config** resolution endpoint (customer's own rows if any, else system), **clone** / **revert** operations, an admin tree UI, and a **per-customer "Taxonomy" tab** that toggles *use system* vs *clone & edit*.
 
 ---
 
@@ -62,370 +46,213 @@ and a lightweight management UI to browse/edit the tree.
 
 ### The mental model
 
-An **entity** is a node. Every node has a **type** (a coarse category, e.g. `GROUP`,
-`PROFILE`, `TARIFF`) and a **key** (a stable identifier within that usage, e.g.
-`ENERGY-ENTRY`, `ENTRADA`). A node *may* carry a **value** (free text — a label, a code,
-a number-as-string) and *may* point at a **parent** node via `parent_entity_id`. Nodes
-with `parent_entity_id = NULL` are **roots**.
+An **entity** is a node. It has a **type** (from the registry — e.g. `GROUP`, `PROFILE`, `EQUIPMENT`) and a **key** (the taxonomy value within that type — e.g. `energy-commonarea`, `CHILLER`). It may carry a **value** and may point at a **parent** of the same kind. Roots have `parent_entity_id = NULL`.
 
 ```
-GROUP / ENERGY-ENTRY            (root, parent = NULL)
-└── PROFILE / ENTRADA           (parent = the GROUP above)
-    ├── PROFILE / SUBENTRADA-A
-    └── PROFILE / SUBENTRADA-B
+GROUP / energy-commonarea          (root, system default)
+├── PROFILE / CHILLER
+├── PROFILE / FANCOIL
+└── PROFILE / HVAC
 ```
 
-Worked example matching the original request:
+> **Shape A (chosen).** Few *types* (`GROUP`, `PROFILE`, `EQUIPMENT`); the rich telemetry taxonomy lives in `entity_key`. The registry encodes "a `PROFILE` may only hang under a `GROUP`". This keeps the type set tiny and governable instead of turning every taxonomy string into a type.
 
-```text
-Entity A
-  id               = 7f1c…  (autogenerated)
-  entity_type      = 'GROUP'
-  entity_key       = 'ENERGY-ENTRY'
-  entity_value     = null
-  parent_entity_id = null
-  is_active        = true
-  is_deleted       = false
-  metadata         = { "ingestionId": "ing_123" }
-  created_at/by, updated_at/by, version
+> **Membership is data, not code (for downstream classifiers).** When a consumer classifies devices into these profiles (e.g. the climatização engine), the **per-node matching rules live in `metadata`** (e.g. `metadata.match: { deviceProfiles, identifierContains }`) and are evaluated by a **generic engine** in the consumer. Adding a profile/subcategory is therefore a **data** insert here — **no new per-key code** downstream. The *engine semantics* (how the rules evaluate, and `sort_order` as evaluation order) stay in the consumer's golden-tested code; this registry supplies only the typed tree + ordering. (A consumer that runs offline should ship a build-time **baked copy** of the system-default tree and keep a checked-in list of system `entity_key`s for CI parity — see `RFC-0047-Entity-API.md` §5.)
 
-Entity B
-  id               = 9b2d…
-  entity_type      = 'PROFILE'
-  entity_key       = 'ENTRADA'
-  entity_value     = 'Entrada principal'
-  parent_entity_id = 7f1c…        -- points at Entity A
-  is_active        = true
-  is_deleted       = false
-  metadata         = { "slaveId": 1 }
-```
+### System defaults vs per-customer override
+
+- A **system default** row has `customer_id = NULL` and `is_system = true`. Every customer **inherits** it. It is **never deletable/deactivatable**; only an admin path may edit it.
+- A customer is **binary** (v1, *whole-config*): either **using system defaults** (zero own rows → read-fallback) or **customized** (its entire taxonomy materialized under its `customer_id`).
+- **Resolution** is dead simple: *does the customer have ≥1 non-deleted row? serve the customer's; else serve the system's.*
+- **Clone** ("create a copy and edit") materializes the system tree under the customer (new ids, remapped parents, `is_system = false`). From then on it is a **snapshot** — later changes to the system default do **not** propagate (documented drift; re-sync is a manual revert + re-clone).
+- **Revert** ("go back to system") soft-deletes all the customer's rows in one tx → resolution falls back to system again. Re-clone later picks up the *current* system.
+
+> `clone_scope_key` is `'*'` for everyone in v1 (whole-config). It is carried in the schema so the future **per-root-tree** granularity (a customer customizes `energy-commonarea` while still receiving system updates on `water-*`/`temperature-*`) becomes a **data migration, not a redesign**.
 
 ### What you get for free
 
-- **No migration to add a new concept.** Pick a new `entity_type` string and insert rows.
-- **Soft delete + deactivate are different.** `is_deleted` hides a row (recoverable);
-  `is_active` keeps it but marks it dormant. Lists default to *not deleted*, and let you
-  opt into `active`/`inactive`/`all`.
-- **Audit is built in.** Every write stamps `updated_by`/`updated_at` and bumps `version`.
-- **Hierarchy without a join table.** `parent_entity_id` is enough for the shallow trees
-  this is meant for; `deep=1` returns a node with its direct children.
+No per-concept migration; soft-delete ≠ deactivate; built-in audit; hierarchy without a join table; system-default inheritance with opt-in override.
 
-### When *not* to use it
+### When *not* to use it (promotion criterion)
 
-- You need to **join heavily** on the data, enforce **rich FKs**, or it's a **hot,
-  high-cardinality** aggregate → make a real table.
-- You need **deep recursive analytics** over millions of nodes → use a closure table or
-  `ltree`, not adjacency-list + app recursion.
+Promote an `entity_type` to its **own real table** the moment **any** of these fire:
+1. The service starts branching on it (`if entity_type === 'X'` business logic) — it has behavior.
+2. It needs a typed FK *from* another domain (real referential integrity).
+3. It becomes hot/high-cardinality (rule of thumb: thousands of rows per tenant, or a hot read path).
+4. A field in `entity_value`/`metadata` needs its own index + semantics for recurring filter/aggregate.
+5. The tree stops being shallow (ancestors/descendants as a first-class operation → closure table or promotion).
+
+Rule of thumb: **`entities` is for nodes the system reads and displays but does not reason about and does not relate to strongly.**
 
 ---
 
 ## Reference-level explanation
 
-### Database schema
+> The authoritative wire contract is `RFC-0047-Entity-API.md`; the DDL/Drizzle is `RFC-0047-Entity-schema.md`. This section states the model and the rules they implement.
+
+### Tables
+
+**`entity_types`** — the governed type registry (seed-driven; admin adds rows):
+
+| Column | Notes |
+| --- | --- |
+| `entity_type` (PK, text) | e.g. `GROUP`, `PROFILE`, `EQUIPMENT` |
+| `tenant_id` | scope |
+| `label`, `description` | for the admin UI |
+| `allowed_parent_types text[]` | which types may be this node's parent (`{}` = root-only) |
+| `is_active` | retire a type without deleting |
+
+**`entities`** — the nodes:
+
+| Column | Notes |
+| --- | --- |
+| `id uuid` PK | `gen_random_uuid()` |
+| `tenant_id uuid` | mandatory, scopes everything |
+| `customer_id uuid NULL` | **NULL = system default**, set = customer override |
+| `entity_type text` | **FK → entity_types** |
+| `entity_key text` | taxonomy value (e.g. `energy-commonarea`, `CHILLER`) |
+| `entity_value text NULL` | optional payload |
+| `parent_entity_id uuid NULL` | self-FK, `ON DELETE RESTRICT` |
+| `sort_order int NOT NULL DEFAULT 0` | deterministic sibling order; **system-locked** on `is_system` rows |
+| `clone_scope_key text NOT NULL DEFAULT '*'` | v1 always `'*'`; reserves per-axis override |
+| `is_system boolean NOT NULL DEFAULT false` | protected system rows |
+| `is_active boolean NOT NULL DEFAULT true` | |
+| `is_deleted boolean NOT NULL DEFAULT false` | soft delete |
+| `metadata jsonb NOT NULL DEFAULT '{}'` | e.g. `ingestionId` |
+| `created_at/by`, `updated_at/by`, `version` | audit + optimistic lock |
+
+**Invariants (enforced — CHECK + trigger + service):**
+- **Writes are MYIO-only** — a customer API key (`gcdr_cust_*`) on any write endpoint → **`403 FORBIDDEN`**; `entities:write` is a MYIO-staff scope. Customer keys read/resolve only.
+- `is_system = true` ⇒ `customer_id IS NULL` (no "system row of a customer").
+- `is_system = true` rows are **immutable to non-admin writers**: DELETE (soft/hard), deactivate, and edit all return **`409 SYSTEM_PROTECTED`** — including changing `sort_order` (reordering a system row = rewriting classification order). A `BEFORE DELETE/UPDATE` **trigger** is the source of truth; the service returns the friendly status. Admin-only paths may edit system rows.
+- `parent_entity_id <> id` (CHECK); deeper cycles + parent-type rules (`allowed_parent_types`) + same-tenant/same-scope parent enforced in the **service** (cycle check is synchronous).
+
+### Uniqueness
+
+Two partial unique indexes (system vs customer namespaces), excluding soft-deleted rows so a key frees on delete and re-clone works:
 
 ```sql
-CREATE TABLE entities (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id        UUID NOT NULL,
+-- system defaults: one default per (type, key, parent)
+CREATE UNIQUE INDEX entities_system_uq ON entities
+  (tenant_id, COALESCE(parent_entity_id,'00000000-0000-0000-0000-000000000000'::uuid), entity_type, entity_key)
+  WHERE customer_id IS NULL AND is_deleted = false;
 
-  entity_type      TEXT NOT NULL,                 -- 'GROUP' | 'PROFILE' | …  (free, app-validated)
-  entity_key       TEXT NOT NULL,                 -- stable id within the type/parent
-  entity_value     TEXT,                          -- optional payload (label/code/number-as-text)
-
-  parent_entity_id UUID REFERENCES entities(id) ON DELETE RESTRICT,
-
-  is_active        BOOLEAN NOT NULL DEFAULT true,
-  is_deleted       BOOLEAN NOT NULL DEFAULT false,
-
-  metadata         JSONB   NOT NULL DEFAULT '{}'::jsonb,
-
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_by       UUID NOT NULL,
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_by       UUID NOT NULL,
-  version          INTEGER NOT NULL DEFAULT 1
-);
-
--- A node's natural key is unique per (tenant, parent, type, key). COALESCE folds the
--- nullable parent so two roots can't share the same (type,key) either (NULLs are
--- otherwise distinct in a UNIQUE index). Excludes soft-deleted rows so a key can be
--- "freed" by deletion and reused.
-CREATE UNIQUE INDEX entities_natural_key_uq
-  ON entities (tenant_id, COALESCE(parent_entity_id, '00000000-0000-0000-0000-000000000000'::uuid), entity_type, entity_key)
-  WHERE is_deleted = false;
-
-CREATE INDEX entities_tenant_type_idx   ON entities (tenant_id, entity_type) WHERE is_deleted = false;
-CREATE INDEX entities_tenant_key_idx    ON entities (tenant_id, entity_key)  WHERE is_deleted = false;
-CREATE INDEX entities_tenant_parent_idx ON entities (tenant_id, parent_entity_id) WHERE is_deleted = false;
-CREATE INDEX entities_metadata_gin      ON entities USING gin (metadata jsonb_path_ops);
-
--- Guard: a node cannot be its own parent (deeper cycle prevention is enforced in the
--- service layer — see "Validation rules").
-ALTER TABLE entities ADD CONSTRAINT entities_no_self_parent CHECK (parent_entity_id IS NULL OR parent_entity_id <> id);
+-- customer overrides: one per customer namespace
+CREATE UNIQUE INDEX entities_customer_uq ON entities
+  (tenant_id, customer_id, COALESCE(parent_entity_id,'00000000-0000-0000-0000-000000000000'::uuid), entity_type, entity_key)
+  WHERE customer_id IS NOT NULL AND is_deleted = false;
 ```
 
-Notes:
-- **Multi-tenant.** `tenant_id` is mandatory and scopes every index/query, matching the
-  rest of GCDR. Parents must live in the same tenant (service-enforced).
-- **`ON DELETE RESTRICT`.** Hard-deleting a parent with children is refused; soft-delete
-  cascades are an explicit service operation (see endpoints), never a silent DB cascade.
-- **Partial unique** keyed on `is_deleted = false` lets a deleted key be reused.
+A customer override **coexists** with the system row (same `entity_key`); the "shadow" is **logical** — done in resolution, not by the index.
 
-### TypeScript / Drizzle
+### Effective-config resolution (whole-config)
 
-```typescript
-// src/domain/entities/Entity.ts
-export interface RegistryEntity {
-  id: string;
-  tenantId: string;
-  entityType: string;
-  entityKey: string;
-  entityValue: string | null;
-  parentEntityId: string | null;
-  isActive: boolean;
-  isDeleted: boolean;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-  createdBy: string;
-  updatedAt: string;
-  updatedBy: string;
-  version: number;
-  /** Present only when fetched with deep≥1 (direct children, recursively shaped). */
-  children?: RegistryEntity[];
-}
+```
+hasCustom = EXISTS(SELECT 1 FROM entities
+                   WHERE tenant_id=:t AND customer_id=:cid AND is_deleted=false)
+served = hasCustom ? rows WHERE customer_id=:cid
+                   : rows WHERE customer_id IS NULL AND is_system=true   -- + non-system system-scope rows, see note
+       AND is_deleted=false
 ```
 
-```typescript
-// src/infrastructure/database/drizzle/schema.ts (sketch)
-export const entities = pgTable('entities', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').notNull(),
-  entityType: text('entity_type').notNull(),
-  entityKey: text('entity_key').notNull(),
-  entityValue: text('entity_value'),
-  parentEntityId: uuid('parent_entity_id'),
-  isActive: boolean('is_active').notNull().default(true),
-  isDeleted: boolean('is_deleted').notNull().default(false),
-  metadata: jsonb('metadata').notNull().default({}),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: uuid('created_by').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedBy: uuid('updated_by').notNull(),
-  version: integer('version').notNull().default(1),
-});
-```
+No per-node merge, no hybrid tree (a mixed tree would orphan a customer profile under a system parent — forbidden by construction). *(Note: "system scope" = `customer_id IS NULL`, which includes both `is_system` defaults and any non-protected system-scope rows an admin added.)*
 
-### REST API
+### Clone & revert
 
-Base path `/api/v1/entities`. Auth: JWT Bearer **or** customer API key (the project's
-hybrid auth). Scopes: reads need `entities:read` (or `*:read`); writes need
-`entities:write`. All responses use the standard envelope
-`{ success, data, pagination?, error? }`; lists include `total` and `totalPages`.
+- **Clone** (`POST /entities/clone` for a customer): one transaction — `SELECT … FOR SHARE` the system rows, build an `old_id → new_id` map, remap `parent_entity_id` (NULL stays NULL), set `customer_id`, `is_system = false`, reset `version`/audit, insert in topological order. **Re-clone is refused → `409 ALREADY_CLONED`** (overwrite would destroy customizations). An advisory lock on `(tenant, customer)` serializes concurrent clones.
+- **Revert** (`POST /entities/revert` for a customer): one transaction soft-deleting **all** the customer's rows → resolution falls back to system. **Soft delete** (recoverable, audited); the partial unique `WHERE is_deleted=false` lets a later clone insert fresh rows without colliding with the dead layer. (Optional ops housekeeping: purge clone rows soft-deleted > N days.)
+- **Drift:** a clone is a snapshot; later system-default changes do **not** propagate. Re-sync = revert + re-clone. Stated as a contract, not a TODO.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/entities` | Create a node. |
-| `GET` | `/entities/:id` | Fetch one node; `deep` controls child inclusion. |
-| `GET` | `/entities` | List/search with filters + pagination. |
-| `GET` | `/entities/:id/children` | Direct (or full) subtree of one node. |
-| `GET` | `/entities/tree` | Roots (and subtree) for a `type`/scope, as a forest. |
-| `PATCH` | `/entities/:id` | Partial update (value/active/metadata/parent). Optimistic `version`. |
-| `DELETE` | `/entities/:id` | Soft delete by default; `?hard=true` + `?cascade=true` variants. |
-| `POST` | `/entities/:id/restore` | Un-delete a soft-deleted node. |
+### `deep` semantics
 
-#### `deep` semantics
+`deep` embeds children under `data.children` (recursively), bounded by `ENTITY_MAX_DEPTH` (default 5):
+- `deep=0` (default) — the entity only.
+- `deep=1` — entity + direct children.
+- `deep=N` / `deep=all` — bounded subtree; each cut parent carries **`truncated:true`** (per-node, not a global flag). At this scale `deep` loads the whole subtree in one query and assembles in memory (no lazy-per-level, no N+1 by construction).
 
-`deep` is an integer depth of children to embed under `data.children` (recursively):
+**Sibling order is deterministic** — children come back ordered by `sort_order` asc, then `entity_key` — never relying on row/insertion/JSON-key order. Order-sensitive consumers (e.g. a classifier whose catch-all node must evaluate last) depend on this; by convention the fallback carries the highest `sort_order`.
 
-- `deep=0` **(default)** — the entity only; no `children` field.
-- `deep=1` — the entity **plus its direct children** (one level).
-- `deep=N` — N levels (optional extension; bounded by `ENTITY_MAX_DEPTH`, default 5).
-- `deep=all` — the full subtree (optional; same bound, returns `truncated:true` if hit).
+### List / search filters
 
-Children honour the list filters that make sense (e.g. `active`, `type`) so a `deep=1`
-fetch can ask for *active children only*.
+`type`, `key`, `value`, `q` (partial, case-insensitive over `key`+`value`), `id` (batch), `parentId` (`null` = roots), `customerId` (resolve effective config), `state` (`active|inactive|all`), `includeDeleted`, `metadata.<path>` (containment), `deep`, `page`/`pageSize`, `sort`. Standard envelope `{ success, data, pagination }` with `total`/`totalPages`. Full table in `RFC-0047-Entity-API.md`.
 
-#### List / search query parameters (`GET /entities`)
+### Validation & correctness rules (the must-fix set)
 
-| Param | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `type` | string | — | Exact `entity_type` (repeatable → IN list). |
-| `key` | string | — | Exact `entity_key`. |
-| `value` | string | — | Exact `entity_value`. |
-| `q` | string | — | Partial, case-insensitive match over `key` **and** `value` (and optionally `metadata` text). |
-| `id` | uuid | — | Fetch by id (repeatable → IN list; convenience for batch). |
-| `parentId` | uuid \| `null` | — | Children of a parent; literal `null` → roots only. |
-| `state` | enum | `active` | `active` \| `inactive` \| `all` (filters `is_active`). |
-| `includeDeleted` | bool | `false` | When true, also returns `is_deleted = true` rows. |
-| `metadata.<path>` | string | — | Match a JSONB field, e.g. `metadata.ingestionId=ing_123`. |
-| `deep` | int \| `all` | `0` | Embed children on each returned row (bounded). |
-| `page` / `pageSize` | int | `1` / `50` | Pagination (`pageSize` max 200). |
-| `sort` | string | `entity_key_asc` | `<field>_<asc\|desc>`: `entity_key`, `entity_type`, `created_at`, `updated_at`, `version`. |
+From the implementation review — these are **must-fix v1**, scale-independent:
+1. **`RESTORE_CONFLICT`** — restoring a soft-deleted node whose `(scope, key, parent)` was re-created returns **409**, never a raw 500 from the unique constraint.
+2. **`SYSTEM_PROTECTED`** — any non-admin delete/deactivate/edit of an `is_system` row → 409 (trigger + service).
+3. **`ALREADY_CLONED`** — re-clone of an already-customized customer → 409.
+4. **metadata merge** — `PATCH metadata` is a strict **top-level** merge; define the delete-key sentinel (recommend **JSON Merge Patch / RFC 7396**: `null` = remove). `?metadataMode=replace` swaps wholesale.
+5. **`version` semantics** — fixed and documented: absent `version` on `PATCH` = **last-write-wins** (field then informational) **or** required (412) — pick one in the API doc; mismatch = `409 VERSION_CONFLICT`.
+6. **cycle check is synchronous** — a re-parent that would create a cycle → `400 ENTITY_CYCLE` (walk ancestors); `parent_type` must be in `allowed_parent_types`.
+7. **`metadata.<path>` is parameterized** — path passed as a `text[]` (`#> $1::text[]`) / containment (`@>`), never string-interpolated; allow-list chars, cap segments.
+8. **`q` escapes `%`/`_`**.
+9. **revert is whole-scope** — deleting one override row keeps the customer in customer-mode (no partial fallback / no node-mixing); only deleting **all** rows resumes system.
 
-Examples:
-
-```http
-# all active GROUPs (no children)
-GET /api/v1/entities?type=GROUP&state=active
-
-# one entity with its direct children, active children only
-GET /api/v1/entities/7f1c…?deep=1&state=active
-
-# partial search across key/value, including inactive, page 2
-GET /api/v1/entities?q=entrada&state=all&page=2&pageSize=25
-
-# roots of the PROFILE/GROUP forest
-GET /api/v1/entities?parentId=null&type=GROUP
-
-# find by integration id stored in metadata
-GET /api/v1/entities?metadata.ingestionId=ing_123
-```
-
-#### Request / response shapes
-
-```jsonc
-// POST /api/v1/entities
-{
-  "entityType": "PROFILE",
-  "entityKey": "ENTRADA",
-  "entityValue": "Entrada principal",
-  "parentEntityId": "7f1c…",          // optional; null/omitted = root
-  "isActive": true,                    // optional, default true
-  "metadata": { "slaveId": 1 }         // optional, default {}
-}
-
-// 200 GET /api/v1/entities/7f1c…?deep=1
-{
-  "success": true,
-  "data": {
-    "id": "7f1c…", "entityType": "GROUP", "entityKey": "ENERGY-ENTRY",
-    "entityValue": null, "parentEntityId": null,
-    "isActive": true, "isDeleted": false,
-    "metadata": { "ingestionId": "ing_123" },
-    "createdAt": "…", "createdBy": "…", "updatedAt": "…", "updatedBy": "…", "version": 1,
-    "children": [
-      { "id": "9b2d…", "entityType": "PROFILE", "entityKey": "ENTRADA",
-        "entityValue": "Entrada principal", "parentEntityId": "7f1c…",
-        "isActive": true, "isDeleted": false, "metadata": { "slaveId": 1 },
-        "version": 1 /* … */ }
-    ]
-  }
-}
-```
-
-`PATCH` accepts any subset of `{ entityValue, isActive, metadata, parentEntityId, entityKey }`
-plus an **optional** `version` for optimistic concurrency (409 `VERSION_CONFLICT` on
-mismatch). `metadata` is **merged** shallowly by default; `?metadataMode=replace` swaps it.
-
-### Validation rules
-
-1. `(tenant_id, parent_entity_id, entity_type, entity_key)` is unique among non-deleted rows.
-2. `parent_entity_id`, if set, must exist, be in the **same tenant**, and **not be deleted**.
-3. **No cycles.** A `PATCH` that re-parents must not create a cycle (walk ancestors; reject
-   with `400 ENTITY_CYCLE`). Depth is bounded by `ENTITY_MAX_DEPTH` (default 5).
-4. `entity_type` / `entity_key` are non-empty, trimmed, length-bounded (e.g. ≤ 128), and
-   may be constrained per tenant to an allow-list (optional config; off by default).
-5. Soft delete sets `is_deleted = true`; the row keeps its FK. **Hard delete** is refused if
-   children exist unless `cascade=true` (then children are hard-deleted in one tx).
-6. Re-activating/re-creating a key equal to a *soft-deleted* one is allowed (partial unique).
-
-### Repository / service notes
-
-- All reads filter `is_deleted = false` unless `includeDeleted=true`.
-- `deep` is resolved by the service: one query for the roots, then **batched** child
-  queries per level (`WHERE parent_entity_id IN (…)`) up to the requested/clamped depth —
-  never N+1. The result is assembled into the nested `children` shape.
-- Writes append nothing to a separate history table in v1 (audit columns suffice); a
-  bounded `metadata.changelog` (RFC-0028 style) or a dedicated `entity_history` table is a
-  documented future option if per-field audit is needed.
+**Deferred at this scale (<1000, internal-UI writer)** — accept/defer with a one-line note: concurrent-re-parent lock (advisory only on clone), GIN index on `metadata`, `pg_trgm`/`tsvector` for `q` (accept seq-scan), `ENTITY_MAX_NODES` cap, the no-N+1 query-count test. Add a plain B-tree index on `customer_id`.
 
 ### Management UI
 
-A generic admin screen under the platform/admin area (not customer-facing):
+**Admin (system defaults):** tree/forest browser (lazy one-level expand at this scale is fine), `entity_type` = **SELECT** (never free text), `entity_key` with live duplicate-check showing the **scope** of uniqueness, `parent` picker showing the **full path** (breadcrumb), `entity_value`, `is_active`, a **validated** JSON metadata editor, cycle-checked re-parent, soft-delete/restore, and a hard-delete that **shows the impact** (descendant count + references) with type-to-confirm. `is_system` rows are non-deletable in the UI.
 
-- **Tree/forest browser** — pick an `entity_type` (or "all"); show roots, expand to load
-  children lazily (`deep=1` per expand). Search box → `q`; toggles for `state`
-  (active/inactive/all) and *show deleted*.
-- **Detail/edit panel** — view/edit `entityValue`, `isActive`, `metadata` (JSON editor),
-  and re-parent via a picker (cycle-checked). Shows audit (`created/updated by/at`,
-  `version`) read-only.
-- **Create** — type + key + optional value + parent; inline duplicate-key check.
-- **Soft delete / restore** — delete hides the node (with a "show deleted" toggle to
-  recover); hard delete is gated behind a confirm + the `cascade` choice when children
-  exist.
-- Reuses existing list/table, JSON-editor and confirm-dialog components; multi-select on
-  the list page follows the project standard (`MultiSelectDropdown`).
+**Per-customer "Taxonomy" tab** (inside a customer's detail; operated by MYIO staff):
+- A **full-width state banner**: 🔵 *Using system default* (`[Create copy & customize]`) or 🟠 *Customized (copy)* with **who + when** and `[Revert to system default]`.
+- **Create copy** opens a modal naming the consequences (edit freely / stops receiving system updates / revertible-but-loses-edits) + the **item count** to be copied; the state flip is visible (banner color + toast).
+- Once cloned, the same tree UI scoped to the customer, with per-node **"modified" / "new"** markers (a full side-by-side diff vs system is **v2**, on real pain).
+- **Revert** lists, item by item, what is lost + type-the-customer-name to confirm (soft-delete = recoverable by support).
+- **Cut from v1:** partial clone, mass re-parent, type creation (admin-only, separate). `is_system` items stay non-deletable inside a clone.
 
 ---
 
 ## Drawbacks
 
-- **Generic tables erode type-safety.** `entity_type`/`entity_key` are strings; a typo
-  creates a sibling concept silently. Mitigation: optional per-tenant type allow-list, and
-  treating heavily-used types as "promote to a real table when they grow up".
-- **No referential integrity *into* the data.** Other tables can't FK an `entities` row by
-  its natural key; they'd store the uuid. Fine for lookups, bad for hot relations.
-- **Adjacency list = app-side recursion.** Deep/large trees are awkward and can N+1 if
-  implemented naively; we bound depth and batch per level. True deep analytics want a
-  closure table / `ltree`.
-- **Querying JSON metadata is second-class.** The GIN index helps equality/containment;
-  it is not a substitute for real columns when a field becomes a first-class filter.
+- **Genericity erodes type-safety.** Mitigated by the `entity_types` registry (no free type strings) + admin-only type creation; integrity *into* the data still uses the uuid, not the natural key.
+- **Adjacency-list = app-side recursion.** Fine for the shallow trees here; bounded depth + whole-subtree-in-one-query avoid N+1. Deep analytics would want a closure table (promotion).
+- **JSONB metadata is second-class to query.** Containment only; not a substitute for real columns when a field becomes a first-class filter.
+- **Clone drift.** A clone is a snapshot; system changes don't propagate. Accepted (re-sync = revert + re-clone); whole-config keeps it to one decision point per customer.
 
 ## Alternatives considered
 
-- **A new bespoke table per concept.** The status quo. Best type-safety and query power;
-  worst velocity (migration + controller + DTO + repo + tests each time). This RFC targets
-  exactly the cases where that cost isn't justified.
-- **Pure EAV (entity-attribute-value).** More generic still (arbitrary attributes per row);
-  rejected — it pushes *all* structure into rows and is notoriously hard to query/validate.
-  Our `metadata` JSONB covers the "few extra fields" need without going full EAV.
-- **Closure table / `ltree` for hierarchy.** Superior for deep/heavy trees and subtree
-  queries. Rejected for v1 (the target data is shallow, low-cardinality); kept as the
-  documented upgrade path if a type outgrows adjacency-list.
-- **Stuffing it into existing `metadata` blobs.** The thing we're trying to stop:
-  unqueryable, unrelatable, unaudited.
+- **A real table per concept** — best type-safety/query power, worst velocity. The taxonomy here is 8+ open-ended group types with profile children — the pattern is already proven (rule-of-three met many times over), so a generic registry is justified, not premature.
+- **Pure EAV** — rejected; `entity_value` + bounded `metadata` cover "a few extra fields" without exploding structure into rows.
+- **Closure table / `ltree`** — superior for deep/heavy trees; deferred (shallow, low-cardinality) and named as the promotion path.
+- **Per-root-tree override granularity** — endorsed as the *future* shape; deferred behind `clone_scope_key='*'` because at this scale (internal writer, tiny volume, one-toggle UI) whole-config is simpler and the upgrade is a data migration.
 
 ## Resolved decisions
 
 | Question | Decision |
 | --- | --- |
-| Multi-tenant? | **Yes** — `tenant_id` mandatory, scopes all indexes/queries. |
-| Soft vs hard delete | **Soft by default** (`is_deleted`); hard delete explicit, refused with children unless `cascade=true`. |
-| `is_active` vs `is_deleted` | **Independent** — deactivate ≠ delete. Lists default to active & not-deleted. |
-| Hierarchy storage | **Adjacency list** (`parent_entity_id`); depth bounded; closure table deferred. |
-| Natural-key uniqueness | `(tenant, parent, type, key)` via `COALESCE` partial unique (non-deleted only). |
-| Extra fields | **`metadata` JSONB** (e.g. `ingestionId`), GIN-indexed; not EAV. |
-| `deep` default | `0` (entity only); `1` = direct children; `N`/`all` bounded extension. |
+| Type as free string? | **No** — `entity_types` registry (FK), admin-only creation. Shape A (taxonomy in `entity_key`). |
+| Multi-tenant? | **Yes** — `tenant_id` mandatory. |
+| System defaults | `customer_id IS NULL AND is_system=true`; **never deletable/deactivatable** (trigger + 409 `SYSTEM_PROTECTED`). |
+| Override unit (v1) | **Whole-customer-config** — customer is binary (system vs cloned). `clone_scope_key='*'` reserves per-root-tree for later. |
+| Resolution | `customer has ≥1 non-deleted row ? customer : system` — no per-node merge, no mixing. |
+| Clone | Snapshot copy (id/parent remap, `is_system=false`, version reset); re-clone = `409 ALREADY_CLONED`. |
+| Revert | **Soft delete** all customer rows → fallback resumes; re-clone picks up current system. |
+| Drift | **No auto-sync** (contract); re-sync = revert + re-clone. |
+| Soft vs hard delete | Soft default; hard refused with children unless `cascade=true`; `is_system` never. |
+| Hierarchy | Adjacency-list (`parent_entity_id`), depth-bounded; closure table deferred. |
+| `deep` default | `0`; `1` = direct children; `N`/`all` bounded, `truncated` per-node. |
+| Sibling ordering | **Explicit `sort_order` int** — siblings resolve by `sort_order` then `entity_key`; system-locked on `is_system` rows. |
+| Who edits | **MYIO only** — customer keys read/resolve-only (`403` on writes); no customer-editable surface, no reclassification flow. |
+| Membership rules | **Data on the node (`metadata`)**, evaluated by a generic engine in the consumer — new subcategory = data insert, no per-key code. |
+| `metadata.<path>` | Parameterized **containment (`@>`)**; B-tree on `customer_id`; GIN deferred at this scale. |
 
 ## Unresolved questions
 
-- **Per-field audit?** Are audit columns enough, or do we need a `metadata.changelog`
-  (RFC-0028 style) / `entity_history` table from day one?
-- **Type registry.** Should `entity_type` (and allowed keys/parent-types per type) be a
-  governed allow-list (its own small table) rather than free strings? Start free, formalise
-  if abuse appears.
-- **Cross-tenant / global entities.** Any need for tenant-NULL "global" lookups, or always
-  tenant-scoped? (Assume tenant-scoped for v1.)
-- **Value typing.** `entity_value` is free text. Do we ever need a typed value
-  (`value_number`, `value_bool`) or is text-plus-metadata enough?
-- **Ordering.** Do siblings need an explicit `sort_order` column, or is `entity_key` order
-  sufficient?
+- **Type ownership UI** — admin creates types; do we need a tiny `entity_types` admin screen in v1, or seed + migration only? (Lean: seed/migration; UI later.)
+- **Per-field audit** — audit columns vs a `metadata.changelog` (RFC-0028 style) / `entity_history` table. (Defer.)
+- **Value typing** — `entity_value` is text; a typed value (`value_number`/`value_bool`) may emerge.
+- **Cross-tenant global types** — types are tenant-scoped for now.
 
 ## Implementation plan
 
-1. **Migration** — `00NN_entities.sql`: table + partial unique + indexes + check constraint
-   (via the custom runner, `schema_migrations`; see `docs/DB-MIGRATIONS.md`).
-2. **Schema/types** — `entities` in Drizzle schema; `RegistryEntity` domain type.
-3. **DTOs** — Zod request/response schemas (`CreateEntityDTO`, `UpdateEntityDTO`,
-   `ListEntitiesQuery`) with the validation rules above.
-4. **Repository** — CRUD + filtered list + batched `deep` loader + cycle check; all
-   tenant-scoped and soft-delete-aware.
-5. **Service** — business rules (uniqueness, parent/tenant checks, cycle prevention,
-   delete/cascade/restore, optimistic `version`).
-6. **Controller** — `/api/v1/entities` routes with hybrid auth + `entities:read|write`
-   scopes; standard response envelope + pagination.
-7. **Tests** — unit (service rules: cycles, uniqueness, deep assembly, soft-delete) +
-   integration (endpoints, filters, `deep`, pagination).
-8. **Frontend** — generic management screen (tree browser, detail/edit, JSON metadata
-   editor, soft-delete/restore) reusing existing list/modal components.
-9. **Docs** — wire-contract doc (`RFC-0047-Entity-API.md`) kept in sync with the controller.
+1. **Migration** `00NN_entities.sql` — `entity_types` + `entities` (+ `customer_id`, `is_system`, `clone_scope_key`, `sort_order`), the two partial unique indexes (the parent index carries `sort_order`), the FK and CHECK invariants, the `BEFORE DELETE/UPDATE` `is_system` trigger, and a B-tree on `customer_id`. Seed the initial `entity_types` (`GROUP`/`PROFILE`/`EQUIPMENT`) and the system-default taxonomy.
+2. **Schema/types** — Drizzle (`RFC-0047-Entity-schema.md`); `RegistryEntity`, `EntityType` domain types.
+3. **DTOs** — Zod request/response (`CreateEntityDTO`, `UpdateEntityDTO`, `ListEntitiesQuery`, `CloneDTO`) enforcing the validation rules.
+4. **Repository** — tenant-scoped CRUD, filtered list, batched `deep` loader, effective-config resolution, clone/revert, cycle check; soft-delete + `is_system` aware.
+5. **Service** — uniqueness, parent/tenant/type-rule checks, cycle prevention, `SYSTEM_PROTECTED`/`RESTORE_CONFLICT`/`ALREADY_CLONED`, clone/revert, optimistic `version`.
+6. **Controller** — `/api/v1/entities` with hybrid auth; `entities:read` for reads/resolve, `entities:write` (**MYIO-only** — customer keys get `403` on writes) for mutations; envelope + pagination (`RFC-0047-Entity-API.md`).
+7. **Tests** — unit (cycles, uniqueness, deep assembly, soft-delete, resolution, `is_system` protection ×4, clone remap integrity, re-clone refused, revert/fallback, drift no-propagation, no-node-mixing) + integration (endpoints, filters, `deep`, pagination, tenant isolation).
+8. **Frontend** — admin tree UI + per-customer Taxonomy tab (banner, clone/revert modals, "modified/new" markers) reusing existing list/modal/JSON-editor components.
+9. **Docs** — keep `RFC-0047-Entity-API.md` in sync with the controller.
