@@ -110,6 +110,12 @@ export function makeCentralAuthMiddleware(centrals: CentralRepoDep = centralRepo
       const token = req.headers['authorization'];
       const uuidHeader = req.headers['uuid'];
 
+      // NOTE: these are INPUT-PRESENCE checks, not the security boundary. The
+      // uuid header only SELECTS which central (and thus which agent_secret) the
+      // token is verified against; authentication is decided solely by the HMAC
+      // verify below (verifyHs256 + timingSafeEqual). A caller cannot bypass it
+      // by manipulating these headers — without the central's agent_secret the
+      // signature check fails. (Re: CodeQL "user-controlled bypass" here.)
       if (typeof token !== 'string' || !token) {
         throw new UnauthorizedError('Central token não fornecido');
       }
