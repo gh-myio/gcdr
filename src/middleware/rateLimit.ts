@@ -105,3 +105,34 @@ export const operatorPinRateLimiter = rateLimit('operator-pin', {
   keyFn: (req) => clientIp(req),
   message: 'Too many PIN login attempts; wait before retrying',
 });
+
+/**
+ * Central zero-touch enrollment: a PUBLIC endpoint where the one-time enroll
+ * token IS the credential, so throttle by IP to blunt token brute-forcing /
+ * enroll abuse. Enrollment is rare (once per central; re-enroll only on a
+ * field-swap), so the window is generous but finite.
+ */
+export const centralEnrollRateLimiter = rateLimit('central-enroll', {
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  keyFn: (req) => clientIp(req),
+  message: 'Too many enrollment attempts; wait before retrying',
+});
+
+/**
+ * Central poll loop (jobs/next + progress reports). Authenticated by the
+ * agent-secret JWT, but rate-limited per-central so a single runaway/compromised
+ * device cannot hammer the control plane. Keyed by the `uuid` header so each
+ * central is its own bucket (many centrals behind one NAT do not starve each
+ * other); falls back to IP when the header is absent. A healthy central polls
+ * every 30s (~2/min); 60/min leaves ample room for retries while bounding abuse.
+ */
+export const centralPollRateLimiter = rateLimit('central-poll', {
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: (req) => {
+    const u = req.headers['uuid'];
+    return typeof u === 'string' && u ? `central:${u}` : `ip:${clientIp(req)}`;
+  },
+  message: 'Too many central-agent requests; slow down the poll loop',
+});

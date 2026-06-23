@@ -93,6 +93,7 @@ import { simulatorAdminController } from './controllers/admin/simulator-admin.co
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
+import { centralEnrollRateLimiter, centralPollRateLimiter } from './middleware/rateLimit';
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
@@ -259,12 +260,16 @@ apiV1Router.use('/centrals', authMiddleware, centralsController);
 // agent_secret yet, so its one-time enroll token IS the credential. It exchanges
 // { uuid, enrollToken } for its agent_secret here, then authenticates the poll
 // loop below.
-apiV1Router.post('/central-agent/enroll', centralAgentEnrollHandler);
+// Rate-limited per IP: the enroll token is the only credential here, so throttle
+// brute-force / abuse before the handler.
+apiV1Router.post('/central-agent/enroll', centralEnrollRateLimiter, centralAgentEnrollHandler);
 
 // Central-agent poll loop (field-swap restore). NOT operator-authed — the
 // central authenticates itself with its agent_secret-signed JWT
 // (centralAuthMiddleware sets req.centralContext + tenant from the central row).
-apiV1Router.use('/central-agent', centralAuthMiddleware, centralAgentController);
+// Rate-limited per-central (by uuid header) so one runaway device can't hammer
+// the control plane, without starving other centrals behind the same NAT.
+apiV1Router.use('/central-agent', centralPollRateLimiter, centralAuthMiddleware, centralAgentController);
 
 // Themes (Look and Feel)
 apiV1Router.use('/themes', authMiddleware, themesController);
