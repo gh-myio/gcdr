@@ -244,7 +244,26 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 10 policies';
+    -- Work Orders Only Policy - access confined to the OS (Work Orders) domain
+    -- Backs role:os-only (frontend confines such users to the /os area).
+    INSERT INTO policies (id, tenant_id, key, display_name, description, allow, deny, risk_level, is_system, version)
+    VALUES (
+        'cccc1212-1212-1212-1212-121212121212',
+        v_tenant_id,
+        'policy:work-orders-only',
+        'Work Orders Only',
+        'Access limited to the OS (Work Orders) domain; no other domain is granted',
+        '["workorders.*.*"]',
+        '[]',
+        'low',
+        true,
+        1
+    )
+    -- Idempotent: the same record may already exist from the ops script
+    -- (scripts/db/ops/seed-local-test-users-os.sql / add-os-only-role.sql).
+    ON CONFLICT DO NOTHING;
+
+    RAISE NOTICE 'Inserted 11 policies';
 END $$;
 
 -- Verify

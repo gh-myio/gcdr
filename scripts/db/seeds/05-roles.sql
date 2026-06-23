@@ -152,7 +152,27 @@ BEGIN
         1
     );
 
-    RAISE NOTICE 'Inserted 9 roles';
+    -- OS-Only Role - confined to the OS (Work Orders) area (RFC-0037/0041/0042)
+    -- The frontend (role:os-only) shows only the OS menu and redirects every
+    -- other route to /os. Assign at customer scope to limit which customers' OS.
+    INSERT INTO roles (id, tenant_id, key, display_name, description, policies, tags, risk_level, is_system, version)
+    VALUES (
+        'dddd1212-1212-1212-1212-121212121212',
+        v_tenant_id,
+        'role:os-only',
+        'OS Only',
+        'Access restricted to the OS (Work Orders) area only; no other menus or routes',
+        '["policy:work-orders-only"]',
+        '["os", "workorders", "restricted"]',
+        'low',
+        true,
+        1
+    )
+    -- Idempotent: the same record may already exist from the ops script
+    -- (scripts/db/ops/seed-local-test-users-os.sql / add-os-only-role.sql).
+    ON CONFLICT DO NOTHING;
+
+    RAISE NOTICE 'Inserted 10 roles';
 END $$;
 
 -- Verify
