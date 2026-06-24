@@ -302,6 +302,79 @@ export const assets = pgTable('assets', {
 }));
 
 // =============================================================================
+// ENTITIES (RFC-0047 — Generic Entity Registry)
+// =============================================================================
+// Governed type registry + a typed key/value forest with system defaults
+// (customer_id NULL) and per-customer overrides. See drizzle/migrations/
+// 0049_entities.sql + 0050_entities_triggers.sql and docs/rfcs/RFC-0047-*.
+
+export const entityTypes = pgTable('entity_types', {
+  entityType: text('entity_type').notNull(),
+  tenantId: uuid('tenant_id').notNull(),
+  label: text('label').notNull(),
+  description: text('description'),
+  allowedParentTypes: text('allowed_parent_types').array().notNull().default(sql`'{}'::text[]`),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.tenantId, table.entityType] }),
+}));
+
+export const entities = pgTable('entities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id'),                       // null = system default; set = customer override
+  entityType: text('entity_type').notNull(),
+  entityKey: text('entity_key').notNull(),
+  entityValue: text('entity_value'),
+  parentEntityId: uuid('parent_entity_id'),              // self-FK (ON DELETE RESTRICT in migration)
+  sortOrder: integer('sort_order').notNull().default(0), // deterministic sibling order; system-locked on is_system rows
+  cloneScopeKey: text('clone_scope_key').notNull().default('*'),
+  isSystem: boolean('is_system').notNull().default(false),
+  isActive: boolean('is_active').notNull().default(true),
+  isDeleted: boolean('is_deleted').notNull().default(false),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid('updated_by').notNull(),
+  version: integer('version').notNull().default(1),
+}, (table) => ({
+  // Partial unique indexes — system vs customer namespace, soft-deleted excluded.
+  // COALESCE folds the nullable parent (NULLs are otherwise distinct in UNIQUE).
+  systemUq: uniqueIndex('entities_system_uq')
+    .on(
+      table.tenantId,
+      sql`COALESCE(${table.parentEntityId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      table.entityType,
+      table.entityKey,
+    )
+    .where(sql`${table.customerId} IS NULL AND ${table.isDeleted} = false`),
+  customerUq: uniqueIndex('entities_customer_uq')
+    .on(
+      table.tenantId,
+      table.customerId,
+      sql`COALESCE(${table.parentEntityId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      table.entityType,
+      table.entityKey,
+    )
+    .where(sql`${table.customerId} IS NOT NULL AND ${table.isDeleted} = false`),
+  tenantTypeIdx: index('entities_tenant_type_idx')
+    .on(table.tenantId, table.entityType)
+    .where(sql`${table.isDeleted} = false`),
+  tenantKeyIdx: index('entities_tenant_key_idx')
+    .on(table.tenantId, table.entityKey)
+    .where(sql`${table.isDeleted} = false`),
+  tenantParentIdx: index('entities_tenant_parent_idx')
+    .on(table.tenantId, table.parentEntityId, table.sortOrder)
+    .where(sql`${table.isDeleted} = false`),
+  customerIdx: index('entities_customer_idx')
+    .on(table.tenantId, table.customerId)
+    .where(sql`${table.isDeleted} = false`),
+}));
+
+// =============================================================================
 // DEVICES
 // =============================================================================
 
