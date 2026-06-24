@@ -183,4 +183,23 @@ ON CONFLICT DO NOTHING;
 -- example system-default taxonomy (customer_id NULL, is_system true)
 -- GROUP energy-commonarea → PROFILE CHILLER / FANCOIL / HVAC, etc.
 -- (inserted by the seed/migration with is_system = true; never deletable)
+
+-- example consumer types — RFC-0207 device-classification tree (served by THIS registry,
+-- no bespoke API). Roots per domain; descendants share one node type so the tree topology
+-- stays arbitrary (depth = parent_entity_id; role lives in metadata.role).
+INSERT INTO entity_types (tenant_id, entity_type, label, allowed_parent_types) VALUES
+  ('<tenant>', 'CLASSIFICATION_ENERGY',      'Classification · Energy',      '{}'),
+  ('<tenant>', 'CLASSIFICATION_WATER',       'Classification · Water',       '{}'),
+  ('<tenant>', 'CLASSIFICATION_TEMPERATURE', 'Classification · Temperature', '{}'),
+  ('<tenant>', 'CLASSIFICATION_NODE',        'Classification · Node',
+     '{CLASSIFICATION_ENERGY,CLASSIFICATION_WATER,CLASSIFICATION_TEMPERATURE,CLASSIFICATION_NODE}')
+ON CONFLICT DO NOTHING;
 ```
+
+> **`metadata` shape is enforced in the SERVICE, not the DB.** The `metadata` column is plain
+> `jsonb` (no DB-level shape). When a consumer stores structured fields there (e.g. RFC-0207's
+> `label`/`icon`/`role`/`rules`/`formula` under the `CLASSIFICATION_*` types), the service applies a
+> **per-`entity_type` Zod schema (`.strict()`)** on every write — the only guard against a malformed
+> write silently corrupting a downstream classifier. The `bulk-replace` whole-subtree swap and the
+> subtree-level `If-Match` version live in the service/repository too; see `RFC-0047-Entity-API.md`
+> §2.5 and the RFC §"Validation & correctness rules" (#10).

@@ -63,6 +63,7 @@ implementation** (`src/controllers/entities.controller.ts`, `src/dto/request/Ent
 | `POST` | `/entities/:id/restore` | write | Un-delete a soft-deleted node. |
 | `POST` | `/entities/clone` | write | Materialize the system tree under a customer. |
 | `POST` | `/entities/revert` | write | Soft-delete all of a customer's rows → back to system. |
+| `PUT` | `/entities/bulk-replace` | write | **Atomic whole-subtree replace** for a `(customerId, type)`; optimistic `If-Match`. |
 
 ### 2.1 `GET /entities` — list / search
 
@@ -115,6 +116,8 @@ Returns the customer's own forest **if it has any non-deleted rows** (a whole-tr
 ```
 `?metadataMode=replace` swaps metadata wholesale. **`version` semantics:** if `version` is sent and stale → `409 VERSION_CONFLICT`; if **absent** → last-write-wins (the field is then informational). Editing an `is_system` row requires **admin** scope; otherwise `409 SYSTEM_PROTECTED`.
 
+**Per-type `metadata` validation (write path).** Because `metadata` is opaque jsonb, the service validates it on every write with a **Zod schema discriminated by `entity_type`** (`.strict()` — unknown keys rejected) → `400 VALIDATION_ERROR` on mismatch. A type with no registered schema accepts free-form metadata (back-compat). This is the **mandatory guard** when a consumer's classifier or logic reads structured fields out of `metadata` (e.g. RFC-0207's `rules`/`formula`) — the DB doesn't enforce shape, so the write path must, or a malformed write silently corrupts the consumer. **Containment filters (`metadata.<path>=…`) are only valid over top-level scalar keys** (e.g. `role`, `icon`, `domain`); nested objects/arrays like `rules`/`formula` are read payload, never filter predicates.
+
 ### 2.4 `POST /entities/clone` / `POST /entities/revert`
 
 ```jsonc
@@ -128,7 +131,23 @@ POST /entities/revert       { "customerId": "<uuid>" }
 // 200 → { success, data: { reverted: 17, customerId } }
 ```
 
-### 2.5 `DELETE /entities/:id`
+### 2.5 `PUT /entities/bulk-replace` — atomic whole-subtree replace
+
+For a consumer whose editor replaces a **whole tree** at once (e.g. RFC-0207's classification modal), orchestrating `revert`+`clone`+`PATCH` client-side is **non-atomic and racy** — a crash mid-way leaves the customer with a partial tree and `/resolve` can observe an intermediate state. This endpoint does the replace in **one transaction**.
+
+```http
+PUT /api/v1/entities/bulk-replace?customerId=<uuid>&type=<entity_type>
+If-Match: "v_2026_06_23_a"          # the X-Version-Id of the subtree being replaced
+Content-Type: application/json
+{ "roots": [ /* the full new forest for (customerId, type), each node with children */ ] }
+```
+
+- **One transaction:** soft-delete every existing customer row for `(customerId, entity_type)`, insert the new set in topological order (remapping `parentEntityId`, `sortOrder` from each node's order). The `/resolve` view never sees a partial tree.
+- **Optimistic concurrency at the *subtree* level** (not per-row): the server recomputes the current `X-Version-Id` for `(customerId, type)` inside the transaction; if it differs from `If-Match` → **`409 VERSION_CONFLICT`** (body carries `currentVersion`), rollback, **zero writes**. "Someone saved while you were editing" is deterministic, never last-write-wins. (The per-row `PATCH` `version` does not apply — the unit of concurrency here is the whole subtree.)
+- **MYIO-only** (`entities:write`); the new set is validated as a unit: per-type `metadata` Zod (above), key uniqueness, depth ≤ `ENTITY_MAX_DEPTH`, cycle-free, parent-type rules.
+- `200 → { success, data: { version: "<new>", source: "customer", replaced: <n> } }`.
+
+### 2.6 `DELETE /entities/:id`
 
 Soft delete by default. `?hard=true` (refused if children exist unless `?cascade=true`). `is_system` rows are never deletable → `409 SYSTEM_PROTECTED`.
 
@@ -165,7 +184,7 @@ GET /api/v1/entities?q=chiller&state=all&page=2&pageSize=25
 | 400 | `PARTIAL_CLONE` | Attempt to clone a sub-tree (v1 clone is whole-config). |
 | 403 | `FORBIDDEN` | Missing scope — a customer key on any write endpoint, a non-MYIO caller writing, a non-admin creating a type. |
 | 404 | `NOT_FOUND` | Unknown id / parent / customer / type. |
-| 409 | `VERSION_CONFLICT` | Optimistic `version` mismatch on PATCH. |
+| 409 | `VERSION_CONFLICT` | Optimistic mismatch — `version` on `PATCH`, or `If-Match` subtree version on `PUT /bulk-replace` (body carries `currentVersion`). |
 | 409 | `DUPLICATE_KEY` | `(scope, type, key, parent)` already exists (non-deleted). |
 | 409 | `RESTORE_CONFLICT` | Restoring would collide with a live `(scope, type, key, parent)`. |
 | 409 | `SYSTEM_PROTECTED` | Delete/deactivate/edit of an `is_system` row by a non-admin. |
@@ -182,3 +201,12 @@ GET /api/v1/entities?q=chiller&state=all&page=2&pageSize=25
 - **Canonical keys (parity):** if a consumer pairs each `entity_key` with code (e.g. a classification engine evaluating a node's rules), keep a **checked-in list of the system-default `entity_key`s** so the consumer's CI can assert parity without calling GCDR. Membership rules travel **as data on the node** (`metadata`), evaluated by a **generic** engine — so adding a subcategory needs **no new per-key code**, only a baked regenerate.
 - **Drift:** a customer's clone is a **snapshot** — system-default changes after a clone do **not** reach it. Re-sync is an explicit `revert` + `clone`.
 - **Pagination + `deep`:** prefer `deep` for trees and pagination for flat lists; deep responses are not paginated (tiny data).
+
+### 5.1 Example consumer — RFC-0207 device-classification tree
+
+The dashboard classification profile (RFC-0207) is served **entirely by this generic registry** — no bespoke `/classification-profile` API. The integration registers its own types and a per-type metadata schema:
+
+- **Types** (seeded in `entity_types`): `CLASSIFICATION_ENERGY` / `CLASSIFICATION_WATER` / `CLASSIFICATION_TEMPERATURE` for the domain roots (`allowedParentTypes: '{}'`), and `CLASSIFICATION_NODE` for every descendant (`allowedParentTypes: '{CLASSIFICATION_ENERGY,CLASSIFICATION_WATER,CLASSIFICATION_TEMPERATURE,CLASSIFICATION_NODE}'`). Depth = `parentEntityId`; the node's *role* lives in `metadata.role`, **not** in the type — so the tree topology stays arbitrary.
+- **Field mapping:** `entity_key` = the stable classifier key (key-parity with the lib's golden engine); `metadata.label` = display name (i18n-friendly, not `entity_value`); `sort_order` = evaluation order; `metadata.{icon,role,rules,formula}` = the rest.
+- **Per-type metadata schema** validates `{ label, domain?, icon?, role?, rules?, formula? }` `.strict()` on write. The `icon` field is validated against a **synced curated token set** (the canonical catalog is owned by MYIO-Design; GCDR mirrors it via a checked-in file — like the key-parity list, not a hard-coded enum — and rejects an off-catalog `icon` with `400 VALIDATION_ERROR`, so a free emoji can never enter via any write path).
+- **Editing:** the operator's modal replaces the whole tree → `PUT /entities/bulk-replace?type=CLASSIFICATION_ENERGY` (§2.5). Load is `GET /entities/resolve` (304-aware, baked fallback in the widget).

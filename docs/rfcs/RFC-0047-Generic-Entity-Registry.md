@@ -59,6 +59,8 @@ GROUP / energy-commonarea          (root, system default)
 
 > **Membership is data, not code (for downstream classifiers).** When a consumer classifies devices into these profiles (e.g. the climatização engine), the **per-node matching rules live in `metadata`** (e.g. `metadata.match: { deviceProfiles, identifierContains }`) and are evaluated by a **generic engine** in the consumer. Adding a profile/subcategory is therefore a **data** insert here — **no new per-key code** downstream. The *engine semantics* (how the rules evaluate, and `sort_order` as evaluation order) stay in the consumer's golden-tested code; this registry supplies only the typed tree + ordering. (A consumer that runs offline should ship a build-time **baked copy** of the system-default tree and keep a checked-in list of system `entity_key`s for CI parity — see `RFC-0047-Entity-API.md` §5.)
 
+> **Worked example — RFC-0207 device-classification (no bespoke API).** The dashboard classification tree is served entirely by this registry: types `CLASSIFICATION_ENERGY|WATER|TEMPERATURE` (roots) + `CLASSIFICATION_NODE` (descendants); `entity_key` = stable classifier key, `metadata.label` = display, `sort_order` = evaluation order, `metadata.{icon,role,rules,formula}` = the rest — validated by the per-type Zod schema (must-fix #10). The editor saves via `PUT /entities/bulk-replace`; `metadata.icon` is checked against a curated token set synced from MYIO-Design (a checked-in mirror, not a hard-coded enum). Full mapping in `RFC-0047-Entity-API.md` §5.1. This is the template for *any* consumer: register types, register a metadata schema, consume `/resolve`.
+
 ### System defaults vs per-customer override
 
 - A **system default** row has `customer_id = NULL` and `is_system = true`. Every customer **inherits** it. It is **never deletable/deactivatable**; only an admin path may edit it.
@@ -162,6 +164,7 @@ No per-node merge, no hybrid tree (a mixed tree would orphan a customer profile 
 - **Clone** (`POST /entities/clone` for a customer): one transaction — `SELECT … FOR SHARE` the system rows, build an `old_id → new_id` map, remap `parent_entity_id` (NULL stays NULL), set `customer_id`, `is_system = false`, reset `version`/audit, insert in topological order. **Re-clone is refused → `409 ALREADY_CLONED`** (overwrite would destroy customizations). An advisory lock on `(tenant, customer)` serializes concurrent clones.
 - **Revert** (`POST /entities/revert` for a customer): one transaction soft-deleting **all** the customer's rows → resolution falls back to system. **Soft delete** (recoverable, audited); the partial unique `WHERE is_deleted=false` lets a later clone insert fresh rows without colliding with the dead layer. (Optional ops housekeeping: purge clone rows soft-deleted > N days.)
 - **Drift:** a clone is a snapshot; later system-default changes do **not** propagate. Re-sync = revert + re-clone. Stated as a contract, not a TODO.
+- **Bulk-replace** (`PUT /entities/bulk-replace?customerId=&type=`): for a consumer whose editor saves a **whole tree at once**, doing `revert`+`clone`+`PATCH` from the client is non-atomic and racy. This is the atomic alternative — **one transaction** soft-deletes the customer's rows for `(customer_id, entity_type)` and inserts the new forest in topological order. **Optimistic concurrency is at the *subtree* level**: the server recomputes the `(customer, type)` version inside the tx and rejects a stale `If-Match` with `409 VERSION_CONFLICT` (zero writes) — the per-row `version` does not apply to a whole-tree replace.
 
 ### `deep` semantics
 
@@ -188,6 +191,7 @@ From the implementation review — these are **must-fix v1**, scale-independent:
 7. **`metadata.<path>` is parameterized** — path passed as a `text[]` (`#> $1::text[]`) / containment (`@>`), never string-interpolated; allow-list chars, cap segments.
 8. **`q` escapes `%`/`_`**.
 9. **revert is whole-scope** — deleting one override row keeps the customer in customer-mode (no partial fallback / no node-mixing); only deleting **all** rows resumes system.
+10. **per-type `metadata` validation** — when a consumer reads structured fields out of `metadata` (e.g. a classifier reading `rules`/`formula`), the service validates `metadata` on write with a **Zod schema discriminated by `entity_type`** (`.strict()`, unknown keys rejected) → `400 VALIDATION_ERROR`. The DB cannot enforce jsonb shape, so the write path must — otherwise a malformed write silently corrupts the consumer (the failure mode behind the Moxuara double-serialization bug). Types with no registered schema accept free-form metadata (back-compat). Containment filters stay over **top-level scalars** only.
 
 **Deferred at this scale (<1000, internal-UI writer)** — accept/defer with a one-line note: concurrent-re-parent lock (advisory only on clone), GIN index on `metadata`, `pg_trgm`/`tsvector` for `q` (accept seq-scan), `ENTITY_MAX_NODES` cap, the no-N+1 query-count test. Add a plain B-tree index on `customer_id`.
 
@@ -249,9 +253,9 @@ From the implementation review — these are **must-fix v1**, scale-independent:
 
 1. **Migration** `00NN_entities.sql` — `entity_types` + `entities` (+ `customer_id`, `is_system`, `clone_scope_key`, `sort_order`), the two partial unique indexes (the parent index carries `sort_order`), the FK and CHECK invariants, the `BEFORE DELETE/UPDATE` `is_system` trigger, and a B-tree on `customer_id`. Seed the initial `entity_types` (`GROUP`/`PROFILE`/`EQUIPMENT`) and the system-default taxonomy.
 2. **Schema/types** — Drizzle (`RFC-0047-Entity-schema.md`); `RegistryEntity`, `EntityType` domain types.
-3. **DTOs** — Zod request/response (`CreateEntityDTO`, `UpdateEntityDTO`, `ListEntitiesQuery`, `CloneDTO`) enforcing the validation rules.
-4. **Repository** — tenant-scoped CRUD, filtered list, batched `deep` loader, effective-config resolution, clone/revert, cycle check; soft-delete + `is_system` aware.
-5. **Service** — uniqueness, parent/tenant/type-rule checks, cycle prevention, `SYSTEM_PROTECTED`/`RESTORE_CONFLICT`/`ALREADY_CLONED`, clone/revert, optimistic `version`.
+3. **DTOs** — Zod request/response (`CreateEntityDTO`, `UpdateEntityDTO`, `ListEntitiesQuery`, `CloneDTO`, `BulkReplaceDTO`) enforcing the validation rules, plus a **per-`entity_type` `metadata` schema registry** (`.strict()`) applied on every write (must-fix #10).
+4. **Repository** — tenant-scoped CRUD, filtered list, batched `deep` loader, effective-config resolution, clone/revert, **bulk-replace (single-tx whole-subtree swap)**, cycle check; soft-delete + `is_system` aware.
+5. **Service** — uniqueness, parent/tenant/type-rule checks, cycle prevention, `SYSTEM_PROTECTED`/`RESTORE_CONFLICT`/`ALREADY_CLONED`, per-type metadata validation, clone/revert, **bulk-replace with subtree-level `If-Match` → `VERSION_CONFLICT`**, optimistic `version`.
 6. **Controller** — `/api/v1/entities` with hybrid auth; `entities:read` for reads/resolve, `entities:write` (**MYIO-only** — customer keys get `403` on writes) for mutations; envelope + pagination (`RFC-0047-Entity-API.md`).
 7. **Tests** — unit (cycles, uniqueness, deep assembly, soft-delete, resolution, `is_system` protection ×4, clone remap integrity, re-clone refused, revert/fallback, drift no-propagation, no-node-mixing) + integration (endpoints, filters, `deep`, pagination, tenant isolation).
 8. **Frontend** — admin tree UI + per-customer Taxonomy tab (banner, clone/revert modals, "modified/new" markers) reusing existing list/modal/JSON-editor components.
