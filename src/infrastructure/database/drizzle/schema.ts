@@ -786,6 +786,8 @@ export const centralRestoreJobs = pgTable('central_restore_jobs', {
 }, (table) => ({
   tenantCentralIdx: index('central_restore_jobs_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
   tenantStatusIdx: index('central_restore_jobs_tenant_status_idx').on(table.tenantId, table.status),
+  // CR-S5: stalled-job sweep filters status='RUNNING' AND updated_at < cutoff.
+  statusUpdatedIdx: index('central_restore_jobs_status_updated_idx').on(table.status, table.updatedAt),
 }));
 
 // =============================================================================

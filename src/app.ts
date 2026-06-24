@@ -97,6 +97,7 @@ import { centralEnrollRateLimiter, centralPollRateLimiter } from './middleware/r
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
+import { startRestoreSweep } from './services/CentralRestoreSweep';
 
 const app: Express = express();
 
@@ -438,6 +439,14 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to initialize simulator subsystem:', error);
+    }
+
+    // CR-S5: periodically fail RUNNING restore jobs orphaned by a dead central.
+    try {
+      startRestoreSweep();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the restore-sweep:', error);
     }
   });
 }

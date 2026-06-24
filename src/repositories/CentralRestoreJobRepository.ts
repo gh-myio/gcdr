@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, lt, sql } from 'drizzle-orm';
 import { db, schema, CentralRestoreJob } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
@@ -150,6 +150,31 @@ export class CentralRestoreJobRepository {
       .returning();
 
     return row ?? null;
+  }
+
+  /**
+   * CR-S5 visibility-timeout: a RUNNING job whose central died mid-restore stops
+   * reporting, so updated_at goes stale while status stays RUNNING forever. This
+   * sweeps cross-tenant for RUNNING jobs not updated within `olderThanMs` and
+   * fails them (a partial pg_restore is NOT safe to auto-requeue), surfacing the
+   * stall for alerting/operator action. Returns the reaped job ids.
+   */
+  reapStalledJobsQuery(cutoff: Date) {
+    return db
+      .update(centralRestoreJobs)
+      .set({
+        status: 'FAILED',
+        errorMessage:
+          'restore timed out: no progress within the stall window (central likely died mid-restore)',
+        updatedAt: new Date(now()),
+      })
+      .where(and(eq(centralRestoreJobs.status, 'RUNNING'), lt(centralRestoreJobs.updatedAt, cutoff)))
+      .returning({ id: centralRestoreJobs.id, centralId: centralRestoreJobs.centralId });
+  }
+
+  async reapStalledJobs(olderThanMs: number): Promise<{ id: string; centralId: string }[]> {
+    const cutoff = new Date(new Date(now()).getTime() - olderThanMs);
+    return this.reapStalledJobsQuery(cutoff);
   }
 }
 

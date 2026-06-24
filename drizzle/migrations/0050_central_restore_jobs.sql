@@ -30,3 +30,5 @@ CREATE TABLE "central_restore_jobs" (
 
 CREATE INDEX "central_restore_jobs_tenant_central_idx" ON "central_restore_jobs" ("tenant_id", "central_id", "created_at" DESC);
 CREATE INDEX "central_restore_jobs_tenant_status_idx" ON "central_restore_jobs" ("tenant_id", "status");
+-- CR-S5: cross-tenant stalled-job sweep (status='RUNNING' AND updated_at < cutoff).
+CREATE INDEX "central_restore_jobs_status_updated_idx" ON "central_restore_jobs" ("status", "updated_at");
