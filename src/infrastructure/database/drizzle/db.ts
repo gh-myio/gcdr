@@ -33,6 +33,13 @@ export type NewUser = typeof schema.users.$inferInsert;
 export type Asset = typeof schema.assets.$inferSelect;
 export type NewAsset = typeof schema.assets.$inferInsert;
 
+// RFC-0047: Generic Entity Registry
+export type Entity = typeof schema.entities.$inferSelect;
+export type NewEntity = typeof schema.entities.$inferInsert;
+
+export type EntityType = typeof schema.entityTypes.$inferSelect;
+export type NewEntityType = typeof schema.entityTypes.$inferInsert;
+
 export type Device = typeof schema.devices.$inferSelect;
 export type NewDevice = typeof schema.devices.$inferInsert;
 
