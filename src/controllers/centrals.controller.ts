@@ -552,6 +552,28 @@ router.post('/:id/backups/:backupId/confirm',
 );
 
 /**
+ * POST /centrals/:id/backups/:backupId/upload-url
+ * Re-mint the presigned PUT URL for a PENDING backup (CR-S9) — same key, no new
+ * row — for a central whose upload outran the previous URL's TTL.
+ */
+router.post('/:id/backups/:backupId/upload-url',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_INITIATED,
+    description: (req) => `Upload URL reissued for backup ${req.params.backupId} (central ${req.params.id})`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const result = await centralBackupService.reissueUploadUrl(tenantId, req.params.id, req.params.backupId);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
  * GET /centrals/:id/backups
  * List backups for a central (newest first).
  */

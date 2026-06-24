@@ -4,12 +4,24 @@ import { NotFoundError, ValidationError } from '../../../src/shared/errors/AppEr
 const SHA = 'a'.repeat(64);
 
 function makeService(
-  opts: { central?: unknown; backupRow?: unknown; listResult?: unknown[] } = {},
+  opts: {
+    central?: unknown;
+    backupRow?: unknown;
+    listResult?: unknown[];
+    headResult?: unknown;
+    uploadUrlImpl?: () => Promise<string>;
+  } = {},
 ) {
   const storage = {
     bucket: 'test-bucket',
-    getPresignedUploadUrl: jest.fn(async () => 'https://s3.test/put?sig=abc'),
+    getPresignedUploadUrl: jest.fn(opts.uploadUrlImpl ?? (async () => 'https://s3.test/put?sig=abc')),
     getPresignedDownloadUrl: jest.fn(async () => 'https://s3.test/get?sig=xyz'),
+    // Default HeadObject reports a 1234-byte object (matches the confirm tests).
+    headObject: jest.fn(async () =>
+      'headResult' in opts
+        ? opts.headResult
+        : { byteSize: 1234, contentType: 'application/octet-stream', etag: null, lastModified: null },
+    ),
   };
   const backups = {
     create: jest.fn(async (input: { id?: string }) => ({
@@ -45,15 +57,23 @@ describe('CentralBackupService', () => {
       expect(res.status).toBe('PENDING');
       expect(res.uploadUrl).toBe('https://s3.test/put?sig=abc');
       expect(res.bucket).toBe('test-bucket');
-      expect(res.expiresIn).toBe(900);
+      expect(res.expiresIn).toBe(3600);
       expect(res.storageKey).toMatch(/^backups\/t1\/c1\/.+\.pgdump\.custom$/);
 
       expect(storage.getPresignedUploadUrl).toHaveBeenCalledWith(
-        expect.objectContaining({ contentType: 'application/octet-stream', expiresInSeconds: 900 }),
+        expect.objectContaining({ contentType: 'application/octet-stream', expiresInSeconds: 3600 }),
       );
       expect(backups.create).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 't1', centralId: 'c1', createdBy: 'u1' }),
       );
+    });
+
+    it('derives the storage key server-side from tenant+central+backupId (CR-S9a)', async () => {
+      const { svc } = makeService();
+      const res = await svc.createBackup('t1', 'c1', 'u1', {});
+      // Key is never client-supplied: fixed prefix + server ids, no traversal.
+      expect(res.storageKey).toMatch(/^backups\/t1\/c1\/[^/]+\.pgdump\.custom$/);
+      expect(res.storageKey).not.toContain('..');
     });
 
     it('throws NotFoundError when the central does not exist', async () => {
@@ -61,20 +81,69 @@ describe('CentralBackupService', () => {
       await expect(svc.createBackup('t1', 'missing', 'u1', {})).rejects.toThrow(NotFoundError);
       expect(storage.getPresignedUploadUrl).not.toHaveBeenCalled();
     });
+
+    it('leaves NO row when the presign fails (CR-S10)', async () => {
+      const { svc, backups } = makeService({
+        uploadUrlImpl: async () => {
+          throw new Error('presign boom');
+        },
+      });
+      await expect(svc.createBackup('t1', 'c1', 'u1', {})).rejects.toThrow('presign boom');
+      // The metadata row is created AFTER the presign, so a presign failure must
+      // not leave an orphan PENDING row.
+      expect(backups.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('confirmBackup', () => {
-    it('marks a PENDING backup AVAILABLE with sha256 + byteSize', async () => {
-      const { svc, backups } = makeService({ backupRow: { id: 'bkp-1', status: 'PENDING' } });
+    const PENDING_ROW = {
+      id: 'bkp-1',
+      status: 'PENDING',
+      storageKey: 'backups/t1/c1/bkp-1.pgdump.custom',
+    };
+
+    it('marks a PENDING backup AVAILABLE after HeadObject confirms the size', async () => {
+      const { svc, backups, storage } = makeService({ backupRow: PENDING_ROW });
       const res = await svc.confirmBackup('t1', 'c1', 'bkp-1', { sha256: SHA, byteSize: 1234 });
       expect(res.status).toBe('AVAILABLE');
+      expect(storage.headObject).toHaveBeenCalledWith('backups/t1/c1/bkp-1.pgdump.custom');
       expect(backups.markAvailable).toHaveBeenCalledWith('t1', 'bkp-1', SHA, 1234);
     });
 
-    it('is idempotent: re-confirming an AVAILABLE backup does not touch the row', async () => {
-      const { svc, backups } = makeService({ backupRow: { id: 'bkp-1', status: 'AVAILABLE' } });
+    it('rejects when the object is not in storage (upload never landed, CR-S4)', async () => {
+      const { svc, backups } = makeService({ backupRow: PENDING_ROW, headResult: null });
+      await expect(
+        svc.confirmBackup('t1', 'c1', 'bkp-1', { sha256: SHA, byteSize: 1234 }),
+      ).rejects.toThrow(ValidationError);
+      expect(backups.markAvailable).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the storage size mismatches the reported byteSize (CR-S4)', async () => {
+      const { svc, backups } = makeService({
+        backupRow: PENDING_ROW,
+        headResult: { byteSize: 999, contentType: null, etag: null, lastModified: null },
+      });
+      await expect(
+        svc.confirmBackup('t1', 'c1', 'bkp-1', { sha256: SHA, byteSize: 1234 }),
+      ).rejects.toThrow(ValidationError);
+      expect(backups.markAvailable).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent: re-confirming an AVAILABLE backup is a no-op (no HeadObject)', async () => {
+      const { svc, backups, storage } = makeService({
+        backupRow: { id: 'bkp-1', status: 'AVAILABLE' },
+      });
       const res = await svc.confirmBackup('t1', 'c1', 'bkp-1', { sha256: SHA, byteSize: 1234 });
       expect(res.status).toBe('AVAILABLE');
+      expect(storage.headObject).not.toHaveBeenCalled();
+      expect(backups.markAvailable).not.toHaveBeenCalled();
+    });
+
+    it('rejects a FAILED/EXPIRED backup deterministically (400, not 500)', async () => {
+      const { svc, backups } = makeService({ backupRow: { id: 'bkp-1', status: 'FAILED' } });
+      await expect(
+        svc.confirmBackup('t1', 'c1', 'bkp-1', { sha256: SHA, byteSize: 1 }),
+      ).rejects.toThrow(ValidationError);
       expect(backups.markAvailable).not.toHaveBeenCalled();
     });
 
@@ -83,6 +152,36 @@ describe('CentralBackupService', () => {
       await expect(
         svc.confirmBackup('t1', 'c1', 'nope', { sha256: SHA, byteSize: 1 }),
       ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('reissueUploadUrl (CR-S9)', () => {
+    it('re-mints a PUT URL for a PENDING backup using the SAME key, no new row', async () => {
+      const { svc, storage, backups } = makeService({
+        backupRow: {
+          id: 'bkp-1',
+          status: 'PENDING',
+          storageKey: 'backups/t1/c1/bkp-1.pgdump.custom',
+          bucket: 'test-bucket',
+        },
+      });
+      const res = await svc.reissueUploadUrl('t1', 'c1', 'bkp-1');
+      expect(res.uploadUrl).toBe('https://s3.test/put?sig=abc');
+      expect(res.storageKey).toBe('backups/t1/c1/bkp-1.pgdump.custom');
+      expect(storage.getPresignedUploadUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'backups/t1/c1/bkp-1.pgdump.custom' }),
+      );
+      expect(backups.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to reissue for an already-confirmed (AVAILABLE) backup', async () => {
+      const { svc } = makeService({ backupRow: { id: 'bkp-1', status: 'AVAILABLE' } });
+      await expect(svc.reissueUploadUrl('t1', 'c1', 'bkp-1')).rejects.toThrow(ValidationError);
+    });
+
+    it('throws NotFoundError when the backup is missing', async () => {
+      const { svc } = makeService({ backupRow: null });
+      await expect(svc.reissueUploadUrl('t1', 'c1', 'nope')).rejects.toThrow(NotFoundError);
     });
   });
 
