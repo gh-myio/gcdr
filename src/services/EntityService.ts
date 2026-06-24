@@ -90,14 +90,23 @@ export class EntityService {
   private mapRepoError(err: unknown): never {
     if (err instanceof AppError) throw err;
 
-    const message = err instanceof Error ? err.message : String(err);
-    const code = (err as { code?: string })?.code;
+    // Drizzle wraps the driver error: the real PostgresError (message
+    // 'SYSTEM_PROTECTED', the SQLSTATE on `.code`) lives on `.cause`, while the
+    // top-level `.message` is a "Failed query: …" wrapper and `.code` is
+    // undefined. Inspect both so the mapping fires regardless of wrapping.
+    const top = err as { message?: string; code?: string; cause?: { message?: string; code?: string } };
+    const cause = top.cause ?? {};
+    const message = `${top.message ?? String(err)}\n${cause.message ?? ''}`;
+    const code = cause.code ?? top.code;
 
     if (message.includes('SYSTEM_PROTECTED')) {
       throw new AppError('SYSTEM_PROTECTED', 'Operation not allowed on a system-protected row', 409);
     }
     if (code === '23505' || /unique|duplicate key/i.test(message)) {
       throw new AppError('DUPLICATE_KEY', 'An entity with this (scope, type, key, parent) already exists', 409);
+    }
+    if (code === '23503' || /foreign key/i.test(message)) {
+      throw new AppError('TYPE_IN_USE', 'Entity type is still referenced by one or more entities', 409);
     }
     throw err;
   }
@@ -151,11 +160,66 @@ export class EntityService {
     }
   }
 
+  async updateEntityType(
+    tenantId: string,
+    entityType: string,
+    dto: { label?: string; description?: string | null; allowedParentTypes?: string[]; isActive?: boolean },
+    opts: { isAdmin: boolean },
+  ): Promise<EntityType> {
+    if (!opts.isAdmin) {
+      throw new AppError('FORBIDDEN', 'Editing an entity type requires admin scope', 403);
+    }
+    const existing = await this.repository.getEntityType(tenantId, entityType);
+    if (!existing) {
+      throw new NotFoundError(`Entity type ${entityType} not found`);
+    }
+    try {
+      return await this.repository.updateEntityType(tenantId, entityType, dto);
+    } catch (err) {
+      this.mapRepoError(err);
+    }
+  }
+
+  async deleteEntityType(
+    tenantId: string,
+    entityType: string,
+    opts: { isAdmin: boolean },
+  ): Promise<void> {
+    if (!opts.isAdmin) {
+      throw new AppError('FORBIDDEN', 'Deleting an entity type requires admin scope', 403);
+    }
+    const existing = await this.repository.getEntityType(tenantId, entityType);
+    if (!existing) {
+      throw new NotFoundError(`Entity type ${entityType} not found`);
+    }
+    try {
+      await this.repository.deleteEntityType(tenantId, entityType);
+    } catch (err) {
+      this.mapRepoError(err);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // CRUD
   // ---------------------------------------------------------------------------
 
-  async create(tenantId: string, dto: CreateEntityDTO, userId: string): Promise<RegistryEntity> {
+  async create(
+    tenantId: string,
+    dto: CreateEntityDTO,
+    userId: string,
+    opts: { isAdmin?: boolean } = {},
+  ): Promise<RegistryEntity> {
+    // 0) minting a protected system default is admin-only and must be unscoped
+    //    (DB CHECK entities_system_scope: is_system ⇒ customer_id IS NULL).
+    if (dto.isSystem) {
+      if (!opts.isAdmin) {
+        throw new AppError('FORBIDDEN', 'Creating a system entity requires admin scope', 403);
+      }
+      if (dto.customerId) {
+        throw new ValidationError('A system entity cannot be scoped to a customer (customerId must be null)');
+      }
+    }
+
     // 1) the type must be registered.
     const type = await this.repository.getEntityType(tenantId, dto.entityType);
     if (!type) {

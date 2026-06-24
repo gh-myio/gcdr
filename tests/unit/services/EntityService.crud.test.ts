@@ -61,6 +61,68 @@ describe('EntityService — CRUD + entity_types', () => {
     });
   });
 
+  describe('updateEntityType', () => {
+    it('rejects FORBIDDEN for a non-admin caller', async () => {
+      await expectErrorWithCode(
+        service.updateEntityType(tenantId, 'GROUP', { label: 'X' }, { isAdmin: false }),
+        'FORBIDDEN',
+      );
+      expect(repo.updateEntityType).not.toHaveBeenCalled();
+    });
+
+    it('rejects NOT_FOUND when the type does not exist', async () => {
+      repo.getEntityType.mockResolvedValue(null);
+      await expectErrorWithCode(
+        service.updateEntityType(tenantId, 'NOPE', { label: 'X' }, { isAdmin: true }),
+        'NOT_FOUND',
+      );
+    });
+
+    it('updates the type for an admin caller', async () => {
+      repo.getEntityType.mockResolvedValue(makeType({ entityType: 'GROUP' }));
+      repo.updateEntityType.mockResolvedValue(makeType({ entityType: 'GROUP', label: 'Grupo' }));
+      const got = await service.updateEntityType(tenantId, 'GROUP', { label: 'Grupo' }, { isAdmin: true });
+      expect(got.label).toBe('Grupo');
+      expect(repo.updateEntityType).toHaveBeenCalledWith(tenantId, 'GROUP', { label: 'Grupo' });
+    });
+  });
+
+  describe('deleteEntityType', () => {
+    it('rejects FORBIDDEN for a non-admin caller', async () => {
+      await expectErrorWithCode(
+        service.deleteEntityType(tenantId, 'GROUP', { isAdmin: false }),
+        'FORBIDDEN',
+      );
+      expect(repo.deleteEntityType).not.toHaveBeenCalled();
+    });
+
+    it('rejects NOT_FOUND when the type does not exist', async () => {
+      repo.getEntityType.mockResolvedValue(null);
+      await expectErrorWithCode(
+        service.deleteEntityType(tenantId, 'NOPE', { isAdmin: true }),
+        'NOT_FOUND',
+      );
+    });
+
+    it('maps an FK violation (still in use) to TYPE_IN_USE', async () => {
+      repo.getEntityType.mockResolvedValue(makeType({ entityType: 'GROUP' }));
+      repo.deleteEntityType.mockRejectedValue(
+        Object.assign(new Error('update or delete violates foreign key constraint'), { code: '23503' }),
+      );
+      await expectErrorWithCode(
+        service.deleteEntityType(tenantId, 'GROUP', { isAdmin: true }),
+        'TYPE_IN_USE',
+      );
+    });
+
+    it('deletes the type for an admin caller', async () => {
+      repo.getEntityType.mockResolvedValue(makeType({ entityType: 'CUSTOM' }));
+      repo.deleteEntityType.mockResolvedValue();
+      await service.deleteEntityType(tenantId, 'CUSTOM', { isAdmin: true });
+      expect(repo.deleteEntityType).toHaveBeenCalledWith(tenantId, 'CUSTOM');
+    });
+  });
+
   // ---- create ---------------------------------------------------------------
 
   describe('create', () => {
@@ -123,6 +185,37 @@ describe('EntityService — CRUD + entity_types', () => {
       repo.getEntityType.mockResolvedValue(makeType({ allowedParentTypes: [] }));
       repo.create.mockRejectedValue(Object.assign(new Error('duplicate key value'), { code: '23505' }));
       await expectErrorWithCode(service.create(tenantId, baseDto as never, userId), 'DUPLICATE_KEY');
+    });
+
+    it('rejects FORBIDDEN when a non-admin mints a system default (isSystem)', async () => {
+      await expectErrorWithCode(
+        service.create(tenantId, { ...baseDto, isSystem: true } as never, userId, { isAdmin: false }),
+        'FORBIDDEN',
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects VALIDATION_ERROR when an admin scopes a system default to a customer', async () => {
+      await expectErrorWithCode(
+        service.create(
+          tenantId,
+          { ...baseDto, isSystem: true, customerId: '33333333-3333-3333-3333-333333333333' } as never,
+          userId,
+          { isAdmin: true },
+        ),
+        'VALIDATION_ERROR',
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin mint an unscoped system default', async () => {
+      repo.getEntityType.mockResolvedValue(makeType({ allowedParentTypes: [] }));
+      repo.create.mockResolvedValue(makeEntity({ isSystem: true }));
+      const got = await service.create(tenantId, { ...baseDto, isSystem: true } as never, userId, {
+        isAdmin: true,
+      });
+      expect(got.isSystem).toBe(true);
+      expect(repo.create).toHaveBeenCalled();
     });
   });
 

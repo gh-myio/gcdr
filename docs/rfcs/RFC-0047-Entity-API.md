@@ -53,7 +53,9 @@ implementation** (`src/controllers/entities.controller.ts`, `src/dto/request/Ent
 | --- | --- | --- | --- |
 | `GET` | `/entity-types` | read | List the type registry. |
 | `POST` | `/entity-types` | **admin** | Register a new type. |
-| `POST` | `/entities` | write | Create a node. |
+| `PATCH` | `/entity-types/:type` | **admin** | Merge-patch a type (`label`/`description`/`allowedParentTypes`/`isActive`). |
+| `DELETE` | `/entity-types/:type` | **admin** | Remove a type (`409 TYPE_IN_USE` while any entity references it). |
+| `POST` | `/entities` | write (**admin** for `isSystem`) | Create a node. `isSystem:true` mints a protected system default (admin-only, `customerId` must be null). |
 | `GET` | `/entities/:id` | read | Fetch one node; `deep` controls children. |
 | `GET` | `/entities` | read | List/search with filters + pagination. |
 | `GET` | `/entities/:id/children` | read | Direct (or bounded subtree) of one node. |

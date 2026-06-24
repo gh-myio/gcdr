@@ -8,6 +8,8 @@ import {
   RevertSchema,
   BulkReplaceSchema,
   BulkReplaceQuerySchema,
+  CreateEntityTypeSchema,
+  UpdateEntityTypeSchema,
 } from '../dto/request/EntityDTO';
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
@@ -26,6 +28,7 @@ function parseState(v: unknown): 'active' | 'inactive' | 'all' | undefined {
 }
 
 const ERR_ID_REQUIRED = 'Entity ID is required';
+const ERR_TYPE_REQUIRED = 'Entity type is required';
 
 const router = Router();
 
@@ -107,10 +110,50 @@ entityTypesRouter.get('/', async (req: Request, res: Response, next: NextFunctio
 entityTypesRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const type = await entityService.createEntityType(tenantId, req.body, {
+    const dto = CreateEntityTypeSchema.parse(req.body);
+    const type = await entityService.createEntityType(tenantId, dto, {
       isAdmin: isAdminContext(req),
     });
     sendCreated(res, type, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /entity-types/:type  (admin)
+ * Merge-patch label/description/allowedParentTypes/isActive of a registered type.
+ */
+entityTypesRouter.patch('/:type', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { type } = req.params;
+    if (!type) {
+      throw new ValidationError(ERR_TYPE_REQUIRED);
+    }
+    const dto = UpdateEntityTypeSchema.parse(req.body);
+    const updated = await entityService.updateEntityType(tenantId, type, dto, {
+      isAdmin: isAdminContext(req),
+    });
+    sendSuccess(res, updated, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /entity-types/:type  (admin)
+ * Remove a type. Blocked (409 TYPE_IN_USE) while any entity references it.
+ */
+entityTypesRouter.delete('/:type', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.context;
+    const { type } = req.params;
+    if (!type) {
+      throw new ValidationError(ERR_TYPE_REQUIRED);
+    }
+    await entityService.deleteEntityType(tenantId, type, { isAdmin: isAdminContext(req) });
+    sendNoContent(res);
   } catch (err) {
     next(err);
   }
@@ -256,7 +299,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = CreateEntitySchema.parse(req.body);
-    const entity = await entityService.create(tenantId, data, userId);
+    const entity = await entityService.create(tenantId, data, userId, {
+      isAdmin: isAdminContext(req),
+    });
     sendCreated(res, entity, requestId);
   } catch (err) {
     next(err);

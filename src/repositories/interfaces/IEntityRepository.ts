@@ -45,6 +45,17 @@ export interface IEntityRepository {
     data: { entityType: string; label: string; description?: string | null; allowedParentTypes: string[] },
   ): Promise<EntityType>;
 
+  /** Merge-patch an entity_type's label/description/allowedParentTypes/isActive. */
+  updateEntityType(
+    tenantId: string,
+    entityType: string,
+    data: { label?: string; description?: string | null; allowedParentTypes?: string[]; isActive?: boolean },
+  ): Promise<EntityType>;
+
+  /** Hard-delete an entity_type. The entities FK (ON DELETE RESTRICT) blocks it
+   * while any entity still references the type (Postgres 23503 → 409 upstream). */
+  deleteEntityType(tenantId: string, entityType: string): Promise<void>;
+
   // ---- entities CRUD --------------------------------------------------------
   create(tenantId: string, data: CreateEntityDTO, createdBy: string): Promise<RegistryEntity>;
 

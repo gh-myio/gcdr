@@ -83,6 +83,34 @@ export class EntityRepository implements IEntityRepository {
     return this.mapTypeToEntity(row);
   }
 
+  async updateEntityType(
+    tenantId: string,
+    entityType: string,
+    data: { label?: string; description?: string | null; allowedParentTypes?: string[]; isActive?: boolean },
+  ): Promise<EntityType> {
+    const patch: Partial<typeof entityTypes.$inferInsert> = {};
+    if (data.label !== undefined) patch.label = data.label;
+    if (data.description !== undefined) patch.description = data.description;
+    if (data.allowedParentTypes !== undefined) patch.allowedParentTypes = data.allowedParentTypes;
+    if (data.isActive !== undefined) patch.isActive = data.isActive;
+
+    const [row] = await db
+      .update(entityTypes)
+      .set(patch)
+      .where(and(eq(entityTypes.tenantId, tenantId), eq(entityTypes.entityType, entityType)))
+      .returning();
+
+    return this.mapTypeToEntity(row);
+  }
+
+  async deleteEntityType(tenantId: string, entityType: string): Promise<void> {
+    // ON DELETE RESTRICT on entities.entity_type → Postgres 23503 if still in
+    // use; the service maps that to 409 TYPE_IN_USE.
+    await db
+      .delete(entityTypes)
+      .where(and(eq(entityTypes.tenantId, tenantId), eq(entityTypes.entityType, entityType)));
+  }
+
   // ===========================================================================
   // entities CRUD
   // ===========================================================================
@@ -99,6 +127,7 @@ export class EntityRepository implements IEntityRepository {
         parentEntityId: data.parentEntityId ?? null,
         sortOrder: data.sortOrder ?? 0,
         isActive: data.isActive ?? true,
+        isSystem: data.isSystem ?? false,
         metadata: data.metadata ?? {},
         createdBy,
         updatedBy: createdBy,

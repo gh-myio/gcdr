@@ -23,6 +23,8 @@ export function makeRepo(): jest.Mocked<IEntityRepository> {
     listEntityTypes: jest.fn(),
     getEntityType: jest.fn(),
     createEntityType: jest.fn(),
+    updateEntityType: jest.fn(),
+    deleteEntityType: jest.fn(),
     create: jest.fn(),
     getById: jest.fn(),
     update: jest.fn(),

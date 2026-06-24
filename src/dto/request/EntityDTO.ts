@@ -53,11 +53,39 @@ export const CreateEntitySchema = z.object({
   customerId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
+  // isSystem: mint a protected system default. Admin-only + customerId must be
+  // null (DB CHECK entities_system_scope); both are enforced in the service.
+  isSystem: z.boolean().default(false),
   // Per-type shape is validated in the service via validateMetadataForType().
   metadata: z.record(z.unknown()).default({}),
 });
 
 export type CreateEntityDTO = z.infer<typeof CreateEntitySchema>;
+
+// -----------------------------------------------------------------------------
+// entity_types registry — create / update (admin tier)
+// -----------------------------------------------------------------------------
+
+export const CreateEntityTypeSchema = z.object({
+  entityType: entityTypeToken,
+  label: z.string().min(1).max(200),
+  description: z.string().max(2000).nullable().optional(),
+  allowedParentTypes: z.array(entityTypeToken).default([]),
+});
+
+export type CreateEntityTypeDTO = z.infer<typeof CreateEntityTypeSchema>;
+
+/** Merge-patch for an entity_type; at least one field required. */
+export const UpdateEntityTypeSchema = z
+  .object({
+    label: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    allowedParentTypes: z.array(entityTypeToken).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: 'At least one field is required' });
+
+export type UpdateEntityTypeDTO = z.infer<typeof UpdateEntityTypeSchema>;
 
 export const UpdateEntitySchema = z.object({
   entityKey: entityKey.optional(),

@@ -14,6 +14,8 @@ jest.mock('../../../src/services/EntityService', () => ({
   entityService: {
     listEntityTypes: jest.fn(),
     createEntityType: jest.fn(),
+    updateEntityType: jest.fn(),
+    deleteEntityType: jest.fn(),
     create: jest.fn(),
     getById: jest.fn(),
     list: jest.fn(),
@@ -128,7 +130,7 @@ describe('entities.controller — route -> service wiring', () => {
       await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ entityType: 'PROFILE' }),
+        body: JSON.stringify({ entityType: 'PROFILE', label: 'Profile' }),
       });
       expect(svc.createEntityType).toHaveBeenCalledWith(
         TENANT_ID,
@@ -158,7 +160,7 @@ describe('entities.controller — route -> service wiring', () => {
       await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ entityType: 'X' }),
+        body: JSON.stringify({ entityType: 'X', label: 'X' }),
       });
       expect(svc.createEntityType).toHaveBeenCalledWith(TENANT_ID, expect.anything(), { isAdmin: true });
     } finally {
@@ -180,7 +182,7 @@ describe('entities.controller — route -> service wiring', () => {
       await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ entityType: 'X' }),
+        body: JSON.stringify({ entityType: 'X', label: 'X' }),
       });
       expect(svc.createEntityType).toHaveBeenCalledWith(TENANT_ID, expect.anything(), { isAdmin: false });
     } finally {
@@ -203,7 +205,7 @@ describe('entities.controller — route -> service wiring', () => {
       await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ entityType: 'X' }),
+        body: JSON.stringify({ entityType: 'X', label: 'X' }),
       });
       expect(svc.createEntityType).toHaveBeenCalledWith(TENANT_ID, expect.anything(), { isAdmin: true });
     } finally {
@@ -225,7 +227,41 @@ describe('entities.controller — route -> service wiring', () => {
         TENANT_ID,
         expect.objectContaining({ entityType: 'PROFILE', entityKey: 'CHILLER' }),
         USER_ID,
+        { isAdmin: false },
       );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('PATCH /entity-types/:type -> updateEntityType with isAdmin', async () => {
+    svc.updateEntityType.mockResolvedValue({ entityType: 'GROUP', label: 'Grupo' } as never);
+    const srv = await listen(buildApp({ apiKeyScopes: ['entities:admin'] }));
+    try {
+      const res = await fetch(`${srv.url}/entity-types/GROUP`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ label: 'Grupo' }),
+      });
+      expect(res.status).toBe(200);
+      expect(svc.updateEntityType).toHaveBeenCalledWith(
+        TENANT_ID,
+        'GROUP',
+        expect.objectContaining({ label: 'Grupo' }),
+        { isAdmin: true },
+      );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('DELETE /entity-types/:type -> deleteEntityType with isAdmin, 204', async () => {
+    svc.deleteEntityType.mockResolvedValue(undefined as never);
+    const srv = await listen(buildApp({ apiKeyScopes: ['entities:admin'] }));
+    try {
+      const res = await fetch(`${srv.url}/entity-types/CUSTOM`, { method: 'DELETE' });
+      expect(res.status).toBe(204);
+      expect(svc.deleteEntityType).toHaveBeenCalledWith(TENANT_ID, 'CUSTOM', { isAdmin: true });
     } finally {
       await srv.close();
     }
