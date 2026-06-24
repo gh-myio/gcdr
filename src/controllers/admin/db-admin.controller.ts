@@ -584,12 +584,33 @@ function sqlLit(val: unknown): string {
   return `'${String(val).replace(/'/g, "''")}'`;
 }
 
-/** Build a single INSERT ... ON CONFLICT (id) DO NOTHING statement */
-function buildInsert(table: string, row: Record<string, unknown>, conflictCol = 'id'): string {
+/** Build a single INSERT ... ON CONFLICT DO NOTHING statement.
+ * No conflict target = catches a conflict on ANY constraint/index, so it works
+ * for tables with composite PKs (consumption_goal_hours, work_orders_devices,
+ * user_maintenance_groups, …) as well as the id-PK tables. */
+function buildInsert(table: string, row: Record<string, unknown>): string {
   const cols = Object.keys(row);
   const vals = cols.map(c => sqlLit(row[c]));
-  return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (${conflictCol}) DO NOTHING;`;
+  return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT DO NOTHING;`;
 }
+
+/**
+ * The full customer footprint exported by the Seed Export, FK-ordered (parents
+ * before children for a clean replay). Single source of truth — drives both the
+ * default export set and the UI checkbox list. Tables absent from the target DB
+ * are skipped at runtime via a to_regclass guard.
+ */
+const CUSTOMER_EXPORT_TABLES: string[] = [
+  'customers', 'assets', 'devices', 'centrals', 'rules', 'alarm_bundle_versions',
+  'groups', 'group_channels', 'group_dispatch_configs', 'maintenance_groups',
+  'users', 'user_contacts', 'role_assignments', 'user_maintenance_groups',
+  'customer_channels', 'customer_api_keys', 'device_sync_jobs',
+  'look_and_feels', 'templates', 'entities',
+  'consumption_goals', 'consumption_goal_hours', 'consumption_goal_history',
+  'work_orders_customer_settings', 'work_orders', 'work_orders_devices',
+  'work_orders_events', 'work_orders_watchers', 'work_orders_ticket_meta',
+  'annotations', 'annotation_responses',
+];
 
 /** Generate a SQL seed script for a specific customer (and optional descendants) */
 async function generateSeedExport(
@@ -597,8 +618,7 @@ async function generateSeedExport(
   options: { includeDescendants?: boolean; includeTables?: string[] },
 ): Promise<string> {
   const lines: string[] = [];
-  const defaultTables = ['customers', 'assets', 'devices', 'centrals', 'rules', 'customer_api_keys', 'groups', 'look_and_feels', 'alarm_bundle_versions'];
-  const tables = options.includeTables ?? defaultTables;
+  const tables = options.includeTables ?? CUSTOMER_EXPORT_TABLES;
 
   lines.push(`-- =============================================================================`);
   lines.push(`-- GCDR Seed Export`);
@@ -740,6 +760,72 @@ async function generateSeedExport(
       }
       lines.push('');
     }
+  }
+
+  // ── 11+. Evolved customer-scoped tables (declarative, FK-ordered) ─────────
+  // Each spec is exported only if (a) requested in `tables` and (b) the table
+  // exists in this DB (to_regclass guard → safe against schemas where a recent
+  // RFC table is not deployed yet). Indirect relations join up to the customer.
+  const idIn = `(${idList})`;
+  const extraSpecs: Array<{
+    table: string; where: string; order?: string; limit?: number; note?: string;
+    query?: string; strip?: string[];
+  }> = [
+    { table: 'maintenance_groups',           where: `customer_id IN ${idIn}` },
+    { table: 'group_channels',               where: `group_id IN (SELECT id FROM groups WHERE customer_id IN ${idIn})` },
+    { table: 'group_dispatch_configs',       where: `group_id IN (SELECT id FROM groups WHERE customer_id IN ${idIn})` },
+    { table: 'users',                        where: `customer_id IN ${idIn}`, order: 'email' },
+    { table: 'user_contacts',                where: `user_id IN (SELECT id FROM users WHERE customer_id IN ${idIn})` },
+    { table: 'role_assignments',             where: `user_id IN (SELECT id FROM users WHERE customer_id IN ${idIn})` },
+    { table: 'user_maintenance_groups',      where: `user_id IN (SELECT id FROM users WHERE customer_id IN ${idIn})` },
+    { table: 'customer_channels',            where: `customer_id IN ${idIn}` },
+    { table: 'device_sync_jobs',             where: `customer_id IN ${idIn}`, order: 'created_at DESC', limit: 100 },
+    { table: 'templates',                    where: `customer_id IN ${idIn}` },
+    // RFC-0047 entities: self-referential → emit parents before children (FK).
+    { table: 'entities', where: `customer_id IN ${idIn}`, note: 'RFC-0047 entity registry (customer-scoped overrides)',
+      strip: ['__d'],
+      query: `WITH RECURSIVE t AS (
+        SELECT e.*, 0 AS __d FROM entities e WHERE e.customer_id IN ${idIn} AND e.parent_entity_id IS NULL
+        UNION ALL
+        SELECT e.*, t.__d + 1 FROM entities e JOIN t ON e.parent_entity_id = t.id WHERE e.customer_id IN ${idIn}
+      ) SELECT * FROM t ORDER BY __d, sort_order, entity_key` },
+    { table: 'consumption_goals',            where: `customer_id IN ${idIn}` },
+    { table: 'consumption_goal_hours',       where: `goal_id IN (SELECT id FROM consumption_goals WHERE customer_id IN ${idIn})` },
+    { table: 'consumption_goal_history',     where: `goal_id IN (SELECT id FROM consumption_goals WHERE customer_id IN ${idIn})` },
+    { table: 'work_orders_customer_settings', where: `customer_id IN ${idIn}` },
+    { table: 'work_orders',                  where: `customer_id IN ${idIn}`, order: 'created_at DESC', limit: 1000 },
+    { table: 'work_orders_devices',          where: `work_order_id IN (SELECT id FROM work_orders WHERE customer_id IN ${idIn})` },
+    { table: 'work_orders_events',           where: `work_order_id IN (SELECT id FROM work_orders WHERE customer_id IN ${idIn})` },
+    { table: 'work_orders_watchers',         where: `work_order_id IN (SELECT id FROM work_orders WHERE customer_id IN ${idIn})` },
+    { table: 'work_orders_ticket_meta',      where: `work_order_id IN (SELECT id FROM work_orders WHERE customer_id IN ${idIn})` },
+    { table: 'annotations',                  where: `customer_id IN ${idIn}`, order: 'created_at DESC', limit: 1000 },
+    { table: 'annotation_responses',         where: `annotation_id IN (SELECT id FROM annotations WHERE customer_id IN ${idIn})` },
+  ];
+
+  for (const spec of extraSpecs) {
+    if (!tables.includes(spec.table)) continue;
+    const guard = await db.execute(sql.raw(`SELECT to_regclass('public.${spec.table}') IS NOT NULL AS present`));
+    const present = Array.isArray(guard) && guard.length > 0 && (guard[0] as { present?: boolean }).present === true;
+    if (!present) continue;
+
+    let q = spec.query ?? `SELECT * FROM ${spec.table} WHERE ${spec.where}`;
+    if (!spec.query) {
+      if (spec.order) q += ` ORDER BY ${spec.order}`;
+      if (spec.limit) q += ` LIMIT ${spec.limit}`;
+    }
+    const rows = await db.execute(sql.raw(q));
+    const arr = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+    if (arr.length === 0) continue;
+
+    lines.push(`  -- ----- ${spec.table} (${arr.length}) -----`);
+    if (spec.note) lines.push(`  -- NOTE: ${spec.note}`);
+    for (const row of arr) {
+      const clean = spec.strip
+        ? Object.fromEntries(Object.entries(row).filter(([k]) => !spec.strip!.includes(k)))
+        : row;
+      lines.push(`  ${buildInsert(spec.table, clean)}`);
+    }
+    lines.push('');
   }
 
   lines.push('END $$;');
@@ -1691,7 +1777,7 @@ function getHtmlPage(): string {
               Tabelas a exportar:
             </label>
             <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-              ${['customers','assets','devices','centrals','rules','customer_api_keys','groups','look_and_feels','alarm_bundle_versions'].map(t =>
+              ${CUSTOMER_EXPORT_TABLES.map(t =>
                 `<label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;background:var(--bg-tertiary);padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);">
                   <input type="checkbox" class="seed-table-check" value="${t}" checked /> ${t}
                 </label>`
