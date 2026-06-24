@@ -572,12 +572,50 @@ ORDER BY ak.created_at DESC;`,
 // Seed Export — Reverse Engineering
 // =============================================================================
 
-/** Escape a value for use in a SQL literal */
-function sqlLit(val: unknown): string {
+/**
+ * Per-table column-type cache (populated by loadColTypes before the inserts).
+ * A JS array returned by the driver is ambiguous — it can come from a jsonb
+ * column OR a real Postgres array column (uuid[]/text[]/…). The column type
+ * disambiguates so sqlLit emits the right literal (array literal vs jsonb).
+ */
+const tableColTypes = new Map<string, Map<string, { dataType: string; udtName: string }>>();
+
+async function loadColTypes(tableList: string[]): Promise<void> {
+  tableColTypes.clear();
+  if (tableList.length === 0) return;
+  const inList = tableList.map(t => `'${t.replace(/'/g, "''")}'`).join(', ');
+  const rows = await db.execute(sql.raw(`
+    SELECT table_name, column_name, data_type, udt_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name IN (${inList})
+  `));
+  for (const r of (Array.isArray(rows) ? rows : []) as Array<{
+    table_name: string; column_name: string; data_type: string; udt_name: string;
+  }>) {
+    let m = tableColTypes.get(r.table_name);
+    if (!m) { m = new Map(); tableColTypes.set(r.table_name, m); }
+    m.set(r.column_name, { dataType: r.data_type, udtName: r.udt_name });
+  }
+}
+
+/** Escape a value for use in a SQL literal. `colType` (when known) lets a JS
+ * array be emitted as a Postgres array literal for real array columns. */
+function sqlLit(val: unknown, colType?: { dataType: string; udtName: string }): string {
   if (val === null || val === undefined) return 'NULL';
   if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
   if (typeof val === 'number') return String(val);
   if (val instanceof Date) return `'${val.toISOString()}'::timestamptz`;
+  // Real Postgres array column (uuid[]/text[]/int[]/…): emit an array literal,
+  // NOT jsonb — the driver returns these as JS arrays. udt_name '_uuid' -> uuid[].
+  if (Array.isArray(val) && colType?.dataType === 'ARRAY') {
+    const cast = `${colType.udtName.replace(/^_/, '')}[]`;
+    const elems = val
+      .map((e) => (e === null || e === undefined
+        ? 'NULL'
+        : `"${String(e).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`))
+      .join(',');
+    return `'${`{${elems}}`.replace(/'/g, "''")}'::${cast}`;
+  }
   if (typeof val === 'object') {
     return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
   }
@@ -587,10 +625,12 @@ function sqlLit(val: unknown): string {
 /** Build a single INSERT ... ON CONFLICT DO NOTHING statement.
  * No conflict target = catches a conflict on ANY constraint/index, so it works
  * for tables with composite PKs (consumption_goal_hours, work_orders_devices,
- * user_maintenance_groups, …) as well as the id-PK tables. */
+ * user_maintenance_groups, …) as well as the id-PK tables. Column types are read
+ * from the tableColTypes cache so array columns serialize as array literals. */
 function buildInsert(table: string, row: Record<string, unknown>): string {
+  const types = tableColTypes.get(table);
   const cols = Object.keys(row);
-  const vals = cols.map(c => sqlLit(row[c]));
+  const vals = cols.map(c => sqlLit(row[c], types?.get(c)));
   return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT DO NOTHING;`;
 }
 
@@ -619,6 +659,7 @@ async function generateSeedExport(
 ): Promise<string> {
   const lines: string[] = [];
   const tables = options.includeTables ?? CUSTOMER_EXPORT_TABLES;
+  await loadColTypes(tables); // column types → correct array-literal serialization
 
   lines.push(`-- =============================================================================`);
   lines.push(`-- GCDR Seed Export`);
