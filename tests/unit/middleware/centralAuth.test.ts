@@ -119,6 +119,37 @@ describe('centralAuthMiddleware', () => {
     expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
   });
 
+  it('rejects a token with NO exp claim (replay protection → 401, CR-S1)', async () => {
+    const getByUuid = jest.fn(async () => makeCentralRow());
+    const mw = makeCentralAuthMiddleware({ getByUuid } as never);
+
+    const token = signHs256({ UUID: CENTRAL_UUID }, SECRET); // no exp
+    const req = makeReq({ authorization: token, uuid: CENTRAL_UUID });
+    const next = jest.fn();
+
+    await mw(req, {} as never, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+    expect(req.centralContext).toBeUndefined();
+  });
+
+  it('rejects a token whose iat is older than the max age (401, CR-S1)', async () => {
+    const getByUuid = jest.fn(async () => makeCentralRow());
+    const mw = makeCentralAuthMiddleware({ getByUuid } as never);
+
+    // Future exp but a stale iat (signed long ago) → rejected.
+    const token = signHs256(
+      { UUID: CENTRAL_UUID, iat: nowSeconds() - 3600, exp: nowSeconds() + 3600 },
+      SECRET,
+    );
+    const req = makeReq({ authorization: token, uuid: CENTRAL_UUID });
+    const next = jest.fn();
+
+    await mw(req, {} as never, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+  });
+
   it('rejects when the authorization header is missing (401)', async () => {
     const getByUuid = jest.fn(async () => makeCentralRow());
     const mw = makeCentralAuthMiddleware({ getByUuid } as never);

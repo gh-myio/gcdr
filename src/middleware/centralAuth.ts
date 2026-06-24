@@ -49,9 +49,19 @@ function base64UrlDecode(input: string): Buffer {
  * Verify an HS256 JWT against `secret` using the SAME scheme as
  * AuthService.verifyJWT: HMAC-SHA256 over `${header}.${payload}` compared with
  * crypto.timingSafeEqual. Returns the decoded payload, or null if the token is
- * malformed, the signature is wrong, or `exp` (when present) is in the past.
+ * malformed, the signature is wrong, or `exp` is absent / in the past (CR-S1).
  */
-function verifyHs256<T extends { exp?: number }>(token: string, secret: string): T | null {
+// CR-S1: the central JWT MUST carry an exp. A token with no expiry replays
+// forever, so we reject it. When iat is present we also bound the absolute age
+// (and reject a far-future iat beyond clock skew) so a bogus far-future exp
+// can't extend a token indefinitely.
+const MAX_TOKEN_AGE_SECONDS = 300; // 5 min — the poll loop re-signs every 30s
+const CLOCK_SKEW_SECONDS = 60;
+
+function verifyHs256<T extends { exp?: number; iat?: number }>(
+  token: string,
+  secret: string,
+): T | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -71,10 +81,14 @@ function verifyHs256<T extends { exp?: number }>(token: string, secret: string):
 
     const decoded = JSON.parse(base64UrlDecode(payload).toString('utf-8')) as T;
 
-    // exp is optional; when present it must be in the future.
-    if (typeof decoded.exp === 'number') {
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      if (decoded.exp < nowSeconds) return null;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    // exp is REQUIRED (CR-S1) and must be in the future.
+    if (typeof decoded.exp !== 'number') return null;
+    if (decoded.exp < nowSeconds) return null;
+    // When iat is present, bound the token age and reject a far-future iat.
+    if (typeof decoded.iat === 'number') {
+      if (decoded.iat > nowSeconds + CLOCK_SKEW_SECONDS) return null;
+      if (nowSeconds - decoded.iat > MAX_TOKEN_AGE_SECONDS) return null;
     }
 
     return decoded;
