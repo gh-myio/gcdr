@@ -29,6 +29,11 @@ const ERR_ID_REQUIRED = 'Entity ID is required';
 
 const router = Router();
 
+// `/entity-types` is a TOP-LEVEL sibling of `/entities` per RFC-0047-Entity-API
+// §2 (mounted at /api/v1/entity-types), so it gets its own router rather than
+// living under the `/entities` mount.
+const entityTypesRouter = Router();
+
 // =============================================================================
 // RFC-0047 — Generic Entity Registry · Express router
 // =============================================================================
@@ -76,7 +81,7 @@ function isAdminContext(req: Request): boolean {
  * GET /entity-types
  * List the type registry.
  */
-router.get('/entity-types', async (req: Request, res: Response, next: NextFunction) => {
+entityTypesRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const types = await entityService.listEntityTypes(tenantId);
@@ -90,7 +95,7 @@ router.get('/entity-types', async (req: Request, res: Response, next: NextFuncti
  * POST /entity-types  (admin)
  * Register a new type. Creating a type requires the admin tier.
  */
-router.post('/entity-types', async (req: Request, res: Response, next: NextFunction) => {
+entityTypesRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const type = await entityService.createEntityType(tenantId, req.body, {
@@ -359,4 +364,5 @@ router.post('/:id/restore', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
+export { entityTypesRouter };
 export default router;

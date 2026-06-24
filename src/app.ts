@@ -57,6 +57,7 @@ import {
   themesGetDefaultByCustomerHandler,
   // RFC-0047: Generic Entity Registry
   entitiesController,
+  entityTypesController,
   // RFC-0013: User Access Profile Bundle
   maintenanceGroupsController,
   accessBundleController,
@@ -275,6 +276,12 @@ apiV1Router.use('/assets', hybridAuthByMethod('assets:read', 'assets:write'), as
 // write attempt gets 403). entity_type creation + is_system mutation need the
 // extra admin tier, computed inside the controller from req.context.
 apiV1Router.use('/entities', hybridAuthByMethod('entities:read', 'entities:write'), entitiesController);
+
+// RFC-0047: entity-type registry — top-level sibling of /entities (API §2).
+// GET /entity-types requires entities:read; POST requires entities:write + the
+// admin tier (enforced in the controller). Mounted separately so the canonical
+// path is /api/v1/entity-types, not /api/v1/entities/entity-types.
+apiV1Router.use('/entity-types', hybridAuthByMethod('entities:read', 'entities:write'), entityTypesController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);

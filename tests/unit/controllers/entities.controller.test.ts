@@ -29,7 +29,7 @@ jest.mock('../../../src/services/EntityService', () => ({
 }));
 
 import { entityService } from '../../../src/services/EntityService';
-import entitiesController from '../../../src/controllers/entities.controller';
+import entitiesController, { entityTypesRouter } from '../../../src/controllers/entities.controller';
 import { errorHandler } from '../../../src/middleware/errorHandler';
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111';
@@ -64,6 +64,9 @@ function buildApp(contextOverrides: Record<string, unknown> = {}, user?: Request
     next();
   });
   app.use('/entities', entitiesController);
+  // entity-types is a top-level sibling of /entities (API §2), mounted at its
+  // own path — mirror that here so the route map under test matches production.
+  app.use('/entity-types', entityTypesRouter);
   app.use(errorHandler);
   return app;
 }
@@ -84,11 +87,11 @@ beforeEach(() => {
 });
 
 describe('entities.controller — route -> service wiring', () => {
-  it('GET /entities/entity-types -> listEntityTypes(tenantId)', async () => {
+  it('GET /entity-types -> listEntityTypes(tenantId)', async () => {
     svc.listEntityTypes.mockResolvedValue([{ entityType: 'GROUP' }] as never);
     const srv = await listen(buildApp());
     try {
-      const res = await fetch(`${srv.url}/entities/entity-types`);
+      const res = await fetch(`${srv.url}/entity-types`);
       const body = (await res.json()) as { success: boolean; data: Record<string, unknown> };
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
@@ -98,11 +101,11 @@ describe('entities.controller — route -> service wiring', () => {
     }
   });
 
-  it('POST /entities/entity-types -> createEntityType with isAdmin:false for a non-admin caller', async () => {
+  it('POST /entity-types -> createEntityType with isAdmin:false for a non-admin caller', async () => {
     svc.createEntityType.mockResolvedValue({ entityType: 'PROFILE' } as never);
     const srv = await listen(buildApp({ apiKeyScopes: ['entities:write'] }));
     try {
-      const res = await fetch(`${srv.url}/entities/entity-types`, {
+      const res = await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ entityType: 'PROFILE', label: 'Profile' }),
@@ -118,11 +121,11 @@ describe('entities.controller — route -> service wiring', () => {
     }
   });
 
-  it('POST /entities/entity-types -> isAdmin:true when caller has entities:admin', async () => {
+  it('POST /entity-types -> isAdmin:true when caller has entities:admin', async () => {
     svc.createEntityType.mockResolvedValue({ entityType: 'PROFILE' } as never);
     const srv = await listen(buildApp({ apiKeyScopes: ['entities:admin'] }));
     try {
-      await fetch(`${srv.url}/entities/entity-types`, {
+      await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ entityType: 'PROFILE' }),
@@ -149,7 +152,7 @@ describe('entities.controller — route -> service wiring', () => {
     } as Request['user']);
     const srv = await listen(app);
     try {
-      await fetch(`${srv.url}/entities/entity-types`, {
+      await fetch(`${srv.url}/entity-types`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ entityType: 'X' }),
