@@ -46,26 +46,35 @@ const entityTypesRouter = Router();
 
 /**
  * Compute the admin tier from the request context. `isAdmin` is true when the
- * caller carries an `entities:admin` scope or a `*:*` wildcard — for API keys
- * these live on `req.context.apiKeyScopes`; for JWT bearers on `req.user.roles`
- * (roles are surfaced as `scope:<scope>` for API-key-derived users, and bare
- * role strings for real users). The route mount already gates write access; this
- * only decides whether the caller may create a type or mutate an `is_system` row.
+ * caller is a platform admin — the tier that may create an `entity_type` or
+ * mutate an `is_system` row. The route mount already gates write access; this is
+ * the EXTRA gate. Three caller shapes carry an admin grant, and they spell it
+ * differently:
+ *  - API keys: an `entities:admin` or `*:*` scope on `req.context.apiKeyScopes`
+ *    (and the auth layer also mirrors these onto a key-derived user's roles as
+ *    `scope:<scope>`).
+ *  - Real JWT login: `req.user.roles` holds RBAC role KEYS (from
+ *    `getUserRoleKeys`), so the platform super-admin is `role:super-admin`
+ *    (policy:full-admin) — the JWT equivalent of the `entities:admin` tier.
+ *    A `role:customer-admin` is NOT a platform admin and must not mutate the
+ *    global is_system defaults, so we match super-admin specifically.
+ *  - Dev / service-account / master-key bypass: a bare `*` full-access wildcard.
  */
 function isAdminContext(req: Request): boolean {
-  const ADMIN_TOKENS = new Set(['entities:admin', '*:*']);
+  // Scope-shaped admin grants (API keys, and `scope:<scope>` on key-derived JWTs).
+  const ADMIN_SCOPES = new Set(['entities:admin', '*:*']);
+  // Role-shaped admin grants on a real JWT login (RBAC role keys) + dev wildcard.
+  const ADMIN_ROLES = new Set(['*', 'role:super-admin']);
 
   const apiKeyScopes = req.context?.apiKeyScopes ?? [];
-  if (apiKeyScopes.some((s) => ADMIN_TOKENS.has(s))) {
+  if (apiKeyScopes.some((s) => ADMIN_SCOPES.has(s))) {
     return true;
   }
 
-  // JWT bearer: roles may be bare scope strings or `scope:<scope>` (the form
-  // the auth layer mints for API-key-derived users).
   const roles = req.user?.roles ?? [];
   for (const role of roles) {
-    if (ADMIN_TOKENS.has(role)) return true;
-    if (role.startsWith('scope:') && ADMIN_TOKENS.has(role.slice('scope:'.length))) {
+    if (ADMIN_ROLES.has(role) || ADMIN_SCOPES.has(role)) return true;
+    if (role.startsWith('scope:') && ADMIN_SCOPES.has(role.slice('scope:'.length))) {
       return true;
     }
   }

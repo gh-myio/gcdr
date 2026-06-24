@@ -140,6 +140,54 @@ describe('entities.controller — route -> service wiring', () => {
     }
   });
 
+  it('isAdmin:true via JWT role:super-admin (real RBAC login)', async () => {
+    svc.createEntityType.mockResolvedValue({} as never);
+    // A real JWT login carries RBAC role KEYS (getUserRoleKeys), so the platform
+    // super-admin shows up as `role:super-admin` — not a scope token. This must
+    // be recognized as the admin tier (regression: editing an is_system row as
+    // admin@gcdr.io was 409ing because only scope-shaped tokens were matched).
+    const app = buildApp({}, {
+      sub: USER_ID,
+      tenant_id: TENANT_ID,
+      email: 'admin@gcdr.io',
+      roles: ['role:super-admin'],
+      type: 'USER',
+    } as Request['user']);
+    const srv = await listen(app);
+    try {
+      await fetch(`${srv.url}/entity-types`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ entityType: 'X' }),
+      });
+      expect(svc.createEntityType).toHaveBeenCalledWith(TENANT_ID, expect.anything(), { isAdmin: true });
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('isAdmin:false via JWT role:customer-admin (not a platform admin)', async () => {
+    svc.createEntityType.mockResolvedValue({} as never);
+    const app = buildApp({}, {
+      sub: USER_ID,
+      tenant_id: TENANT_ID,
+      email: 'cadmin@acme',
+      roles: ['role:customer-admin'],
+      type: 'USER',
+    } as Request['user']);
+    const srv = await listen(app);
+    try {
+      await fetch(`${srv.url}/entity-types`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ entityType: 'X' }),
+      });
+      expect(svc.createEntityType).toHaveBeenCalledWith(TENANT_ID, expect.anything(), { isAdmin: false });
+    } finally {
+      await srv.close();
+    }
+  });
+
   it('isAdmin:true via JWT *:* role (scope:*:* form)', async () => {
     svc.createEntityType.mockResolvedValue({} as never);
     // A JWT bearer carrying a `scope:*:*` wildcard role → isAdmin true.
