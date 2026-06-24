@@ -1,6 +1,9 @@
+process.env.SECRET_ENCRYPTION_KEY = process.env.SECRET_ENCRYPTION_KEY ?? 'a'.repeat(64);
+
 import * as crypto from 'crypto';
 import { makeCentralAuthMiddleware } from '../../../src/middleware/centralAuth';
 import { UnauthorizedError } from '../../../src/shared/errors/AppError';
+import { encryptSecret } from '../../../src/shared/utils/secretEnvelope';
 
 // -----------------------------------------------------------------------------
 // HS256 token helper — mints a token the SAME way the central does: HMAC-SHA256
@@ -63,6 +66,21 @@ describe('centralAuthMiddleware', () => {
     // next() called with NO error argument on success.
     expect(next.mock.calls[0][0]).toBeUndefined();
     expect(req.context.tenantId).toBe(TENANT_ID);
+    expect(req.centralContext).toEqual({ centralId: CENTRAL_UUID, tenantId: TENANT_ID });
+  });
+
+  it('verifies a token when agent_secret is stored ENCRYPTED at rest (CR-S3)', async () => {
+    const getByUuid = jest.fn(async () => makeCentralRow({ agentSecret: encryptSecret(SECRET) }));
+    const mw = makeCentralAuthMiddleware({ getByUuid } as never);
+
+    const token = signHs256({ UUID: CENTRAL_UUID, exp: nowSeconds() + 3600 }, SECRET);
+    const req = makeReq({ authorization: token, uuid: CENTRAL_UUID });
+    const next = jest.fn();
+
+    await mw(req, {} as never, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next.mock.calls[0][0]).toBeUndefined();
     expect(req.centralContext).toEqual({ centralId: CENTRAL_UUID, tenantId: TENANT_ID });
   });
 

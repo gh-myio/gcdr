@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { centralRepository } from '../repositories/CentralRepository';
 import { NotFoundError, UnauthorizedError } from '../shared/errors/AppError';
+import { encryptSecret } from '../shared/utils/secretEnvelope';
 
 // Enroll-token lifetime: long enough to flash + first-boot a central, short
 // enough that a leaked .bootstrap is not indefinitely useful.
@@ -104,10 +105,12 @@ export class CentralEnrollmentService {
 
     const agentSecret = crypto.randomBytes(AGENT_SECRET_BYTES).toString('hex');
     // CR-S8: pass the token hash so the UPDATE is a single-use compare-and-swap.
+    // CR-S3: persist the secret ENCRYPTED at rest; the device gets the plaintext
+    // back (returned once below) to sign its poll-loop JWT with.
     const updated = await this.centrals.completeEnrollment(
       uuid,
       storedHash,
-      agentSecret,
+      encryptSecret(agentSecret),
       new Date(),
     );
     if (!updated) throw new UnauthorizedError(ENROLL_FAILURE_MESSAGE);

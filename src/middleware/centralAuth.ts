@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError } from '../shared/errors/AppError';
 import { centralRepository } from '../repositories/CentralRepository';
+import { decryptSecret } from '../shared/utils/secretEnvelope';
 
 // =============================================================================
 // Central-agent authentication (field-swap backup/restore poll loop).
@@ -152,7 +153,9 @@ export function makeCentralAuthMiddleware(centrals: CentralRepoDep = centralRepo
         throw new UnauthorizedError('Central sem credencial de agente');
       }
 
-      const payload = verifyHs256(token, central.agentSecret);
+      // CR-S3: agent_secret is stored encrypted at rest; decrypt to the raw HMAC
+      // key to verify. A legacy plaintext value passes through unchanged.
+      const payload = verifyHs256(token, decryptSecret(central.agentSecret));
       if (!payload) {
         throw new UnauthorizedError('Token de central inválido ou expirado');
       }

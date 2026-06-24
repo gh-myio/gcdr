@@ -1,6 +1,9 @@
+process.env.SECRET_ENCRYPTION_KEY = process.env.SECRET_ENCRYPTION_KEY ?? 'a'.repeat(64);
+
 import * as crypto from 'crypto';
 import { CentralEnrollmentService } from '../../../src/services/CentralEnrollmentService';
 import { NotFoundError, UnauthorizedError } from '../../../src/shared/errors/AppError';
+import { isEnvelope, decryptSecret } from '../../../src/shared/utils/secretEnvelope';
 
 const TENANT_ID = 't1';
 const CENTRAL_ID = '22222222-2222-2222-2222-222222222222';
@@ -108,7 +111,10 @@ describe('CentralEnrollmentService', () => {
       expect(idArg).toBe(CENTRAL_ID);
       // CR-S8: the stored token hash is passed so the UPDATE is a single-use CAS.
       expect(hashArg).toBe(sha256Hex(TOKEN));
-      expect(secretArg).toBe(result.agentSecret);
+      // CR-S3: the STORED value is an encrypted envelope; the RETURNED secret is
+      // the plaintext the device signs its poll JWT with.
+      expect(isEnvelope(secretArg)).toBe(true);
+      expect(decryptSecret(secretArg)).toBe(result.agentSecret);
       expect(enrolledAtArg).toBeInstanceOf(Date);
     });
 
