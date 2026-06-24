@@ -55,6 +55,8 @@ import {
   themesController,
   themesListByCustomerHandler,
   themesGetDefaultByCustomerHandler,
+  // RFC-0047: Generic Entity Registry
+  entitiesController,
   // RFC-0013: User Access Profile Bundle
   maintenanceGroupsController,
   accessBundleController,
@@ -266,6 +268,13 @@ apiV1Router.use('/devices', hybridAuthByMethod('devices:read', 'devices:write'),
 
 // Assets (hybridAuth for ThingsBoard integration)
 apiV1Router.use('/assets', hybridAuthByMethod('assets:read', 'assets:write'), assetsController);
+
+// RFC-0047: Generic Entity Registry (hybridAuth — JWT or customer API key).
+// GET requires entities:read (or *:read); writes require entities:write
+// (MYIO-operator only — a customer key gcdr_cust_* is read/resolve-only and a
+// write attempt gets 403). entity_type creation + is_system mutation need the
+// extra admin tier, computed inside the controller from req.context.
+apiV1Router.use('/entities', hybridAuthByMethod('entities:read', 'entities:write'), entitiesController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
