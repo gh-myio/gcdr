@@ -1,0 +1,5 @@
+# Local-only code-review notes (PR pre-reviews, scratch analysis).
+# Nothing in this folder is tracked — only this .gitignore is committed,
+# so the folder exists in the repo as a local review scratch space.
+*
+!.gitignore
