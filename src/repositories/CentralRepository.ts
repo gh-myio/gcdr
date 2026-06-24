@@ -362,6 +362,10 @@ export class CentralRepository implements ICentralRepository {
       .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
   }
 
+  // SECURITY (CR-B2): this is the operator-facing allowlist. The credential
+  // columns agent_secret / enroll_token_hash / enroll_token_expires_at /
+  // enrolled_at are intentionally NOT mapped onto the Central entity, so they
+  // can never reach a response body. Do NOT switch this to `...row` / a spread.
   private mapToEntity(row: typeof centrals.$inferSelect): Central {
     return {
       id: row.id,
