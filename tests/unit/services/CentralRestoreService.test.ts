@@ -111,10 +111,44 @@ describe('CentralRestoreService', () => {
       const { svc, jobs } = makeService({
         job: { id: 'job-1', status: 'RUNNING', currentPhase: 'START_SERVICES', logEntries: [] },
       });
-      await svc.updateProgress('t1', 'c1', 'job-1', { status: 'DONE', message: 'finished' });
+      await svc.updateProgress('t1', 'c1', 'job-1', {
+        status: 'DONE',
+        currentPhase: 'DONE',
+        message: 'finished',
+      });
       const patch = jobs.update.mock.calls[0][2];
       expect(patch.status).toBe('DONE');
       expect(patch.completedAt).toBeInstanceOf(Date);
+    });
+
+    it('rejects a phase regression (CR-S6)', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'RESTORE_DB', logEntries: [] },
+      });
+      await expect(
+        svc.updateProgress('t1', 'c1', 'job-1', { currentPhase: 'DOWNLOAD' }),
+      ).rejects.toThrow(ValidationError);
+      expect(jobs.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects status DONE without reaching the DONE phase (CR-S6)', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'RESTORE_DB', logEntries: [] },
+      });
+      await expect(svc.updateProgress('t1', 'c1', 'job-1', { status: 'DONE' })).rejects.toThrow(
+        ValidationError,
+      );
+      expect(jobs.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an illegal status transition RUNNING -> QUEUED (CR-S6)', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'DOWNLOAD', logEntries: [] },
+      });
+      await expect(svc.updateProgress('t1', 'c1', 'job-1', { status: 'QUEUED' })).rejects.toThrow(
+        ValidationError,
+      );
+      expect(jobs.update).not.toHaveBeenCalled();
     });
 
     it('rejects updates to an already-finished job', async () => {

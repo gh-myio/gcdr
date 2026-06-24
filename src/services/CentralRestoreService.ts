@@ -12,6 +12,24 @@ import { StartRestoreDTO, UpdateRestoreProgressDTO } from '../dto/request/Centra
 const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h — central downloads the dump
 const TERMINAL_STATUSES = new Set(['DONE', 'FAILED', 'CANCELED']);
 
+// CR-S6: phases advance in this fixed order — a progress report may stay on the
+// same phase or move forward, but never regress. Status transitions out of a
+// non-terminal state are constrained too (FAILED/CANCELED stay reachable from
+// anywhere; DONE only from RUNNING and only once the phase is DONE).
+const RESTORE_PHASE_ORDER = [
+  'QUEUED',
+  'DOWNLOAD',
+  'VERIFY',
+  'STOP_SERVICES',
+  'RESTORE_DB',
+  'START_SERVICES',
+  'DONE',
+];
+const ALLOWED_STATUS_NEXT: Record<string, Set<string>> = {
+  QUEUED: new Set(['QUEUED', 'RUNNING', 'FAILED', 'CANCELED']),
+  RUNNING: new Set(['RUNNING', 'DONE', 'FAILED', 'CANCELED']),
+};
+
 // Structural deps for unit testing (mirrors CentralBackupService DI).
 type RestoreRepoDep = Pick<
   typeof centralRestoreJobRepository,
@@ -116,6 +134,25 @@ export class CentralRestoreService {
     if (!job) throw new NotFoundError(`Restore job ${jobId} not found for central ${centralId}`);
     if (TERMINAL_STATUSES.has(job.status)) {
       throw new ValidationError(`Restore job ${jobId} is already ${job.status}`);
+    }
+
+    // CR-S6: reject illegal transitions before applying the patch. The central
+    // drives this state machine, but must not jump statuses, regress a phase, or
+    // report DONE without having reached the DONE phase.
+    if (dto.status && !(ALLOWED_STATUS_NEXT[job.status] ?? new Set<string>()).has(dto.status)) {
+      throw new ValidationError(`Invalid restore status transition: ${job.status} -> ${dto.status}`);
+    }
+    if (dto.currentPhase) {
+      const from = RESTORE_PHASE_ORDER.indexOf(job.currentPhase);
+      const to = RESTORE_PHASE_ORDER.indexOf(dto.currentPhase);
+      if (to < from) {
+        throw new ValidationError(
+          `Restore phase cannot regress: ${job.currentPhase} -> ${dto.currentPhase}`,
+        );
+      }
+    }
+    if ((dto.status ?? job.status) === 'DONE' && (dto.currentPhase ?? job.currentPhase) !== 'DONE') {
+      throw new ValidationError('Restore status DONE requires the DONE phase');
     }
 
     const phase = dto.currentPhase ?? job.currentPhase;
