@@ -48,7 +48,7 @@ const svc = entityService as jest.Mocked<typeof entityService>;
  * `contextOverrides` lets a test simulate a read-only customer key, an admin
  * scope, etc.
  */
-function buildApp(contextOverrides: Record<string, unknown> = {}) {
+function buildApp(contextOverrides: Record<string, unknown> = {}, user?: Request['user']) {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -59,6 +59,8 @@ function buildApp(contextOverrides: Record<string, unknown> = {}) {
       ip: '127.0.0.1',
       ...contextOverrides,
     } as Request['context'];
+    // Set req.user BEFORE the controller mount so isAdminContext sees JWT roles.
+    if (user) req.user = user;
     next();
   });
   app.use('/entities', entitiesController);
@@ -87,7 +89,7 @@ describe('entities.controller — route -> service wiring', () => {
     const srv = await listen(buildApp());
     try {
       const res = await fetch(`${srv.url}/entities/entity-types`);
-      const body = await res.json();
+      const body = (await res.json()) as { success: boolean; data: Record<string, unknown> };
       expect(res.status).toBe(200);
       expect(body.success).toBe(true);
       expect(svc.listEntityTypes).toHaveBeenCalledWith(TENANT_ID);
@@ -137,14 +139,14 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('isAdmin:true via JWT *:* role (scope:*:* form)', async () => {
     svc.createEntityType.mockResolvedValue({} as never);
-    const app = buildApp();
-    // Inject req.user with a wildcard role after context middleware.
-    app.use((req: Request, _res, next) => {
-      req.user = { sub: USER_ID, tenant_id: TENANT_ID, email: 'op@myio', roles: ['scope:*:*'], type: 'USER' };
-      next();
-    });
-    app.use('/entities', entitiesController);
-    app.use(errorHandler);
+    // A JWT bearer carrying a `scope:*:*` wildcard role → isAdmin true.
+    const app = buildApp({}, {
+      sub: USER_ID,
+      tenant_id: TENANT_ID,
+      email: 'op@myio',
+      roles: ['scope:*:*'],
+      type: 'USER',
+    } as Request['user']);
     const srv = await listen(app);
     try {
       await fetch(`${srv.url}/entities/entity-types`, {
@@ -202,7 +204,7 @@ describe('entities.controller — route -> service wiring', () => {
       expect(svc.getById).toHaveBeenCalledWith(
         TENANT_ID,
         ENTITY_ID,
-        expect.objectContaining({ deep: '1', state: 'active' }),
+        expect.objectContaining({ deep: 1, state: 'active' }),
       );
     } finally {
       await srv.close();
@@ -321,7 +323,7 @@ describe('entities.controller — /resolve versioning', () => {
       const res = await fetch(`${srv.url}/entities/resolve?customerId=${CUSTOMER_ID}&deep=all`);
       expect(res.status).toBe(200);
       expect(res.headers.get('x-version-id')).toBe('v_2026_06_23_a');
-      const body = await res.json();
+      const body = (await res.json()) as { success: boolean; data: Record<string, unknown> };
       expect(body.data.source).toBe('customer');
       expect(svc.resolve).toHaveBeenCalledWith(
         TENANT_ID,

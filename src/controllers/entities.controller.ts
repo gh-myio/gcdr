@@ -12,6 +12,19 @@ import {
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
 
+/** Coerce the `deep` query param (`string | string[]`) to `number | 'all' | undefined`. */
+function parseDeep(v: unknown): number | 'all' | undefined {
+  if (v === undefined || v === '') return undefined;
+  if (v === 'all') return 'all';
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Coerce the `state` query param to the entity state enum (else undefined). */
+function parseState(v: unknown): 'active' | 'inactive' | 'all' | undefined {
+  return v === 'active' || v === 'inactive' || v === 'all' ? v : undefined;
+}
+
 const router = Router();
 
 // =============================================================================
@@ -107,8 +120,8 @@ router.get('/resolve', async (req: Request, res: Response, next: NextFunction) =
     }
 
     const result = await entityService.resolve(tenantId, customerId as string, {
-      deep: deep as string | undefined,
-      state: state as string | undefined,
+      deep: parseDeep(deep),
+      state: parseState(state),
     });
 
     res.setHeader('X-Version-Id', result.version);
@@ -251,8 +264,8 @@ router.get('/:id/children', async (req: Request, res: Response, next: NextFuncti
     }
     const { deep, state } = req.query;
     const children = await entityService.getChildren(tenantId, id, {
-      deep: deep as string | undefined,
-      state: state as string | undefined,
+      deep: parseDeep(deep) ?? 0,
+      state: parseState(state),
     });
     sendSuccess(res, children, 200, requestId);
   } catch (err) {
@@ -273,8 +286,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     }
     const { deep, state } = req.query;
     const entity = await entityService.getById(tenantId, id, {
-      deep: deep as string | undefined,
-      state: state as string | undefined,
+      deep: parseDeep(deep) ?? 0,
+      state: parseState(state),
     });
     sendSuccess(res, entity, 200, requestId);
   } catch (err) {
