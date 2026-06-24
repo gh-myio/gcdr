@@ -27,8 +27,7 @@ CREATE TABLE "central_backups" (
   "created_at"   timestamptz NOT NULL DEFAULT now(),
   "updated_at"   timestamptz NOT NULL DEFAULT now(),
   "confirmed_at" timestamptz,
-  "created_by"   uuid,
-  "version"      integer NOT NULL DEFAULT 1
+  "created_by"   uuid
 );
 
 CREATE UNIQUE INDEX "central_backups_storage_key_unique" ON "central_backups" ("storage_key");

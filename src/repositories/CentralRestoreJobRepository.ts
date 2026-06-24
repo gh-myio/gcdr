@@ -57,7 +57,6 @@ export class CentralRestoreJobRepository {
         createdAt: ts,
         updatedAt: ts,
         createdBy: input.createdBy ?? null,
-        version: 1,
       })
       .returning();
 
@@ -97,7 +96,7 @@ export class CentralRestoreJobRepository {
 
   /**
    * Atomically claim the oldest QUEUED job for `centralId` and transition it
-   * QUEUED -> RUNNING (version-bumped) in a single statement. Used by the
+   * QUEUED -> RUNNING in a single statement. Used by the
    * central-agent poll loop (GET /central-agent/jobs/next). `FOR UPDATE SKIP
    * LOCKED` on the inner select makes concurrent polls hand out distinct jobs
    * (or none) instead of blocking. Returns the claimed row, or null if the
@@ -110,7 +109,6 @@ export class CentralRestoreJobRepository {
       .set({
         status: 'RUNNING',
         updatedAt: ts,
-        version: sql`${centralRestoreJobs.version} + 1`,
       })
       .where(
         eq(
@@ -147,7 +145,7 @@ export class CentralRestoreJobRepository {
 
     const [row] = await db
       .update(centralRestoreJobs)
-      .set({ ...patch, updatedAt: ts, version: sql`${centralRestoreJobs.version} + 1` })
+      .set({ ...patch, updatedAt: ts })
       .where(and(eq(centralRestoreJobs.tenantId, tenantId), eq(centralRestoreJobs.id, id)))
       .returning();
 

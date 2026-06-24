@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { db, schema, CentralBackup } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
@@ -40,7 +40,6 @@ export class CentralBackupRepository {
         createdAt: ts,
         updatedAt: ts,
         createdBy: input.createdBy ?? null,
-        version: 1,
       })
       .returning();
 
@@ -88,7 +87,6 @@ export class CentralBackupRepository {
         byteSize,
         confirmedAt: ts,
         updatedAt: ts,
-        version: sql`${centralBackups.version} + 1`,
       })
       .where(and(eq(centralBackups.tenantId, tenantId), eq(centralBackups.id, id)))
       .returning();

@@ -754,7 +754,6 @@ export const centralBackups = pgTable('central_backups', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
   createdBy: uuid('created_by'),
-  version: integer('version').notNull().default(1),
 }, (table) => ({
   storageKeyUnique: uniqueIndex('central_backups_storage_key_unique').on(table.storageKey),
   tenantCentralIdx: index('central_backups_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
@@ -784,7 +783,6 @@ export const centralRestoreJobs = pgTable('central_restore_jobs', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   createdBy: uuid('created_by'),
-  version: integer('version').notNull().default(1),
 }, (table) => ({
   tenantCentralIdx: index('central_restore_jobs_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
   tenantStatusIdx: index('central_restore_jobs_tenant_status_idx').on(table.tenantId, table.status),

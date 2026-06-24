@@ -3,7 +3,7 @@
  *
  * The claim is the atomic heart of the central-agent poll loop: it must
  * transition the OLDEST QUEUED job for ONE central to RUNNING in a single
- * statement (version-bumped), and only that central's jobs. We assert the
+ * statement, and only that central's jobs. We assert the
  * generated SQL via PgDialect.sqlToQuery (no DB) — same approach as
  * WikiPageRepository.sql.test.ts.
  */
@@ -26,12 +26,11 @@ describe('CentralRestoreJobRepository.claimNextQueued SQL shape', () => {
 
   const { sql, params } = queryOf(repo.claimNextQueuedQuery(TENANT, CENTRAL));
 
-  it('is an UPDATE that transitions the job to RUNNING and bumps version', () => {
+  it('is an UPDATE that transitions the job to RUNNING', () => {
     expect(sql).toMatch(/^\s*update\s+"central_restore_jobs"/i);
-    // status set to RUNNING (bound param) + version bumped.
+    // status set to RUNNING (bound param).
     expect(sql).toMatch(/set\s+"status"\s*=/i);
     expect(params).toContain('RUNNING');
-    expect(sql).toMatch(/"version"\s*=\s*"central_restore_jobs"\."version"\s*\+\s*1/i);
   });
 
   it('only claims a QUEUED job for the given tenant + central', () => {

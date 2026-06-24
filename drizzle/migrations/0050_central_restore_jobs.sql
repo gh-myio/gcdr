@@ -25,8 +25,7 @@ CREATE TABLE "central_restore_jobs" (
   "created_at"       timestamptz NOT NULL DEFAULT now(),
   "updated_at"       timestamptz NOT NULL DEFAULT now(),
   "completed_at"     timestamptz,
-  "created_by"       uuid,
-  "version"          integer NOT NULL DEFAULT 1
+  "created_by"       uuid
 );
 
 CREATE INDEX "central_restore_jobs_tenant_central_idx" ON "central_restore_jobs" ("tenant_id", "central_id", "created_at" DESC);
