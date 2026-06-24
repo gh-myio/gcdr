@@ -15,7 +15,7 @@ function sha256Hex(value: string): string {
  * row). The setEnrollToken mock echoes a row back so issue succeeds; pass
  * { central: null } to simulate an unknown central on the device path.
  */
-function makeService(opts: { central?: unknown; setRow?: unknown } = {}) {
+function makeService(opts: { central?: unknown; setRow?: unknown; completeRow?: unknown } = {}) {
   const centrals = {
     setEnrollToken: jest.fn(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,7 +36,10 @@ function makeService(opts: { central?: unknown; setRow?: unknown } = {}) {
           },
     ),
     completeEnrollment: jest.fn(
-      async (id: string, agentSecret: string, _enrolledAt: Date) => ({ id, agentSecret }),
+      // CR-S8 signature: (id, expectedEnrollTokenHash, agentSecret, enrolledAt).
+      // Returns null to simulate the conditional UPDATE matching zero rows.
+      async (id: string, _expectedHash: string, agentSecret: string, _enrolledAt: Date) =>
+        'completeRow' in opts ? opts.completeRow : { id, agentSecret },
     ),
   };
   const svc = new CentralEnrollmentService(
@@ -101,15 +104,17 @@ describe('CentralEnrollmentService', () => {
       // method is what CLEARS enroll_token_hash/expiry — assert it was called with
       // the minted secret + a timestamp.
       expect(centrals.completeEnrollment).toHaveBeenCalledTimes(1);
-      const [idArg, secretArg, enrolledAtArg] = centrals.completeEnrollment.mock.calls[0];
+      const [idArg, hashArg, secretArg, enrolledAtArg] = centrals.completeEnrollment.mock.calls[0];
       expect(idArg).toBe(CENTRAL_ID);
+      // CR-S8: the stored token hash is passed so the UPDATE is a single-use CAS.
+      expect(hashArg).toBe(sha256Hex(TOKEN));
       expect(secretArg).toBe(result.agentSecret);
       expect(enrolledAtArg).toBeInstanceOf(Date);
     });
 
-    it('rejects an unknown uuid (NotFoundError, no completeEnrollment)', async () => {
+    it('rejects an unknown uuid with 401, not 404 (no enumeration oracle, CR-S2)', async () => {
       const { svc, centrals } = makeService({ central: null });
-      await expect(svc.enroll(CENTRAL_ID, 'a'.repeat(64))).rejects.toThrow(NotFoundError);
+      await expect(svc.enroll(CENTRAL_ID, 'a'.repeat(64))).rejects.toThrow(UnauthorizedError);
       expect(centrals.completeEnrollment).not.toHaveBeenCalled();
     });
 
@@ -158,6 +163,36 @@ describe('CentralEnrollmentService', () => {
       // A brand-new secret is minted (not the stale one on the row).
       expect(r2.agentSecret).not.toBe('old-secret');
       expect(second.centrals.completeEnrollment).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses ONE identical message for every failure (CR-S2 — no oracle in the body)', async () => {
+      const messages: string[] = [];
+      const collect = async (central: unknown, token: string) => {
+        try {
+          await makeService({ central }).svc.enroll(CENTRAL_ID, token);
+        } catch (e) {
+          messages.push((e as Error).message);
+        }
+      };
+      await collect(null, 'a'.repeat(64)); // unknown uuid
+      await collect(pendingTokenRow('x'.repeat(64), { enrollTokenHash: null }), 'a'.repeat(64)); // no token
+      await collect(
+        pendingTokenRow('y'.repeat(64), { enrollTokenExpiresAt: new Date(Date.now() - 1000) }),
+        'y'.repeat(64),
+      ); // expired
+      await collect(pendingTokenRow('z'.repeat(64)), 'WRONG'.repeat(13)); // bad token
+      expect(messages).toHaveLength(4);
+      expect(new Set(messages).size).toBe(1); // every reason is indistinguishable
+    });
+
+    it('concurrent re-enroll: the loser (completeEnrollment matched 0 rows) gets 401 (CR-S8)', async () => {
+      const TOKEN = 'e'.repeat(64);
+      const { svc, centrals } = makeService({
+        central: pendingTokenRow(TOKEN),
+        completeRow: null, // the conditional CAS lost — token already consumed
+      });
+      await expect(svc.enroll(CENTRAL_ID, TOKEN)).rejects.toThrow(UnauthorizedError);
+      expect(centrals.completeEnrollment).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -113,11 +113,18 @@ export class CentralRepository implements ICentralRepository {
   /**
    * Finalize enrollment (Slice 1.5). Device-facing → cross-tenant by `id` (the
    * central only knows its own uuid). Persists the freshly-minted agent_secret,
-   * stamps enrolled_at, and CLEARS the enroll token (hash + expiry) so the token
-   * is single-use. Returns the updated row, or null if no such central.
+   * stamps enrolled_at, and CLEARS the enroll token (hash + expiry).
+   *
+   * CR-S8: the UPDATE is CONDITIONAL on the enroll-token hash still being present
+   * and matching `expectedEnrollTokenHash`, so mint-new + revoke-old happen in a
+   * single compare-and-swap statement. Concurrent re-enrolls of the same token
+   * (field-swap retry storm) therefore resolve to exactly ONE winner — the rest
+   * match zero rows and get null. Returns the updated row, or null if no central
+   * matched (unknown id OR the token was already consumed).
    */
   async completeEnrollment(
     id: string,
+    expectedEnrollTokenHash: string,
     agentSecret: string,
     enrolledAt: Date,
   ): Promise<typeof centrals.$inferSelect | null> {
@@ -130,7 +137,7 @@ export class CentralRepository implements ICentralRepository {
         enrollTokenExpiresAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(centrals.id, id))
+      .where(and(eq(centrals.id, id), eq(centrals.enrollTokenHash, expectedEnrollTokenHash)))
       .returning();
 
     return row ?? null;
