@@ -42,6 +42,21 @@ module.exports = {
       lines:      22,
       statements: 20,
     },
+    // RFC-0047 Generic Entity Registry — gate the new module so its unit
+    // coverage doesn't backslide. Modest floors the layer agents' unit suites
+    // can realistically meet; raise as the suites grow.
+    'src/services/EntityService.ts': {
+      branches:   20,
+      functions:  15,
+      lines:      20,
+      statements: 20,
+    },
+    'src/repositories/EntityRepository.ts': {
+      branches:   20,
+      functions:  15,
+      lines:      20,
+      statements: 20,
+    },
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
