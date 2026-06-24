@@ -1,0 +1,347 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { entityService } from '../services/EntityService';
+import {
+  CreateEntitySchema,
+  UpdateEntitySchema,
+  ListEntitiesQuerySchema,
+  CloneSchema,
+  RevertSchema,
+  BulkReplaceSchema,
+  BulkReplaceQuerySchema,
+} from '../dto/request/EntityDTO';
+import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
+import { ValidationError } from '../shared/errors/AppError';
+
+const router = Router();
+
+// =============================================================================
+// RFC-0047 — Generic Entity Registry · Express router
+// =============================================================================
+// Wire contract: docs/rfcs/RFC-0047-Entity-API.md §2. Mounted in app.ts under
+// `/entities` with `hybridAuthByMethod('entities:read','entities:write')` — so
+// reads are gated by entities:read (or *:read) and writes by entities:write
+// (MYIO-operator only; a customer key gcdr_cust_* is read/resolve-only and a
+// write attempt yields 403 at the mount). The `isAdmin` tier below is the EXTRA
+// gate for `entity_type` creation + `is_system` row mutation.
+
+/**
+ * Compute the admin tier from the request context. `isAdmin` is true when the
+ * caller carries an `entities:admin` scope or a `*:*` wildcard — for API keys
+ * these live on `req.context.apiKeyScopes`; for JWT bearers on `req.user.roles`
+ * (roles are surfaced as `scope:<scope>` for API-key-derived users, and bare
+ * role strings for real users). The route mount already gates write access; this
+ * only decides whether the caller may create a type or mutate an `is_system` row.
+ */
+function isAdminContext(req: Request): boolean {
+  const ADMIN_TOKENS = new Set(['entities:admin', '*:*']);
+
+  const apiKeyScopes = req.context?.apiKeyScopes ?? [];
+  if (apiKeyScopes.some((s) => ADMIN_TOKENS.has(s))) {
+    return true;
+  }
+
+  // JWT bearer: roles may be bare scope strings or `scope:<scope>` (the form
+  // the auth layer mints for API-key-derived users).
+  const roles = req.user?.roles ?? [];
+  for (const role of roles) {
+    if (ADMIN_TOKENS.has(role)) return true;
+    if (role.startsWith('scope:') && ADMIN_TOKENS.has(role.slice('scope:'.length))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// Entity types
+// -----------------------------------------------------------------------------
+
+/**
+ * GET /entity-types
+ * List the type registry.
+ */
+router.get('/entity-types', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const types = await entityService.listEntityTypes(tenantId);
+    sendSuccess(res, types, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /entity-types  (admin)
+ * Register a new type. Creating a type requires the admin tier.
+ */
+router.post('/entity-types', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const type = await entityService.createEntityType(tenantId, req.body, {
+      isAdmin: isAdminContext(req),
+    });
+    sendCreated(res, type, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Entities — list / resolve (static paths before /:id)
+// -----------------------------------------------------------------------------
+
+/**
+ * GET /entities/resolve
+ * Effective config for a customer (own rows if any, else system). Mirrors the
+ * alarm-bundle versioning pattern: sets `X-Version-Id` = data.version; honors
+ * `If-None-Match` -> 304 Not Modified (no body) when the version is unchanged.
+ */
+router.get('/resolve', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId, deep, state } = req.query;
+
+    if (!customerId) {
+      throw new ValidationError('customerId query param is required');
+    }
+
+    const result = await entityService.resolve(tenantId, customerId as string, {
+      deep: deep as string | undefined,
+      state: state as string | undefined,
+    });
+
+    res.setHeader('X-Version-Id', result.version);
+
+    // 304 when the client's cached version matches. If-None-Match may arrive
+    // quoted (`"v_…"`); compare against both the raw and the quoted form.
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (typeof ifNoneMatch === 'string') {
+      const normalized = ifNoneMatch.replace(/^"(.*)"$/, '$1').trim();
+      if (normalized === result.version) {
+        res.status(304).end();
+        return;
+      }
+    }
+
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /entities
+ * List / search with filters + pagination.
+ */
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const query = ListEntitiesQuerySchema.parse(req.query);
+    const result = await entityService.list(tenantId, query);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Clone / revert / bulk-replace (static collection-level mutations)
+// -----------------------------------------------------------------------------
+
+/**
+ * POST /entities/clone
+ * Materialize the whole system tree under a customer.
+ */
+router.post('/clone', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { customerId } = CloneSchema.parse(req.body);
+    const result = await entityService.clone(tenantId, customerId, userId);
+    sendCreated(res, result, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /entities/revert
+ * Soft-delete all of a customer's rows -> resolution falls back to system.
+ */
+router.post('/revert', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { customerId } = RevertSchema.parse(req.body);
+    const result = await entityService.revert(tenantId, customerId, userId);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PUT /entities/bulk-replace
+ * Atomic whole-subtree replace for a (customerId, type). Optimistic concurrency
+ * at the subtree level via the `If-Match` request header (the X-Version-Id of
+ * the subtree being replaced). Sets `X-Version-Id` = the new version on success.
+ */
+router.put('/bulk-replace', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { customerId, type } = BulkReplaceQuerySchema.parse(req.query);
+    const body = BulkReplaceSchema.parse(req.body);
+
+    // If-Match carries the X-Version-Id of the subtree being replaced; may be
+    // quoted. Pass the normalized value to the service for the subtree CAS.
+    const rawIfMatch = req.headers['if-match'];
+    const ifMatch =
+      typeof rawIfMatch === 'string'
+        ? rawIfMatch.replace(/^"(.*)"$/, '$1').trim()
+        : undefined;
+
+    const result = await entityService.bulkReplace(
+      tenantId,
+      customerId,
+      type,
+      body,
+      ifMatch,
+      userId,
+    );
+
+    res.setHeader('X-Version-Id', result.version);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Entities — create
+// -----------------------------------------------------------------------------
+
+/**
+ * POST /entities
+ * Create a node.
+ */
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const data = CreateEntitySchema.parse(req.body);
+    const entity = await entityService.create(tenantId, data, userId);
+    sendCreated(res, entity, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Entities — per-id (dynamic paths last)
+// -----------------------------------------------------------------------------
+
+/**
+ * GET /entities/:id/children
+ * Direct children (or bounded subtree) of one node.
+ */
+router.get('/:id/children', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError('Entity ID is required');
+    }
+    const { deep, state } = req.query;
+    const children = await entityService.getChildren(tenantId, id, {
+      deep: deep as string | undefined,
+      state: state as string | undefined,
+    });
+    sendSuccess(res, children, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /entities/:id
+ * Fetch one node; `deep` controls embedded children.
+ */
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError('Entity ID is required');
+    }
+    const { deep, state } = req.query;
+    const entity = await entityService.getById(tenantId, id, {
+      deep: deep as string | undefined,
+      state: state as string | undefined,
+    });
+    sendSuccess(res, entity, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /entities/:id
+ * Partial update; optimistic `version`. `?metadataMode=replace` swaps metadata
+ * wholesale. Editing an `is_system` row requires the admin tier.
+ */
+router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError('Entity ID is required');
+    }
+    const data = UpdateEntitySchema.parse(req.body);
+    const metadataMode = req.query.metadataMode === 'replace' ? 'replace' : 'merge';
+    const entity = await entityService.update(tenantId, id, data, userId, {
+      isAdmin: isAdminContext(req),
+      metadataMode,
+    });
+    sendSuccess(res, entity, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /entities/:id
+ * Soft delete (default); `?hard=true`, `?cascade=true`.
+ */
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId } = req.context;
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError('Entity ID is required');
+    }
+    const hard = req.query.hard === 'true';
+    const cascade = req.query.cascade === 'true';
+    await entityService.remove(tenantId, id, userId, { hard, cascade });
+    sendNoContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /entities/:id/restore
+ * Un-delete a soft-deleted node.
+ */
+router.post('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError('Entity ID is required');
+    }
+    const entity = await entityService.restore(tenantId, id, userId);
+    sendSuccess(res, entity, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;

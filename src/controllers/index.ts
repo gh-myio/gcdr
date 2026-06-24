@@ -75,3 +75,6 @@ export { default as customerIntegrationsController } from './customer-integratio
 
 // RFC-0043: GCDR Copiloto (assistant)
 export { default as assistantController } from './assistant.controller';
+
+// RFC-0047: Generic Entity Registry
+export { default as entitiesController } from './entities.controller';
