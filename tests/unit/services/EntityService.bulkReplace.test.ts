@@ -65,12 +65,8 @@ describe('EntityService — bulkReplace', () => {
     await expectErrorWithCode(promise, 'VERSION_CONFLICT');
     expect(repo.bulkReplace).not.toHaveBeenCalled();
 
-    try {
-      await promise;
-    } catch (err) {
-      const details = (err as AppError & { details?: Record<string, unknown> }).details;
-      expect(details?.currentVersion).toBe(currentVersion);
-    }
+    const err = await promise.catch((e) => e as AppError & { details?: Record<string, unknown> });
+    expect(err.details?.currentVersion).toBe(currentVersion);
   });
 
   it('rejects VALIDATION_ERROR when a node has invalid per-type metadata', async () => {

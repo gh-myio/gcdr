@@ -25,6 +25,8 @@ function parseState(v: unknown): 'active' | 'inactive' | 'all' | undefined {
   return v === 'active' || v === 'inactive' || v === 'all' ? v : undefined;
 }
 
+const ERR_ID_REQUIRED = 'Entity ID is required';
+
 const router = Router();
 
 // =============================================================================
@@ -260,7 +262,7 @@ router.get('/:id/children', async (req: Request, res: Response, next: NextFuncti
     const { tenantId, requestId } = req.context;
     const { id } = req.params;
     if (!id) {
-      throw new ValidationError('Entity ID is required');
+      throw new ValidationError(ERR_ID_REQUIRED);
     }
     const { deep, state } = req.query;
     const children = await entityService.getChildren(tenantId, id, {
@@ -282,7 +284,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { tenantId, requestId } = req.context;
     const { id } = req.params;
     if (!id) {
-      throw new ValidationError('Entity ID is required');
+      throw new ValidationError(ERR_ID_REQUIRED);
     }
     const { deep, state } = req.query;
     const entity = await entityService.getById(tenantId, id, {
@@ -305,7 +307,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
     if (!id) {
-      throw new ValidationError('Entity ID is required');
+      throw new ValidationError(ERR_ID_REQUIRED);
     }
     const data = UpdateEntitySchema.parse(req.body);
     const metadataMode = req.query.metadataMode === 'replace' ? 'replace' : 'merge';
@@ -328,7 +330,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { tenantId, userId } = req.context;
     const { id } = req.params;
     if (!id) {
-      throw new ValidationError('Entity ID is required');
+      throw new ValidationError(ERR_ID_REQUIRED);
     }
     const hard = req.query.hard === 'true';
     const cascade = req.query.cascade === 'true';
@@ -348,7 +350,7 @@ router.post('/:id/restore', async (req: Request, res: Response, next: NextFuncti
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
     if (!id) {
-      throw new ValidationError('Entity ID is required');
+      throw new ValidationError(ERR_ID_REQUIRED);
     }
     const entity = await entityService.restore(tenantId, id, userId);
     sendSuccess(res, entity, 200, requestId);

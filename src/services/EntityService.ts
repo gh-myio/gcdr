@@ -248,19 +248,21 @@ export class EntityService {
     }
 
     // Re-parent guards: cycle + allowed parent type.
-    if (dto.parentEntityId !== undefined && dto.parentEntityId !== current.parentEntityId) {
-      if (dto.parentEntityId) {
-        const cycles = await this.repository.wouldCreateCycle(tenantId, id, dto.parentEntityId);
-        if (cycles) {
-          throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
-        }
-        const parent = await this.repository.getById(tenantId, dto.parentEntityId);
-        if (!parent) {
-          throw new NotFoundError(`Parent entity ${dto.parentEntityId} not found`);
-        }
-        const type = await this.repository.getEntityType(tenantId, current.entityType);
-        if (type) this.assertAllowedParentType(type, parent.entityType);
+    if (
+      dto.parentEntityId !== undefined &&
+      dto.parentEntityId !== current.parentEntityId &&
+      dto.parentEntityId
+    ) {
+      const cycles = await this.repository.wouldCreateCycle(tenantId, id, dto.parentEntityId);
+      if (cycles) {
+        throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
       }
+      const parent = await this.repository.getById(tenantId, dto.parentEntityId);
+      if (!parent) {
+        throw new NotFoundError(`Parent entity ${dto.parentEntityId} not found`);
+      }
+      const type = await this.repository.getEntityType(tenantId, current.entityType);
+      if (type) this.assertAllowedParentType(type, parent.entityType);
     }
 
     try {
