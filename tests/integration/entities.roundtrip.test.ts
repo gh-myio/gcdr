@@ -48,13 +48,32 @@ async function exec(query: ReturnType<typeof sql>): Promise<Row[]> {
   return Array.isArray(res) ? (res as Row[]) : [];
 }
 
-/** count of a customer's non-deleted rows for a (customer, type) subtree. */
-async function liveCount(customerId: string, entityType: string): Promise<number> {
+/**
+ * Unwrap a Drizzle-wrapped DB error to the underlying driver { message, code }.
+ * Drizzle throws a `DrizzleQueryError` whose own `.message` is a "Failed query:
+ * …" wrapper and whose `.code` is undefined; the real PostgresError (message
+ * 'SYSTEM_PROTECTED', the SQLSTATE on `.code`) lives on `.cause`. We surface both
+ * the wrapper text and the cause so callers can match on either.
+ */
+function dbError(e: unknown): { message: string; code: string | undefined } {
+  const top = e as {
+    message?: string;
+    code?: string;
+    cause?: { message?: string; code?: string };
+  };
+  const cause = top.cause ?? {};
+  return {
+    message: `${top.message ?? ''}\n${cause.message ?? ''}`,
+    code: cause.code ?? top.code,
+  };
+}
+
+/** Count of a customer's non-deleted rows (the whole cloned subtree, all types). */
+async function liveCount(customerId: string): Promise<number> {
   const rows = await exec(sql`
     SELECT COUNT(*)::int AS n FROM entities
     WHERE tenant_id = ${TENANT_ID}
       AND customer_id = ${customerId}
-      AND entity_type = ${entityType}
       AND is_deleted = false
   `);
   return Number((rows[0]?.n as number) ?? 0);
@@ -67,17 +86,20 @@ async function liveCount(customerId: string, entityType: string): Promise<number
  * assertions deterministically. We hash the ordered (key, value, sort_order,
  * parent, metadata) of the live rows.
  */
-async function subtreeVersion(customerId: string, entityType: string): Promise<string> {
+async function subtreeVersion(customerId: string): Promise<string> {
+  // Hash the parent by its (stable) entity_key, NOT its UUID — a re-clone/replace
+  // mints fresh ids, so a UUID-based hash would spuriously change. The structural
+  // content (key, value, sort, parent-key, metadata) is what the version tracks.
   const rows = await exec(sql`
     SELECT md5(string_agg(
-             entity_key || '|' || COALESCE(entity_value,'') || '|' || sort_order::text || '|' ||
-             COALESCE(parent_entity_id::text,'-') || '|' || metadata::text,
-             ',' ORDER BY sort_order, entity_key)) AS v
-    FROM entities
-    WHERE tenant_id = ${TENANT_ID}
-      AND customer_id = ${customerId}
-      AND entity_type = ${entityType}
-      AND is_deleted = false
+             e.entity_key || '|' || COALESCE(e.entity_value,'') || '|' || e.sort_order::text || '|' ||
+             COALESCE(p.entity_key,'-') || '|' || e.metadata::text,
+             ',' ORDER BY e.sort_order, e.entity_key)) AS v
+    FROM entities e
+    LEFT JOIN entities p ON p.id = e.parent_entity_id
+    WHERE e.tenant_id = ${TENANT_ID}
+      AND e.customer_id = ${customerId}
+      AND e.is_deleted = false
   `);
   return String(rows[0]?.v ?? 'empty');
 }
@@ -152,7 +174,7 @@ async function resolve(
   customerId: string,
   entityType: string,
 ): Promise<{ source: 'customer' | 'system'; rows: Row[] }> {
-  const own = await liveCount(customerId, entityType);
+  const own = await liveCount(customerId);
   if (own > 0) {
     const rows = await exec(sql`
       SELECT entity_key, entity_value, sort_order, parent_entity_id, metadata
@@ -179,11 +201,19 @@ async function resolve(
     // Close the underlying postgres-js pool so Jest exits cleanly.
     try {
       // drizzle(postgres-js) exposes the client on $client in newer versions.
-      const client = (db as unknown as { $client?: { end?: () => Promise<void> } }).$client;
+      const client = (db as unknown as {
+        $client?: { end?: (opts?: { timeout?: number }) => Promise<void> };
+      }).$client;
       if (client?.end) await client.end({ timeout: 5 });
     } catch {
       /* best-effort */
     }
+  });
+
+  // Each test starts from a clean customer so a failed test cannot cascade into
+  // the next (e.g. a leftover clone tripping the next clone's unique index).
+  beforeEach(async () => {
+    await cleanupCustomer(TEST_CUSTOMER);
   });
 
   // -------------------------------------------------------------------------
@@ -205,7 +235,7 @@ async function resolve(
       meta: r.metadata,
     }));
 
-    const v0 = await subtreeVersion(TEST_CUSTOMER, 'GROUP');
+    const v0 = await subtreeVersion(TEST_CUSTOMER);
 
     // bulk-replace with the same logical forest, in ONE transaction: soft-delete
     // the live set, re-insert the identical nodes (the service does this for the
@@ -216,7 +246,7 @@ async function resolve(
                sort_order, metadata
         FROM entities
         WHERE tenant_id = ${TENANT_ID} AND customer_id = ${TEST_CUSTOMER}
-          AND entity_type = 'GROUP' AND is_deleted = false
+          AND is_deleted = false
         ORDER BY (parent_entity_id IS NULL) DESC, sort_order
       `);
       const rows = Array.isArray(current) ? (current as Row[]) : [];
@@ -224,7 +254,7 @@ async function resolve(
       await tx.execute(sql`
         UPDATE entities SET is_deleted = true, updated_at = now()
         WHERE tenant_id = ${TENANT_ID} AND customer_id = ${TEST_CUSTOMER}
-          AND entity_type = 'GROUP' AND is_deleted = false
+          AND is_deleted = false
       `);
       // re-insert identical nodes with fresh ids (topological: roots first)
       const idMap = new Map<string, string>();
@@ -264,8 +294,8 @@ async function resolve(
 
     // The replace happened — the live count is unchanged and the version is
     // recomputable (content-identical, so the hash matches).
-    expect(await liveCount(TEST_CUSTOMER, 'GROUP')).toBe(cloned);
-    expect(await subtreeVersion(TEST_CUSTOMER, 'GROUP')).toBe(v0);
+    expect(await liveCount(TEST_CUSTOMER)).toBe(cloned);
+    expect(await subtreeVersion(TEST_CUSTOMER)).toBe(v0);
 
     await cleanupCustomer(TEST_CUSTOMER);
   });
@@ -277,7 +307,7 @@ async function resolve(
   // -------------------------------------------------------------------------
   it('rejects a stale If-Match bulk-replace and writes zero rows', async () => {
     await cloneSystemTree(TEST_CUSTOMER, 'GROUP');
-    const before = await liveCount(TEST_CUSTOMER, 'GROUP');
+    const before = await liveCount(TEST_CUSTOMER);
     const staleVersion = 'v_stale_does_not_match';
 
     let conflicted = false;
@@ -307,7 +337,7 @@ async function resolve(
 
     expect(conflicted).toBe(true);
     // Zero-write: the subtree is byte-for-byte the same count.
-    expect(await liveCount(TEST_CUSTOMER, 'GROUP')).toBe(before);
+    expect(await liveCount(TEST_CUSTOMER)).toBe(before);
 
     await cleanupCustomer(TEST_CUSTOMER);
   });
@@ -318,7 +348,7 @@ async function resolve(
   // (per-type metadata .strict() violation) aborts the transaction → zero rows.
   // -------------------------------------------------------------------------
   it('aborts a bulk-replace with one invalid node and writes zero rows', async () => {
-    const before = await liveCount(TEST_CUSTOMER, 'GROUP');
+    const before = await liveCount(TEST_CUSTOMER);
 
     // Per-type strict metadata guard: GROUP nodes accept no `bogusUnknownKey`.
     const newForest = [
@@ -358,7 +388,7 @@ async function resolve(
 
     expect(validationFailed).toBe(true);
     // Zero rows written — even the valid node never landed.
-    expect(await liveCount(TEST_CUSTOMER, 'GROUP')).toBe(before);
+    expect(await liveCount(TEST_CUSTOMER)).toBe(before);
 
     await cleanupCustomer(TEST_CUSTOMER);
   });
@@ -386,7 +416,7 @@ async function resolve(
         UPDATE entities SET entity_value = 'hacked' WHERE id = ${sysId}
       `);
     } catch (e: unknown) {
-      protectedUpdate = /SYSTEM_PROTECTED/.test((e as Error).message);
+      protectedUpdate = /SYSTEM_PROTECTED/.test(dbError(e).message);
     }
     expect(protectedUpdate).toBe(true);
 
@@ -395,7 +425,7 @@ async function resolve(
     try {
       await db.execute(sql`DELETE FROM entities WHERE id = ${sysId}`);
     } catch (e: unknown) {
-      protectedDelete = /SYSTEM_PROTECTED/.test((e as Error).message);
+      protectedDelete = /SYSTEM_PROTECTED/.test(dbError(e).message);
     }
     expect(protectedDelete).toBe(true);
 
@@ -444,10 +474,10 @@ async function resolve(
       `);
     } catch (e: unknown) {
       // 23505 = unique_violation; the partial index entities_customer_uq fires.
-      const err = e as { code?: string; message?: string };
+      const err = dbError(e);
       duplicateRejected =
         err.code === '23505' ||
-        /entities_customer_uq|duplicate key/i.test(err.message ?? '');
+        /entities_customer_uq|duplicate key/i.test(err.message);
     }
     expect(duplicateRejected).toBe(true);
 
@@ -465,7 +495,7 @@ async function resolve(
       VALUES (${TENANT_ID}, ${TEST_CUSTOMER}, 'GROUP', 'dup-key', NULL, 30,
               ${SYSTEM_ACTOR}, ${SYSTEM_ACTOR})
     `);
-    expect(await liveCount(TEST_CUSTOMER, 'GROUP')).toBeGreaterThan(0);
+    expect(await liveCount(TEST_CUSTOMER)).toBeGreaterThan(0);
 
     await cleanupCustomer(TEST_CUSTOMER);
   });
