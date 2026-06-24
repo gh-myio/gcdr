@@ -1,4 +1,4 @@
--- Migration 0048: central_restore_jobs — tracks a restore of a central from one
+-- Migration 0050: central_restore_jobs — tracks a restore of a central from one
 -- of its OWN backups (field-swap: the replacement hardware adopts the same
 -- serial+UUID, so source backup and target central share the central id).
 --

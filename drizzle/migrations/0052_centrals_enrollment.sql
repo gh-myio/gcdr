@@ -1,4 +1,4 @@
--- Migration 0050: zero-touch central enrollment (Slice 1.5).
+-- Migration 0052: zero-touch central enrollment (Slice 1.5).
 --
 -- A central self-registers and receives its `agent_secret` with zero field-tech
 -- action via a one-time enroll token:
