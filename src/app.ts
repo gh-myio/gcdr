@@ -100,6 +100,14 @@ import { initializeSimulator, registerShutdownHandlers } from './services/Simula
 
 const app: Express = express();
 
+// CR-S7: trust the reverse proxy in front of us (Dokploy/Traefik = 1 hop) so
+// `req.ip` resolves to the real client from a VETTED X-Forwarded-For instead of
+// a spoofable raw header. TRUST_PROXY_HOPS configures how many proxies to trust;
+// 0 disables it (direct exposure). Without this, the rate limiters key on an
+// attacker-controllable XFF.
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? '1');
+app.set('trust proxy', Number.isFinite(trustProxyHops) ? trustProxyHops : 1);
+
 // Initialize audit logging (RFC-0009)
 initializeAuditLogging();
 

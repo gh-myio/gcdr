@@ -4,8 +4,12 @@ import { Request, Response, NextFunction } from 'express';
 // In-memory token-bucket-ish rate limiter for sensitive endpoints
 // (RFC-0032 Phase 2 — operator-pin).
 //
-// Single-instance only. If the deployment scales horizontally, replace the
-// internal Map with Redis. The interface stays the same.
+// Single-instance only (per-process Map). CR-S7 follow-up: with multiple
+// replicas the GLOBAL caps (central-enroll, operator-pin) become N×max — move
+// those to a shared store. There is no Redis in the stack today; a Postgres
+// fixed-window limiter via the existing `db` is the lightest correct option.
+// The per-central poll limiter can stay per-replica (it is anti-runaway, not a
+// hard global cap). The interface stays the same.
 //
 // Key strategies (compose at the call site):
 //   - byIp(req)            → "<ip>"
@@ -45,11 +49,10 @@ function getStore(name: string): Map<string, BucketEntry> {
 }
 
 export function clientIp(req: Request): string {
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string') {
-    return xff.split(',')[0]?.trim() || 'unknown';
-  }
-  return req.socket?.remoteAddress || 'unknown';
+  // CR-S7: use Express's vetted req.ip, which honours `app.set('trust proxy')`
+  // — a spoofed X-Forwarded-For from beyond the trusted hop count is ignored.
+  // Reading the raw XFF here (as before) let any client forge their bucket key.
+  return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
 /**

@@ -1,8 +1,9 @@
 import { centralEnrollRateLimiter, centralPollRateLimiter } from '../../../src/middleware/rateLimit';
 
 // Mocks for the express req/res/next triple used by the rate-limit middleware.
+// clientIp() now reads Express's vetted req.ip (CR-S7), so set it here.
 function mockReq(headers: Record<string, string>, ip = '10.0.0.1'): any {
-  return { headers, socket: { remoteAddress: ip }, context: { requestId: 'r' } };
+  return { ip, headers, socket: { remoteAddress: ip }, context: { requestId: 'r' } };
 }
 
 function mockRes(): any {
@@ -24,13 +25,13 @@ describe('centralEnrollRateLimiter', () => {
     for (let i = 0; i < 30; i++) {
       const res = mockRes();
       const next = jest.fn();
-      centralEnrollRateLimiter(mockReq({ 'x-forwarded-for': ip }), res, next);
+      centralEnrollRateLimiter(mockReq({}, ip), res, next);
       expect(next).toHaveBeenCalledTimes(1);
       expect(res.status).not.toHaveBeenCalled();
     }
     const res = mockRes();
     const next = jest.fn();
-    centralEnrollRateLimiter(mockReq({ 'x-forwarded-for': ip }), res, next);
+    centralEnrollRateLimiter(mockReq({}, ip), res, next);
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(429);
   });
@@ -38,10 +39,10 @@ describe('centralEnrollRateLimiter', () => {
   it('keeps separate budgets per IP', () => {
     const resA = mockRes();
     const nextA = jest.fn();
-    centralEnrollRateLimiter(mockReq({ 'x-forwarded-for': '203.0.113.10' }), resA, nextA);
+    centralEnrollRateLimiter(mockReq({}, '203.0.113.10'), resA, nextA);
     const resB = mockRes();
     const nextB = jest.fn();
-    centralEnrollRateLimiter(mockReq({ 'x-forwarded-for': '203.0.113.11' }), resB, nextB);
+    centralEnrollRateLimiter(mockReq({}, '203.0.113.11'), resB, nextB);
     expect(nextA).toHaveBeenCalled();
     expect(nextB).toHaveBeenCalled();
   });
