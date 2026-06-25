@@ -91,9 +91,10 @@ export class CentralEnrollmentService {
   async enroll(uuid: string, enrollToken: string): Promise<EnrollResult> {
     const central = await this.centrals.getByUuid(uuid);
     const storedHash = central?.enrollTokenHash ?? null;
+    const expiresAt = central?.enrollTokenExpiresAt ?? null;
     const expired =
-      central?.enrollTokenExpiresAt != null &&
-      new Date(central.enrollTokenExpiresAt).getTime() < Date.now();
+      expiresAt !== null &&
+      new Date(expiresAt).getTime() < Date.now();
 
     // Always run the constant-time compare (decoy when storedHash is null) so
     // the unknown-uuid path is timing-indistinguishable from a bad token.
