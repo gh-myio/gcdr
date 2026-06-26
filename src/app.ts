@@ -279,13 +279,34 @@ apiV1Router.use('/assets', hybridAuthByMethod('assets:read', 'assets:write'), as
 // (MYIO-operator only — a customer key gcdr_cust_* is read/resolve-only and a
 // write attempt gets 403). entity_type creation + is_system mutation need the
 // extra admin tier, computed inside the controller from req.context.
-apiV1Router.use('/entities', hybridAuthByMethod('entities:read', 'entities:write'), entitiesController);
+//
+// Rate-limited per IP. Same express-rate-limit pattern as the goals router
+// (recognized by CodeQL's js/missing-rate-limiting); shared bucket across
+// /entities and /entity-types. Generous ceiling so the admin UI and M2M
+// read/resolve consumers (Node-RED bundles) are not throttled in normal use,
+// while bounding runaway/abuse. validate:false — we key on a custom XFF-aware
+// string (single-instance), not req.ip.
+const entitiesRateLimiter = expressRateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => clientIp(req),
+  handler: (req, res) =>
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many entity-registry requests; please slow down' },
+      meta: { requestId: req.context?.requestId, timestamp: new Date().toISOString() },
+    }),
+});
+apiV1Router.use('/entities', entitiesRateLimiter, hybridAuthByMethod('entities:read', 'entities:write'), entitiesController);
 
 // RFC-0047: entity-type registry — top-level sibling of /entities (API §2).
 // GET /entity-types requires entities:read; POST requires entities:write + the
 // admin tier (enforced in the controller). Mounted separately so the canonical
 // path is /api/v1/entity-types, not /api/v1/entities/entity-types.
-apiV1Router.use('/entity-types', hybridAuthByMethod('entities:read', 'entities:write'), entityTypesController);
+apiV1Router.use('/entity-types', entitiesRateLimiter, hybridAuthByMethod('entities:read', 'entities:write'), entityTypesController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
