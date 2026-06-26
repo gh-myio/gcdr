@@ -285,27 +285,36 @@ export class ConsumptionGoalRepository {
       updatedBy: h.updatedBy ?? null,
     }));
 
-    const rows = await exec
-      .insert(consumptionGoalHours)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [
-          consumptionGoalHours.goalId,
-          consumptionGoalHours.month,
-          consumptionGoalHours.day,
-          consumptionGoalHours.hour,
-        ],
-        set: {
-          value: sqlExcluded('value'),
-          sourceLevel: sqlExcluded('source_level'),
-          derived: sqlExcluded('derived'),
-          updatedAt: now,
-          updatedBy: sqlExcluded('updated_by'),
-        },
-      })
-      .returning({ goalId: consumptionGoalHours.goalId });
+    // A full year of hour rows (8760) × 9 bound columns blows past postgres'
+    // 65534-parameter limit in a single INSERT, so chunk the upsert. With 9
+    // columns the hard cap is floor(65534/9)=7281 rows; 1000 keeps a wide margin.
+    const CHUNK_SIZE = 1000;
+    let affected = 0;
+    for (let i = 0; i < values.length; i += CHUNK_SIZE) {
+      const chunk = values.slice(i, i + CHUNK_SIZE);
+      const rows = await exec
+        .insert(consumptionGoalHours)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: [
+            consumptionGoalHours.goalId,
+            consumptionGoalHours.month,
+            consumptionGoalHours.day,
+            consumptionGoalHours.hour,
+          ],
+          set: {
+            value: sqlExcluded('value'),
+            sourceLevel: sqlExcluded('source_level'),
+            derived: sqlExcluded('derived'),
+            updatedAt: now,
+            updatedBy: sqlExcluded('updated_by'),
+          },
+        })
+        .returning({ goalId: consumptionGoalHours.goalId });
+      affected += rows.length;
+    }
 
-    return rows.length;
+    return affected;
   }
 
   /**
