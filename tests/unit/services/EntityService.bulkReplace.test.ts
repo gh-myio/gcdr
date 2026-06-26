@@ -65,7 +65,9 @@ describe('EntityService — bulkReplace', () => {
     await expectErrorWithCode(promise, 'VERSION_CONFLICT');
     expect(repo.bulkReplace).not.toHaveBeenCalled();
 
-    const err = await promise.catch((e) => e as AppError & { details?: Record<string, unknown> });
+    const err = (await promise.catch((e: unknown) => e)) as AppError & {
+      details?: Record<string, unknown>;
+    };
     expect(err.details?.currentVersion).toBe(currentVersion);
   });
 
