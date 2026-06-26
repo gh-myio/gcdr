@@ -55,6 +55,9 @@ import {
   themesController,
   themesListByCustomerHandler,
   themesGetDefaultByCustomerHandler,
+  // RFC-0047: Generic Entity Registry
+  entitiesController,
+  entityTypesController,
   // RFC-0013: User Access Profile Bundle
   maintenanceGroupsController,
   accessBundleController,
@@ -111,7 +114,11 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key', 'X-Admin-Password'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key', 'X-Admin-Password', 'If-Match', 'If-None-Match'],
+  // Custom response headers the browser must be allowed to read (optimistic
+  // concurrency / cache validation): the entities bulk-replace and alarm-bundle
+  // endpoints return the new version in X-Version-Id; ETag is the If-Match token.
+  exposedHeaders: ['X-Version-Id', 'X-Request-Id', 'ETag'],
 }));
 
 // Compression
@@ -266,6 +273,40 @@ apiV1Router.use('/devices', hybridAuthByMethod('devices:read', 'devices:write'),
 
 // Assets (hybridAuth for ThingsBoard integration)
 apiV1Router.use('/assets', hybridAuthByMethod('assets:read', 'assets:write'), assetsController);
+
+// RFC-0047: Generic Entity Registry (hybridAuth — JWT or customer API key).
+// GET requires entities:read (or *:read); writes require entities:write
+// (MYIO-operator only — a customer key gcdr_cust_* is read/resolve-only and a
+// write attempt gets 403). entity_type creation + is_system mutation need the
+// extra admin tier, computed inside the controller from req.context.
+//
+// Rate-limited per IP. Same express-rate-limit pattern as the goals router
+// (recognized by CodeQL's js/missing-rate-limiting); shared bucket across
+// /entities and /entity-types. Generous ceiling so the admin UI and M2M
+// read/resolve consumers (Node-RED bundles) are not throttled in normal use,
+// while bounding runaway/abuse. validate:false — we key on a custom XFF-aware
+// string (single-instance), not req.ip.
+const entitiesRateLimiter = expressRateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => clientIp(req),
+  handler: (req, res) =>
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many entity-registry requests; please slow down' },
+      meta: { requestId: req.context?.requestId, timestamp: new Date().toISOString() },
+    }),
+});
+apiV1Router.use('/entities', entitiesRateLimiter, hybridAuthByMethod('entities:read', 'entities:write'), entitiesController);
+
+// RFC-0047: entity-type registry — top-level sibling of /entities (API §2).
+// GET /entity-types requires entities:read; POST requires entities:write + the
+// admin tier (enforced in the controller). Mounted separately so the canonical
+// path is /api/v1/entity-types, not /api/v1/entities/entity-types.
+apiV1Router.use('/entity-types', entitiesRateLimiter, hybridAuthByMethod('entities:read', 'entities:write'), entityTypesController);
 
 // Asset Devices (nested route - must come after assets router for :assetId routes)
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);

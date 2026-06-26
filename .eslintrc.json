@@ -45,6 +45,8 @@
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "jest/expect-expect": ["warn", { "assertFunctionNames": ["expect", "expectErrorWithCode"] }],
         "sonarjs/no-duplicate-string": "off",
         "sonarjs/no-identical-functions": "off",
         "sonarjs/cognitive-complexity": "off"

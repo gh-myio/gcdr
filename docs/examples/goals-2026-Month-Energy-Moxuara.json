@@ -1,0 +1,95 @@
+{
+    "success": true,
+    "data": {
+        "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",
+        "domain": "ENERGY",
+        "unit": "kWh",
+        "aggregationMethod": "SUM",
+        "year": 2026,
+        "version": 2,
+        "tree": {
+            "annual": {
+                "value": 9813372.349,
+                "method": "SUM"
+            },
+            "monthly": {
+                "10": {
+                    "value": 803306.489,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "11": {
+                    "value": 853295.443,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "12": {
+                    "value": 888178.277,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "01": {
+                    "value": 901637.202,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "02": {
+                    "value": 789310.427,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "03": {
+                    "value": 760876.541,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "04": {
+                    "value": 845430.681,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "05": {
+                    "value": 808056.727,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "06": {
+                    "value": 814849.756,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "07": {
+                    "value": 765899.249,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "08": {
+                    "value": 788059.384,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                },
+                "09": {
+                    "value": 794472.173,
+                    "method": "SUM",
+                    "sourceLevel": "HOUR",
+                    "derived": false
+                }
+            }
+        }
+    },
+    "meta": {
+        "requestId": "0ec4fff5-47cf-4b55-a743-cb5d2954ff49",
+        "timestamp": "2026-06-25T20:30:44.413Z"
+    }
+}

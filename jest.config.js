@@ -42,6 +42,27 @@ module.exports = {
       lines:      22,
       statements: 20,
     },
+    // RFC-0047 Generic Entity Registry — gate the new module so its unit
+    // coverage doesn't backslide. Modest floors the layer agents' unit suites
+    // can realistically meet; raise as the suites grow.
+    'src/services/EntityService.ts': {
+      branches:   20,
+      functions:  15,
+      lines:      20,
+      statements: 20,
+    },
+    // EntityRepository is a thin Drizzle data-access layer; its real coverage
+    // comes from the env-gated integration suite (real PG round-trip), which
+    // THIS CI job does not run — pr-quality.yml sets DATABASE_URL but starts no
+    // postgres service, so that suite is skipped. Unit coverage is therefore
+    // only the SQL-shape test. Floor = current actual minus a margin; raise it
+    // once integration runs in CI (add a postgres `services:` block).
+    'src/repositories/EntityRepository.ts': {
+      branches:   0,
+      functions:  0,
+      lines:      3,
+      statements: 3,
+    },
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
