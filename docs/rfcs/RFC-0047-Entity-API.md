@@ -144,7 +144,9 @@ Content-Type: application/json
 { "roots": [ /* the full new forest for (customerId, type), each node with children */ ] }
 ```
 
-- **One transaction:** soft-delete every existing customer row for `(customerId, entity_type)`, insert the new set in topological order (remapping `parentEntityId`, `sortOrder` from each node's order). The `/resolve` view never sees a partial tree.
+- **`?type=` is the ROOT type, not a per-node type.** The forest may be **multi-type** — a `GROUP` root with `PROFILE` leaves. Each node MAY carry its own `entityType`; a node that omits it **inherits the query `type`** (single-type callers — e.g. RFC-0207's classification tree — can ignore the field entirely).
+- **One transaction:** soft-delete the **whole customer subtree(s) rooted at a root of `entity_type`** (every descendant, regardless of the descendant's own type — *not* only rows whose own type equals `entity_type`), then insert the new set in topological order with **each node's own `entityType`** (remapping `parentEntityId`, `sortOrder` from each node's order). The `/resolve` view never sees a partial tree.
+  > **Why subtree-scoped delete:** deleting by `entity_type = type` would orphan the differently-typed descendants of the replaced roots (e.g. the `PROFILE` leaves under a `GROUP` tree), which then resurface as bogus roots in `/resolve`. The delete must follow the hierarchy, not the type column.
 - **Optimistic concurrency at the *subtree* level** (not per-row): the server recomputes the current `X-Version-Id` for `(customerId, type)` inside the transaction; if it differs from `If-Match` → **`409 VERSION_CONFLICT`** (body carries `currentVersion`), rollback, **zero writes**. "Someone saved while you were editing" is deterministic, never last-write-wins. (The per-row `PATCH` `version` does not apply — the unit of concurrency here is the whole subtree.)
 - **MYIO-only** (`entities:write`); the new set is validated as a unit: per-type `metadata` Zod (above), key uniqueness, depth ≤ `ENTITY_MAX_DEPTH`, cycle-free, parent-type rules.
 - `200 → { success, data: { version: "<new>", source: "customer", replaced: <n> } }`.

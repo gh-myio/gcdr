@@ -327,7 +327,11 @@ export class EntityRepository implements IEntityRepository {
     const hasCustomer = await this.hasCustomerRows(tenantId, customerId);
     const source: 'customer' | 'system' = hasCustomer ? 'customer' : 'system';
 
-    const state = options?.state ?? 'active';
+    // `state` is an OPTIONAL filter: absent ⇒ no filtering (return active AND
+    // inactive). The management/governance views need inactive nodes visible to
+    // toggle them; a runtime consumer that wants only active passes state='active'
+    // explicitly. (Was defaulting to 'active', which silently hid inactivated nodes.)
+    const state = options?.state ?? 'all';
     const deep = this.normalizeDeep(options?.deep);
 
     const scopeCond = hasCustomer
@@ -431,17 +435,35 @@ export class EntityRepository implements IEntityRepository {
     actorId: string,
   ): Promise<{ replaced: number; roots: RegistryEntity[] }> {
     return db.transaction(async (tx) => {
-      // 1. Soft-delete every existing customer row for this (customer, type).
-      const deleted = await tx
-        .update(entities)
-        .set({ isDeleted: true, updatedAt: new Date(), updatedBy: actorId })
-        .where(and(
-          eq(entities.tenantId, tenantId),
-          eq(entities.customerId, customerId),
-          eq(entities.entityType, entityType),
-          eq(entities.isDeleted, false),
-        ))
-        .returning({ id: entities.id });
+      // 1. Soft-delete the WHOLE customer subtree(s) rooted at a root of this
+      //    `entityType` — NOT just the rows whose own type is `entityType`. The
+      //    forest is multi-type (a GROUP root has PROFILE leaves), so deleting by
+      //    `entity_type = entityType` would orphan the descendants of other types
+      //    and leave them surfacing as bogus roots in /resolve. The recursive CTE
+      //    walks from each matching root down through every descendant regardless
+      //    of the descendant's own type.
+      const deletedRows = await tx.execute<{ id: string }>(sql`
+        WITH RECURSIVE doomed AS (
+          SELECT ${entities.id} AS id
+          FROM ${entities}
+          WHERE ${entities.tenantId} = ${tenantId}
+            AND ${entities.customerId} = ${customerId}
+            AND ${entities.parentEntityId} IS NULL
+            AND ${entities.entityType} = ${entityType}
+            AND ${entities.isDeleted} = false
+          UNION ALL
+          SELECT e.id
+          FROM ${entities} e
+          JOIN doomed d ON e.parent_entity_id = d.id
+          WHERE e.tenant_id = ${tenantId} AND e.is_deleted = false
+        )
+        UPDATE ${entities}
+        SET is_deleted = true, updated_at = now(), updated_by = ${actorId}
+        WHERE ${entities.id} IN (SELECT id FROM doomed)
+        RETURNING ${entities.id} AS id
+      `);
+      const deleted = (deletedRows as unknown as { rows?: { id: string }[] }).rows
+        ?? (deletedRows as unknown as { id: string }[]);
 
       // 2. Insert the new forest in topological order, remapping parents by nesting.
       const inserted: EntityRow[] = [];
@@ -455,7 +477,9 @@ export class EntityRepository implements IEntityRepository {
           .values({
             tenantId,
             customerId,
-            entityType,
+            // Each node carries its OWN type; the query `entityType` is only the
+            // default for callers that send a single-type forest (RFC-0207).
+            entityType: node.entityType ?? entityType,
             entityKey: node.entityKey,
             entityValue: node.entityValue ?? null,
             parentEntityId: parentId,

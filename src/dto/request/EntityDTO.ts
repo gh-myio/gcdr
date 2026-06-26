@@ -168,7 +168,15 @@ export type RevertDTO = z.infer<typeof RevertSchema>;
 
 // A node in the new forest. `children` recurse; `parentEntityId` is implied by
 // nesting (the service remaps ids). `sortOrder` is taken from order/field.
+//
+// `entityType` is OPTIONAL and defaults to the `?type=` query param. It exists
+// because the forest may be **multi-type** — a GROUP tree carries PROFILE leaves
+// — and a per-call single type would mistype (and orphan) the descendants. The
+// `?type=` query identifies the ROOT type (the delete scope); each node carries
+// its OWN type so it is re-inserted faithfully. Single-type callers (RFC-0207's
+// classification tree) may omit it and inherit the query type unchanged.
 export interface BulkReplaceNodeInput {
+  entityType?: string;
   entityKey: string;
   entityValue?: string | null;
   sortOrder?: number;
@@ -179,6 +187,7 @@ export interface BulkReplaceNodeInput {
 
 const BulkReplaceNodeSchema: z.ZodType<BulkReplaceNodeInput> = z.lazy(() =>
   z.object({
+    entityType: entityTypeToken.optional(),
     entityKey: entityKey,
     entityValue: z.string().max(1000).nullable().optional(),
     sortOrder: z.number().int().optional(),

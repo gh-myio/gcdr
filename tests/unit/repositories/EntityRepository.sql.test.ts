@@ -109,25 +109,37 @@ describe('EntityRepository SQL shape', () => {
     expect(params).toEqual(expect.arrayContaining(ids));
   });
 
-  it('bulk-replace soft-delete targets (customer_id, entity_type) live rows', () => {
-    const builder = db
-      .update(entities)
-      .set({ isDeleted: true })
-      .where(
-        and(
-          eq(entities.tenantId, TENANT),
-          eq(entities.customerId, CUSTOMER),
-          eq(entities.entityType, 'CLASSIFICATION_ENERGY'),
-          eq(entities.isDeleted, false),
-        ),
-      );
-
-    const { sql: text, params } = queryOf(builder);
-    expect(text).toMatch(/update\s+"entities"\s+set\s+"is_deleted"\s*=\s*\$\d+/i);
-    expect(text).toMatch(/"customer_id"\s*=\s*\$\d+/);
-    expect(text).toMatch(/"entity_type"\s*=\s*\$\d+/);
-    expect(params).toContain(CUSTOMER);
-    expect(params).toContain('CLASSIFICATION_ENERGY');
+  it('bulk-replace soft-delete walks the WHOLE subtree rooted at a root of `type`', () => {
+    // The delete must follow the hierarchy (recursive CTE from roots of `type`
+    // down through every descendant regardless of the descendant's own type),
+    // NOT a flat `entity_type = type` match — else the differently-typed leaves
+    // (e.g. PROFILE under a GROUP tree) are orphaned and resurface as roots.
+    const frag = sql`
+      WITH RECURSIVE doomed AS (
+        SELECT ${entities.id} AS id
+        FROM ${entities}
+        WHERE ${entities.tenantId} = ${TENANT}
+          AND ${entities.customerId} = ${CUSTOMER}
+          AND ${entities.parentEntityId} IS NULL
+          AND ${entities.entityType} = ${'GROUP'}
+          AND ${entities.isDeleted} = false
+        UNION ALL
+        SELECT e.id
+        FROM ${entities} e
+        JOIN doomed d ON e.parent_entity_id = d.id
+        WHERE e.tenant_id = ${TENANT} AND e.is_deleted = false
+      )
+      UPDATE ${entities}
+      SET is_deleted = true
+      WHERE ${entities.id} IN (SELECT id FROM doomed)
+    `;
+    const q = dialect.sqlToQuery(frag);
+    expect(q.sql).toMatch(/with recursive\s+doomed/i);
+    expect(q.sql).toMatch(/"parent_entity_id"\s+is null/i);
+    expect(q.sql).toMatch(/join\s+doomed\s+d\s+on\s+e\.parent_entity_id\s*=\s*d\.id/i);
+    expect(q.sql).toMatch(/update\s+"entities"\s+set\s+is_deleted\s*=\s*true/i);
+    expect(q.params).toContain(CUSTOMER);
+    expect(q.params).toContain('GROUP');
   });
 
   it('bulk-replace insert carries customer_id, sort_order and is_system=false', () => {

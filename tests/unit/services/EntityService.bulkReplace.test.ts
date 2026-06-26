@@ -86,6 +86,50 @@ describe('EntityService — bulkReplace', () => {
     expect(repo.bulkReplace).not.toHaveBeenCalled();
   });
 
+  it('validates metadata against each node OWN type in a multi-type forest', async () => {
+    // A CLASSIFICATION_ENERGY root (free-form metadata here) with a child that
+    // declares entityType CLASSIFICATION_ENERGY and bad metadata: the per-node
+    // type must drive validation, so the strict child schema rejects it.
+    const multiBody: BulkReplaceDTO = {
+      roots: [
+        {
+          entityType: 'GROUP', // free-form -> root passes
+          entityKey: 'energy',
+          children: [
+            {
+              entityType: 'CLASSIFICATION_ENERGY', // strict schema -> child fails
+              entityKey: 'bad',
+              metadata: { unknownKey: 'x' },
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+    await expectErrorWithCode(
+      service.bulkReplace(tenantId, customerId, 'GROUP', multiBody, undefined, userId),
+      'VALIDATION_ERROR',
+    );
+    expect(repo.bulkReplace).not.toHaveBeenCalled();
+  });
+
+  it('passes each node OWN entityType through to the repository', async () => {
+    const roots = [makeEntity({ entityType: 'GROUP' })];
+    repo.bulkReplace.mockResolvedValue({ replaced: 0, roots });
+    const multiBody: BulkReplaceDTO = {
+      roots: [{ entityType: 'GROUP', entityKey: 'energy', children: [
+        { entityType: 'PROFILE', entityKey: 'CHILLER', children: [] },
+      ] }],
+    };
+
+    await service.bulkReplace(tenantId, customerId, 'GROUP', multiBody, undefined, userId);
+
+    // The service forwards the body verbatim; the repo stamps node.entityType ?? type.
+    const forwarded = repo.bulkReplace.mock.calls[0][3] as BulkReplaceDTO;
+    expect(forwarded.roots[0].entityType).toBe('GROUP');
+    expect(forwarded.roots[0].children?.[0].entityType).toBe('PROFILE');
+  });
+
   it('maps a SYSTEM_PROTECTED repo error to AppError SYSTEM_PROTECTED', async () => {
     repo.bulkReplace.mockRejectedValue(new Error('SYSTEM_PROTECTED: cannot modify system row'));
     await expectErrorWithCode(

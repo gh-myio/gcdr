@@ -450,10 +450,13 @@ export class EntityService {
     ifMatch: string | undefined,
     userId: string,
   ): Promise<{ version: string; source: 'customer'; replaced: number }> {
-    // Per-type metadata validation for every node in the incoming forest.
+    // Per-type metadata validation for every node in the incoming forest. The
+    // forest is multi-type (e.g. GROUP roots with PROFILE leaves), so validate
+    // each node against ITS OWN type, defaulting to the query `entityType` when
+    // a node omits it (single-type callers, RFC-0207).
     const validateNodes = (nodes: BulkReplaceDTO['roots']): void => {
       for (const node of nodes) {
-        this.validateMetadata(entityType, (node.metadata ?? {}) as Record<string, unknown>);
+        this.validateMetadata(node.entityType ?? entityType, (node.metadata ?? {}) as Record<string, unknown>);
         if (node.children?.length) validateNodes(node.children);
       }
     };
