@@ -33,7 +33,10 @@ BEGIN
 
     -- Telemetry-grouping types (Shape A: taxonomy lives in entity_key).
     INSERT INTO entity_types (tenant_id, entity_type, label, description, allowed_parent_types) VALUES
-      (v_tenant_id, 'GROUP',     'Group',     'Top-level telemetry grouping (root-only).', '{}'),
+      -- GROUP is a root OR nestable under another GROUP (domain > subdomain).
+      -- The '' marker means "may be a root"; 'GROUP' means "may hang under a
+      -- GROUP". Without '' it would NOT be offered as a root in the editor.
+      (v_tenant_id, 'GROUP',     'Group',     'Telemetry grouping — a root, or nested under another GROUP.', '{GROUP,""}'),
       (v_tenant_id, 'PROFILE',   'Profile',   'A profile under a group (e.g. CHILLER, FANCOIL).', '{GROUP}'),
       (v_tenant_id, 'EQUIPMENT', 'Equipment', 'An equipment node under a profile.', '{PROFILE}')
     ON CONFLICT DO NOTHING;
