@@ -1,4 +1,8 @@
-import { centralEnrollRateLimiter, centralPollRateLimiter } from '../../../src/middleware/rateLimit';
+import {
+  centralEnrollRateLimiter,
+  centralPollRateLimiter,
+  centralPollIpRateLimiter,
+} from '../../../src/middleware/rateLimit';
 
 // Mocks for the express req/res/next triple used by the rate-limit middleware.
 // clientIp() now reads Express's vetted req.ip (CR-S7), so set it here.
@@ -78,5 +82,35 @@ describe('centralPollRateLimiter', () => {
     const next = jest.fn();
     centralPollRateLimiter(mockReq({}, '198.51.100.7'), res, next);
     expect(next).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('centralPollIpRateLimiter (outer pre-auth bound)', () => {
+  it('caps total poll load per IP even when the uuid header is rotated', () => {
+    const ip = '203.0.113.99';
+    // Attacker rotates a fresh uuid every request to dodge the per-central
+    // bucket; the outer IP bound must still cap them at 600/min.
+    for (let i = 0; i < 600; i++) {
+      const res = mockRes();
+      const next = jest.fn();
+      centralPollIpRateLimiter(mockReq({ uuid: `spoof-${i}` }, ip), res, next);
+      expect(next).toHaveBeenCalledTimes(1);
+    }
+    const res = mockRes();
+    const next = jest.fn();
+    centralPollIpRateLimiter(mockReq({ uuid: 'spoof-601' }, ip), res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(429);
+  });
+
+  it('keeps separate budgets per source IP', () => {
+    const resA = mockRes();
+    const nextA = jest.fn();
+    centralPollIpRateLimiter(mockReq({ uuid: 'x' }, '198.51.100.20'), resA, nextA);
+    const resB = mockRes();
+    const nextB = jest.fn();
+    centralPollIpRateLimiter(mockReq({ uuid: 'x' }, '198.51.100.21'), resB, nextB);
+    expect(nextA).toHaveBeenCalled();
+    expect(nextB).toHaveBeenCalled();
   });
 });

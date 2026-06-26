@@ -139,3 +139,20 @@ export const centralPollRateLimiter = rateLimit('central-poll', {
   },
   message: 'Too many central-agent requests; slow down the poll loop',
 });
+
+/**
+ * Outer per-IP bound for the central poll route, composed BEFORE the per-central
+ * limiter. The per-central limiter keys on the unauthenticated `uuid` header
+ * (it runs before centralAuthMiddleware), so an attacker rotating arbitrary uuids
+ * would otherwise get a fresh 60/min bucket per value and drive an unbounded
+ * number of getByUuid lookups in the auth gate (a DoS amplification). This caps
+ * total PRE-AUTH poll load per source IP regardless of header spoofing, while
+ * staying generous for a real fleet of centrals behind one NAT (each polls ~2/min,
+ * so 600/min ≈ 300 centrals with retry headroom).
+ */
+export const centralPollIpRateLimiter = rateLimit('central-poll-ip', {
+  windowMs: 60 * 1000,
+  max: 600,
+  keyFn: (req) => clientIp(req),
+  message: 'Too many central-agent requests from this source; slow down',
+});

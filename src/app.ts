@@ -93,7 +93,7 @@ import { simulatorAdminController } from './controllers/admin/simulator-admin.co
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
-import { centralEnrollRateLimiter, centralPollRateLimiter } from './middleware/rateLimit';
+import { centralEnrollRateLimiter, centralPollRateLimiter, centralPollIpRateLimiter } from './middleware/rateLimit';
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
@@ -277,8 +277,10 @@ apiV1Router.post('/central-agent/enroll', centralEnrollRateLimiter, centralAgent
 // central authenticates itself with its agent_secret-signed JWT
 // (centralAuthMiddleware sets req.centralContext + tenant from the central row).
 // Rate-limited per-central (by uuid header) so one runaway device can't hammer
-// the control plane, without starving other centrals behind the same NAT.
-apiV1Router.use('/central-agent', centralPollRateLimiter, centralAuthMiddleware, centralAgentController);
+// the control plane, without starving other centrals behind the same NAT; an
+// outer per-IP bound (centralPollIpRateLimiter) runs FIRST to cap total PRE-AUTH
+// load, since the uuid header is unauthenticated/spoofable before centralAuth.
+apiV1Router.use('/central-agent', centralPollIpRateLimiter, centralPollRateLimiter, centralAuthMiddleware, centralAgentController);
 
 // Themes (Look and Feel)
 apiV1Router.use('/themes', authMiddleware, themesController);
