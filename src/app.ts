@@ -114,7 +114,11 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key', 'X-Admin-Password'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Request-Id', 'X-API-Key', 'X-Admin-Password', 'If-Match', 'If-None-Match'],
+  // Custom response headers the browser must be allowed to read (optimistic
+  // concurrency / cache validation): the entities bulk-replace and alarm-bundle
+  // endpoints return the new version in X-Version-Id; ETag is the If-Match token.
+  exposedHeaders: ['X-Version-Id', 'X-Request-Id', 'ETag'],
 }));
 
 // Compression
