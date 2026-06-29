@@ -1,4 +1,5 @@
 import express, { Express, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -175,6 +176,26 @@ app.use('/health', healthController);
 // =============================================================================
 
 const apiV1Router = Router();
+
+// Defense-in-depth baseline: a generous global rate limit on every /api/v1 route.
+// The per-route limiters in middleware/rateLimit.ts add stricter caps where it
+// matters (operator-pin, central-agent enroll/poll). Implemented with
+// express-rate-limit — which CodeQL's js/missing-rate-limiting query models — so
+// authenticated routes guarded only by our custom limiter aren't false-flagged.
+// Single-instance in-memory store; see the CR-S7 note in middleware/rateLimit.ts
+// for the multi-replica follow-up (shared store).
+apiV1Router.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests; please slow down' },
+    },
+  }),
+);
 
 // Frequently-reused permission scopes (sonarjs/no-duplicate-string).
 const PERM_BUNDLES_READ = 'bundles:read';
