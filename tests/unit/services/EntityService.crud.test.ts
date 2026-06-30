@@ -289,6 +289,29 @@ describe('EntityService — CRUD + entity_types', () => {
       );
     });
 
+    it('rejects INVALID_PARENT_TYPE when un-parenting a type that requires a parent', async () => {
+      // The orphaning bug: an edit that sent parentEntityId=null turned a PROFILE
+      // (allowedParentTypes ['GROUP']) into a root with no valid parent.
+      repo.getById.mockResolvedValue(makeEntity({ entityType: 'PROFILE', parentEntityId: 'g-1' }));
+      repo.getEntityType.mockResolvedValue(makeType({ entityType: 'PROFILE', allowedParentTypes: ['GROUP'] }));
+
+      await expectErrorWithCode(
+        service.update(tenantId, 'ent-1', { parentEntityId: null }, userId, { isAdmin: true }),
+        'INVALID_PARENT_TYPE',
+      );
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('allows un-parenting a root-eligible type (GROUP carries the "" root marker)', async () => {
+      repo.getById.mockResolvedValue(makeEntity({ entityType: 'GROUP', parentEntityId: 'g-0' }));
+      repo.getEntityType.mockResolvedValue(makeType({ entityType: 'GROUP', allowedParentTypes: ['GROUP', ''] }));
+      repo.update.mockResolvedValue(makeEntity({ entityType: 'GROUP', parentEntityId: null, version: 2 }));
+
+      const got = await service.update(tenantId, 'ent-1', { parentEntityId: null }, userId, { isAdmin: true });
+      expect(got.version).toBe(2);
+      expect(repo.update).toHaveBeenCalled();
+    });
+
     it('updates and validates merged metadata for free-form types', async () => {
       repo.getById.mockResolvedValue(makeEntity({ metadata: { a: 1 } }));
       repo.update.mockResolvedValue(makeEntity({ metadata: { a: 1, b: 2 }, version: 2 }));
