@@ -311,39 +311,12 @@ export class EntityService {
       this.validateMetadata(current.entityType, effective);
     }
 
-    // Re-parent guards: cycle + allowed parent type. Runs on ANY parent change,
-    // including un-parenting (-> null): a type that requires a parent (e.g.
-    // PROFILE) must not be silently turned into a root. Without this an edit that
-    // sent parentEntityId=null orphaned the node (it then had no valid parent and
-    // disappeared from the tree).
+    // Re-parent guard (cycle + allowed-parent-type, incl. un-parenting -> null).
     if (
       dto.parentEntityId !== undefined &&
       dto.parentEntityId !== current.parentEntityId
     ) {
-      if (dto.parentEntityId) {
-        // Moving under a new parent: no cycle + the parent's type must be allowed.
-        const cycles = await this.repository.wouldCreateCycle(tenantId, id, dto.parentEntityId);
-        if (cycles) {
-          throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
-        }
-        const parent = await this.repository.getById(tenantId, dto.parentEntityId);
-        if (!parent) {
-          throw new NotFoundError(`Parent entity ${dto.parentEntityId} not found`);
-        }
-        const type = await this.repository.getEntityType(tenantId, current.entityType);
-        if (type) this.assertAllowedParentType(type, parent.entityType);
-      } else {
-        // Un-parenting (-> root): only allowed if the type may be a root, i.e.
-        // its allowedParentTypes is empty OR carries the '' root marker.
-        const type = await this.repository.getEntityType(tenantId, current.entityType);
-        if (type && type.allowedParentTypes.length > 0 && !type.allowedParentTypes.includes('')) {
-          throw new AppError(
-            'INVALID_PARENT_TYPE',
-            `Type ${current.entityType} requires a parent of: ${type.allowedParentTypes.join(', ')}`,
-            400,
-          );
-        }
-      }
+      await this.assertReparentAllowed(tenantId, current, dto.parentEntityId ?? null);
     }
 
     try {
@@ -513,6 +486,41 @@ export class EntityService {
   // ---------------------------------------------------------------------------
   // internal helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Validate a parent change for an existing entity: moving under a new parent
+   * checks cycle + allowed-parent-type; un-parenting (`null`) is only allowed for
+   * a root-eligible type (empty `allowedParentTypes` or the `''` root marker).
+   * Extracted from `update` to keep that method's complexity in check.
+   */
+  private async assertReparentAllowed(
+    tenantId: string,
+    current: RegistryEntity,
+    newParentId: string | null,
+  ): Promise<void> {
+    if (newParentId) {
+      const cycles = await this.repository.wouldCreateCycle(tenantId, current.id, newParentId);
+      if (cycles) {
+        throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
+      }
+      const parent = await this.repository.getById(tenantId, newParentId);
+      if (!parent) {
+        throw new NotFoundError(`Parent entity ${newParentId} not found`);
+      }
+      const type = await this.repository.getEntityType(tenantId, current.entityType);
+      if (type) this.assertAllowedParentType(type, parent.entityType);
+      return;
+    }
+    // Un-parenting (-> root): only allowed if the type may be a root.
+    const type = await this.repository.getEntityType(tenantId, current.entityType);
+    if (type && type.allowedParentTypes.length > 0 && !type.allowedParentTypes.includes('')) {
+      throw new AppError(
+        'INVALID_PARENT_TYPE',
+        `Type ${current.entityType} requires a parent of: ${type.allowedParentTypes.join(', ')}`,
+        400,
+      );
+    }
+  }
 
   /** Throw 400 INVALID_PARENT_TYPE if `parentType` is not allowed for `type`. */
   private assertAllowedParentType(type: EntityType, parentType: string): void {
