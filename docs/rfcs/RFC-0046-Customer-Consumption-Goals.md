@@ -1,8 +1,8 @@
 # RFC-0046 — Customer Consumption Goals
 
-- **Status:** **Implemented** (backend + frontend) on branch `feat/rfc-0046-consumption-goals` — not yet merged/in prod. Design closed (DEC-1…DEC-7, 2026-06-18).
+- **Status:** **Implemented & shipped** (backend + frontend) — merged to `desenv` and **in production** (migrations `0047`/`0048` applied/baselined in prod 2026-06-26). Design closed (DEC-1…DEC-7, 2026-06-18).
 - **Created:** 2026-06-18
-- **Updated:** 2026-06-19
+- **Updated:** 2026-06-30
 - **Migrations:** `0047_consumption_goals.sql` (four tables + domain seed) · `0048_consumption_goals_history_ops.sql` (operation-level audit columns). Applied to local Docker; **pending prod**.
 - **Author:** MYIO Engineering
 - **Domain:** Customers / Consumption Goals (Energy · Water · Temperature)

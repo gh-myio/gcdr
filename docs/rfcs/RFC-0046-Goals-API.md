@@ -3,12 +3,13 @@
 **Contract document** shared by the GCDR backend and frontend teams.
 This is the authoritative wire contract derived from [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md), **kept in sync with the implementation** (`src/controllers/consumption-goals.controller.ts`, `src/dto/request/GoalsDTO.ts`, `src/services/consumptionGoalService.ts`). If this document and the code disagree, the code wins; open a PR to reconcile.
 
-- **Status:** **Implemented** (branch `feat/rfc-0046-consumption-goals`, not yet merged/in prod).
+- **Status:** **Implemented & shipped** — merged to `desenv`; **in production** (migrations `0047_consumption_goals` + `0048_consumption_goals_history_ops` applied/baselined in prod on 2026-06-26).
 - **Base path:** `/api/v1`
 - **Auth:** hybrid (`hybridAuthByMethod`) — JWT Bearer *or* customer API key (`X-API-Key: gcdr_cust_*`).
 - **Scopes:** reads need `goals:read` (or `*:read`); writes need `goals:write`.
 - **Audit:** every change appends a per-goal `consumption_goal_history` row (one per operation — see §1.7). A global `CUSTOMER_GOALS_UPDATED` event is designed but **not yet emitted**.
-- **Last updated:** 2026-06-19
+- **Storage note:** a fully-specified year is **8 760 hour rows**; the hourly upsert is **chunked** (1 000 rows/batch) so a whole-year write stays under postgres' 65 534 bind-parameter limit (`consumptionGoalRepository`).
+- **Last updated:** 2026-06-30
 
 ---
 
@@ -548,4 +549,4 @@ curl ".../goals?domain=ENERGY&year=2026&granularity=month&fetchHistory=true" -H 
 
 ---
 
-**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) + the implementation. · **Last updated:** 2026-06-19
+**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) + the implementation. · **Last updated:** 2026-06-30
