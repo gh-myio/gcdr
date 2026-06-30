@@ -311,22 +311,39 @@ export class EntityService {
       this.validateMetadata(current.entityType, effective);
     }
 
-    // Re-parent guards: cycle + allowed parent type.
+    // Re-parent guards: cycle + allowed parent type. Runs on ANY parent change,
+    // including un-parenting (-> null): a type that requires a parent (e.g.
+    // PROFILE) must not be silently turned into a root. Without this an edit that
+    // sent parentEntityId=null orphaned the node (it then had no valid parent and
+    // disappeared from the tree).
     if (
       dto.parentEntityId !== undefined &&
-      dto.parentEntityId !== current.parentEntityId &&
-      dto.parentEntityId
+      dto.parentEntityId !== current.parentEntityId
     ) {
-      const cycles = await this.repository.wouldCreateCycle(tenantId, id, dto.parentEntityId);
-      if (cycles) {
-        throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
+      if (dto.parentEntityId) {
+        // Moving under a new parent: no cycle + the parent's type must be allowed.
+        const cycles = await this.repository.wouldCreateCycle(tenantId, id, dto.parentEntityId);
+        if (cycles) {
+          throw new AppError('ENTITY_CYCLE', 'Re-parenting would create a cycle', 400);
+        }
+        const parent = await this.repository.getById(tenantId, dto.parentEntityId);
+        if (!parent) {
+          throw new NotFoundError(`Parent entity ${dto.parentEntityId} not found`);
+        }
+        const type = await this.repository.getEntityType(tenantId, current.entityType);
+        if (type) this.assertAllowedParentType(type, parent.entityType);
+      } else {
+        // Un-parenting (-> root): only allowed if the type may be a root, i.e.
+        // its allowedParentTypes is empty OR carries the '' root marker.
+        const type = await this.repository.getEntityType(tenantId, current.entityType);
+        if (type && type.allowedParentTypes.length > 0 && !type.allowedParentTypes.includes('')) {
+          throw new AppError(
+            'INVALID_PARENT_TYPE',
+            `Type ${current.entityType} requires a parent of: ${type.allowedParentTypes.join(', ')}`,
+            400,
+          );
+        }
       }
-      const parent = await this.repository.getById(tenantId, dto.parentEntityId);
-      if (!parent) {
-        throw new NotFoundError(`Parent entity ${dto.parentEntityId} not found`);
-      }
-      const type = await this.repository.getEntityType(tenantId, current.entityType);
-      if (type) this.assertAllowedParentType(type, parent.entityType);
     }
 
     try {
