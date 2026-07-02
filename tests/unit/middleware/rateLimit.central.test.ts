@@ -2,6 +2,7 @@ import {
   centralEnrollRateLimiter,
   centralPollRateLimiter,
   centralPollIpRateLimiter,
+  sweepExpiredBuckets,
 } from '../../../src/middleware/rateLimit';
 
 // Mocks for the express req/res/next triple used by the rate-limit middleware.
@@ -112,5 +113,24 @@ describe('centralPollIpRateLimiter (outer pre-auth bound)', () => {
     centralPollIpRateLimiter(mockReq({ uuid: 'x' }, '198.51.100.21'), resB, nextB);
     expect(nextA).toHaveBeenCalled();
     expect(nextB).toHaveBeenCalled();
+  });
+});
+
+describe('sweepExpiredBuckets (round-3 #6 eviction)', () => {
+  it('evicts entries whose window has elapsed so rotated keys do not leak', () => {
+    // Seed distinct uuid buckets, then sweep with a far-future clock so every
+    // window is expired: the janitor must reclaim them (no unbounded growth).
+    const ip = '198.51.100.200';
+    for (let i = 0; i < 25; i++) {
+      centralPollIpRateLimiter(mockReq({ uuid: `rot-${i}` }, ip), mockRes(), jest.fn());
+    }
+    const farFuture = Date.now() + 60 * 60 * 1000;
+    const removed = sweepExpiredBuckets(farFuture);
+    expect(removed).toBeGreaterThan(0);
+    // a fresh window is available again after eviction (count resets)
+    const res = mockRes();
+    const next = jest.fn();
+    centralPollIpRateLimiter(mockReq({ uuid: 'rot-0' }, ip), res, next);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

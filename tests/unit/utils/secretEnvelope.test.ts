@@ -1,6 +1,11 @@
 process.env.SECRET_ENCRYPTION_KEY = process.env.SECRET_ENCRYPTION_KEY ?? 'a'.repeat(64);
 
-import { encryptSecret, decryptSecret, isEnvelope } from '../../../src/shared/utils/secretEnvelope';
+import {
+  encryptSecret,
+  decryptSecret,
+  isEnvelope,
+  validateSecretEncryptionKey,
+} from '../../../src/shared/utils/secretEnvelope';
 
 describe('secretEnvelope (CR-S3)', () => {
   it('round-trips encrypt -> decrypt', () => {
@@ -32,5 +37,22 @@ describe('secretEnvelope (CR-S3)', () => {
     const ct = parts[3];
     const flipped = (ct[0] === 'A' ? 'B' : 'A') + ct.slice(1);
     expect(() => decryptSecret(`${parts[0]}:${parts[1]}:${parts[2]}:${flipped}`)).toThrow();
+  });
+
+  describe('validateSecretEncryptionKey (round-3 #8 boot check)', () => {
+    const original = process.env.SECRET_ENCRYPTION_KEY;
+    afterEach(() => {
+      process.env.SECRET_ENCRYPTION_KEY = original;
+    });
+
+    it('passes for a valid 64-hex key', () => {
+      process.env.SECRET_ENCRYPTION_KEY = 'a'.repeat(64);
+      expect(() => validateSecretEncryptionKey()).not.toThrow();
+    });
+
+    it('throws when the key is unset', () => {
+      delete process.env.SECRET_ENCRYPTION_KEY;
+      expect(() => validateSecretEncryptionKey()).toThrow(/SECRET_ENCRYPTION_KEY/);
+    });
   });
 });

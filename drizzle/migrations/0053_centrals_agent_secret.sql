@@ -1,4 +1,4 @@
--- Migration 0051: centrals.agent_secret — shared HMAC secret the central signs
+-- Migration 0053: centrals.agent_secret — shared HMAC secret the central signs
 -- its poll-loop JWT (HS256) with, so /api/v1/central-agent can authenticate the
 -- device (centralAuthMiddleware verifies the token against this column).
 --

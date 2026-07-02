@@ -1,4 +1,4 @@
--- Migration 0049: central_backups — registry of PostgreSQL/TimescaleDB dumps
+-- Migration 0051: central_backups — registry of PostgreSQL/TimescaleDB dumps
 -- taken FROM each central. The CENTRAL runs pg_dump (custom format) on its own
 -- embedded Postgres; gcdr only BROKERS a presigned S3 URL and tracks metadata.
 -- The dump bytes never touch gcdr (central PUTs to presigned URL, later GETs

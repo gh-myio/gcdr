@@ -23,6 +23,20 @@ const ALGO = 'aes-256-gcm';
 const IV_BYTES = 12; // GCM standard 96-bit nonce
 const KEY_BYTES = 32; // AES-256
 
+// Memoize the derived key. `decryptSecret` runs on the central-agent auth hot
+// path (every poll), and a passphrase-format key re-derives via scryptSync — a
+// deliberately slow KDF that would block the event loop on every request. The
+// key is fixed for the process lifetime, so derive once per distinct raw value.
+let cachedKey: Buffer | null = null;
+let cachedFromRaw: string | null = null;
+
+function deriveKey(raw: string): Buffer {
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, 'hex');
+  const asB64 = Buffer.from(raw, 'base64');
+  if (asB64.length === KEY_BYTES) return asB64;
+  return crypto.scryptSync(raw, 'gcdr-secret-envelope', KEY_BYTES);
+}
+
 function getKey(): Buffer {
   const raw = process.env.SECRET_ENCRYPTION_KEY;
   if (!raw) {
@@ -30,10 +44,26 @@ function getKey(): Buffer {
       'SECRET_ENCRYPTION_KEY is not set — cannot encrypt/decrypt secrets at rest (CR-S3)',
     );
   }
-  if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, 'hex');
-  const asB64 = Buffer.from(raw, 'base64');
-  if (asB64.length === KEY_BYTES) return asB64;
-  return crypto.scryptSync(raw, 'gcdr-secret-envelope', KEY_BYTES);
+  if (cachedKey && cachedFromRaw === raw) return cachedKey;
+  cachedKey = deriveKey(raw);
+  cachedFromRaw = raw;
+  return cachedKey;
+}
+
+/**
+ * Boot-time validation (CR/round-3 #8): fail fast at startup rather than as a
+ * request-time 500 if SECRET_ENCRYPTION_KEY is missing or does not resolve to a
+ * 32-byte key. Call this from the server bootstrap. Returns nothing; throws on
+ * misconfiguration so the process refuses to start.
+ */
+export function validateSecretEncryptionKey(): void {
+  const key = getKey(); // throws if unset
+  if (key.length !== KEY_BYTES) {
+    throw new Error(
+      `SECRET_ENCRYPTION_KEY must resolve to ${KEY_BYTES} bytes (got ${key.length}); ` +
+        'provide 64 hex chars, 32-byte base64, or a passphrase',
+    );
+  }
 }
 
 function b64u(buf: Buffer): string {

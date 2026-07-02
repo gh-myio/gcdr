@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, sql } from 'drizzle-orm';
+import { eq, and, desc, lt, inArray, sql } from 'drizzle-orm';
 import { db, schema, CentralRestoreJob } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
@@ -95,6 +95,34 @@ export class CentralRestoreJobRepository {
   }
 
   /**
+   * Paginated list (newest first) + total count, so the API returns the
+   * project's PaginatedResult instead of a bare array with a hidden cap
+   * (round-3 #12).
+   */
+  async listByCentralPaged(
+    tenantId: string,
+    centralId: string,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: CentralRestoreJob[]; total: number }> {
+    const where = and(
+      eq(centralRestoreJobs.tenantId, tenantId),
+      eq(centralRestoreJobs.centralId, centralId),
+    );
+    const items = await db
+      .select()
+      .from(centralRestoreJobs)
+      .where(where)
+      .orderBy(desc(centralRestoreJobs.createdAt))
+      .limit(opts.limit)
+      .offset(opts.offset);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(centralRestoreJobs)
+      .where(where);
+    return { items, total: Number(count) };
+  }
+
+  /**
    * Atomically claim the oldest QUEUED job for `centralId` and transition it
    * QUEUED -> RUNNING in a single statement. Used by the
    * central-agent poll loop (GET /central-agent/jobs/next). `FOR UPDATE SKIP
@@ -136,17 +164,75 @@ export class CentralRestoreJobRepository {
     return row ?? null;
   }
 
+  /**
+   * Release a job we just claimed back to QUEUED — compensation for a
+   * `nextJob`/poll that atomically claimed the job (QUEUED -> RUNNING) but then
+   * failed to hand the central a usable job (missing backup / presign error).
+   * CAS on `status = 'RUNNING'` so we only revert our own fresh claim and never
+   * clobber a terminal status set concurrently (e.g. by the stall reaper).
+   */
+  async releaseClaim(tenantId: string, id: string): Promise<void> {
+    const ts = new Date(now());
+    await db
+      .update(centralRestoreJobs)
+      .set({ status: 'QUEUED', currentPhase: 'QUEUED', updatedAt: ts })
+      .where(
+        and(
+          eq(centralRestoreJobs.tenantId, tenantId),
+          eq(centralRestoreJobs.id, id),
+          eq(centralRestoreJobs.status, 'RUNNING'),
+        ),
+      );
+  }
+
+  /**
+   * The current non-terminal restore job for a central (QUEUED or RUNNING), if
+   * any. Used to reject starting a second concurrent restore of the same central
+   * — a partial-unique index enforces this at the DB level, this is the friendly
+   * pre-check that turns the race into a clean 409.
+   */
+  async findActiveByCentral(
+    tenantId: string,
+    centralId: string,
+  ): Promise<CentralRestoreJob | null> {
+    const [row] = await db
+      .select()
+      .from(centralRestoreJobs)
+      .where(
+        and(
+          eq(centralRestoreJobs.tenantId, tenantId),
+          eq(centralRestoreJobs.centralId, centralId),
+          inArray(centralRestoreJobs.status, ['QUEUED', 'RUNNING']),
+        ),
+      )
+      .orderBy(desc(centralRestoreJobs.createdAt))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  /**
+   * Patch a job. When `expectedStatus` is given the write is a compare-and-swap
+   * (`... AND status = expectedStatus`), so a concurrent terminal transition
+   * (e.g. the reaper marking the job FAILED between a caller's read and this
+   * write) makes the update a no-op and returns null instead of resurrecting the
+   * job with a stale-validated patch.
+   */
   async update(
     tenantId: string,
     id: string,
     patch: UpdateRestoreJobPatch,
+    expectedStatus?: RestoreJobStatus,
   ): Promise<CentralRestoreJob | null> {
     const ts = new Date(now());
+
+    const predicates = [eq(centralRestoreJobs.tenantId, tenantId), eq(centralRestoreJobs.id, id)];
+    if (expectedStatus) predicates.push(eq(centralRestoreJobs.status, expectedStatus));
 
     const [row] = await db
       .update(centralRestoreJobs)
       .set({ ...patch, updatedAt: ts })
-      .where(and(eq(centralRestoreJobs.tenantId, tenantId), eq(centralRestoreJobs.id, id)))
+      .where(and(...predicates))
       .returning();
 
     return row ?? null;

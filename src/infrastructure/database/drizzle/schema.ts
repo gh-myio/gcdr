@@ -704,14 +704,14 @@ export const centrals = pgTable('centrals', {
 
   // Central-agent auth (field-swap backup/restore): shared HMAC secret the
   // central signs its poll-loop JWT (HS256) with. Provisioned in a later slice;
-  // nullable so existing centrals keep working. See migration 0051.
+  // nullable so existing centrals keep working. See migration 0053.
   agentSecret: text('agent_secret'),
 
   // Zero-touch enrollment (Slice 1.5). An operator issues a one-time enroll
   // token; only its sha256 hash + expiry are stored. The central exchanges the
   // plaintext token for its agent_secret via POST /central-agent/enroll, which
   // clears the hash (single-use) and stamps enrolled_at. Re-issuing a fresh
-  // token re-enables enrollment (field-swap). All nullable. See migration 0052.
+  // token re-enables enrollment (field-swap). All nullable. See migration 0054.
   enrollTokenHash: text('enroll_token_hash'),
   enrollTokenExpiresAt: timestamp('enroll_token_expires_at', { withTimezone: true }),
   enrolledAt: timestamp('enrolled_at', { withTimezone: true }),
@@ -730,7 +730,7 @@ export const centrals = pgTable('centrals', {
 
 // Central backups (field-swap backup/restore). The CENTRAL runs pg_dump on its
 // own embedded Postgres; gcdr only brokers the presigned S3 URL + tracks this
-// metadata. See migration 0049_central_backups.sql.
+// metadata. See migration 0051_central_backups.sql.
 export const centralBackupStatusEnum = pgEnum('central_backup_status', ['PENDING', 'AVAILABLE', 'EXPIRED', 'FAILED']);
 
 export const centralBackups = pgTable('central_backups', {
@@ -762,7 +762,7 @@ export const centralBackups = pgTable('central_backups', {
 
 // Central restore jobs (field-swap restore). The CENTRAL runs pg_restore on its
 // own Postgres; gcdr tracks this job state machine, driven by the central's
-// progress reports. See migration 0050_central_restore_jobs.sql.
+// progress reports. See migration 0052_central_restore_jobs.sql.
 export const centralRestoreJobStatusEnum = pgEnum('central_restore_job_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED', 'CANCELED']);
 export const centralRestoreJobPhaseEnum = pgEnum('central_restore_job_phase', ['QUEUED', 'DOWNLOAD', 'VERIFY', 'STOP_SERVICES', 'RESTORE_DB', 'START_SERVICES', 'DONE']);
 

@@ -194,4 +194,19 @@ describe('centralAuthMiddleware', () => {
     expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     expect(getByUuid).not.toHaveBeenCalled();
   });
+
+  it('rejects a malformed uuid header as 401 without hitting the DB (round-3 #4)', async () => {
+    const getByUuid = jest.fn(async () => makeCentralRow());
+    const mw = makeCentralAuthMiddleware({ getByUuid } as never);
+
+    const token = signHs256({ exp: nowSeconds() + 3600 }, SECRET);
+    // not a UUID → would otherwise reach the typed `uuid` column and 500/leak
+    const req = makeReq({ authorization: token, uuid: "not-a-uuid'; DROP TABLE" });
+    const next = jest.fn();
+
+    await mw(req, {} as never, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+    expect(getByUuid).not.toHaveBeenCalled();
+  });
 });

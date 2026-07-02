@@ -32,7 +32,7 @@ export interface NextCommandResult {
 }
 
 // Structural deps for unit testing (mirrors CentralRestoreService DI).
-type RestoreRepoDep = Pick<typeof centralRestoreJobRepository, 'claimNextQueued'>;
+type RestoreRepoDep = Pick<typeof centralRestoreJobRepository, 'claimNextQueued' | 'releaseClaim'>;
 type BackupRepoDep = Pick<typeof centralBackupRepository, 'getById'>;
 type StorageDep = Pick<typeof s3Storage, 'getPresignedDownloadUrl'>;
 type RestoreServiceDep = Pick<CentralRestoreService, 'updateProgress'>;
@@ -68,27 +68,39 @@ export class CentralAgentService {
     const job = await this.jobs.claimNextQueued(ctx.tenantId, ctx.centralId);
     if (!job) return null;
 
-    const backup = await this.backups.getById(ctx.tenantId, ctx.centralId, job.sourceBackupId);
-    if (!backup) {
-      throw new NotFoundError(
-        `Backup ${job.sourceBackupId} not found for central ${ctx.centralId}`,
-      );
+    // The claim already moved the job QUEUED -> RUNNING. Any failure below (the
+    // source backup vanished, the presign errored) would otherwise strand the
+    // job RUNNING with no download URL ever delivered — invisible until the
+    // ~20-min stall reaper fails it. Compensate by releasing the claim back to
+    // QUEUED so the next poll re-claims it, then rethrow.
+    try {
+      const backup = await this.backups.getById(ctx.tenantId, ctx.centralId, job.sourceBackupId);
+      if (!backup) {
+        throw new NotFoundError(
+          `Backup ${job.sourceBackupId} not found for central ${ctx.centralId}`,
+        );
+      }
+
+      const downloadUrl = await this.storage.getPresignedDownloadUrl({
+        key: backup.storageKey,
+        responseContentType: 'application/octet-stream',
+        responseContentDisposition: `attachment; filename="central-${ctx.centralId}-${backup.id}.pgdump.custom"`,
+        expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
+      });
+
+      return {
+        jobId: job.id,
+        type: 'restore',
+        sourceBackupId: job.sourceBackupId,
+        downloadUrl,
+        phase: job.currentPhase,
+      };
+    } catch (err) {
+      await this.jobs.releaseClaim(ctx.tenantId, job.id).catch(() => {
+        /* best-effort compensation; the stall reaper is the backstop */
+      });
+      throw err;
     }
-
-    const downloadUrl = await this.storage.getPresignedDownloadUrl({
-      key: backup.storageKey,
-      responseContentType: 'application/octet-stream',
-      responseContentDisposition: `attachment; filename="central-${ctx.centralId}-${backup.id}.pgdump.custom"`,
-      expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
-    });
-
-    return {
-      jobId: job.id,
-      type: 'restore',
-      sourceBackupId: job.sourceBackupId,
-      downloadUrl,
-      phase: job.currentPhase,
-    };
   }
 
   /**
