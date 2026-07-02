@@ -90,6 +90,15 @@ tags:
       device | work_order | work_order_event). Text + status + responses +
       events + mentions + attachments, with optimistic locking. Work-order
       observations are expressed as annotations on the WO or a specific event.
+  - name: Consumption Goals
+    description: |
+      RFC-0046 — Per-customer consumption targets (ENERGY | WATER | TEMPERATURE)
+      by domain and year, stored at a single canonical grain (the hour; up to
+      8 760 rows/goal). `PUT` replaces the whole (domain, year) tree; `PATCH`
+      merges sparse buckets; coarser views (year/month/day) are rolled up on
+      read. Optimistic concurrency via `expectedVersion` (409 on mismatch).
+      Nested under `/customers/{customerId}/goals`; scopes `goals:read` /
+      `goals:write`. Full wire contract: docs/rfcs/RFC-0046-Goals-API.md.
 
 security:
   - bearerAuth: []
@@ -5118,6 +5127,123 @@ components:
       properties:
         pin: { type: string, pattern: '^\d{4}$', nullable: true, description: 'Pass null to clear PIN' }
 
+    # ── RFC-0046 Consumption Goals ─────────────────────────────────────────────
+    GoalHistoryEntry:
+      type: object
+      description: One audit row — one per operation (a mutation = a version = one entry).
+      properties:
+        source:        { type: string, enum: [IMPORT, REPLACE, MERGE, DELETE, EDIT] }
+        actionLevel:   { type: string, enum: [YEAR, MONTH, DAY, HOUR], description: Coarsest level the operation touched }
+        bucketRef:     { type: string, description: 'Representative ref (the single bucket, else the year)' }
+        oldValue:      { type: number, nullable: true }
+        newValue:      { type: number, nullable: true }
+        bucketCount:   { type: integer, description: How many operator buckets the operation carried }
+        details:       { type: array, description: 'Compact sample (server-capped at 50)', items: { type: object, properties: { ref: { type: string }, value: { type: number } } } }
+        distributed:   { type: boolean, description: 'true = system spread to hours' }
+        hoursAffected: { type: integer }
+        version:       { type: integer, description: The version this operation produced }
+        actor:         { type: string, format: uuid, nullable: true }
+        changedAt:     { type: string, format: date-time }
+
+    GoalTree:
+      type: object
+      description: |
+        Resolved goal for one (customer, domain, year). The hour is the only stored
+        grain; year/month/day views are rolled up on read (SUM domains) or weighted-
+        averaged (TEMPERATURE), and every node declares its `method`. The nested tree
+        fields are passed through — see RFC-0046-Goals-API.md §2 for the full shape.
+      additionalProperties: true
+      properties:
+        domain:  { type: string, enum: [ENERGY, WATER, TEMPERATURE] }
+        year:    { type: integer, example: 2026 }
+        unit:    { type: string, example: kWh, description: 'kWh | m3 | C — fixed per domain' }
+        method:  { type: string, enum: [SUM, AVERAGE] }
+        version: { type: integer, description: Optimistic version (increments on every change) }
+        total:   { type: number, nullable: true }
+        source:  { type: string, example: customer }
+        history:
+          type: array
+          description: 'Present when ?fetchHistory=true (≤100, newest-first).'
+          items: { $ref: '#/components/schemas/GoalHistoryEntry' }
+
+    GoalsWriteResult:
+      type: object
+      description: 'Write outcome. The new version is also returned in the `X-Version-Id` response header. See RFC-0046-Goals-API.md for exact fields.'
+      additionalProperties: true
+      properties:
+        version: { type: integer }
+        source:  { type: string, example: customer }
+
+    GoalReplaceBucket:
+      type: object
+      required: [value]
+      properties:
+        value:       { type: number, description: '>= 0 for ENERGY/WATER; TEMPERATURE may be negative' }
+        sourceLevel: { type: string, enum: [YEAR, MONTH, DAY, HOUR], nullable: true }
+
+    GoalReplaceDayNode:
+      type: object
+      properties:
+        value: { type: number }
+        hourly:
+          type: object
+          description: 'Map of "00".."23" → bucket.'
+          additionalProperties: { $ref: '#/components/schemas/GoalReplaceBucket' }
+
+    GoalReplaceMonthNode:
+      type: object
+      properties:
+        value: { type: number }
+        daily:
+          type: object
+          description: 'Map of "01".."31" → day node.'
+          additionalProperties: { $ref: '#/components/schemas/GoalReplaceDayNode' }
+
+    GoalsReplaceBody:
+      type: object
+      description: 'PUT (replace) — at least `annual` or one month must be present. Buckets absent from the scope are removed; values distribute to the hourly grain.'
+      properties:
+        annual: { $ref: '#/components/schemas/GoalReplaceBucket' }
+        monthly:
+          type: object
+          description: 'Map of "01".."12" → month node.'
+          additionalProperties: { $ref: '#/components/schemas/GoalReplaceMonthNode' }
+        expectedVersion: { type: integer, description: 'Optimistic guard → 409 on mismatch' }
+
+    GoalsMergeBody:
+      type: object
+      description: 'PATCH (merge) — only the named buckets are (re)distributed; everything else preserved.'
+      required: [buckets]
+      properties:
+        buckets:
+          type: array
+          minItems: 1
+          maxItems: 8760
+          items:
+            type: object
+            required: [ref, value]
+            properties:
+              ref:   { type: string, minLength: 4, maxLength: 13, description: 'Bucket ref: 2026 | 2026-03 | 2026-03-15 | 2026-03-15T08' }
+              value: { type: number }
+        expectedVersion: { type: integer }
+
+    GoalsImportBody:
+      type: object
+      required: [csv]
+      properties:
+        csv:             { type: string, description: 'CSV text (ref,value rows). Merge/PATCH semantics, stateless.' }
+        expectedVersion: { type: integer }
+
+    GoalsDeleteBody:
+      type: object
+      description: 'Optional DELETE body — an optimistic guard and/or a single sub-bucket to delete (omit `bucket` to delete the whole domain/year).'
+      properties:
+        bucket:
+          type: object
+          properties:
+            ref: { type: string, minLength: 4, maxLength: 13 }
+        expectedVersion: { type: integer }
+
 paths:
   # Health
   /health:
@@ -6140,6 +6266,144 @@ paths:
                   - properties:
                       data:
                         $ref: '#/components/schemas/Customer'
+
+  # RFC-0046 — Consumption Goals (nested under /customers)
+  /customers/{customerId}/goals:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Consumption Goals]
+      summary: Get the resolved goal for a (domain, year)
+      description: 'Returns the goal tree with coarser levels rolled up on read. `domain` and `year` are required together. Scope `goals:read`.'
+      operationId: getConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer, example: 2026 } }
+        - { name: fetchHistory, in: query, required: false, description: 'Include ≤100 history entries (newest-first)', schema: { type: boolean } }
+      responses:
+        '200':
+          description: Resolved goal
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/GoalTree' }
+        '400':
+          description: domain/year missing or invalid
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '404':
+          description: No goal for this (customer, domain, year)
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    put:
+      tags: [Consumption Goals]
+      summary: Replace the whole (domain, year)
+      description: 'PUT = replace — buckets absent from the payload scope are removed; values distribute to the hourly grain. Optimistic `expectedVersion` → 409. Scope `goals:write`.'
+      operationId: replaceConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalsReplaceBody' } } }
+      responses:
+        '200':
+          description: Replaced (new version in X-Version-Id)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/GoalsWriteResult' }
+        '400':
+          description: Invalid body
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: 'VERSION_CONFLICT — expectedVersion mismatch (body carries currentVersion)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    patch:
+      tags: [Consumption Goals]
+      summary: Merge sparse buckets
+      description: 'PATCH = merge — only the named buckets are (re)distributed; everything else preserved. Scope `goals:write`.'
+      operationId: mergeConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalsMergeBody' } } }
+      responses:
+        '200':
+          description: Merged (new version in X-Version-Id)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/GoalsWriteResult' }
+        '400':
+          description: Invalid body
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    delete:
+      tags: [Consumption Goals]
+      summary: Delete a (domain, year) or a single sub-bucket
+      description: 'Deletes the whole year (no body / no guard → 204) or a sub-bucket. With `expectedVersion` returns 200 + body. Scope `goals:write`.'
+      operationId: deleteConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalsDeleteBody' } } }
+      responses:
+        '200':
+          description: Deleted with optimistic guard (body returned)
+          content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } }
+        '204':
+          description: Deleted (no guard)
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /customers/{customerId}/goals/import:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Consumption Goals]
+      summary: Import goals from CSV (preview or persist)
+      description: 'Stateless CSV import (merge semantics). `dryRun=true` (default) previews + diagnostics WITHOUT persisting; re-post the same CSV with `dryRun=false` to persist (no previewToken). Scope `goals:write`.'
+      operationId: importConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: dryRun, in: query, required: false, description: 'true (default) = preview only; false = persist', schema: { type: boolean, default: true } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalsImportBody' } } }
+      responses:
+        '200':
+          description: Preview (dryRun) or persisted result
+          content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } }
+        '400':
+          description: Invalid CSV or params
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
   # Partners
   /partners:
