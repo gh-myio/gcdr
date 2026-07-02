@@ -35,3 +35,10 @@ CREATE INDEX "central_commands_tenant_status_idx"  ON "central_commands" ("tenan
 -- Stalled-command sweep (status='RUNNING' AND updated_at < cutoff): a central
 -- that dies mid-command stops reporting, so the row ages out and is failed.
 CREATE INDEX "central_commands_status_updated_idx" ON "central_commands" ("status", "updated_at");
+-- At most one in-flight command per central. The app-level findActiveByCentral
+-- check gives the friendly message for the common (sequential) case; this index
+-- is the race-proof backstop for two truly-concurrent submits (mirrors
+-- central_restore_jobs_one_active_per_central in the restore migration).
+CREATE UNIQUE INDEX "central_commands_one_active_per_central"
+  ON "central_commands" ("central_id")
+  WHERE "status" IN ('QUEUED', 'RUNNING');

@@ -816,6 +816,11 @@ export const centralCommands = pgTable('central_commands', {
   tenantCentralIdx: index('central_commands_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
   tenantStatusIdx: index('central_commands_tenant_status_idx').on(table.tenantId, table.status),
   statusUpdatedIdx: index('central_commands_status_updated_idx').on(table.status, table.updatedAt),
+  // At most one in-flight command per central — race-proof backstop for the
+  // app-level findActiveByCentral dedup (mirrors central_restore_jobs).
+  oneActivePerCentral: uniqueIndex('central_commands_one_active_per_central')
+    .on(table.centralId)
+    .where(sql`${table.status} IN ('QUEUED', 'RUNNING')`),
 }));
 
 // =============================================================================
