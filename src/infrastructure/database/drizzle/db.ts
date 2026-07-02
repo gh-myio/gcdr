@@ -60,6 +60,9 @@ export type NewCentralBackup = typeof schema.centralBackups.$inferInsert;
 export type CentralRestoreJob = typeof schema.centralRestoreJobs.$inferSelect;
 export type NewCentralRestoreJob = typeof schema.centralRestoreJobs.$inferInsert;
 
+export type CentralCommand = typeof schema.centralCommands.$inferSelect;
+export type NewCentralCommand = typeof schema.centralCommands.$inferInsert;
+
 export type Group = typeof schema.groups.$inferSelect;
 export type NewGroup = typeof schema.groups.$inferInsert;
 

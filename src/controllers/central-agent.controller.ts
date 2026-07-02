@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { centralAgentService } from '../services/CentralAgentService';
 import { centralEnrollmentService } from '../services/CentralEnrollmentService';
 import { UpdateRestoreProgressSchema } from '../dto/request/CentralRestoreDTO';
+import { UpdateCommandResultSchema } from '../dto/request/CentralCommandDTO';
 import { EnrollCentralSchema } from '../dto/request/CentralEnrollDTO';
 import { sendSuccess, sendNoContent } from '../middleware';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
@@ -64,6 +65,48 @@ router.patch('/restore/:jobId', async (req: Request, res: Response, next: NextFu
     }
     const dto = UpdateRestoreProgressSchema.parse(req.body);
     const result = await centralAgentService.reportProgress(ctx, jobId, dto);
+    sendSuccess(res, result, 200, req.context.requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /central-agent/commands/next
+ * Claim the next QUEUED operational command for the authenticated central
+ * (atomically QUEUED -> RUNNING). Returns 204 No Content when there is nothing
+ * to do. The agent runs it locally (reboot / systemctl restart myio) and reports
+ * the result via PATCH /central-agent/commands/:commandId.
+ */
+router.get('/commands/next', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ctx = requireCentral(req);
+    const cmd = await centralAgentService.nextCommand(ctx);
+    if (!cmd) {
+      sendNoContent(res);
+      return;
+    }
+    sendSuccess(res, cmd, 200, req.context.requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /central-agent/commands/:commandId
+ * Result report from the authenticated central after it ran the command
+ * (exit_code + stdout + stderr + status). Scoped to the central — it can only
+ * touch its own commands.
+ */
+router.patch('/commands/:commandId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ctx = requireCentral(req);
+    const { commandId } = req.params;
+    if (!commandId) {
+      throw new ValidationError('Command ID is required');
+    }
+    const dto = UpdateCommandResultSchema.parse(req.body);
+    const result = await centralAgentService.reportCommandResult(ctx, commandId, dto);
     sendSuccess(res, result, 200, req.context.requestId);
   } catch (err) {
     next(err);

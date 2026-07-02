@@ -790,6 +790,34 @@ export const centralRestoreJobs = pgTable('central_restore_jobs', {
   statusUpdatedIdx: index('central_restore_jobs_status_updated_idx').on(table.status, table.updatedAt),
 }));
 
+// Central operational commands (reboot the box, restart the erlang/myio-core
+// service). The CENTRAL runs the command via its myio-gcdr-agent poll loop;
+// gcdr tracks this state machine, driven by the central's result report
+// (exit_code + stdout + stderr). See migration 0053_central_commands.sql.
+export const centralCommandTypeEnum = pgEnum('central_command_type', ['REBOOT', 'RESTART_ERLANG']);
+export const centralCommandStatusEnum = pgEnum('central_command_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED']);
+
+export const centralCommands = pgTable('central_commands', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  centralId: uuid('central_id').notNull().references(() => centrals.id),
+  type: centralCommandTypeEnum('type').notNull(),
+  status: centralCommandStatusEnum('status').notNull().default('QUEUED'),
+  exitCode: integer('exit_code'),
+  stdout: text('stdout'),
+  stderr: text('stderr'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  tenantCentralIdx: index('central_commands_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
+  tenantStatusIdx: index('central_commands_tenant_status_idx').on(table.tenantId, table.status),
+  statusUpdatedIdx: index('central_commands_status_updated_idx').on(table.status, table.updatedAt),
+}));
+
 // =============================================================================
 // GROUPS
 // =============================================================================
