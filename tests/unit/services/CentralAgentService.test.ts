@@ -17,6 +17,7 @@ function makeService(
             sourceBackupId: 'bkp-1',
           },
     ),
+    releaseClaim: jest.fn(async () => undefined),
   };
   const backups = {
     getById: jest.fn(async () =>
@@ -80,6 +81,20 @@ describe('CentralAgentService', () => {
     it('throws NotFoundError when the source backup is missing', async () => {
       const { svc } = makeService({ backup: null });
       await expect(svc.nextJob(CTX)).rejects.toThrow(NotFoundError);
+    });
+
+    it('releases the claim back to QUEUED when post-claim work fails (no strand)', async () => {
+      const { svc, jobs } = makeService({ backup: null });
+      await expect(svc.nextJob(CTX)).rejects.toThrow(NotFoundError);
+      // the claim moved it to RUNNING; compensation must release it so the next
+      // poll re-claims it instead of leaving it stranded until the reaper
+      expect(jobs.releaseClaim).toHaveBeenCalledWith('t1', 'job-1');
+    });
+
+    it('does not release when there was nothing to claim', async () => {
+      const { svc, jobs } = makeService({ job: null });
+      await svc.nextJob(CTX);
+      expect(jobs.releaseClaim).not.toHaveBeenCalled();
     });
 
     it('scopes the claim to the AUTHENTICATED central only', async () => {

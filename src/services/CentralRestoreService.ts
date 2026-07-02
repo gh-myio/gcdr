@@ -33,7 +33,7 @@ const ALLOWED_STATUS_NEXT: Record<string, Set<string>> = {
 // Structural deps for unit testing (mirrors CentralBackupService DI).
 type RestoreRepoDep = Pick<
   typeof centralRestoreJobRepository,
-  'create' | 'getById' | 'listByCentral' | 'update'
+  'create' | 'getById' | 'listByCentral' | 'update' | 'findActiveByCentral'
 >;
 type BackupRepoDep = Pick<typeof centralBackupRepository, 'getById'>;
 type StorageDep = Pick<typeof s3Storage, 'getPresignedDownloadUrl'>;
@@ -79,19 +79,33 @@ export class CentralRestoreService {
       );
     }
 
+    // Reject a second concurrent restore of the same central: an operator retry
+    // (or double-submit) must not enqueue a second job that the central would run
+    // back-to-back — two full pg_restores = double downtime on a production box.
+    // A partial-unique index on non-terminal status is the race-proof backstop;
+    // this pre-check turns the common sequential retry into a clean 409.
+    const active = await this.jobs.findActiveByCentral(tenantId, centralId);
+    if (active) {
+      throw new ValidationError(
+        `A restore is already in progress for central ${centralId} (job ${active.id}, status ${active.status})`,
+      );
+    }
+
+    // Presign BEFORE creating the job so a presign failure can't leave an orphan
+    // QUEUED job behind (which the central would then claim without a usable URL).
+    const downloadUrl = await this.storage.getPresignedDownloadUrl({
+      key: backup.storageKey,
+      responseContentType: 'application/octet-stream',
+      responseContentDisposition: `attachment; filename="central-${centralId}-${backup.id}.pgdump.custom"`,
+      expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
+    });
+
     const job = await this.jobs.create({
       tenantId,
       centralId,
       sourceBackupId: dto.sourceBackupId,
       dryRun: dto.dryRun,
       createdBy: userId ?? null,
-    });
-
-    const downloadUrl = await this.storage.getPresignedDownloadUrl({
-      key: backup.storageKey,
-      responseContentType: 'application/octet-stream',
-      responseContentDisposition: `attachment; filename="central-${centralId}-${backup.id}.pgdump.custom"`,
-      expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
     });
 
     return {
@@ -174,8 +188,16 @@ export class CentralRestoreService {
       if (TERMINAL_STATUSES.has(dto.status)) patch.completedAt = new Date();
     }
 
-    const updated = await this.jobs.update(tenantId, jobId, patch);
-    if (!updated) throw new NotFoundError(`Restore job ${jobId} not found`);
+    // Compare-and-swap on the status we validated against: if a concurrent
+    // terminal transition (e.g. the stall reaper marking this job FAILED) landed
+    // between the read above and this write, the CAS misses and we reject the
+    // report instead of resurrecting a reaped job with a stale-validated patch.
+    const updated = await this.jobs.update(tenantId, jobId, patch, job.status);
+    if (!updated) {
+      throw new ValidationError(
+        `Restore job ${jobId} changed concurrently (no longer ${job.status}); progress report rejected`,
+      );
+    }
     return updated;
   }
 }

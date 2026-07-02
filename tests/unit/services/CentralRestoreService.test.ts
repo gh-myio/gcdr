@@ -4,7 +4,14 @@ import { NotFoundError, ValidationError } from '../../../src/shared/errors/AppEr
 const SHA = 'a'.repeat(64);
 
 function makeService(
-  opts: { central?: unknown; backup?: unknown; job?: unknown; listResult?: unknown[] } = {},
+  opts: {
+    central?: unknown;
+    backup?: unknown;
+    job?: unknown;
+    listResult?: unknown[];
+    activeJob?: unknown;
+    updateResult?: unknown;
+  } = {},
 ) {
   const jobs = {
     create: jest.fn(async (i: { id?: string; dryRun?: boolean }) => ({
@@ -17,8 +24,11 @@ function makeService(
     })),
     getById: jest.fn(async () => ('job' in opts ? opts.job : null)),
     listByCentral: jest.fn(async () => opts.listResult ?? []),
+    findActiveByCentral: jest.fn(async () => ('activeJob' in opts ? opts.activeJob : null)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    update: jest.fn(async (_t: string, id: string, patch: any) => ({ id, ...patch })),
+    update: jest.fn(async (_t: string, id: string, patch: any) =>
+      'updateResult' in opts ? opts.updateResult : { id, ...patch },
+    ),
   };
   const backups = {
     getById: jest.fn(async () =>
@@ -87,6 +97,27 @@ describe('CentralRestoreService', () => {
       const { svc, jobs } = makeService({ backup: { id: 'bkp-1', status: 'PENDING' } });
       await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
         ValidationError,
+      );
+      expect(jobs.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a second restore while one is already active (no double-run)', async () => {
+      const { svc, jobs, storage } = makeService({
+        activeJob: { id: 'job-active', status: 'RUNNING' },
+      });
+      await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
+        ValidationError,
+      );
+      expect(jobs.create).not.toHaveBeenCalled();
+      // guard rejects before any presign/create side effect
+      expect(storage.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('presigns before creating the job (no orphan on presign failure)', async () => {
+      const { svc, jobs, storage } = makeService();
+      storage.getPresignedDownloadUrl.mockRejectedValueOnce(new Error('presign down'));
+      await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
+        'presign down',
       );
       expect(jobs.create).not.toHaveBeenCalled();
     });
@@ -166,6 +197,18 @@ describe('CentralRestoreService', () => {
       await expect(svc.updateProgress('t1', 'c1', 'nope', { message: 'x' })).rejects.toThrow(
         NotFoundError,
       );
+    });
+
+    it('CAS: rejects the report when the job changed concurrently (update no-op)', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'DOWNLOAD', logEntries: [] },
+        updateResult: null, // reaper flipped it to FAILED between read and write
+      });
+      await expect(
+        svc.updateProgress('t1', 'c1', 'job-1', { currentPhase: 'RESTORE_DB', message: 'x' }),
+      ).rejects.toThrow(ValidationError);
+      // CAS predicate carries the pre-read status
+      expect(jobs.update).toHaveBeenCalledWith('t1', 'job-1', expect.any(Object), 'RUNNING');
     });
   });
 
