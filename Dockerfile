@@ -29,6 +29,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY src ./src
+# The build script (npm run build) copies docs/openapi.yaml into dist/docs, so it
+# must be present in the builder stage too (not only the production stage).
+COPY docs/openapi.yaml ./docs/openapi.yaml
 
 # Build TypeScript
 RUN npm run build
