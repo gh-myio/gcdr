@@ -5,20 +5,27 @@ import {
 import { centralRepository } from '../repositories/CentralRepository';
 import { NotFoundError, ValidationError } from '../shared/errors/AppError';
 import { CreateCommandDTO, UpdateCommandResultDTO } from '../dto/request/CentralCommandDTO';
+import { PaginatedResult } from '../shared/types';
+import { CentralCommand } from '../infrastructure/database/drizzle/db';
 
 const TERMINAL_STATUSES = new Set(['DONE', 'FAILED']);
 
 // Status may advance QUEUED -> RUNNING -> DONE/FAILED. FAILED is reachable from
-// anywhere non-terminal; DONE only from RUNNING (the central ran the command).
+// any non-terminal state; DONE only from RUNNING (the central always claims a
+// command — QUEUED -> RUNNING — before it can report a result, so a direct
+// QUEUED -> DONE never happens and is not allowed).
 const ALLOWED_STATUS_NEXT: Record<string, Set<string>> = {
-  QUEUED: new Set(['QUEUED', 'RUNNING', 'DONE', 'FAILED']),
+  QUEUED: new Set(['QUEUED', 'RUNNING', 'FAILED']),
   RUNNING: new Set(['RUNNING', 'DONE', 'FAILED']),
 };
+
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 200;
 
 // Structural deps for unit testing (mirrors CentralRestoreService DI).
 type CommandRepoDep = Pick<
   typeof centralCommandRepository,
-  'create' | 'getById' | 'listByCentral' | 'update'
+  'create' | 'getById' | 'listByCentralPaged' | 'update' | 'findActiveByCentral'
 >;
 type CentralRepoDep = Pick<typeof centralRepository, 'getById'>;
 
@@ -44,6 +51,17 @@ export class CentralCommandService {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
+    // Dedup guard: reject a second command while one is still in flight. Without
+    // this a double-submit (or two operators) could enqueue several REBOOTs the
+    // central would run back-to-back — reboot, come back, reboot again.
+    const active = await this.commands.findActiveByCentral(tenantId, centralId);
+    if (active) {
+      throw new ValidationError(
+        `Central ${centralId} already has a pending command (${active.type}, ${active.status}); ` +
+          'wait for it to finish before sending another',
+      );
+    }
+
     return this.commands.create({
       tenantId,
       centralId,
@@ -52,10 +70,30 @@ export class CentralCommandService {
     });
   }
 
-  async listCommands(tenantId: string, centralId: string) {
+  async listCommands(
+    tenantId: string,
+    centralId: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<CentralCommand>> {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
-    return this.commands.listByCentral(tenantId, centralId);
+
+    const limit = Math.min(Math.max(1, opts.limit ?? DEFAULT_PAGE_LIMIT), MAX_PAGE_LIMIT);
+    const page = Math.max(1, opts.page ?? 1);
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.commands.listByCentralPaged(tenantId, centralId, {
+      limit,
+      offset,
+    });
+    return {
+      items,
+      pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: offset + items.length < total,
+      },
+    };
   }
 
   async getCommand(tenantId: string, centralId: string, commandId: string) {
@@ -94,8 +132,16 @@ export class CentralCommandService {
     if (dto.stderr !== undefined) patch.stderr = dto.stderr;
     if (dto.errorMessage !== undefined) patch.errorMessage = dto.errorMessage;
 
-    const updated = await this.commands.update(tenantId, commandId, patch);
-    if (!updated) throw new NotFoundError(`Command ${commandId} not found`);
+    // Compare-and-swap on the status we validated against: if the reaper (or any
+    // concurrent terminal transition) changed the command between the read above
+    // and this write, the CAS misses and we reject the report instead of
+    // resurrecting a reaped command with a stale-validated patch.
+    const updated = await this.commands.update(tenantId, commandId, patch, cmd.status);
+    if (!updated) {
+      throw new ValidationError(
+        `Command ${commandId} changed concurrently (no longer ${cmd.status}); result report rejected`,
+      );
+    }
     return updated;
   }
 }

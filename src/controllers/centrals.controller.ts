@@ -703,9 +703,17 @@ router.patch('/:id/restore/:jobId', async (req: Request, res: Response, next: Ne
 
 /**
  * POST /centrals/:id/commands
- * Send an operational command to this central (REBOOT the box, or RESTART_ERLANG
- * the myio-core service). Creates a QUEUED command the central's agent picks up
- * on its next poll; the result (exit code + output) is reported back.
+ * Send an operational command to this central (REBOOT the box, RESTART_ERLANG the
+ * myio-core service, or RESTART_MYIOAPI the myioapi service). Creates a QUEUED
+ * command the central's agent picks up on its next poll; the result (exit code +
+ * output) is reported back.
+ *
+ * AUTHORIZATION (trust decision, round-3 #6): this route sits behind plain
+ * authMiddleware, so ANY tenant principal with `centrals` access can issue these
+ * physically-disruptive actions on a production central — there is no elevated
+ * scope today. This is accepted for now, gated in the UI (a confirm dialog);
+ * a `centrals:admin`-style scope is the tracked follow-up. Documented here so the
+ * accepted risk stays visible at the call site.
  */
 router.post('/:id/commands',
   logEvent({
@@ -732,7 +740,10 @@ router.post('/:id/commands',
 router.get('/:id/commands', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const result = await centralCommandService.listCommands(tenantId, req.params.id);
+    const result = await centralCommandService.listCommands(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);

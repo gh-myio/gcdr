@@ -1,4 +1,4 @@
--- Migration 0053: central_commands — one-shot operational commands the operator
+-- Migration 0055: central_commands — one-shot operational commands the operator
 -- sends to a central (reboot the box, restart the erlang/myio-core service, or
 -- restart the myioapi service).
 --

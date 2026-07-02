@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, sql } from 'drizzle-orm';
+import { eq, and, desc, lt, inArray, sql } from 'drizzle-orm';
 import { db, schema, CentralCommand } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
@@ -79,6 +79,59 @@ export class CentralCommandRepository {
   }
 
   /**
+   * Paginated list (newest first) + total count → the API returns the project's
+   * PaginatedResult instead of a bare array with a hidden cap.
+   */
+  async listByCentralPaged(
+    tenantId: string,
+    centralId: string,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: CentralCommand[]; total: number }> {
+    const where = and(
+      eq(centralCommands.tenantId, tenantId),
+      eq(centralCommands.centralId, centralId),
+    );
+    const items = await db
+      .select()
+      .from(centralCommands)
+      .where(where)
+      .orderBy(desc(centralCommands.createdAt))
+      .limit(opts.limit)
+      .offset(opts.offset);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(centralCommands)
+      .where(where);
+    return { items, total: Number(count) };
+  }
+
+  /**
+   * The current non-terminal command for a central (QUEUED or RUNNING), if any.
+   * Used to reject enqueuing a second command while one is still in flight — an
+   * operator (or double-submit) must not queue several REBOOTs the central would
+   * run back-to-back.
+   */
+  async findActiveByCentral(
+    tenantId: string,
+    centralId: string,
+  ): Promise<CentralCommand | null> {
+    const [row] = await db
+      .select()
+      .from(centralCommands)
+      .where(
+        and(
+          eq(centralCommands.tenantId, tenantId),
+          eq(centralCommands.centralId, centralId),
+          inArray(centralCommands.status, ['QUEUED', 'RUNNING']),
+        ),
+      )
+      .orderBy(desc(centralCommands.createdAt))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  /**
    * Atomically claim the oldest QUEUED command for `centralId` (QUEUED ->
    * RUNNING) in a single statement, used by the central-agent poll loop
    * (GET /central-agent/commands/next). `FOR UPDATE SKIP LOCKED` makes concurrent
@@ -112,17 +165,28 @@ export class CentralCommandRepository {
     return row ?? null;
   }
 
+  /**
+   * Patch a command. When `expectedStatus` is given the write is a compare-and-
+   * swap (`... AND status = expectedStatus`), so a concurrent terminal transition
+   * (e.g. the reaper failing the command between a caller's read and this write)
+   * makes the update a no-op and returns null instead of resurrecting it with a
+   * stale-validated patch.
+   */
   async update(
     tenantId: string,
     id: string,
     patch: UpdateCommandPatch,
+    expectedStatus?: CommandStatus,
   ): Promise<CentralCommand | null> {
     const ts = new Date(now());
+
+    const predicates = [eq(centralCommands.tenantId, tenantId), eq(centralCommands.id, id)];
+    if (expectedStatus) predicates.push(eq(centralCommands.status, expectedStatus));
 
     const [row] = await db
       .update(centralCommands)
       .set({ ...patch, updatedAt: ts })
-      .where(and(eq(centralCommands.tenantId, tenantId), eq(centralCommands.id, id)))
+      .where(and(...predicates))
       .returning();
 
     return row ?? null;

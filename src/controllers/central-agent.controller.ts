@@ -4,8 +4,9 @@ import { centralEnrollmentService } from '../services/CentralEnrollmentService';
 import { UpdateRestoreProgressSchema } from '../dto/request/CentralRestoreDTO';
 import { UpdateCommandResultSchema } from '../dto/request/CentralCommandDTO';
 import { EnrollCentralSchema } from '../dto/request/CentralEnrollDTO';
-import { sendSuccess, sendNoContent } from '../middleware';
+import { sendSuccess, sendNoContent, logAuditEvent } from '../middleware';
 import { UnauthorizedError, ValidationError } from '../shared/errors/AppError';
+import { EventType, ActorType } from '../shared/types';
 
 // =============================================================================
 // Central-agent API (field-swap restore poll loop). Mounted at
@@ -107,6 +108,31 @@ router.patch('/commands/:commandId', async (req: Request, res: Response, next: N
     }
     const dto = UpdateCommandResultSchema.parse(req.body);
     const result = await centralAgentService.reportCommandResult(ctx, commandId, dto);
+
+    // Audit the OUTCOME (not just that a command was requested): during an
+    // incident the trail must show whether the reboot/restart actually succeeded
+    // or failed. Actor is the central itself (reporting via its agent).
+    if (result.status === 'DONE' || result.status === 'FAILED') {
+      await logAuditEvent(
+        ctx.tenantId,
+        result.status === 'DONE'
+          ? EventType.CENTRAL_COMMAND_COMPLETED
+          : EventType.CENTRAL_COMMAND_FAILED,
+        {
+          entityId: result.id,
+          actorType: ActorType.SYSTEM,
+          userId: `central:${ctx.centralId}`,
+          description: `Command ${result.type} on central ${ctx.centralId} ${result.status.toLowerCase()}`,
+          metadata: {
+            centralId: ctx.centralId,
+            type: result.type,
+            exitCode: result.exitCode ?? null,
+          },
+          requestId: req.context.requestId,
+        },
+      );
+    }
+
     sendSuccess(res, result, 200, req.context.requestId);
   } catch (err) {
     next(err);

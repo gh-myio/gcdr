@@ -1,7 +1,15 @@
 import { CentralCommandService } from '../../../src/services/CentralCommandService';
 import { NotFoundError, ValidationError } from '../../../src/shared/errors/AppError';
 
-function makeService(opts: { central?: unknown; command?: unknown; listResult?: unknown[] } = {}) {
+function makeService(
+  opts: {
+    central?: unknown;
+    command?: unknown;
+    listResult?: unknown[];
+    activeCommand?: unknown;
+    updateResult?: unknown;
+  } = {},
+) {
   const commands = {
     create: jest.fn(async (i: { id?: string; type?: string }) => ({
       id: i.id ?? 'cmd-1',
@@ -9,9 +17,22 @@ function makeService(opts: { central?: unknown; command?: unknown; listResult?: 
       ...i,
     })),
     getById: jest.fn(async () => ('command' in opts ? opts.command : null)),
-    listByCentral: jest.fn(async () => opts.listResult ?? []),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    update: jest.fn(async (_t: string, id: string, patch: any) => ({ id, ...patch })),
+    listByCentralPaged: jest.fn(async () => ({
+      items: opts.listResult ?? [],
+      total: (opts.listResult ?? []).length,
+    })),
+    findActiveByCentral: jest.fn(async () =>
+      'activeCommand' in opts ? opts.activeCommand : null,
+    ),
+    update: jest.fn(
+      async (
+        _t: string,
+        id: string,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        patch: any,
+        _expectedStatus?: string,
+      ) => ('updateResult' in opts ? opts.updateResult : { id, ...patch }),
+    ),
   };
   const centrals = {
     getById: jest.fn(async () => ('central' in opts ? opts.central : { id: 'c1' })),
@@ -45,6 +66,16 @@ describe('CentralCommandService', () => {
       const { svc, commands } = makeService({ central: null });
       await expect(svc.createCommand('t1', 'x', 'u1', { type: 'REBOOT' })).rejects.toThrow(
         NotFoundError,
+      );
+      expect(commands.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a second command while one is still in flight (dedup guard)', async () => {
+      const { svc, commands } = makeService({
+        activeCommand: { id: 'cmd-active', type: 'REBOOT', status: 'QUEUED' },
+      });
+      await expect(svc.createCommand('t1', 'c1', 'u1', { type: 'REBOOT' })).rejects.toThrow(
+        ValidationError,
       );
       expect(commands.create).not.toHaveBeenCalled();
     });
@@ -108,6 +139,18 @@ describe('CentralCommandService', () => {
         NotFoundError,
       );
     });
+
+    it('CAS: rejects the report when the command changed concurrently (update no-op)', async () => {
+      const { svc, commands } = makeService({
+        command: { id: 'cmd-1', status: 'RUNNING' },
+        updateResult: null, // reaper flipped it to FAILED between read and write
+      });
+      await expect(
+        svc.updateResult('t1', 'c1', 'cmd-1', { status: 'DONE', exitCode: 0 }),
+      ).rejects.toThrow(ValidationError);
+      // CAS predicate carries the pre-read status
+      expect(commands.update).toHaveBeenCalledWith('t1', 'cmd-1', expect.any(Object), 'RUNNING');
+    });
   });
 
   describe('getCommand / listCommands', () => {
@@ -119,6 +162,15 @@ describe('CentralCommandService', () => {
     it('listCommands throws NotFoundError when the central is missing', async () => {
       const { svc } = makeService({ central: null });
       await expect(svc.listCommands('t1', 'x')).rejects.toThrow(NotFoundError);
+    });
+
+    it('listCommands returns a PaginatedResult envelope', async () => {
+      const { svc } = makeService({ listResult: [{ id: 'cmd-1' }] });
+      const res = await svc.listCommands('t1', 'c1', { page: 1, limit: 50 });
+      expect(res.items).toHaveLength(1);
+      expect(res.pagination).toEqual(
+        expect.objectContaining({ total: 1, totalPages: 1, hasMore: false }),
+      );
     });
   });
 });
