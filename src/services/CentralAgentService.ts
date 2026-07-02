@@ -4,6 +4,9 @@ import { centralBackupRepository } from '../repositories/CentralBackupRepository
 import { centralRestoreService, CentralRestoreService } from './CentralRestoreService';
 import { NotFoundError } from '../shared/errors/AppError';
 import { UpdateRestoreProgressDTO } from '../dto/request/CentralRestoreDTO';
+import { centralCommandRepository } from '../repositories/CentralCommandRepository';
+import { centralCommandService, CentralCommandService } from './CentralCommandService';
+import { UpdateCommandResultDTO } from '../dto/request/CentralCommandDTO';
 
 const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h — central downloads the dump
 
@@ -22,11 +25,19 @@ export interface NextJobResult {
   phase: string;
 }
 
+/** Shape returned to the central when it claims an operational command. */
+export interface NextCommandResult {
+  commandId: string;
+  type: 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
+}
+
 // Structural deps for unit testing (mirrors CentralRestoreService DI).
 type RestoreRepoDep = Pick<typeof centralRestoreJobRepository, 'claimNextQueued' | 'releaseClaim'>;
 type BackupRepoDep = Pick<typeof centralBackupRepository, 'getById'>;
 type StorageDep = Pick<typeof s3Storage, 'getPresignedDownloadUrl'>;
 type RestoreServiceDep = Pick<CentralRestoreService, 'updateProgress'>;
+type CommandRepoDep = Pick<typeof centralCommandRepository, 'claimNextQueued'>;
+type CommandServiceDep = Pick<CentralCommandService, 'updateResult'>;
 
 /**
  * Central-agent brokerage for the field-swap restore poll loop. The central
@@ -43,6 +54,8 @@ export class CentralAgentService {
     private readonly backups: BackupRepoDep = centralBackupRepository,
     private readonly storage: StorageDep = s3Storage,
     private readonly restore: RestoreServiceDep = centralRestoreService,
+    private readonly commands: CommandRepoDep = centralCommandRepository,
+    private readonly commandService: CommandServiceDep = centralCommandService,
   ) {}
 
   /**
@@ -102,6 +115,31 @@ export class CentralAgentService {
     patch: UpdateRestoreProgressDTO,
   ) {
     return this.restore.updateProgress(ctx.tenantId, ctx.centralId, jobId, patch);
+  }
+
+  /**
+   * Claim the next QUEUED operational command for the authenticated central
+   * (atomically QUEUED -> RUNNING). Returns null when there is nothing to do
+   * (the route maps that to 204). The agent runs the command locally (reboot /
+   * systemctl restart) and reports the result via reportCommandResult.
+   */
+  async nextCommand(ctx: CentralAgentContext): Promise<NextCommandResult | null> {
+    const cmd = await this.commands.claimNextQueued(ctx.tenantId, ctx.centralId);
+    if (!cmd) return null;
+    return { commandId: cmd.id, type: cmd.type };
+  }
+
+  /**
+   * Apply a command result from the authenticated central (exit_code + stdout/
+   * stderr + status). Scoped to the central's id so it can only touch its own
+   * commands — delegates to CentralCommandService.updateResult.
+   */
+  async reportCommandResult(
+    ctx: CentralAgentContext,
+    commandId: string,
+    patch: UpdateCommandResultDTO,
+  ) {
+    return this.commandService.updateResult(ctx.tenantId, ctx.centralId, commandId, patch);
   }
 }
 

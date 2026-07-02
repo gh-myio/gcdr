@@ -14,6 +14,8 @@ import {
   ConfirmCentralBackupSchema,
 } from '../dto/request/CentralBackupDTO';
 import { centralRestoreService } from '../services/CentralRestoreService';
+import { centralCommandService } from '../services/CentralCommandService';
+import { CreateCommandSchema } from '../dto/request/CentralCommandDTO';
 import {
   StartRestoreSchema,
   UpdateRestoreProgressSchema,
@@ -693,6 +695,69 @@ router.patch('/:id/restore/:jobId', async (req: Request, res: Response, next: Ne
       req.params.jobId,
       userId,
     );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /centrals/:id/commands
+ * Send an operational command to this central (REBOOT the box, RESTART_ERLANG the
+ * myio-core service, or RESTART_MYIOAPI the myioapi service). Creates a QUEUED
+ * command the central's agent picks up on its next poll; the result (exit code +
+ * output) is reported back.
+ *
+ * AUTHORIZATION (trust decision, round-3 #6): this route sits behind plain
+ * authMiddleware, so ANY tenant principal with `centrals` access can issue these
+ * physically-disruptive actions on a production central — there is no elevated
+ * scope today. This is accepted for now, gated in the UI (a confirm dialog);
+ * a `centrals:admin`-style scope is the tracked follow-up. Documented here so the
+ * accepted risk stays visible at the call site.
+ */
+router.post('/:id/commands',
+  logEvent({
+    eventType: EventType.CENTRAL_COMMAND_ISSUED,
+    description: (req) => `Command ${req.body?.type} issued for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const dto = CreateCommandSchema.parse(req.body);
+      const result = await centralCommandService.createCommand(tenantId, req.params.id, userId, dto);
+      sendCreated(res, result, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/commands
+ * List operational commands for a central (newest first).
+ */
+router.get('/:id/commands', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralCommandService.listCommands(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/commands/:commandId
+ * Command status + result (exit code, stdout, stderr) the central reported.
+ */
+router.get('/:id/commands/:commandId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralCommandService.getCommand(tenantId, req.params.id, req.params.commandId);
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
