@@ -17,7 +17,6 @@ import {
   MfaRequiredResponse,
   TokenResponse,
 } from '../dto/response/AuthResponseDTO';
-import { config } from '../shared/config/Config';
 
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-in-production';
@@ -160,7 +159,7 @@ export class AuthService {
     password: string,
     mfaCode?: string,
     ip?: string,
-    deviceInfo?: string
+    _deviceInfo?: string
   ): Promise<LoginResponse | MfaRequiredResponse> {
     // Find user by email (tenant-independent)
     let user: User;
