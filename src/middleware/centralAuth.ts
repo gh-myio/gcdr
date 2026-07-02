@@ -1,8 +1,8 @@
-import * as crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError } from '../shared/errors/AppError';
 import { centralRepository } from '../repositories/CentralRepository';
 import { decryptSecret } from '../shared/utils/secretEnvelope';
+import { base64UrlDecode, verifyHs256Signature } from '../shared/utils/jwtHs256';
 
 // =============================================================================
 // Central-agent authentication (field-swap backup/restore poll loop).
@@ -13,9 +13,9 @@ import { decryptSecret } from '../shared/utils/secretEnvelope';
 //   - header `uuid: <central-UUID>`        (the central's own id)
 //
 // gcdr looks the central up by UUID, then HMAC-verifies (HS256) the token with
-// THAT central's `agent_secret` — using the exact same createHmac('sha256') +
-// timingSafeEqual scheme as AuthService.verifyJWT. The tenant is derived from
-// the central row (the device does not know its tenant).
+// THAT central's `agent_secret` — via the shared verifyHs256Signature primitive
+// (same crypto as AuthService.verifyJWT). The tenant is derived from the central
+// row (the device does not know its tenant).
 // =============================================================================
 
 /** Identity of the authenticated central, set on req.context.central. */
@@ -44,21 +44,6 @@ type CentralRepoDep = Pick<typeof centralRepository, 'getByUuid'>;
 // a status/enumeration oracle.
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-function base64UrlDecode(input: string): Buffer {
-  let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = 4 - (base64.length % 4);
-  if (padding !== 4) {
-    base64 += '='.repeat(padding);
-  }
-  return Buffer.from(base64, 'base64');
-}
-
-/**
- * Verify an HS256 JWT against `secret` using the SAME scheme as
- * AuthService.verifyJWT: HMAC-SHA256 over `${header}.${payload}` compared with
- * crypto.timingSafeEqual. Returns the decoded payload, or null if the token is
- * malformed, the signature is wrong, or `exp` is absent / in the past (CR-S1).
- */
 // CR-S1: the central JWT MUST carry an exp. A token with no expiry replays
 // forever, so we reject it. When iat is present we also bound the absolute age
 // (and reject a far-future iat beyond clock skew) so a bogus far-future exp
@@ -66,43 +51,30 @@ function base64UrlDecode(input: string): Buffer {
 const MAX_TOKEN_AGE_SECONDS = 300; // 5 min — the poll loop re-signs every 30s
 const CLOCK_SKEW_SECONDS = 60;
 
+/**
+ * Verify a central-agent HS256 token: signature via the shared primitive, then
+ * the central-specific claim rules — `exp` REQUIRED and in the future (CR-S1),
+ * and (when present) `iat` bounded by MAX_TOKEN_AGE_SECONDS / clock skew.
+ * Returns the decoded payload or null.
+ */
 function verifyHs256<T extends { exp?: number; iat?: number }>(
   token: string,
   secret: string,
 ): T | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
+  const decoded = verifyHs256Signature<T>(token, secret);
+  if (!decoded) return null;
 
-    const [header, payload, signature] = parts;
-    if (!header || !payload || !signature) return null;
-
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(`${header}.${payload}`)
-      .digest();
-
-    const actualSignature = base64UrlDecode(signature);
-
-    if (expectedSignature.length !== actualSignature.length) return null;
-    if (!crypto.timingSafeEqual(expectedSignature, actualSignature)) return null;
-
-    const decoded = JSON.parse(base64UrlDecode(payload).toString('utf-8')) as T;
-
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    // exp is REQUIRED (CR-S1) and must be in the future.
-    if (typeof decoded.exp !== 'number') return null;
-    if (decoded.exp < nowSeconds) return null;
-    // When iat is present, bound the token age and reject a far-future iat.
-    if (typeof decoded.iat === 'number') {
-      if (decoded.iat > nowSeconds + CLOCK_SKEW_SECONDS) return null;
-      if (nowSeconds - decoded.iat > MAX_TOKEN_AGE_SECONDS) return null;
-    }
-
-    return decoded;
-  } catch {
-    return null;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  // exp is REQUIRED (CR-S1) and must be in the future.
+  if (typeof decoded.exp !== 'number') return null;
+  if (decoded.exp < nowSeconds) return null;
+  // When iat is present, bound the token age and reject a far-future iat.
+  if (typeof decoded.iat === 'number') {
+    if (decoded.iat > nowSeconds + CLOCK_SKEW_SECONDS) return null;
+    if (nowSeconds - decoded.iat > MAX_TOKEN_AGE_SECONDS) return null;
   }
+
+  return decoded;
 }
 
 /** Read the `UUID` claim from a JWT payload WITHOUT verifying — used only to

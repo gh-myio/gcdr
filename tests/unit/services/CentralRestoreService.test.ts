@@ -51,7 +51,6 @@ function makeService(
           },
     ),
   };
-  const storage = { getPresignedDownloadUrl: jest.fn(async () => 'https://s3.test/get?sig=xyz') };
   const centrals = {
     getById: jest.fn(async () =>
       'central' in opts ? opts.central : { id: 'c1', serialNumber: '1.2.3.4' },
@@ -63,27 +62,25 @@ function makeService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     backups as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    storage as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     centrals as any,
   );
-  return { svc, jobs, backups, storage, centrals };
+  return { svc, jobs, backups, centrals };
 }
 
 describe('CentralRestoreService', () => {
   describe('startRestore', () => {
-    it('creates a QUEUED job and returns a presigned download URL', async () => {
-      const { svc, jobs, storage } = makeService();
+    it('creates a QUEUED job and returns job metadata (no presigned URL for the browser)', async () => {
+      const { svc, jobs } = makeService();
       const res = await svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' });
       expect(res.status).toBe('QUEUED');
       expect(res.currentPhase).toBe('QUEUED');
-      expect(res.downloadUrl).toBe('https://s3.test/get?sig=xyz');
       expect(res.sha256).toBe(SHA);
-      expect(res.expiresIn).toBe(3600);
+      // the browser must NOT receive the central's presigned download URL (F-B3)
+      expect(res).not.toHaveProperty('downloadUrl');
+      expect(res).not.toHaveProperty('expiresIn');
       expect(jobs.create).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 't1', centralId: 'c1', sourceBackupId: 'bkp-1' }),
       );
-      expect(storage.getPresignedDownloadUrl).toHaveBeenCalled();
     });
 
     it('throws NotFoundError when the central is missing', async () => {
@@ -110,23 +107,13 @@ describe('CentralRestoreService', () => {
     });
 
     it('rejects a second restore while one is already active (no double-run)', async () => {
-      const { svc, jobs, storage } = makeService({
+      const { svc, jobs } = makeService({
         activeJob: { id: 'job-active', status: 'RUNNING' },
       });
       await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
         ValidationError,
       );
-      expect(jobs.create).not.toHaveBeenCalled();
-      // guard rejects before any presign/create side effect
-      expect(storage.getPresignedDownloadUrl).not.toHaveBeenCalled();
-    });
-
-    it('presigns before creating the job (no orphan on presign failure)', async () => {
-      const { svc, jobs, storage } = makeService();
-      storage.getPresignedDownloadUrl.mockRejectedValueOnce(new Error('presign down'));
-      await expect(svc.startRestore('t1', 'c1', 'u1', { sourceBackupId: 'bkp-1' })).rejects.toThrow(
-        'presign down',
-      );
+      // guard rejects before creating anything
       expect(jobs.create).not.toHaveBeenCalled();
     });
   });

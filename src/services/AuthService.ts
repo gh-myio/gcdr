@@ -8,6 +8,7 @@ import { authorizationService } from './AuthorizationService';
 import { userRepository } from '../repositories/UserRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
 import { pinLookupToken, pinVerify } from './work-orders/WoPinService';
+import { verifyHs256Signature } from '../shared/utils/jwtHs256';
 
 // RFC-0011: Configuration for account lockout
 const MAX_FAILED_LOGIN_ATTEMPTS = 6;
@@ -61,15 +62,6 @@ function base64UrlEncode(input: Buffer | string): string {
   return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function base64UrlDecode(input: string): Buffer {
-  let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = 4 - (base64.length % 4);
-  if (padding !== 4) {
-    base64 += '='.repeat(padding);
-  }
-  return Buffer.from(base64, 'base64');
-}
-
 /**
  * Parse JWT_AUDIENCE env variable into string or array
  * Supports comma-separated values for multiple audiences (RFC 7519 Section 4.1.3)
@@ -106,48 +98,15 @@ function createJWT(payload: object, expiresIn: number): string {
 }
 
 function verifyJWT<T>(token: string): T | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
+  // Signature via the shared HS256 primitive; claim validation (expiry) stays
+  // here since it differs from the central-agent token rules.
+  const decoded = verifyHs256Signature<T & { exp: number }>(token, JWT_SECRET);
+  if (!decoded) return null;
 
-    const [header, payload, signature] = parts;
-    if (!header || !payload || !signature) {
-      return null;
-    }
+  const now = Math.floor(Date.now() / 1000);
+  if (decoded.exp < now) return null;
 
-    // Verify signature
-    const expectedSignature = crypto
-      .createHmac('sha256', JWT_SECRET)
-      .update(`${header}.${payload}`)
-      .digest();
-
-    const actualSignature = base64UrlDecode(signature);
-
-    if (expectedSignature.length !== actualSignature.length) {
-      return null;
-    }
-
-    if (!crypto.timingSafeEqual(expectedSignature, actualSignature)) {
-      return null;
-    }
-
-    // Decode payload
-    const decoded = JSON.parse(base64UrlDecode(payload).toString('utf-8')) as T & {
-      exp: number;
-    };
-
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (decoded.exp < now) {
-      return null;
-    }
-
-    return decoded;
-  } catch {
-    return null;
-  }
+  return decoded;
 }
 
 function hashPassword(password: string): string {

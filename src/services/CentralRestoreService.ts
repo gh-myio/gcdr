@@ -1,4 +1,3 @@
-import { s3Storage } from '../infrastructure/storage/S3Storage';
 import {
   centralRestoreJobRepository,
   RestoreLogEntry,
@@ -11,7 +10,6 @@ import { StartRestoreDTO, UpdateRestoreProgressDTO } from '../dto/request/Centra
 import { PaginatedResult } from '../shared/types';
 import { CentralRestoreJob } from '../infrastructure/database/drizzle/db';
 
-const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h — central downloads the dump
 const TERMINAL_STATUSES = new Set(['DONE', 'FAILED', 'CANCELED']);
 
 // CR-S6: phases advance in this fixed order — a progress report may stay on the
@@ -41,29 +39,29 @@ type RestoreRepoDep = Pick<
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 200;
 type BackupRepoDep = Pick<typeof centralBackupRepository, 'getById'>;
-type StorageDep = Pick<typeof s3Storage, 'getPresignedDownloadUrl'>;
 type CentralRepoDep = Pick<typeof centralRepository, 'getById'>;
 
 /**
  * Restore brokerage for the field-swap. The replacement central adopts the same
  * serial+UUID, so a restore targets a central using one of ITS OWN backups.
  *
- * gcdr does NOT run pg_restore — it creates the job (QUEUED), hands the central
- * a presigned download URL for the backup, and tracks the phase progress the
- * central reports (DOWNLOAD -> VERIFY -> STOP_SERVICES -> RESTORE_DB ->
- * START_SERVICES -> DONE).
+ * gcdr does NOT run pg_restore — it creates the job (QUEUED) and tracks the phase
+ * progress the central reports (DOWNLOAD -> VERIFY -> STOP_SERVICES -> RESTORE_DB
+ * -> START_SERVICES -> DONE). The central fetches the dump via its OWN presigned
+ * URL from the agent poll (nextJob), so startRestore never mints one for the
+ * browser (F-B3 boundary).
  */
 export class CentralRestoreService {
   constructor(
     private readonly jobs: RestoreRepoDep = centralRestoreJobRepository,
     private readonly backups: BackupRepoDep = centralBackupRepository,
-    private readonly storage: StorageDep = s3Storage,
     private readonly centrals: CentralRepoDep = centralRepository,
   ) {}
 
   /**
-   * Start a restore of `centralId` from one of its AVAILABLE backups. Returns
-   * the job + a presigned download URL the central uses to fetch the dump.
+   * Start a restore of `centralId` from one of its AVAILABLE backups. Returns the
+   * job metadata only — NOT a presigned URL: the central fetches the dump via its
+   * own agent poll (nextJob), so the browser never receives that capability.
    */
   async startRestore(
     tenantId: string,
@@ -96,15 +94,6 @@ export class CentralRestoreService {
       );
     }
 
-    // Presign BEFORE creating the job so a presign failure can't leave an orphan
-    // QUEUED job behind (which the central would then claim without a usable URL).
-    const downloadUrl = await this.storage.getPresignedDownloadUrl({
-      key: backup.storageKey,
-      responseContentType: 'application/octet-stream',
-      responseContentDisposition: `attachment; filename="central-${centralId}-${backup.id}.pgdump.custom"`,
-      expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
-    });
-
     const job = await this.jobs.create({
       tenantId,
       centralId,
@@ -118,11 +107,9 @@ export class CentralRestoreService {
       status: job.status,
       currentPhase: job.currentPhase,
       sourceBackupId: backup.id,
-      downloadUrl,
       sha256: backup.sha256,
       byteSize: backup.byteSize,
       dryRun: job.dryRun,
-      expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     };
   }
 
