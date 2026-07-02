@@ -30,7 +30,10 @@ function makeService(
       ...input,
     })),
     getById: jest.fn(async () => ('backupRow' in opts ? opts.backupRow : null)),
-    listByCentral: jest.fn(async () => opts.listResult ?? []),
+    listByCentralPaged: jest.fn(async () => ({
+      items: opts.listResult ?? [],
+      total: (opts.listResult ?? []).length,
+    })),
     markAvailable: jest.fn(async (_t: string, id: string, sha256: string, byteSize: number) => ({
       id,
       status: 'AVAILABLE',
@@ -191,10 +194,14 @@ describe('CentralBackupService', () => {
       await expect(svc.listBackups('t1', 'missing')).rejects.toThrow(NotFoundError);
     });
 
-    it('returns the repository list for an existing central', async () => {
+    it('returns a PaginatedResult envelope for an existing central', async () => {
       const rows = [{ id: 'b1' }, { id: 'b2' }];
       const { svc } = makeService({ listResult: rows });
-      await expect(svc.listBackups('t1', 'c1')).resolves.toEqual(rows);
+      const res = await svc.listBackups('t1', 'c1');
+      expect(res.items).toEqual(rows);
+      expect(res.pagination).toEqual(
+        expect.objectContaining({ total: 2, totalPages: 1, hasMore: false }),
+      );
     });
   });
 

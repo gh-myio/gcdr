@@ -1,4 +1,4 @@
--- Migration 0050: central_restore_jobs — tracks a restore of a central from one
+-- Migration 0052: central_restore_jobs — tracks a restore of a central from one
 -- of its OWN backups (field-swap: the replacement hardware adopts the same
 -- serial+UUID, so source backup and target central share the central id).
 --
@@ -32,3 +32,9 @@ CREATE INDEX "central_restore_jobs_tenant_central_idx" ON "central_restore_jobs"
 CREATE INDEX "central_restore_jobs_tenant_status_idx" ON "central_restore_jobs" ("tenant_id", "status");
 -- CR-S5: cross-tenant stalled-job sweep (status='RUNNING' AND updated_at < cutoff).
 CREATE INDEX "central_restore_jobs_status_updated_idx" ON "central_restore_jobs" ("status", "updated_at");
+-- At most one in-flight restore per central: the race-proof backstop for the
+-- active-job guard in CentralRestoreService.startRestore (an operator retry must
+-- not enqueue a second job that runs a second pg_restore back-to-back).
+CREATE UNIQUE INDEX "central_restore_jobs_one_active_per_central"
+  ON "central_restore_jobs" ("central_id")
+  WHERE "status" IN ('QUEUED', 'RUNNING');

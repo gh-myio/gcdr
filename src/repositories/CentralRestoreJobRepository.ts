@@ -95,6 +95,34 @@ export class CentralRestoreJobRepository {
   }
 
   /**
+   * Paginated list (newest first) + total count, so the API returns the
+   * project's PaginatedResult instead of a bare array with a hidden cap
+   * (round-3 #12).
+   */
+  async listByCentralPaged(
+    tenantId: string,
+    centralId: string,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: CentralRestoreJob[]; total: number }> {
+    const where = and(
+      eq(centralRestoreJobs.tenantId, tenantId),
+      eq(centralRestoreJobs.centralId, centralId),
+    );
+    const items = await db
+      .select()
+      .from(centralRestoreJobs)
+      .where(where)
+      .orderBy(desc(centralRestoreJobs.createdAt))
+      .limit(opts.limit)
+      .offset(opts.offset);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(centralRestoreJobs)
+      .where(where);
+    return { items, total: Number(count) };
+  }
+
+  /**
    * Atomically claim the oldest QUEUED job for `centralId` and transition it
    * QUEUED -> RUNNING in a single statement. Used by the
    * central-agent poll loop (GET /central-agent/jobs/next). `FOR UPDATE SKIP

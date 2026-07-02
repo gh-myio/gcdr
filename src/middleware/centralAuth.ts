@@ -129,7 +129,12 @@ export function makeCentralAuthMiddleware(centrals: CentralRepoDep = centralRepo
     next: NextFunction,
   ): Promise<void> {
     try {
-      const token = req.headers['authorization'];
+      const rawAuth = req.headers['authorization'];
+      // Accept both the raw JWT (what the central sends today) and a
+      // `Bearer <jwt>` form, for robustness with proxies/clients that add the
+      // scheme (round-3 #13). The scheme is stripped case-insensitively.
+      const token =
+        typeof rawAuth === 'string' ? rawAuth.replace(/^Bearer\s+/i, '') : rawAuth;
       const uuidHeader = req.headers['uuid'];
 
       // NOTE: these are INPUT-PRESENCE checks, not the security boundary. The

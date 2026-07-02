@@ -580,7 +580,10 @@ router.post('/:id/backups/:backupId/upload-url',
 router.get('/:id/backups', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const result = await centralBackupService.listBackups(tenantId, req.params.id);
+    const result = await centralBackupService.listBackups(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
@@ -643,7 +646,10 @@ router.post('/:id/restore',
 router.get('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const result = await centralRestoreService.listJobs(tenantId, req.params.id);
+    const result = await centralRestoreService.listJobs(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
@@ -666,13 +672,27 @@ router.get('/:id/restore/:jobId', async (req: Request, res: Response, next: Next
 
 /**
  * PATCH /centrals/:id/restore/:jobId
- * Progress report from the central as it runs the restore.
+ * Operator action on a restore job. This is CANCEL-ONLY: the phase/status
+ * progress of a restore is reported by the CENTRAL via
+ * PATCH /central-agent/restore/:jobId (authenticated as the central). The
+ * operator route must not be able to drive the device state machine, so it
+ * accepts only a cancel (round-3 #10).
  */
 router.patch('/:id/restore/:jobId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { tenantId, requestId } = req.context;
+    const { tenantId, userId, requestId } = req.context;
     const dto = UpdateRestoreProgressSchema.parse(req.body);
-    const result = await centralRestoreService.updateProgress(tenantId, req.params.id, req.params.jobId, dto);
+    if (dto.status !== 'CANCELED' || dto.currentPhase) {
+      throw new ValidationError(
+        'Operators may only cancel a restore; phase progress is reported by the central',
+      );
+    }
+    const result = await centralRestoreService.cancelRestore(
+      tenantId,
+      req.params.id,
+      req.params.jobId,
+      userId,
+    );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);

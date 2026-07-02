@@ -4,6 +4,8 @@ import { centralRepository } from '../repositories/CentralRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { NotFoundError, ValidationError } from '../shared/errors/AppError';
 import { CreateCentralBackupDTO, ConfirmCentralBackupDTO } from '../dto/request/CentralBackupDTO';
+import { PaginatedResult } from '../shared/types';
+import { CentralBackup } from '../infrastructure/database/drizzle/db';
 
 // Presigned URL lifetimes. A multi-GB dump over a 4G site link can outrun a
 // 15-min window, so the upload TTL is 1h and reissueUploadUrl() re-mints it for
@@ -19,9 +21,12 @@ type StorageDep = Pick<
 >;
 type BackupRepoDep = Pick<
   typeof centralBackupRepository,
-  'create' | 'getById' | 'listByCentral' | 'markAvailable'
+  'create' | 'getById' | 'listByCentralPaged' | 'markAvailable'
 >;
 type CentralRepoDep = Pick<typeof centralRepository, 'getById'>;
+
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 200;
 
 /**
  * Backup/restore brokerage for centrals. gcdr does NOT run pg_dump/pg_restore:
@@ -157,10 +162,30 @@ export class CentralBackupService {
     };
   }
 
-  async listBackups(tenantId: string, centralId: string) {
+  async listBackups(
+    tenantId: string,
+    centralId: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<CentralBackup>> {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
-    return this.backups.listByCentral(tenantId, centralId);
+
+    const limit = Math.min(Math.max(1, opts.limit ?? DEFAULT_PAGE_LIMIT), MAX_PAGE_LIMIT);
+    const page = Math.max(1, opts.page ?? 1);
+    const offset = (page - 1) * limit;
+
+    const { items, total } = await this.backups.listByCentralPaged(tenantId, centralId, {
+      limit,
+      offset,
+    });
+    return {
+      items,
+      pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: offset + items.length < total,
+      },
+    };
   }
 
   /**

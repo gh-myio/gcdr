@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { db, schema, CentralBackup } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
@@ -69,6 +69,33 @@ export class CentralBackupRepository {
       .where(and(eq(centralBackups.tenantId, tenantId), eq(centralBackups.centralId, centralId)))
       .orderBy(desc(centralBackups.createdAt))
       .limit(limit);
+  }
+
+  /**
+   * Paginated list (newest first) + total count → the API returns the project's
+   * PaginatedResult instead of a bare array with a hidden cap (round-3 #12).
+   */
+  async listByCentralPaged(
+    tenantId: string,
+    centralId: string,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: CentralBackup[]; total: number }> {
+    const where = and(
+      eq(centralBackups.tenantId, tenantId),
+      eq(centralBackups.centralId, centralId),
+    );
+    const items = await db
+      .select()
+      .from(centralBackups)
+      .where(where)
+      .orderBy(desc(centralBackups.createdAt))
+      .limit(opts.limit)
+      .offset(opts.offset);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(centralBackups)
+      .where(where);
+    return { items, total: Number(count) };
   }
 
   async markAvailable(

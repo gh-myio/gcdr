@@ -23,11 +23,19 @@ function makeService(
       ...i,
     })),
     getById: jest.fn(async () => ('job' in opts ? opts.job : null)),
-    listByCentral: jest.fn(async () => opts.listResult ?? []),
+    listByCentralPaged: jest.fn(async () => ({
+      items: opts.listResult ?? [],
+      total: (opts.listResult ?? []).length,
+    })),
     findActiveByCentral: jest.fn(async () => ('activeJob' in opts ? opts.activeJob : null)),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    update: jest.fn(async (_t: string, id: string, patch: any) =>
-      'updateResult' in opts ? opts.updateResult : { id, ...patch },
+    update: jest.fn(
+      async (
+        _t: string,
+        id: string,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        patch: any,
+        _expectedStatus?: string,
+      ) => ('updateResult' in opts ? opts.updateResult : { id, ...patch }),
     ),
   };
   const backups = {
@@ -212,6 +220,27 @@ describe('CentralRestoreService', () => {
     });
   });
 
+  describe('cancelRestore', () => {
+    it('cancels a non-terminal job (CANCELED + completedAt, CAS-guarded)', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'RUNNING', currentPhase: 'DOWNLOAD', logEntries: [] },
+      });
+      await svc.cancelRestore('t1', 'c1', 'job-1', 'u1');
+      const [, , patch, expected] = jobs.update.mock.calls[0];
+      expect(patch.status).toBe('CANCELED');
+      expect(patch.completedAt).toBeInstanceOf(Date);
+      expect(expected).toBe('RUNNING'); // CAS on pre-read status
+    });
+
+    it('rejects cancelling an already-terminal job', async () => {
+      const { svc, jobs } = makeService({
+        job: { id: 'job-1', status: 'DONE', currentPhase: 'DONE', logEntries: [] },
+      });
+      await expect(svc.cancelRestore('t1', 'c1', 'job-1')).rejects.toThrow(ValidationError);
+      expect(jobs.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getJob / listJobs', () => {
     it('getJob throws NotFoundError when missing', async () => {
       const { svc } = makeService({ job: null });
@@ -221,6 +250,15 @@ describe('CentralRestoreService', () => {
     it('listJobs throws NotFoundError when the central is missing', async () => {
       const { svc } = makeService({ central: null });
       await expect(svc.listJobs('t1', 'x')).rejects.toThrow(NotFoundError);
+    });
+
+    it('listJobs returns a PaginatedResult envelope', async () => {
+      const { svc } = makeService({ listResult: [{ id: 'j1' }, { id: 'j2' }] });
+      const res = await svc.listJobs('t1', 'c1', { page: 1, limit: 50 });
+      expect(res.items).toHaveLength(2);
+      expect(res.pagination).toEqual(
+        expect.objectContaining({ total: 2, totalPages: 1, hasMore: false }),
+      );
     });
   });
 });
