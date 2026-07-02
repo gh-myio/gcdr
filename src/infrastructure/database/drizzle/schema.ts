@@ -794,7 +794,7 @@ export const centralRestoreJobs = pgTable('central_restore_jobs', {
 // service). The CENTRAL runs the command via its myio-gcdr-agent poll loop;
 // gcdr tracks this state machine, driven by the central's result report
 // (exit_code + stdout + stderr). See migration 0053_central_commands.sql.
-export const centralCommandTypeEnum = pgEnum('central_command_type', ['REBOOT', 'RESTART_ERLANG']);
+export const centralCommandTypeEnum = pgEnum('central_command_type', ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI']);
 export const centralCommandStatusEnum = pgEnum('central_command_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED']);
 
 export const centralCommands = pgTable('central_commands', {

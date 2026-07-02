@@ -28,7 +28,7 @@ export interface NextJobResult {
 /** Shape returned to the central when it claims an operational command. */
 export interface NextCommandResult {
   commandId: string;
-  type: 'REBOOT' | 'RESTART_ERLANG';
+  type: 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
 }
 
 // Structural deps for unit testing (mirrors CentralRestoreService DI).

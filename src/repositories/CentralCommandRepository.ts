@@ -5,7 +5,7 @@ import { now } from '../shared/utils/dateUtils';
 
 const { centralCommands } = schema;
 
-export type CommandType = 'REBOOT' | 'RESTART_ERLANG';
+export type CommandType = 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
 export type CommandStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
 
 export interface CreateCommandInput {

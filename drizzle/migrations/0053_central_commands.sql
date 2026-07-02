@@ -1,5 +1,6 @@
 -- Migration 0053: central_commands — one-shot operational commands the operator
--- sends to a central (reboot the box, restart the erlang/myio-core service).
+-- sends to a central (reboot the box, restart the erlang/myio-core service, or
+-- restart the myioapi service).
 --
 -- Same broker model as central_restore_jobs: gcdr does NOT reach the central. It
 -- creates the command (QUEUED); the central's myio-gcdr-agent polls
@@ -9,7 +10,7 @@
 --
 -- No BEGIN/COMMIT: the custom runner wraps each file in its own transaction.
 
-CREATE TYPE "central_command_type"   AS ENUM ('REBOOT', 'RESTART_ERLANG');
+CREATE TYPE "central_command_type"   AS ENUM ('REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI');
 CREATE TYPE "central_command_status" AS ENUM ('QUEUED', 'RUNNING', 'DONE', 'FAILED');
 
 CREATE TABLE "central_commands" (

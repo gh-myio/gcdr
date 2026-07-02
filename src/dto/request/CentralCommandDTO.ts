@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-export const COMMAND_TYPES = ['REBOOT', 'RESTART_ERLANG'] as const;
+export const COMMAND_TYPES = ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI'] as const;
 export const COMMAND_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const;
 
 // POST /centrals/:id/commands — operator sends an operational command to the
-// central (reboot the box, or restart the erlang/myio-core service).
+// central (reboot the box, restart the erlang/myio-core service, or restart the
+// myioapi service).
 export const CreateCommandSchema = z.object({
   type: z.enum(COMMAND_TYPES),
 });

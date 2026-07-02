@@ -8,6 +8,7 @@ describe('CentralCommandDTO', () => {
     it('accepts the valid command types', () => {
       expect(CreateCommandSchema.parse({ type: 'REBOOT' }).type).toBe('REBOOT');
       expect(CreateCommandSchema.parse({ type: 'RESTART_ERLANG' }).type).toBe('RESTART_ERLANG');
+      expect(CreateCommandSchema.parse({ type: 'RESTART_MYIOAPI' }).type).toBe('RESTART_MYIOAPI');
     });
 
     it('rejects an unknown type', () => {
