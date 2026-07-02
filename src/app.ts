@@ -1,4 +1,5 @@
 import express, { Express, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -48,6 +49,8 @@ import {
   dbAdminController,
   monitorAdminController,
   centralsController,
+  centralAgentController,
+  centralAgentEnrollHandler,
   centralsListByCustomerHandler,
   centralsListByAssetHandler,
   centralSerialAvailableHandler,
@@ -96,11 +99,28 @@ import {
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
+import { centralAuthMiddleware } from './middleware/centralAuth';
+import {
+  centralEnrollRateLimiter,
+  centralPollRateLimiter,
+  centralPollIpRateLimiter,
+  startRateLimitJanitor,
+} from './middleware/rateLimit';
+import { validateSecretEncryptionKey } from './shared/utils/secretEnvelope';
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
+import { startRestoreSweep } from './services/CentralRestoreSweep';
 
 const app: Express = express();
+
+// CR-S7: trust the reverse proxy in front of us (Dokploy/Traefik = 1 hop) so
+// `req.ip` resolves to the real client from a VETTED X-Forwarded-For instead of
+// a spoofable raw header. TRUST_PROXY_HOPS configures how many proxies to trust;
+// 0 disables it (direct exposure). Without this, the rate limiters key on an
+// attacker-controllable XFF.
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? '1');
+app.set('trust proxy', Number.isFinite(trustProxyHops) ? trustProxyHops : 1);
 
 // Initialize audit logging (RFC-0009)
 initializeAuditLogging();
@@ -172,6 +192,26 @@ app.use('/health', healthController);
 // =============================================================================
 
 const apiV1Router = Router();
+
+// Defense-in-depth baseline: a generous global rate limit on every /api/v1 route.
+// The per-route limiters in middleware/rateLimit.ts add stricter caps where it
+// matters (operator-pin, central-agent enroll/poll). Implemented with
+// express-rate-limit — which CodeQL's js/missing-rate-limiting query models — so
+// authenticated routes guarded only by our custom limiter aren't false-flagged.
+// Single-instance in-memory store; see the CR-S7 note in middleware/rateLimit.ts
+// for the multi-replica follow-up (shared store).
+apiV1Router.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests; please slow down' },
+    },
+  }),
+);
 
 // Frequently-reused permission scopes (sonarjs/no-duplicate-string).
 const PERM_BUNDLES_READ = 'bundles:read';
@@ -322,6 +362,24 @@ apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 // Centrals
 apiV1Router.use('/centrals', authMiddleware, centralsController);
 
+// Zero-touch enrollment (Slice 1.5). PUBLIC and mounted BEFORE the
+// centralAuthMiddleware /central-agent mount: a freshly-flashed central has no
+// agent_secret yet, so its one-time enroll token IS the credential. It exchanges
+// { uuid, enrollToken } for its agent_secret here, then authenticates the poll
+// loop below.
+// Rate-limited per IP: the enroll token is the only credential here, so throttle
+// brute-force / abuse before the handler.
+apiV1Router.post('/central-agent/enroll', centralEnrollRateLimiter, centralAgentEnrollHandler);
+
+// Central-agent poll loop (field-swap restore). NOT operator-authed — the
+// central authenticates itself with its agent_secret-signed JWT
+// (centralAuthMiddleware sets req.centralContext + tenant from the central row).
+// Rate-limited per-central (by uuid header) so one runaway device can't hammer
+// the control plane, without starving other centrals behind the same NAT; an
+// outer per-IP bound (centralPollIpRateLimiter) runs FIRST to cap total PRE-AUTH
+// load, since the uuid header is unauthenticated/spoofable before centralAuth.
+apiV1Router.use('/central-agent', centralPollIpRateLimiter, centralPollRateLimiter, centralAuthMiddleware, centralAgentController);
+
 // Themes (Look and Feel)
 apiV1Router.use('/themes', authMiddleware, themesController);
 
@@ -455,6 +513,23 @@ const PORT = parseInt(process.env.PORT || '3015', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 if (require.main === module) {
+  // round-3 #8: validate SECRET_ENCRYPTION_KEY at boot so a misconfig fails fast
+  // instead of surfacing as request-time 500s on the first enroll/secret write.
+  // Fatal in production; a warning in dev (local runs may not touch central
+  // secrets, and legacy plaintext still decrypts without the key).
+  try {
+    validateSecretEncryptionKey();
+  } catch (error) {
+    const message = (error as Error).message;
+    if (process.env.NODE_ENV === 'production') {
+      // eslint-disable-next-line no-console -- fatal boot diagnostics
+      console.error(`FATAL: ${message}`);
+      process.exit(1);
+    }
+    // eslint-disable-next-line no-console -- boot diagnostics
+    console.warn(`WARNING: ${message} (central enrollment/secret writes will fail)`);
+  }
+
   app.listen(PORT, HOST, async () => {
     const isDev = process.env.NODE_ENV !== 'production';
     const baseUrl = `http://${HOST}:${PORT}`;
@@ -481,6 +556,23 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to initialize simulator subsystem:', error);
+    }
+
+    // CR-S5: periodically fail RUNNING restore jobs orphaned by a dead central.
+    try {
+      startRestoreSweep();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the restore-sweep:', error);
+    }
+
+    // round-3 #6: periodically evict expired rate-limit buckets so rotated keys
+    // (e.g. spoofed uuids on the poll route) can't grow the store without bound.
+    try {
+      startRateLimitJanitor();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the rate-limit janitor:', error);
     }
   });
 }

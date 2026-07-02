@@ -776,6 +776,20 @@ export const centrals = pgTable('centrals', {
   tags: jsonb('tags').notNull().default([]),
   metadata: jsonb('metadata').notNull().default({}),
 
+  // Central-agent auth (field-swap backup/restore): shared HMAC secret the
+  // central signs its poll-loop JWT (HS256) with. Provisioned in a later slice;
+  // nullable so existing centrals keep working. See migration 0053.
+  agentSecret: text('agent_secret'),
+
+  // Zero-touch enrollment (Slice 1.5). An operator issues a one-time enroll
+  // token; only its sha256 hash + expiry are stored. The central exchanges the
+  // plaintext token for its agent_secret via POST /central-agent/enroll, which
+  // clears the hash (single-use) and stamps enrolled_at. Re-issuing a fresh
+  // token re-enables enrollment (field-swap). All nullable. See migration 0054.
+  enrollTokenHash: text('enroll_token_hash'),
+  enrollTokenExpiresAt: timestamp('enroll_token_expires_at', { withTimezone: true }),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }),
+
   // Audit
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -786,6 +800,68 @@ export const centrals = pgTable('centrals', {
   tenantSerialUnique: uniqueIndex('centrals_tenant_serial_unique').on(table.tenantId, table.serialNumber),
   tenantCustomerIdx: index('centrals_tenant_customer_idx').on(table.tenantId, table.customerId),
   tenantAssetIdx: index('centrals_tenant_asset_idx').on(table.tenantId, table.assetId),
+}));
+
+// Central backups (field-swap backup/restore). The CENTRAL runs pg_dump on its
+// own embedded Postgres; gcdr only brokers the presigned S3 URL + tracks this
+// metadata. See migration 0051_central_backups.sql.
+export const centralBackupStatusEnum = pgEnum('central_backup_status', ['PENDING', 'AVAILABLE', 'EXPIRED', 'FAILED']);
+
+export const centralBackups = pgTable('central_backups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  centralId: uuid('central_id').notNull().references(() => centrals.id),
+
+  // S3 object (bytes never touch gcdr — central PUTs/GETs via presigned URL)
+  storageKey: text('storage_key').notNull(),
+  bucket: varchar('bucket', { length: 255 }).notNull(),
+  contentType: varchar('content_type', { length: 127 }).notNull().default('application/octet-stream'),
+
+  // Integrity (reported by the central on confirm)
+  sha256: varchar('sha256', { length: 64 }),
+  byteSize: bigint('byte_size', { mode: 'number' }),
+
+  status: centralBackupStatusEnum('status').notNull().default('PENDING'),
+  sourceLabel: varchar('source_label', { length: 32 }),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  storageKeyUnique: uniqueIndex('central_backups_storage_key_unique').on(table.storageKey),
+  tenantCentralIdx: index('central_backups_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
+  tenantStatusIdx: index('central_backups_tenant_status_idx').on(table.tenantId, table.status),
+}));
+
+// Central restore jobs (field-swap restore). The CENTRAL runs pg_restore on its
+// own Postgres; gcdr tracks this job state machine, driven by the central's
+// progress reports. See migration 0052_central_restore_jobs.sql.
+export const centralRestoreJobStatusEnum = pgEnum('central_restore_job_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED', 'CANCELED']);
+export const centralRestoreJobPhaseEnum = pgEnum('central_restore_job_phase', ['QUEUED', 'DOWNLOAD', 'VERIFY', 'STOP_SERVICES', 'RESTORE_DB', 'START_SERVICES', 'DONE']);
+
+export const centralRestoreJobs = pgTable('central_restore_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  centralId: uuid('central_id').notNull().references(() => centrals.id),
+  sourceBackupId: uuid('source_backup_id').notNull().references(() => centralBackups.id),
+  status: centralRestoreJobStatusEnum('status').notNull().default('QUEUED'),
+  currentPhase: centralRestoreJobPhaseEnum('current_phase').notNull().default('QUEUED'),
+  dryRun: boolean('dry_run').notNull().default(false),
+  logEntries: jsonb('log_entries')
+    .$type<{ ts: string; phase: string; level: string; message: string }[]>()
+    .notNull()
+    .default([]),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  tenantCentralIdx: index('central_restore_jobs_tenant_central_idx').on(table.tenantId, table.centralId, table.createdAt),
+  tenantStatusIdx: index('central_restore_jobs_tenant_status_idx').on(table.tenantId, table.status),
+  // CR-S5: stalled-job sweep filters status='RUNNING' AND updated_at < cutoff.
+  statusUpdatedIdx: index('central_restore_jobs_status_updated_idx').on(table.status, table.updatedAt),
 }));
 
 // =============================================================================

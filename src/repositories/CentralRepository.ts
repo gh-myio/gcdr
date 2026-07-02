@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Central, ConnectionStatus, createDefaultCentralConfig, createDefaultCentralStats } from '../domain/entities/Central';
 import { CreateCentralDTO, UpdateCentralDTO, ListCentralsDTO } from '../dto/request/CentralDTO';
@@ -66,6 +66,81 @@ export class CentralRepository implements ICentralRepository {
       .limit(1);
 
     return result ? this.mapToEntity(result) : null;
+  }
+
+  /**
+   * Cross-tenant lookup by the central's own UUID (its `id`, the value the
+   * device carries as the `UUID` claim in its poll-loop JWT). Tenant-agnostic:
+   * the central does NOT know its tenant — it is derived from the returned row.
+   * Returns the RAW row (incl. tenantId + agentSecret) for centralAuthMiddleware
+   * to verify the HMAC and build req.context. Returns null if no such central.
+   */
+  async getByUuid(uuid: string): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .select()
+      .from(centrals)
+      .where(eq(centrals.id, uuid))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  /**
+   * Store a one-time enroll token (Slice 1.5). Operator path → tenant-aware.
+   * Persists ONLY the sha256 hash of the token + its expiry; the plaintext is
+   * never stored. Returns the updated row, or null if no such central in the
+   * tenant. Re-issuing simply overwrites any prior pending token.
+   */
+  async setEnrollToken(
+    tenantId: string,
+    id: string,
+    enrollTokenHash: string,
+    enrollTokenExpiresAt: Date,
+  ): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .update(centrals)
+      .set({
+        enrollTokenHash,
+        enrollTokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .returning();
+
+    return row ?? null;
+  }
+
+  /**
+   * Finalize enrollment (Slice 1.5). Device-facing → cross-tenant by `id` (the
+   * central only knows its own uuid). Persists the freshly-minted agent_secret,
+   * stamps enrolled_at, and CLEARS the enroll token (hash + expiry).
+   *
+   * CR-S8: the UPDATE is CONDITIONAL on the enroll-token hash still being present
+   * and matching `expectedEnrollTokenHash`, so mint-new + revoke-old happen in a
+   * single compare-and-swap statement. Concurrent re-enrolls of the same token
+   * (field-swap retry storm) therefore resolve to exactly ONE winner — the rest
+   * match zero rows and get null. Returns the updated row, or null if no central
+   * matched (unknown id OR the token was already consumed).
+   */
+  async completeEnrollment(
+    id: string,
+    expectedEnrollTokenHash: string,
+    agentSecret: string,
+    enrolledAt: Date,
+  ): Promise<typeof centrals.$inferSelect | null> {
+    const [row] = await db
+      .update(centrals)
+      .set({
+        agentSecret,
+        enrolledAt,
+        enrollTokenHash: null,
+        enrollTokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(centrals.id, id), eq(centrals.enrollTokenHash, expectedEnrollTokenHash)))
+      .returning();
+
+    return row ?? null;
   }
 
   async existsBySerialNumberGlobal(serialNumber: string): Promise<boolean> {
@@ -294,6 +369,10 @@ export class CentralRepository implements ICentralRepository {
       .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
   }
 
+  // SECURITY (CR-B2): this is the operator-facing allowlist. The credential
+  // columns agent_secret / enroll_token_hash / enroll_token_expires_at /
+  // enrolled_at are intentionally NOT mapped onto the Central entity, so they
+  // can never reach a response body. Do NOT switch this to `...row` / a spread.
   private mapToEntity(row: typeof centrals.$inferSelect): Central {
     return {
       id: row.id,

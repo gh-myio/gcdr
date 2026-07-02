@@ -4,8 +4,12 @@ import { Request, Response, NextFunction } from 'express';
 // In-memory token-bucket-ish rate limiter for sensitive endpoints
 // (RFC-0032 Phase 2 — operator-pin).
 //
-// Single-instance only. If the deployment scales horizontally, replace the
-// internal Map with Redis. The interface stays the same.
+// Single-instance only (per-process Map). CR-S7 follow-up: with multiple
+// replicas the GLOBAL caps (central-enroll, operator-pin) become N×max — move
+// those to a shared store. There is no Redis in the stack today; a Postgres
+// fixed-window limiter via the existing `db` is the lightest correct option.
+// The per-central poll limiter can stay per-replica (it is anti-runaway, not a
+// hard global cap). The interface stays the same.
 //
 // Key strategies (compose at the call site):
 //   - byIp(req)            → "<ip>"
@@ -44,12 +48,45 @@ function getStore(name: string): Map<string, BucketEntry> {
   return store;
 }
 
-export function clientIp(req: Request): string {
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string') {
-    return xff.split(',')[0]?.trim() || 'unknown';
+// round-3 #6: lazy per-key cleanup only reclaims keys that are hit again, so a
+// stream of rotated keys (e.g. spoofed `uuid` values on the poll route) grows the
+// buckets without bound. This janitor periodically drops every expired entry
+// across all stores, capping memory regardless of key churn.
+let janitorHandle: ReturnType<typeof setInterval> | null = null;
+
+export function sweepExpiredBuckets(now: number = Date.now()): number {
+  let removed = 0;
+  for (const store of stores.values()) {
+    for (const [key, entry] of store) {
+      if (entry.resetAt <= now) {
+        store.delete(key);
+        removed += 1;
+      }
+    }
   }
-  return req.socket?.remoteAddress || 'unknown';
+  return removed;
+}
+
+/** Start the periodic bucket sweeper (idempotent). Wired from the server boot. */
+export function startRateLimitJanitor(intervalMs = 5 * 60 * 1000): void {
+  if (janitorHandle) return;
+  janitorHandle = setInterval(() => sweepExpiredBuckets(), intervalMs);
+  // don't keep the event loop alive just for cleanup
+  if (typeof janitorHandle.unref === 'function') janitorHandle.unref();
+}
+
+export function stopRateLimitJanitor(): void {
+  if (janitorHandle) {
+    clearInterval(janitorHandle);
+    janitorHandle = null;
+  }
+}
+
+export function clientIp(req: Request): string {
+  // CR-S7: use Express's vetted req.ip, which honours `app.set('trust proxy')`
+  // — a spoofed X-Forwarded-For from beyond the trusted hop count is ignored.
+  // Reading the raw XFF here (as before) let any client forge their bucket key.
+  return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
 /**
@@ -104,4 +141,52 @@ export const operatorPinRateLimiter = rateLimit('operator-pin', {
   max: 10,
   keyFn: (req) => clientIp(req),
   message: 'Too many PIN login attempts; wait before retrying',
+});
+
+/**
+ * Central zero-touch enrollment: a PUBLIC endpoint where the one-time enroll
+ * token IS the credential, so throttle by IP to blunt token brute-forcing /
+ * enroll abuse. Enrollment is rare (once per central; re-enroll only on a
+ * field-swap), so the window is generous but finite.
+ */
+export const centralEnrollRateLimiter = rateLimit('central-enroll', {
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  keyFn: (req) => clientIp(req),
+  message: 'Too many enrollment attempts; wait before retrying',
+});
+
+/**
+ * Central poll loop (jobs/next + progress reports). Authenticated by the
+ * agent-secret JWT, but rate-limited per-central so a single runaway/compromised
+ * device cannot hammer the control plane. Keyed by the `uuid` header so each
+ * central is its own bucket (many centrals behind one NAT do not starve each
+ * other); falls back to IP when the header is absent. A healthy central polls
+ * every 30s (~2/min); 60/min leaves ample room for retries while bounding abuse.
+ */
+export const centralPollRateLimiter = rateLimit('central-poll', {
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: (req) => {
+    const u = req.headers['uuid'];
+    return typeof u === 'string' && u ? `central:${u}` : `ip:${clientIp(req)}`;
+  },
+  message: 'Too many central-agent requests; slow down the poll loop',
+});
+
+/**
+ * Outer per-IP bound for the central poll route, composed BEFORE the per-central
+ * limiter. The per-central limiter keys on the unauthenticated `uuid` header
+ * (it runs before centralAuthMiddleware), so an attacker rotating arbitrary uuids
+ * would otherwise get a fresh 60/min bucket per value and drive an unbounded
+ * number of getByUuid lookups in the auth gate (a DoS amplification). This caps
+ * total PRE-AUTH poll load per source IP regardless of header spoofing, while
+ * staying generous for a real fleet of centrals behind one NAT (each polls ~2/min,
+ * so 600/min ≈ 300 centrals with retry headroom).
+ */
+export const centralPollIpRateLimiter = rateLimit('central-poll-ip', {
+  windowMs: 60 * 1000,
+  max: 600,
+  keyFn: (req) => clientIp(req),
+  message: 'Too many central-agent requests from this source; slow down',
 });

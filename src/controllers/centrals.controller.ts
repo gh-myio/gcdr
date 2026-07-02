@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { centralRepository } from '../repositories/CentralRepository';
 import { centralService } from '../services/CentralService';
+import { centralBackupService } from '../services/CentralBackupService';
 import {
   CreateCentralSchema,
   UpdateCentralSchema,
@@ -8,6 +9,16 @@ import {
   UpdateConnectionStatusSchema,
   ListCentralsDTO,
 } from '../dto/request/CentralDTO';
+import {
+  CreateCentralBackupSchema,
+  ConfirmCentralBackupSchema,
+} from '../dto/request/CentralBackupDTO';
+import { centralRestoreService } from '../services/CentralRestoreService';
+import {
+  StartRestoreSchema,
+  UpdateRestoreProgressSchema,
+} from '../dto/request/CentralRestoreDTO';
+import { centralEnrollmentService } from '../services/CentralEnrollmentService';
 import { customerIntegrationService } from '../services/CustomerIntegrationService';
 import {
   SetMqttPasswordInputSchema,
@@ -16,6 +27,8 @@ import {
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 import { EventType, ActorType } from '../shared/types';
+
+const ERR_CENTRAL_ID_REQUIRED = 'Central ID is required';
 
 const router = Router();
 
@@ -79,7 +92,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const central = await centralService.getById(tenantId, id);
@@ -99,7 +112,7 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const central = await centralRepository.getById(tenantId, id);
@@ -150,7 +163,7 @@ router.put('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const data = UpdateCentralSchema.parse(req.body);
@@ -179,12 +192,42 @@ router.patch('/:id/status',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const data = UpdateCentralStatusSchema.parse(req.body);
       const central = await centralRepository.updateStatus(tenantId, id, data.status, userId);
       sendSuccess(res, central, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/enroll-token
+ * Issue a one-time enroll token for zero-touch provisioning (Slice 1.5). Stores
+ * only sha256(token) + a 24h expiry on the central; returns the PLAINTEXT token
+ * once (operator burns it into the central's .bootstrap at flash time). The
+ * central later exchanges it for its agent_secret via POST /central-agent/enroll.
+ */
+router.post('/:id/enroll-token',
+  logEvent({
+    eventType: EventType.CENTRAL_ENROLL_TOKEN_ISSUED,
+    description: (req) => `Enroll token issued for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+      }
+
+      const result = await centralEnrollmentService.issueEnrollToken(tenantId, id);
+      sendCreated(res, result, requestId);
     } catch (err) {
       next(err);
     }
@@ -201,7 +244,7 @@ router.patch('/:id/connection', async (req: Request, res: Response, next: NextFu
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const data = UpdateConnectionStatusSchema.parse(req.body);
@@ -222,7 +265,7 @@ router.post('/:id/heartbeat', async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Central ID is required');
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
     }
 
     const stats = req.body.stats || {};
@@ -247,7 +290,7 @@ router.put('/:id/mqtt-passwords/:integrationId',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -288,7 +331,7 @@ router.delete('/:id/mqtt-passwords/:integrationId',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -332,7 +375,7 @@ router.post('/:id/mqtt-passwords/:integrationId/reveal',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       const central = await centralService.getById(tenantId, id);
@@ -374,7 +417,7 @@ router.delete('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Central ID is required');
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
       }
 
       await centralRepository.delete(tenantId, id);
@@ -457,5 +500,203 @@ export const serialNextHandler = async (req: Request, res: Response, next: NextF
     next(err);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Backup / Restore (field-swap). The CENTRAL runs pg_dump/pg_restore on its own
+// embedded Postgres; these endpoints only broker presigned S3 URLs + track
+// central_backups. Phase 1: standalone backup + download.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /centrals/:id/backup
+ * Request a backup slot — returns a presigned PUT URL the central uploads to.
+ */
+router.post('/:id/backup',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_INITIATED,
+    description: (req) => `Backup requested for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const dto = CreateCentralBackupSchema.parse(req.body ?? {});
+      const result = await centralBackupService.createBackup(tenantId, req.params.id, userId, dto);
+      sendCreated(res, result, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/backups/:backupId/confirm
+ * Central confirms the upload finished (sha256 + byteSize) → status AVAILABLE.
+ */
+router.post('/:id/backups/:backupId/confirm',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_CONFIRMED,
+    description: (req) => `Backup ${req.params.backupId} confirmed for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const dto = ConfirmCentralBackupSchema.parse(req.body);
+      const result = await centralBackupService.confirmBackup(tenantId, req.params.id, req.params.backupId, dto);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/backups/:backupId/upload-url
+ * Re-mint the presigned PUT URL for a PENDING backup (CR-S9) — same key, no new
+ * row — for a central whose upload outran the previous URL's TTL.
+ */
+router.post('/:id/backups/:backupId/upload-url',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_INITIATED,
+    description: (req) => `Upload URL reissued for backup ${req.params.backupId} (central ${req.params.id})`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const result = await centralBackupService.reissueUploadUrl(tenantId, req.params.id, req.params.backupId);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/backups
+ * List backups for a central (newest first).
+ */
+router.get('/:id/backups', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralBackupService.listBackups(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/backups/:backupId/download-url
+ * Presigned GET URL for an AVAILABLE backup (analysis or restore/swap).
+ */
+router.get('/:id/backups/:backupId/download-url',
+  logEvent({
+    eventType: EventType.CENTRAL_BACKUP_DOWNLOADED,
+    description: (req) => `Download URL issued for backup ${req.params.backupId} (central ${req.params.id})`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const result = await centralBackupService.getDownloadUrl(tenantId, req.params.id, req.params.backupId);
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Restore (field-swap). gcdr creates + tracks the job; the CENTRAL runs the
+// pg_restore on its own Postgres and reports progress back. Phase 2.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /centrals/:id/restore
+ * Start a restore of this central from one of its AVAILABLE backups. Returns
+ * the job + a presigned download URL for the dump.
+ */
+router.post('/:id/restore',
+  logEvent({
+    eventType: EventType.CENTRAL_RESTORE_INITIATED,
+    description: (req) => `Restore started for central ${req.params.id} from backup ${req.body?.sourceBackupId}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const dto = StartRestoreSchema.parse(req.body);
+      const result = await centralRestoreService.startRestore(tenantId, req.params.id, userId, dto);
+      sendCreated(res, result, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/restore
+ * List restore jobs for a central (newest first).
+ */
+router.get('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralRestoreService.listJobs(tenantId, req.params.id, {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/restore/:jobId
+ * Restore job status / progress.
+ */
+router.get('/:id/restore/:jobId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralRestoreService.getJob(tenantId, req.params.id, req.params.jobId);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /centrals/:id/restore/:jobId
+ * Operator action on a restore job. This is CANCEL-ONLY: the phase/status
+ * progress of a restore is reported by the CENTRAL via
+ * PATCH /central-agent/restore/:jobId (authenticated as the central). The
+ * operator route must not be able to drive the device state machine, so it
+ * accepts only a cancel (round-3 #10).
+ */
+router.patch('/:id/restore/:jobId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const dto = UpdateRestoreProgressSchema.parse(req.body);
+    if (dto.status !== 'CANCELED' || dto.currentPhase) {
+      throw new ValidationError(
+        'Operators may only cancel a restore; phase progress is reported by the central',
+      );
+    }
+    const result = await centralRestoreService.cancelRestore(
+      tenantId,
+      req.params.id,
+      req.params.jobId,
+      userId,
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
