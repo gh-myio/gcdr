@@ -48,6 +48,40 @@ function getStore(name: string): Map<string, BucketEntry> {
   return store;
 }
 
+// round-3 #6: lazy per-key cleanup only reclaims keys that are hit again, so a
+// stream of rotated keys (e.g. spoofed `uuid` values on the poll route) grows the
+// buckets without bound. This janitor periodically drops every expired entry
+// across all stores, capping memory regardless of key churn.
+let janitorHandle: ReturnType<typeof setInterval> | null = null;
+
+export function sweepExpiredBuckets(now: number = Date.now()): number {
+  let removed = 0;
+  for (const store of stores.values()) {
+    for (const [key, entry] of store) {
+      if (entry.resetAt <= now) {
+        store.delete(key);
+        removed += 1;
+      }
+    }
+  }
+  return removed;
+}
+
+/** Start the periodic bucket sweeper (idempotent). Wired from the server boot. */
+export function startRateLimitJanitor(intervalMs = 5 * 60 * 1000): void {
+  if (janitorHandle) return;
+  janitorHandle = setInterval(() => sweepExpiredBuckets(), intervalMs);
+  // don't keep the event loop alive just for cleanup
+  if (typeof janitorHandle.unref === 'function') janitorHandle.unref();
+}
+
+export function stopRateLimitJanitor(): void {
+  if (janitorHandle) {
+    clearInterval(janitorHandle);
+    janitorHandle = null;
+  }
+}
+
 export function clientIp(req: Request): string {
   // CR-S7: use Express's vetted req.ip, which honours `app.set('trust proxy')`
   // — a spoofed X-Forwarded-For from beyond the trusted hop count is ignored.

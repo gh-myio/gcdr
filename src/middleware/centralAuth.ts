@@ -37,6 +37,13 @@ declare global {
 // Structural dep for unit testing — mirrors the DI style used by the services.
 type CentralRepoDep = Pick<typeof centralRepository, 'getByUuid'>;
 
+// A malformed `uuid` header must be rejected as 401 BEFORE it reaches
+// getByUuid: the column is `uuid` typed, so Postgres would throw "invalid input
+// syntax for type uuid" and surface a 500 that leaks the query (round-3 #4).
+// Returning 401 (same as an unknown central) also keeps the endpoint from being
+// a status/enumeration oracle.
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 function base64UrlDecode(input: string): Buffer {
   let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const padding = 4 - (base64.length % 4);
@@ -136,6 +143,11 @@ export function makeCentralAuthMiddleware(centrals: CentralRepoDep = centralRepo
       }
       if (typeof uuidHeader !== 'string' || !uuidHeader) {
         throw new UnauthorizedError('Central UUID não fornecido');
+      }
+      // Reject a malformed UUID as 401 before it reaches the typed `uuid` column
+      // (avoids a SQL-leaking 500 and keeps the endpoint from being an oracle).
+      if (!UUID_RE.test(uuidHeader)) {
+        throw new UnauthorizedError('Central UUID inválido');
       }
 
       // The header UUID is authoritative for the lookup; if the token also

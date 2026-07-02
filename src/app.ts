@@ -94,7 +94,13 @@ import { simulatorAdminController } from './controllers/admin/simulator-admin.co
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
-import { centralEnrollRateLimiter, centralPollRateLimiter, centralPollIpRateLimiter } from './middleware/rateLimit';
+import {
+  centralEnrollRateLimiter,
+  centralPollRateLimiter,
+  centralPollIpRateLimiter,
+  startRateLimitJanitor,
+} from './middleware/rateLimit';
+import { validateSecretEncryptionKey } from './shared/utils/secretEnvelope';
 import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
@@ -436,6 +442,23 @@ const PORT = parseInt(process.env.PORT || '3015', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 if (require.main === module) {
+  // round-3 #8: validate SECRET_ENCRYPTION_KEY at boot so a misconfig fails fast
+  // instead of surfacing as request-time 500s on the first enroll/secret write.
+  // Fatal in production; a warning in dev (local runs may not touch central
+  // secrets, and legacy plaintext still decrypts without the key).
+  try {
+    validateSecretEncryptionKey();
+  } catch (error) {
+    const message = (error as Error).message;
+    if (process.env.NODE_ENV === 'production') {
+      // eslint-disable-next-line no-console -- fatal boot diagnostics
+      console.error(`FATAL: ${message}`);
+      process.exit(1);
+    }
+    // eslint-disable-next-line no-console -- boot diagnostics
+    console.warn(`WARNING: ${message} (central enrollment/secret writes will fail)`);
+  }
+
   app.listen(PORT, HOST, async () => {
     const isDev = process.env.NODE_ENV !== 'production';
     const baseUrl = `http://${HOST}:${PORT}`;
@@ -470,6 +493,15 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to start the restore-sweep:', error);
+    }
+
+    // round-3 #6: periodically evict expired rate-limit buckets so rotated keys
+    // (e.g. spoofed uuids on the poll route) can't grow the store without bound.
+    try {
+      startRateLimitJanitor();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the rate-limit janitor:', error);
     }
   });
 }
