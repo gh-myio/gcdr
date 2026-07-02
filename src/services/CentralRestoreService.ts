@@ -232,13 +232,14 @@ export class CentralRestoreService {
       throw new ValidationError(`Restore job ${jobId} is already ${job.status}`);
     }
 
+    const by = userId ? ` ${userId}` : '';
     const log: RestoreLogEntry[] = [
       ...(job.logEntries ?? []),
       {
         ts: new Date().toISOString(),
         phase: job.currentPhase,
         level: 'INFO',
-        message: `restore canceled by operator${userId ? ` ${userId}` : ''}`,
+        message: `restore canceled by operator${by}`,
       },
     ];
 
