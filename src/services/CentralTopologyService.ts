@@ -8,6 +8,10 @@ import { NotFoundError } from '../shared/errors/AppError';
 const CLOUD_SERVER_URL = process.env.CLOUD_SERVER_URL || '';
 const CLOUD_STATUS_TOKEN = process.env.CLOUD_STATUS_TOKEN || '';
 
+// centralId flows into a server-to-server URL path; constrain it to a UUID so a
+// caller-supplied value cannot alter the request target (CodeQL SSRF).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Shape returned by GET (cloud-server) /centrals/:id/device-status.
 interface CloudDeviceStatus {
   id: number; // erlradio device id == GCDR devices.slaveId
@@ -70,7 +74,7 @@ export class CentralTopologyService {
     const { items } = await deviceRepository.findByCentralId(tenantId, centralId, { limit: 999 });
     const bySlave = new Map<number, (typeof items)[number]>();
     for (const d of items) {
-      if (d.slaveId == null) continue;
+      if (d.slaveId === null || d.slaveId === undefined) continue;
       if (!bySlave.has(d.slaveId)) bySlave.set(d.slaveId, d);
     }
 
@@ -84,7 +88,7 @@ export class CentralTopologyService {
         type: d.deviceType ?? null,
         status: link?.status ?? null,
         averageRetries: avg,
-        signalPct: avg == null ? null : Math.max(0, Math.min(100, Math.round(100 - avg * 10))),
+        signalPct: avg === null ? null : Math.max(0, Math.min(100, Math.round(100 - avg * 10))),
         updatedAt: link?.updated_at ?? null,
       };
     });
@@ -112,9 +116,13 @@ export class CentralTopologyService {
     const map = new Map<number, CloudDeviceStatus>();
     if (!CLOUD_SERVER_URL) return { linkBySlave: map, connected: null };
     try {
+      if (!UUID_RE.test(centralId)) return { linkBySlave: map, connected: null };
       const headers: Record<string, string> = {};
       if (CLOUD_STATUS_TOKEN) headers['x-status-token'] = CLOUD_STATUS_TOKEN;
-      const res = await fetch(`${CLOUD_SERVER_URL}/centrals/${centralId}/device-status`, { headers });
+      const res = await fetch(
+        `${CLOUD_SERVER_URL}/centrals/${encodeURIComponent(centralId)}/device-status`,
+        { headers },
+      );
       if (!res.ok) return { linkBySlave: map, connected: null };
       const body = (await res.json()) as CloudDeviceStatusResponse;
       for (const e of body.devices ?? []) map.set(e.id, e);
