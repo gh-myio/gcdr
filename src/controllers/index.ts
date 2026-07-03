@@ -82,3 +82,10 @@ export { default as assistantController } from './assistant.controller';
 
 // RFC-0047: Generic Entity Registry
 export { default as entitiesController, entityTypesRouter as entityTypesController } from './entities.controller';
+
+// RFC-0050: Pre-Setup Integrations Proxy (Ingestion/ThingsBoard/Central relay)
+export {
+  ingestionProxyController,
+  thingsboardProxyController,
+  centralProxyController,
+} from './integrationsProxy.controller';

@@ -53,6 +53,8 @@ tags:
     description: Audit logs for compliance and traceability
   - name: Customer API Keys
     description: API key management for customer integrations
+  - name: Integrations Proxy
+    description: Pre-Setup relay to non-GCDR backends — Ingestion, ThingsBoard, Central provisioning (RFC-0050). Role-gated (role:presetup-operator), deny-by-default path allowlist, dark unless PRESETUP_PROXY_ENABLED=true.
   - name: Registration
     description: User self-registration and email verification (RFC-0011)
   - name: Admin Users
@@ -8633,6 +8635,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditLogResponse'
+
+  # Integrations Proxy (RFC-0050) — Pre-Setup relay to non-GCDR backends.
+  # Pure passthrough: upstream status/body return untouched. Requires JWT with
+  # role:presetup-operator (or super-admin / master key). Answers 404 unless
+  # PRESETUP_PROXY_ENABLED=true. Paths outside the per-target allowlist → 403
+  # PROXY_PATH_NOT_ALLOWED; missing target env vars → 503 PROXY_TARGET_NOT_CONFIGURED.
+  /integrations/ingestion/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+        description: Upstream Ingestion management-API path (allowlisted — customers, assets, gateways, devices)
+    get:
+      tags: [Integrations Proxy]
+      summary: Relay to Ingestion (GET)
+      description: Injects a server-side OAuth2 client-credentials Bearer token; the caller's GCDR credentials never reach the upstream. POST/PUT/PATCH/DELETE are relayed identically.
+      operationId: proxyIngestion
+      responses:
+        '200': { description: Upstream response, passed through untouched }
+        '403': { description: Path not allowlisted, or caller lacks role:presetup-operator }
+        '503': { description: Target env vars not configured (no fallback by design) }
+  /integrations/thingsboard/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+        description: Upstream ThingsBoard REST path relative to {base}/api (allowlisted — auth, customers, assets, devices, relations, telemetry SERVER_SCOPE)
+    get:
+      tags: [Integrations Proxy]
+      summary: Relay to ThingsBoard (GET)
+      description: Forwards the operator's TB JWT from the X-Target-Authorization request header as ThingsBoard's X-Authorization. /auth/login and /auth/token are exempt (authenticate via body). All methods relayed identically.
+      operationId: proxyThingsboard
+      parameters:
+        - name: X-Target-Authorization
+          in: header
+          required: false
+          schema: { type: string }
+          description: Operator's ThingsBoard JWT (Bearer). Required for every TB path except /auth/login and /auth/token.
+      responses:
+        '200': { description: Upstream response, passed through untouched }
+        '401': { description: X-Target-Authorization missing for a TB path that requires it }
+        '403': { description: Path not allowlisted, or caller lacks role:presetup-operator }
+        '503': { description: Target env vars not configured (no fallback by design) }
+  /integrations/central/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+        description: Upstream Central provisioning path (legacy surface, relayed wholesale — tighten in phase B3)
+    get:
+      tags: [Integrations Proxy]
+      summary: Relay to Central provisioning (GET)
+      description: No upstream auth (legacy service). 120s default timeout — provisioning is slow by nature. All methods relayed identically.
+      operationId: proxyCentral
+      responses:
+        '200': { description: Upstream response, passed through untouched }
+        '403': { description: Caller lacks role:presetup-operator }
+        '503': { description: Target env vars not configured (no fallback by design) }
 
   # Integrations
   /integrations/packages:

@@ -94,6 +94,10 @@ import {
   assistantController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
+  // RFC-0050: Pre-Setup Integrations Proxy
+  ingestionProxyController,
+  thingsboardProxyController,
+  centralProxyController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -397,6 +401,15 @@ apiV1Router.use('/authorization', authMiddleware, authorizationController);
 
 // Rules (hybridAuth: read=bundles:read, write=bundles:read OR rules:write)
 apiV1Router.use('/rules', hybridAuthByMethod('bundles:read', ['bundles:read', 'rules:write']), rulesController);
+
+// RFC-0050: Pre-Setup Integrations Proxy — mounted BEFORE the general
+// /integrations (marketplace) router so these specific prefixes win Express's
+// first-match routing. authMiddleware only (JWT or master key — customer API
+// keys are rejected by the role gate inside each proxy router). Routes answer
+// 404 unless PRESETUP_PROXY_ENABLED=true (deploy dark, flip at cutover).
+apiV1Router.use('/integrations/ingestion', authMiddleware, ingestionProxyController);
+apiV1Router.use('/integrations/thingsboard', authMiddleware, thingsboardProxyController);
+apiV1Router.use('/integrations/central', authMiddleware, centralProxyController);
 
 // Integrations
 apiV1Router.use('/integrations', authMiddleware, integrationsController);

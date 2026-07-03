@@ -172,7 +172,23 @@ BEGIN
     -- (scripts/db/ops/seed-local-test-users-os.sql / add-os-only-role.sql).
     ON CONFLICT DO NOTHING;
 
-    RAISE NOTICE 'Inserted 10 roles';
+    -- Pre-Setup Operator (RFC-0050) — mirrors migration 0051 for dev parity
+    INSERT INTO roles (id, tenant_id, key, display_name, description, policies, tags, risk_level, is_system, version)
+    VALUES (
+        'dddd1313-1313-1313-1313-131313131313',
+        v_tenant_id,
+        'role:presetup-operator',
+        'Pre-Setup Operator',
+        'Provisions customer topology before go-live: customers, assets, centrals, devices, API keys, integration sync state and work orders. Grants access to the integrations proxy (RFC-0050).',
+        '["policy:customer-management", "policy:device-management", "policy:integration-management", "policy:work-orders-only", "policy:reports"]',
+        '["presetup", "operator", "provisioning"]',
+        'high',
+        true,
+        1
+    )
+    ON CONFLICT DO NOTHING;
+
+    RAISE NOTICE 'Inserted 11 roles';
 END $$;
 
 -- Verify
