@@ -16,6 +16,11 @@ interface CloudDeviceStatus {
   updated_at: number; // epoch seconds
 }
 
+interface CloudDeviceStatusResponse {
+  connected?: boolean; // is the central's WS to the cloud currently up?
+  devices?: CloudDeviceStatus[];
+}
+
 export interface TopologyNode {
   deviceId: string;
   slaveId: number;
@@ -42,7 +47,22 @@ export class CentralTopologyService {
     const central = await centralRepository.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
-    const linkBySlave = await this.fetchLinkQuality(centralId);
+    const { linkBySlave, connected } = await this.fetchLinkQuality(centralId);
+
+    // Reflect the central ONLINE/OFFLINE off the SAME cloud link the topology
+    // uses: the cloud-server knows central_connected/disconnected, so GCDR needn't
+    // depend on the central sending heartbeats. Best-effort + only on change, so
+    // the topology still renders if this write fails.
+    if (connected !== null) {
+      const desired = connected ? 'ONLINE' : 'OFFLINE';
+      if (central.connectionStatus !== desired) {
+        try {
+          await centralRepository.updateConnectionStatus(tenantId, centralId, desired);
+        } catch {
+          // reconcile is best-effort; never fail the topology response on it.
+        }
+      }
+    }
 
     // GCDR devices for the central. A board at a slaveId can expose several
     // channel-rows; the star shows ONE node per slaveId (link quality is
@@ -72,20 +92,23 @@ export class CentralTopologyService {
     return { central: { id: central.id, name: central.name }, nodes };
   }
 
-  private async fetchLinkQuality(centralId: string): Promise<Map<number, CloudDeviceStatus>> {
+  private async fetchLinkQuality(
+    centralId: string
+  ): Promise<{ linkBySlave: Map<number, CloudDeviceStatus>; connected: boolean | null }> {
     const map = new Map<number, CloudDeviceStatus>();
-    if (!CLOUD_SERVER_URL) return map;
+    if (!CLOUD_SERVER_URL) return { linkBySlave: map, connected: null };
     try {
       const headers: Record<string, string> = {};
       if (CLOUD_STATUS_TOKEN) headers['x-status-token'] = CLOUD_STATUS_TOKEN;
       const res = await fetch(`${CLOUD_SERVER_URL}/centrals/${centralId}/device-status`, { headers });
-      if (!res.ok) return map;
-      const list = (await res.json()) as CloudDeviceStatus[];
-      for (const e of list) map.set(e.id, e);
+      if (!res.ok) return { linkBySlave: map, connected: null };
+      const body = (await res.json()) as CloudDeviceStatusResponse;
+      for (const e of body.devices ?? []) map.set(e.id, e);
+      return { linkBySlave: map, connected: body.connected ?? null };
     } catch {
       // cloud-server unreachable -> nodes still render, with null link quality.
+      return { linkBySlave: map, connected: null };
     }
-    return map;
   }
 }
 
