@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { centralRepository } from '../repositories/CentralRepository';
+import { deviceRepository } from '../repositories/DeviceRepository';
 import { centralService } from '../services/CentralService';
 import { centralBackupService } from '../services/CentralBackupService';
 import {
@@ -127,7 +128,13 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
       throw new NotFoundError('Central not found');
     }
 
-    sendSuccess(res, central.stats, 200, requestId);
+    // Merge live device counts (physical devices / of those ONLINE) into the
+    // stats passthrough so CentralDetail shows connected/total from the real
+    // device registry instead of the (unpopulated) stats blob.
+    const counts = await deviceRepository.countsByCentralIds(tenantId, [id]);
+    const deviceCounts = counts.get(id) ?? { devicesTotal: 0, devicesConnected: 0 };
+
+    sendSuccess(res, { ...central.stats, ...deviceCounts }, 200, requestId);
   } catch (err) {
     next(err);
   }

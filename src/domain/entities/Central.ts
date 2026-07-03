@@ -115,6 +115,8 @@ export interface Central extends BaseEntity {
 
   // Enriched on read (list/get): the owning customer's display name and a
   // device-count summary for the "connected / total" column. Not persisted.
+  // devicesTotal counts the central's active devices; devicesConnected those
+  // whose connectivity_status is ONLINE.
   customerName?: string;
   statistics?: { devicesTotal: number; devicesConnected: number };
 

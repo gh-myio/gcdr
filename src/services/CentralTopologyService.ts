@@ -89,6 +89,20 @@ export class CentralTopologyService {
       };
     });
 
+    // Reflect each device's connectivity off the same cloud link (online|bad ->
+    // ONLINE, offline -> OFFLINE; unknown/null left as-is). Best-effort + only on
+    // change, so the centrals-list connected/total count reflects reality once a
+    // central has been viewed. The topology response still renders if it fails.
+    await Promise.allSettled(
+      [...bySlave.values()].map((d) => {
+        const link = linkBySlave.get(d.slaveId as number);
+        if (!link?.status) return Promise.resolve();
+        const desired = link.status === 'offline' ? 'OFFLINE' : 'ONLINE';
+        if (d.connectivityStatus === desired) return Promise.resolve();
+        return deviceRepository.setConnectivityStatus(tenantId, d.id, desired);
+      }),
+    );
+
     return { central: { id: central.id, name: central.name }, nodes };
   }
 

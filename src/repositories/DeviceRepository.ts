@@ -205,6 +205,13 @@ export class DeviceRepository implements IDeviceRepository {
 
     return row?.count ?? 0;
   }
+  /** Set a device's connectivity_status (reconciled from the cloud-server link). */
+  async setConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<void> {
+    await db
+      .update(devices)
+      .set({ connectivityStatus: status, updatedAt: new Date(now()) })
+      .where(and(eq(devices.tenantId, tenantId), eq(devices.id, id)));
+  }
 
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Device | null> {
     const [result] = await db

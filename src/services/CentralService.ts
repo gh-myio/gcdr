@@ -8,6 +8,7 @@ import {
 } from '../dto/request/CentralDTO';
 import { CentralRepository } from '../repositories/CentralRepository';
 import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
+import { deviceRepository } from '../repositories/DeviceRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
