@@ -513,21 +513,22 @@ const PORT = parseInt(process.env.PORT || '3015', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 if (require.main === module) {
-  // round-3 #8: validate SECRET_ENCRYPTION_KEY at boot so a misconfig fails fast
-  // instead of surfacing as request-time 500s on the first enroll/secret write.
-  // Fatal in production; a warning in dev (local runs may not touch central
-  // secrets, and legacy plaintext still decrypts without the key).
+  // round-3 #8: validate SECRET_ENCRYPTION_KEY at boot so a misconfig surfaces
+  // immediately instead of as request-time 500s on the first enroll/secret
+  // write. Non-fatal in every environment: a missing key only disables central
+  // enrollment/secret WRITES (legacy plaintext still decrypts without it), so
+  // the rest of the API must come up — the error stays loud in the log and the
+  // affected endpoints fail per-request until the key is provided.
   try {
     validateSecretEncryptionKey();
   } catch (error) {
     const message = (error as Error).message;
-    if (process.env.NODE_ENV === 'production') {
-      // eslint-disable-next-line no-console -- fatal boot diagnostics
-      console.error(`FATAL: ${message}`);
-      process.exit(1);
-    }
     // eslint-disable-next-line no-console -- boot diagnostics
-    console.warn(`WARNING: ${message} (central enrollment/secret writes will fail)`);
+    console.error(
+      `ERROR: ${message} — starting WITHOUT secrets-at-rest support: ` +
+        'central enrollment/secret writes will fail until SECRET_ENCRYPTION_KEY is set ' +
+        '(generate: openssl rand -hex 32)'
+    );
   }
 
   app.listen(PORT, HOST, async () => {
