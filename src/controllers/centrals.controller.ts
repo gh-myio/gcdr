@@ -15,6 +15,7 @@ import {
 } from '../dto/request/CentralBackupDTO';
 import { centralRestoreService } from '../services/CentralRestoreService';
 import { centralCommandService } from '../services/CentralCommandService';
+import { centralTopologyService } from '../services/CentralTopologyService';
 import { CreateCommandSchema } from '../dto/request/CentralCommandDTO';
 import {
   StartRestoreSchema,
@@ -127,6 +128,22 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
     }
 
     sendSuccess(res, central.stats, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /centrals/:id/device-topology
+ * Hub-and-spoke topology of the central's devices + per-device link quality
+ * (status + average_retries, joined from the cloud-server) for the CentralDetail
+ * topology view. One node per physical device (grouped by slaveId).
+ */
+router.get('/:id/device-topology', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralTopologyService.getTopology(tenantId, req.params.id);
+    sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
   }
