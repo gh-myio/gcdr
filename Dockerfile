@@ -102,6 +102,13 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
 
+# Copy drizzle migrations — the custom runner (npm run db:mig:*) reads
+# drizzle/migrations/ and is the only supported way to apply/baseline schema
+# changes from inside the container. Without this COPY the runner fails with
+# ENOENT (2026-07-03 prod incident: code shipped selecting centrals columns
+# that migrations 0051-0055 hadn't created, and the runner couldn't run).
+COPY drizzle ./drizzle
+
 # Copy OpenAPI documentation
 COPY docs/openapi.yaml ./docs/
 
