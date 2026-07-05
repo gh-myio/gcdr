@@ -14,6 +14,8 @@ export interface CreateWorkOrderInput {
   type: string;
   rootAssetId?: string | null;
   code: string;
+  /** RFC-0051: structural parent (Grupo de OS / sub-OS). */
+  parentId?: string | null;
   assignedTo?: string | null;
   scheduledAt?: string | null;
   status?: string;
@@ -51,6 +53,10 @@ export interface IWorkOrderRepository {
   updateStatus(tenantId: string, id: string, status: string): Promise<WorkOrder>;
   softDelete(tenantId: string, id: string): Promise<void>;
   list(tenantId: string, params: ListWorkOrdersDTO): Promise<PaginatedResult<WorkOrder>>;
+  /** RFC-0051: set/clear the structural parent edge (no events — service's job). */
+  updateParent(tenantId: string, id: string, parentId: string | null): Promise<WorkOrder>;
+  /** RFC-0051: all non-deleted children of a parent (capped at 500). */
+  listChildren(tenantId: string, parentId: string): Promise<WorkOrder[]>;
   /** True when a non-deleted WO of the tenant already uses this code. */
   codeExists(tenantId: string, code: string, excludeId?: string): Promise<boolean>;
 

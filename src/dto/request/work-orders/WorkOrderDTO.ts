@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // RFC-0037 — Work Orders (event-log model) request DTOs.
 
-export const WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA', 'CHAMADO'] as const;
+export const WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA', 'CHAMADO', 'GRUPO'] as const;
 
 // Execution WO types a chamado can derive into (excludes CHAMADO itself).
 export const EXECUTION_WORK_ORDER_TYPES = ['INSTALACAO', 'MANUTENCAO', 'VISITA_TECNICA'] as const;
@@ -29,6 +29,8 @@ export const CreateWorkOrderSchema = z.object({
   code:        z.string().trim().min(1).max(100).optional(),
   assignedTo:  z.string().uuid().nullable().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
+  // RFC-0051: create already linked under a parent OS (Grupo de OS / sub-OS).
+  parentId:    z.string().uuid().nullable().optional(),
   // Optional initial device scope.
   devices:     z.array(z.string().uuid()).max(500).optional(),
 });
@@ -44,6 +46,14 @@ export const UpdateWorkOrderSchema = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 export type UpdateWorkOrderDTO = z.infer<typeof UpdateWorkOrderSchema>;
+
+// ---------------------------------------------------------------------------
+// RFC-0051: attach/detach/move a WO under a parent (Grupo de OS / sub-OS)
+// ---------------------------------------------------------------------------
+export const SetWorkOrderParentSchema = z.object({
+  parentId: z.string().uuid().nullable(),
+});
+export type SetWorkOrderParentDTO = z.infer<typeof SetWorkOrderParentSchema>;
 
 // ---------------------------------------------------------------------------
 // List / filter work orders
@@ -64,6 +74,8 @@ export const ListWorkOrdersSchema = z.object({
   type:        z.enum(WORK_ORDER_TYPES).optional(),
   assignedTo:  z.string().uuid().optional(),
   deviceId:    z.string().uuid().optional(),
+  // RFC-0051: list the children of a parent OS (Grupo de OS / sub-OS).
+  parentId:    z.string().uuid().optional(),
   // Opening (createdAt) range — inclusive ISO timestamps.
   createdFrom: z.string().datetime({ offset: true }).optional(),
   createdTo:   z.string().datetime({ offset: true }).optional(),

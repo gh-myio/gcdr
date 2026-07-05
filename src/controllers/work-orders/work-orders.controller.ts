@@ -3,6 +3,7 @@ import { workOrderService } from '../../services/work-orders/WorkOrderService';
 import {
   CreateWorkOrderSchema,
   UpdateWorkOrderSchema,
+  SetWorkOrderParentSchema,
   ListWorkOrdersSchema,
   AppendWorkOrderEventSchema,
   AddWorkOrderDeviceSchema,
@@ -43,7 +44,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
     const {
-      customerId, status, type, assignedTo, deviceId,
+      customerId, status, type, assignedTo, deviceId, parentId,
       createdFrom, createdTo, sort, limit, cursor,
     } = req.query;
 
@@ -53,6 +54,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       type:        type as string | undefined,
       assignedTo:  assignedTo as string | undefined,
       deviceId:    deviceId as string | undefined,
+      parentId:    parentId as string | undefined,
       createdFrom: createdFrom as string | undefined,
       createdTo:   createdTo as string | undefined,
       sort:        sort as string | undefined,
@@ -92,6 +94,17 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     if (!req.params.id) throw new ValidationError('Work order ID is required');
     const data = UpdateWorkOrderSchema.parse(req.body);
     const wo = await workOrderService.update(tenantId, req.params.id, data, actorOf(req));
+    sendSuccess(res, wo, 200, requestId);
+  } catch (err) { next(err); }
+});
+
+/** PUT /wo/work-orders/:id/parent — RFC-0051: attach/detach/move under a parent OS */
+router.put('/:id/parent', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    if (!req.params.id) throw new ValidationError('Work order ID is required');
+    const { parentId } = SetWorkOrderParentSchema.parse(req.body);
+    const wo = await workOrderService.setParent(tenantId, req.params.id, parentId, actorOf(req));
     sendSuccess(res, wo, 200, requestId);
   } catch (err) { next(err); }
 });

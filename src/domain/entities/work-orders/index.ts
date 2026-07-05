@@ -5,7 +5,7 @@
 // and (via the generalized RFC-0036 annotation subsystem) observations.
 // `status` is a service-maintained PROJECTION of the latest lifecycle event.
 
-export type WorkOrderType = 'INSTALACAO' | 'MANUTENCAO' | 'VISITA_TECNICA' | 'CHAMADO';
+export type WorkOrderType = 'INSTALACAO' | 'MANUTENCAO' | 'VISITA_TECNICA' | 'CHAMADO' | 'GRUPO';
 
 // Projected lifecycle status (maintained by the service, not stored per-event).
 export type WorkOrderStatus =
@@ -44,6 +44,8 @@ export interface WorkOrder {
   status: WorkOrderStatus | string;
   /** Mandatory, unique per tenant — generated as OS-<Mercosul plate> when absent. */
   code: string;
+  /** RFC-0051: structural parent (Grupo de OS / sub-OS). NULL = root. */
+  parentId: string | null;
   assignedTo: string | null;
   scheduledAt: string | null;
   createdBy: string;

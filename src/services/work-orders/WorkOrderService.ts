@@ -84,6 +84,16 @@ export class WorkOrderService {
       if (!asset) throw new NotFoundError(`Asset ${data.rootAssetId} not found`);
     }
 
+    // RFC-0051: creating already linked under a parent OS (Grupo de OS / sub-OS).
+    let parent: WorkOrder | null = null;
+    if (data.parentId) {
+      parent = await this.repo.getById(tenantId, data.parentId);
+      if (!parent) throw new NotFoundError(`Parent work order ${data.parentId} not found`);
+      if (parent.customerId !== data.customerId) {
+        throw new ValidationError('Parent work order belongs to a different customer');
+      }
+    }
+
     const code = await this.resolveCode(tenantId, data.code);
 
     const wo = await this.repo.create(tenantId, {
@@ -91,6 +101,7 @@ export class WorkOrderService {
       type:        data.type,
       rootAssetId: data.rootAssetId ?? null,
       code,
+      parentId:    parent ? parent.id : null,
       assignedTo:  data.assignedTo ?? null,
       scheduledAt: data.scheduledAt ?? null,
       status:      'PLANEJADA',
@@ -101,6 +112,19 @@ export class WorkOrderService {
       eventType: 'WO_CRIADA',
       payload:   { type: wo.type, customerId: wo.customerId },
     }));
+
+    // RFC-0051: link markers on BOTH sides (mirrors the CHAMADO_OS_* pattern) —
+    // the link history lives in the event log, no provenance column.
+    if (parent) {
+      await this.repo.appendEvent(tenantId, parent.id, this.actorEvent(ctx, {
+        eventType: 'OS_FILHA_VINCULADA',
+        payload:   { childId: wo.id, childCode: wo.code, childType: wo.type },
+      }));
+      await this.repo.appendEvent(tenantId, wo.id, this.actorEvent(ctx, {
+        eventType: 'OS_FILHA_VINCULADA',
+        payload:   { parentId: parent.id, parentCode: parent.code, parentType: parent.type },
+      }));
+    }
 
     // Optional initial device scope.
     if (data.devices && data.devices.length > 0) {
@@ -264,7 +288,88 @@ export class WorkOrderService {
 
   async delete(tenantId: string, id: string): Promise<void> {
     await this.getById(tenantId, id);
+    // RFC-0051: deleting a parent DETACHES its children (never cascades).
+    const children = await this.repo.listChildren(tenantId, id);
+    for (const child of children) {
+      await this.repo.updateParent(tenantId, child.id, null);
+      await this.repo.appendEvent(tenantId, child.id, {
+        eventType: 'OS_FILHA_DESVINCULADA',
+        actorType: 'SYSTEM',
+        payload: { parentId: id, reason: 'PARENT_DELETED' },
+      });
+    }
     await this.repo.softDelete(tenantId, id);
+  }
+
+  /**
+   * RFC-0051: attach / detach / move a WO under a parent (Grupo de OS or any
+   * OS). Guards: self-parenting, cross-customer, cycles (ancestor walk) and
+   * max depth. Link history lives in OS_FILHA_* markers on BOTH sides.
+   */
+  async setParent(
+    tenantId: string,
+    id: string,
+    parentId: string | null,
+    ctx: ActorContext,
+  ): Promise<WorkOrderDetail> {
+    const wo = await this.getById(tenantId, id);
+    if (wo.parentId === parentId) return this.detail(tenantId, id); // no-op
+
+    let newParent: WorkOrder | null = null;
+    if (parentId) {
+      if (parentId === id) throw new ValidationError('A work order cannot be its own parent');
+      newParent = await this.repo.getById(tenantId, parentId);
+      if (!newParent) throw new NotFoundError(`Parent work order ${parentId} not found`);
+      if (newParent.customerId !== wo.customerId) {
+        throw new ValidationError('Parent work order belongs to a different customer');
+      }
+      // Cycle + depth guard: walk the would-be ancestor chain.
+      const MAX_DEPTH = 5;
+      let cursor: WorkOrder | null = newParent;
+      let depth = 1;
+      while (cursor?.parentId) {
+        if (cursor.parentId === id) {
+          throw new ValidationError('Linking would create a cycle in the OS hierarchy');
+        }
+        cursor = await this.repo.getById(tenantId, cursor.parentId);
+        depth += 1;
+        if (depth >= MAX_DEPTH) {
+          throw new ValidationError(`OS hierarchy exceeds the maximum depth of ${MAX_DEPTH}`);
+        }
+      }
+    }
+
+    // Detach from the previous parent first (its own marker pair).
+    if (wo.parentId) {
+      const oldParent = await this.repo.getById(tenantId, wo.parentId);
+      if (oldParent) {
+        await this.repo.appendEvent(tenantId, oldParent.id, this.actorEvent(ctx, {
+          eventType: 'OS_FILHA_DESVINCULADA',
+          payload:   { childId: wo.id, childCode: wo.code, childType: wo.type },
+        }));
+      }
+      await this.repo.appendEvent(tenantId, wo.id, this.actorEvent(ctx, {
+        eventType: 'OS_FILHA_DESVINCULADA',
+        payload:   oldParent
+          ? { parentId: oldParent.id, parentCode: oldParent.code, parentType: oldParent.type }
+          : { parentId: wo.parentId },
+      }));
+    }
+
+    await this.repo.updateParent(tenantId, id, parentId);
+
+    if (newParent) {
+      await this.repo.appendEvent(tenantId, newParent.id, this.actorEvent(ctx, {
+        eventType: 'OS_FILHA_VINCULADA',
+        payload:   { childId: wo.id, childCode: wo.code, childType: wo.type },
+      }));
+      await this.repo.appendEvent(tenantId, wo.id, this.actorEvent(ctx, {
+        eventType: 'OS_FILHA_VINCULADA',
+        payload:   { parentId: newParent.id, parentCode: newParent.code, parentType: newParent.type },
+      }));
+    }
+
+    return this.detail(tenantId, id);
   }
 
   async list(tenantId: string, params: ListWorkOrdersDTO): Promise<PaginatedResult<WorkOrder>> {

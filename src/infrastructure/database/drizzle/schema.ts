@@ -1875,6 +1875,9 @@ export const workOrders = pgTable('work_orders', {
   scheduledAt:  timestamp('scheduled_at', { withTimezone: true }),
   // RFC-0044: the CHAMADO (type=CHAMADO) work order this OS hangs on (mutable).
   ticketId:     uuid('ticket_id'),
+  // RFC-0051: structural parent edge (Grupo de OS / sub-OS). Orthogonal to
+  // ticketId — an OS can hang on a chamado AND belong to a grupo.
+  parentId:     uuid('parent_id'),
   createdBy:    uuid('created_by').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1884,10 +1887,11 @@ export const workOrders = pgTable('work_orders', {
   tenantStatusIdx:   index('work_orders_tenant_status_idx').on(table.tenantId, table.status),
   rootAssetIdx:      index('work_orders_root_asset_idx').on(table.rootAssetId),
   ticketIdx:         index('work_orders_ticket_idx').on(table.tenantId, table.ticketId).where(sql`${table.ticketId} IS NOT NULL`),
+  parentIdx:         index('work_orders_parent_idx').on(table.tenantId, table.parentId).where(sql`${table.parentId} IS NOT NULL`),
   tenantCodeUnique:  uniqueIndex('work_orders_tenant_code_unique').on(table.tenantId, table.code).where(sql`${table.deletedAt} IS NULL`),
   typeCheck: check(
     'work_orders_type_check',
-    sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA','CHAMADO')`
+    sql`${table.type} IN ('INSTALACAO','MANUTENCAO','VISITA_TECNICA','CHAMADO','GRUPO')`
   ),
 }));
 

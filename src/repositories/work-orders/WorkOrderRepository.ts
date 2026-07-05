@@ -40,6 +40,7 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       type:        data.type,
       status:      data.status ?? 'PLANEJADA',
       code:        data.code,
+      parentId:    data.parentId ?? null,
       assignedTo:  data.assignedTo ?? null,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
       createdBy,
@@ -81,6 +82,32 @@ export class WorkOrderRepository implements IWorkOrderRepository {
 
     if (!row) throw new AppError('WORK_ORDER_NOT_FOUND', 'Work order not found', 404);
     return this.mapWorkOrder(row);
+  }
+
+  async updateParent(tenantId: string, id: string, parentId: string | null): Promise<WorkOrder> {
+    const [row] = await db.update(workOrders)
+      .set({ parentId, updatedAt: new Date() })
+      .where(and(
+        eq(workOrders.tenantId, tenantId),
+        eq(workOrders.id, id),
+        isNull(workOrders.deletedAt),
+      ))
+      .returning();
+    if (!row) throw new AppError('WORK_ORDER_NOT_FOUND', 'Work order not found', 404);
+    return this.mapWorkOrder(row);
+  }
+
+  async listChildren(tenantId: string, parentId: string): Promise<WorkOrder[]> {
+    const rows = await db
+      .select()
+      .from(workOrders)
+      .where(and(
+        eq(workOrders.tenantId, tenantId),
+        eq(workOrders.parentId, parentId),
+        isNull(workOrders.deletedAt),
+      ))
+      .limit(500);
+    return rows.map((r) => this.mapWorkOrder(r));
   }
 
   async updateStatus(tenantId: string, id: string, status: string): Promise<WorkOrder> {
@@ -127,6 +154,8 @@ export class WorkOrderRepository implements IWorkOrderRepository {
     if (params.status)      conditions.push(eq(workOrders.status, params.status));
     if (params.type)        conditions.push(eq(workOrders.type, params.type));
     if (params.assignedTo)  conditions.push(eq(workOrders.assignedTo, params.assignedTo));
+    // RFC-0051: children of a parent OS (Grupo de OS / sub-OS).
+    if (params.parentId)    conditions.push(eq(workOrders.parentId, params.parentId));
     if (params.createdFrom) conditions.push(gte(workOrders.createdAt, new Date(params.createdFrom)));
     if (params.createdTo)   conditions.push(lte(workOrders.createdAt, new Date(params.createdTo)));
 
@@ -340,6 +369,7 @@ export class WorkOrderRepository implements IWorkOrderRepository {
       type:        row.type as WorkOrder['type'],
       status:      row.status,
       code:        row.code,
+      parentId:    row.parentId ?? null,
       assignedTo:  row.assignedTo ?? null,
       scheduledAt: row.scheduledAt ? row.scheduledAt.toISOString() : null,
       createdBy:   row.createdBy,
