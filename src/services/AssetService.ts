@@ -12,6 +12,7 @@ import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { PaginatedResult } from '../shared/types';
 import { NotFoundError, ConflictError, ValidationError } from '../shared/errors/AppError';
+import { workOrderRepository } from '../repositories/work-orders/WorkOrderRepository';
 import { alarmBundleService } from './AlarmBundleService';
 
 export class AssetService {
@@ -118,6 +119,16 @@ export class AssetService {
     }
 
     // TODO: Check for devices attached to this asset
+
+    // Active (non-deleted) work orders anchored on this asset block deletion
+    // with a clear message. History references (soft-deleted WOs, timeline
+    // events) are ON DELETE SET NULL since migration 0058 and don't block.
+    const activeWos = await workOrderRepository.countActiveByRootAsset(tenantId, id);
+    if (activeWos > 0) {
+      throw new ConflictError(
+        `Asset is the root of ${activeWos} active work order(s). Close or delete them first.`
+      );
+    }
 
     await this.repository.delete(tenantId, id);
 

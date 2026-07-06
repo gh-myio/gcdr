@@ -57,6 +57,8 @@ export interface IWorkOrderRepository {
   updateParent(tenantId: string, id: string, parentId: string | null): Promise<WorkOrder>;
   /** RFC-0051: all non-deleted children of a parent (capped at 500). */
   listChildren(tenantId: string, parentId: string): Promise<WorkOrder[]>;
+  /** Non-deleted WOs using the asset as root — guards asset deletion. */
+  countActiveByRootAsset(tenantId: string, assetId: string): Promise<number>;
   /** True when a non-deleted WO of the tenant already uses this code. */
   codeExists(tenantId: string, code: string, excludeId?: string): Promise<boolean>;
 
@@ -71,6 +73,9 @@ export interface IWorkOrderRepository {
   // ---- Device scope --------------------------------------------------------
   addDevice(tenantId: string, workOrderId: string, deviceId: string, addedBy: string): Promise<WorkOrderDevice>;
   removeDevice(tenantId: string, workOrderId: string, deviceId: string): Promise<void>;
+  /** Clears the whole device scope of a WO (used by delete — soft delete never
+   *  fires the DB-level ON DELETE CASCADE, so the junction is cleaned here). */
+  removeAllDevices(tenantId: string, workOrderId: string): Promise<void>;
   listDevices(tenantId: string, workOrderId: string): Promise<WorkOrderDevice[]>;
   hasDevice(tenantId: string, workOrderId: string, deviceId: string): Promise<boolean>;
 

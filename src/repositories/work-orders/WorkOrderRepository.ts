@@ -110,6 +110,14 @@ export class WorkOrderRepository implements IWorkOrderRepository {
     return rows.map((r) => this.mapWorkOrder(r));
   }
 
+  async countActiveByRootAsset(tenantId: string, assetId: string): Promise<number> {
+    return countWhere(workOrders, [
+      eq(workOrders.tenantId, tenantId),
+      eq(workOrders.rootAssetId, assetId),
+      isNull(workOrders.deletedAt),
+    ]);
+  }
+
   async updateStatus(tenantId: string, id: string, status: string): Promise<WorkOrder> {
     const [row] = await db.update(workOrders)
       .set({ status, updatedAt: new Date() })
@@ -285,6 +293,11 @@ export class WorkOrderRepository implements IWorkOrderRepository {
         eq(workOrdersDevices.workOrderId, workOrderId),
         eq(workOrdersDevices.deviceId, deviceId),
       ));
+  }
+
+  async removeAllDevices(tenantId: string, workOrderId: string): Promise<void> {
+    await db.delete(workOrdersDevices)
+      .where(eq(workOrdersDevices.workOrderId, workOrderId));
   }
 
   async listDevices(tenantId: string, workOrderId: string): Promise<WorkOrderDevice[]> {

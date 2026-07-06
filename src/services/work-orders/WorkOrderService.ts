@@ -298,6 +298,10 @@ export class WorkOrderService {
         payload: { parentId: id, reason: 'PARENT_DELETED' },
       });
     }
+    // The junction has ON DELETE CASCADE, but soft delete never fires it —
+    // clear the device scope explicitly so no orphan rows linger. Events and
+    // file links are kept on purpose (audit trail / evidence).
+    await this.repo.removeAllDevices(tenantId, id);
     await this.repo.softDelete(tenantId, id);
   }
 
