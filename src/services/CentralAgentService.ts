@@ -5,6 +5,7 @@ import { centralRestoreService, CentralRestoreService } from './CentralRestoreSe
 import { NotFoundError } from '../shared/errors/AppError';
 import { UpdateRestoreProgressDTO } from '../dto/request/CentralRestoreDTO';
 import { centralCommandRepository } from '../repositories/CentralCommandRepository';
+import { centralRepository } from '../repositories/CentralRepository';
 import { centralCommandService, CentralCommandService } from './CentralCommandService';
 import { UpdateCommandResultDTO } from '../dto/request/CentralCommandDTO';
 
@@ -28,7 +29,10 @@ export interface NextJobResult {
 /** Shape returned to the central when it claims an operational command. */
 export interface NextCommandResult {
   commandId: string;
-  type: 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
+  type: 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI' | 'SET_WIFI';
+  // SET_WIFI carries { ssid, password, country } for the agent to apply via
+  // myio-wifi-set; absent for the payload-less commands.
+  payload?: unknown;
 }
 
 // Structural deps for unit testing (mirrors CentralRestoreService DI).
@@ -38,6 +42,7 @@ type StorageDep = Pick<typeof s3Storage, 'getPresignedDownloadUrl'>;
 type RestoreServiceDep = Pick<CentralRestoreService, 'updateProgress'>;
 type CommandRepoDep = Pick<typeof centralCommandRepository, 'claimNextQueued'>;
 type CommandServiceDep = Pick<CentralCommandService, 'updateResult'>;
+type CentralRepoDep = Pick<typeof centralRepository, 'recordPlatform'>;
 
 /**
  * Central-agent brokerage for the field-swap restore poll loop. The central
@@ -56,6 +61,7 @@ export class CentralAgentService {
     private readonly restore: RestoreServiceDep = centralRestoreService,
     private readonly commands: CommandRepoDep = centralCommandRepository,
     private readonly commandService: CommandServiceDep = centralCommandService,
+    private readonly centrals: CentralRepoDep = centralRepository,
   ) {}
 
   /**
@@ -126,7 +132,18 @@ export class CentralAgentService {
   async nextCommand(ctx: CentralAgentContext): Promise<NextCommandResult | null> {
     const cmd = await this.commands.claimNextQueued(ctx.tenantId, ctx.centralId);
     if (!cmd) return null;
-    return { commandId: cmd.id, type: cmd.type };
+    return { commandId: cmd.id, type: cmd.type, payload: cmd.payload };
+  }
+
+  /**
+   * Best-effort capture of the central's hardware board, which its agent stamps
+   * on every poll via the `x-device-type` header. Persisted to metadata.platform
+   * so the operator UI and the SET_WIFI gate can tell CM4 from Orange Pi. Never
+   * throws into the poll — a failed write just retries next tick.
+   */
+  async recordPlatform(ctx: CentralAgentContext, deviceType?: string): Promise<void> {
+    if (!deviceType) return;
+    await this.centrals.recordPlatform(ctx.tenantId, ctx.centralId, deviceType);
   }
 
   /**

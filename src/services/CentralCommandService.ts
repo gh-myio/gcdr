@@ -10,6 +10,14 @@ import { CentralCommand } from '../infrastructure/database/drizzle/db';
 
 const TERMINAL_STATUSES = new Set(['DONE', 'FAILED']);
 
+// The SET_WIFI payload carries the WiFi password; it is written for the central
+// to consume and must never be echoed back to an operator. Strip it from every
+// operator-facing return (the central-agent path returns the payload separately).
+function stripPayload<T extends { payload?: unknown }>(cmd: T): Omit<T, 'payload'> {
+  const { payload: _payload, ...rest } = cmd;
+  return rest;
+}
+
 // Status may advance QUEUED -> RUNNING -> DONE/FAILED. FAILED is reachable from
 // any non-terminal state; DONE only from RUNNING (the central always claims a
 // command — QUEUED -> RUNNING — before it can report a result, so a direct
@@ -51,6 +59,19 @@ export class CentralCommandService {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
+    // CM4-only: SET_WIFI configures wpa_supplicant, which only the CM4 image
+    // ships (the OPi fleet has no myio-wifi-set). Gate on the board the central
+    // reports via its agent poll (metadata.platform). The UI hides the button
+    // too; this is the server-side backstop.
+    if (dto.type === 'SET_WIFI') {
+      const platform = String(
+        (central.metadata as Record<string, unknown> | undefined)?.platform ?? '',
+      );
+      if (!/cm4/i.test(platform)) {
+        throw new ValidationError('SET_WIFI is only supported on CM4 centrals');
+      }
+    }
+
     // Dedup guard: reject a second command while one is still in flight. Without
     // this a double-submit (or two operators) could enqueue several REBOOTs the
     // central would run back-to-back — reboot, come back, reboot again.
@@ -62,19 +83,21 @@ export class CentralCommandService {
       );
     }
 
-    return this.commands.create({
+    const created = await this.commands.create({
       tenantId,
       centralId,
       type: dto.type,
+      payload: dto.payload,
       createdBy: userId ?? null,
     });
+    return stripPayload(created);
   }
 
   async listCommands(
     tenantId: string,
     centralId: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult<CentralCommand>> {
+  ): Promise<PaginatedResult<Omit<CentralCommand, 'payload'>>> {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
@@ -87,7 +110,7 @@ export class CentralCommandService {
       offset,
     });
     return {
-      items,
+      items: items.map(stripPayload),
       pagination: {
         total,
         totalPages: Math.ceil(total / limit),
@@ -99,7 +122,7 @@ export class CentralCommandService {
   async getCommand(tenantId: string, centralId: string, commandId: string) {
     const cmd = await this.commands.getById(tenantId, centralId, commandId);
     if (!cmd) throw new NotFoundError(`Command ${commandId} not found for central ${centralId}`);
-    return cmd;
+    return stripPayload(cmd);
   }
 
   /**

@@ -18,6 +18,25 @@ describe('CentralCommandDTO', () => {
     it('requires type', () => {
       expect(() => CreateCommandSchema.parse({})).toThrow();
     });
+
+    it('accepts SET_WIFI with a valid payload', () => {
+      const r = CreateCommandSchema.parse({
+        type: 'SET_WIFI',
+        payload: { ssid: 'test-ssid', password: 'test-password-123', country: 'BR' },
+      });
+      expect(r.type).toBe('SET_WIFI');
+      expect(r.payload?.ssid).toBe('test-ssid');
+    });
+
+    it('rejects SET_WIFI without a payload', () => {
+      expect(() => CreateCommandSchema.parse({ type: 'SET_WIFI' })).toThrow();
+    });
+
+    it('rejects SET_WIFI with a too-short password', () => {
+      expect(() =>
+        CreateCommandSchema.parse({ type: 'SET_WIFI', payload: { ssid: 'net', password: 'short' } }),
+      ).toThrow();
+    });
   });
 
   describe('UpdateCommandResultSchema', () => {

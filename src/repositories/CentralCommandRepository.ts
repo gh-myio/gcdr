@@ -5,7 +5,7 @@ import { now } from '../shared/utils/dateUtils';
 
 const { centralCommands } = schema;
 
-export type CommandType = 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
+export type CommandType = 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI' | 'SET_WIFI';
 export type CommandStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
 
 export interface CreateCommandInput {
@@ -13,6 +13,8 @@ export interface CreateCommandInput {
   tenantId: string;
   centralId: string;
   type: CommandType;
+  // SET_WIFI carries { ssid, password, country }; null for payload-less commands.
+  payload?: unknown;
   createdBy?: string | null;
 }
 
@@ -43,6 +45,7 @@ export class CentralCommandRepository {
         tenantId: input.tenantId,
         centralId: input.centralId,
         type: input.type,
+        payload: input.payload ?? null,
         status: 'QUEUED',
         createdAt: ts,
         updatedAt: ts,

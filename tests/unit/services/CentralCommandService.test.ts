@@ -79,6 +79,48 @@ describe('CentralCommandService', () => {
       );
       expect(commands.create).not.toHaveBeenCalled();
     });
+
+    it('rejects SET_WIFI on a non-CM4 central', async () => {
+      const { svc, commands } = makeService({
+        central: { id: 'c1', metadata: { platform: 'orangepi-zero2' } },
+      });
+      await expect(
+        svc.createCommand('t1', 'c1', 'u1', {
+          type: 'SET_WIFI',
+          payload: { ssid: 'net', password: 'password1' },
+        }),
+      ).rejects.toThrow(ValidationError);
+      expect(commands.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects SET_WIFI when the platform is unknown', async () => {
+      const { svc, commands } = makeService({ central: { id: 'c1' } });
+      await expect(
+        svc.createCommand('t1', 'c1', 'u1', {
+          type: 'SET_WIFI',
+          payload: { ssid: 'net', password: 'password1' },
+        }),
+      ).rejects.toThrow(ValidationError);
+      expect(commands.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts SET_WIFI on a CM4 central, passes the payload, and strips it from the response', async () => {
+      const { svc, commands } = makeService({
+        central: { id: 'c1', metadata: { platform: 'raspberrypi-cm4-64' } },
+      });
+      const res = await svc.createCommand('t1', 'c1', 'u1', {
+        type: 'SET_WIFI',
+        payload: { ssid: 'net', password: 'password1', country: 'BR' },
+      });
+      expect(commands.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SET_WIFI',
+          payload: { ssid: 'net', password: 'password1', country: 'BR' },
+        }),
+      );
+      // the WiFi password must never come back to the operator
+      expect((res as Record<string, unknown>).payload).toBeUndefined();
+    });
   });
 
   describe('updateResult', () => {

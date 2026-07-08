@@ -447,6 +447,26 @@ export class CentralRepository implements ICentralRepository {
       .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
   }
 
+  /**
+   * Persist the central's hardware board (reported by its agent on poll via the
+   * x-device-type header) into metadata.platform. Heartbeat-style: no version
+   * bump / optimistic lock (like recordHeartbeat), so it never fights the
+   * operator's update(). No-op when unchanged or the central is gone.
+   */
+  async recordPlatform(tenantId: string, id: string, platform: string): Promise<void> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) return;
+    const current = (existing.metadata as Record<string, unknown> | undefined)?.platform;
+    if (current === platform) return;
+    await db
+      .update(centrals)
+      .set({
+        metadata: { ...(existing.metadata as Record<string, unknown>), platform },
+        updatedAt: new Date(now()),
+      })
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
+  }
+
   // SECURITY (CR-B2): this is the operator-facing allowlist. The credential
   // columns agent_secret / enroll_token_hash / enroll_token_expires_at /
   // enrolled_at are intentionally NOT mapped onto the Central entity, so they
