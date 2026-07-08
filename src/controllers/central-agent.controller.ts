@@ -121,7 +121,11 @@ router.patch('/commands/:commandId', async (req: Request, res: Response, next: N
         {
           entityId: result.id,
           actorType: ActorType.SYSTEM,
-          userId: `central:${ctx.centralId}`,
+          // Actor is the central (SYSTEM), not a user: leave user_id null. Passing
+          // `central:<uuid>` here is not a valid uuid and made the audit_logs insert
+          // throw (user_id is a uuid column), so EVERY command result PATCH returned
+          // 500 even though the command already committed. The central id is kept
+          // below in metadata.centralId.
           description: `Command ${result.type} on central ${ctx.centralId} ${result.status.toLowerCase()}`,
           metadata: {
             centralId: ctx.centralId,
