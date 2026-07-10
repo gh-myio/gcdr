@@ -154,14 +154,14 @@ goalMarginUpdatedAt: timestamp('goal_margin_updated_at', { withTimezone: true })
 
 | Operation | Endpoint | Notes |
 |---|---|---|
-| Set / change margin | `PUT /customers/:customerId/goals/margin?domain=&year=` | body `{ "goalMarginPct": -5, "version": 7 }`; upsert |
+| Set / change margin | `PUT /customers/:customerId/goals/margin?domain=&year=` | body `{ "goalMarginPct": -5, "expectedVersion": 7 }`; upsert |
 | Clear margin | `DELETE /customers/:customerId/goals/margin?domain=&year=` | sets `NULL`; history row (`new_value: null`) |
 | Read (embedded) | `GET /customers/:customerId/goals?domain=&year=` | response gains `goalMargin` + per-node `adjustedValue` |
 | History (embedded) | `GET …/goals?…&fetchHistory=true` | `MARGIN` entries interleave in the existing history array |
 
 **Semantics:**
 
-- **Optimistic lock** — same contract as bucket writes (RFC-0046 §4.4): the body `version` (or `If-Match`) must match `consumption_goals.version`; mismatch → `409 VERSION_CONFLICT` with `currentVersion`. A successful margin write **bumps `version`** — margin and buckets share one version stream, so the timeline stays totally ordered and a margin change invalidates a concurrent stale bucket edit (and vice-versa).
+- **Optimistic lock** — same contract as bucket writes (RFC-0046 §4.4): the body `expectedVersion` must match `consumption_goals.version`; mismatch → `409 VERSION_CONFLICT` with `currentVersion`. A successful margin write **bumps `version`** — margin and buckets share one version stream, so the timeline stays totally ordered and a margin change invalidates a concurrent stale bucket edit (and vice-versa).
 - **Upsert** — `PUT` on a (customer, domain, year) with no `consumption_goals` row creates the parent row with the margin and no buckets (`adjustedValue`s appear once buckets exist). `version` starts at 1.
 - **Validation (Zod, `GoalsDTO.ts`)** — `goalMarginPct: z.number().min(-100).max(100).multipleOf(0.01)`; `domain`/`year` via the existing `GoalsTargetQuerySchema`.
 - **No-op guard** — writing the same pct returns `200` without bumping the version or writing history.

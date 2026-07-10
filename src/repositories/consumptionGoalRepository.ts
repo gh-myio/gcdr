@@ -111,7 +111,7 @@ export interface GoalHistoryAppend {
   version: number; // the version this change produced
 }
 
-export type GoalHistorySource = 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT';
+export type GoalHistorySource = 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT' | 'MARGIN';
 
 /** Default aggregation config per domain (DEC: fixed; seed if missing). */
 const DEFAULT_DOMAIN_CONFIG: Record<GoalDomain, { aggregationMethod: GoalAggregationMethod; unit: string }> = {
@@ -234,6 +234,43 @@ export class ConsumptionGoalRepository {
       .set({
         version: sqlIncrement(),
         updatedAt: new Date(),
+        updatedBy: updatedBy ?? null,
+      })
+      .where(guard)
+      .returning();
+
+    return row ?? null;
+  }
+
+  /**
+   * RFC-0052: sets (or clears, with `null`) the margin overlay together with the
+   * optimistic version bump — one guarded UPDATE, so the margin write and the
+   * bump are a single atomic statement. Returns `null` on a guard miss (409).
+   * `bump=false` skips the version increment (a margin landing on a
+   * freshly-created goal: the create IS the first change, version stays 1).
+   */
+  async setMargin(
+    goalId: string,
+    goalMarginPct: string | null,
+    expectedVersion: number | undefined,
+    updatedBy: string | null,
+    bump = true,
+    exec: GoalDbClient = db,
+  ): Promise<ConsumptionGoalRow | null> {
+    const guard =
+      expectedVersion === undefined
+        ? eq(consumptionGoals.id, goalId)
+        : and(eq(consumptionGoals.id, goalId), eq(consumptionGoals.version, expectedVersion));
+
+    const now = new Date();
+    const [row] = await exec
+      .update(consumptionGoals)
+      .set({
+        goalMarginPct,
+        goalMarginUpdatedBy: updatedBy ?? null,
+        goalMarginUpdatedAt: now,
+        ...(bump ? { version: sqlIncrement() } : {}),
+        updatedAt: now,
         updatedBy: updatedBy ?? null,
       })
       .where(guard)
