@@ -47,6 +47,7 @@ import {
   type ReplaceGoalsBodyDTO,
   type MergeGoalsBodyDTO,
   type DeleteGoalsBodyDTO,
+  type SetGoalMarginBodyDTO,
 } from '../dto/request/GoalsDTO';
 import { ValidationError, NotFoundError, AppError } from '../shared/errors/AppError';
 
@@ -77,11 +78,20 @@ export class VersionConflictError extends AppError {
 
 export interface GoalTreeNode {
   value: number;
+  /** RFC-0052: value with the margin overlay applied (== value when no margin). */
+  adjustedValue?: number;
   method: GoalAggregationMethod;
   /** Finest level the operator set within the node; absent on the pure annual root. */
   sourceLevel?: GoalSourceLevel;
   /** true = every contributing hour was system-distributed. */
   derived?: boolean;
+}
+
+/** RFC-0052 — the margin overlay block returned alongside the tree. */
+export interface GoalMarginInfo {
+  goalMarginPct: number;
+  updatedBy: string | null;
+  updatedAt: string | null;
 }
 
 export interface GoalTree {
@@ -113,6 +123,8 @@ export interface GoalGetResult {
   aggregationMethod: GoalAggregationMethod;
   year: number;
   version: number;
+  /** RFC-0052: null when no margin was ever set for this (domain, year). */
+  goalMargin?: GoalMarginInfo | null;
   tree: GoalTree;
   history?: GoalHistoryEntry[];
 }
@@ -406,6 +418,7 @@ export class ConsumptionGoalService {
         aggregationMethod: cfg.aggregationMethod,
         year: key.year,
         version: 0,
+        goalMargin: null,
         tree: {},
         ...(fetchHistory ? { history: [] } : {}),
       };
@@ -413,6 +426,7 @@ export class ConsumptionGoalService {
 
     const rows = await this.repo.findHours(goal.id);
     const tree = rows.length === 0 ? {} : this.buildTree(rows, granularity, cfg.aggregationMethod);
+    this.overlayMargin(tree, marginPctOf(goal));
 
     const result: GoalGetResult = {
       customerId: key.customerId,
@@ -421,6 +435,7 @@ export class ConsumptionGoalService {
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: goal.version,
+      goalMargin: marginInfoOf(goal),
       tree,
     };
 
@@ -464,6 +479,7 @@ export class ConsumptionGoalService {
     });
 
     const tree = await this.readTreeAt(result.goal.id, granularityOf(actionLevel), cfg.aggregationMethod);
+    this.overlayMargin(tree, marginPctOf(result.goal));
     return {
       customerId: key.customerId,
       domain: key.domain,
@@ -471,6 +487,7 @@ export class ConsumptionGoalService {
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: result.goal.version,
+      goalMargin: marginInfoOf(result.goal),
       tree,
       distribution: { hoursWritten: result.hoursWritten, actionLevel: result.actionLevel },
     };
@@ -507,6 +524,7 @@ export class ConsumptionGoalService {
     });
 
     const tree = await this.readTreeAt(result.goal.id, granularityOf(actionLevel), cfg.aggregationMethod);
+    this.overlayMargin(tree, marginPctOf(result.goal));
     return {
       customerId: key.customerId,
       domain: key.domain,
@@ -514,9 +532,162 @@ export class ConsumptionGoalService {
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: result.goal.version,
+      goalMargin: marginInfoOf(result.goal),
       tree,
       distribution: { hoursWritten: result.hoursWritten, actionLevel: result.actionLevel },
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // RFC-0052 — Goal margin overlay ("Margem da meta")
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sets (or changes) the margin for a (customer, domain, year). Upsert: a
+   * margin on a brand-new (domain, year) creates the parent row (version 1);
+   * on an existing goal the write bumps the shared optimistic version. Writing
+   * the same pct is a no-op (no bump, no history). Every effective change
+   * appends ONE history row (source MARGIN, old pct → new pct).
+   */
+  async setMargin(
+    key: GoalKey,
+    body: SetGoalMarginBodyDTO,
+    actor: string | null,
+  ): Promise<GoalGetResult> {
+    const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
+    const pct = body.goalMarginPct;
+
+    const goal = await this.repo.withTransaction(async (tx) => {
+      const existing = await this.repo.findGoal(key, tx);
+
+      if (!existing) {
+        // Upsert: the create IS the first change — margin lands on version 1.
+        const created = await this.repo.createGoal({ ...key, unit: cfg.unit, createdBy: actor }, tx);
+        const updated = await this.repo.setMargin(created.id, formatMarginPct(pct), undefined, actor, false, tx);
+        const final = updated ?? created;
+        await this.appendMarginHistory(final.id, null, pct, final.version, actor, key.year, tx);
+        return final;
+      }
+
+      this.assertVersion(existing, body.expectedVersion, key);
+
+      const oldPct = marginPctOf(existing);
+      if (oldPct !== null && Math.abs(oldPct - pct) < 1e-9) return existing; // no-op
+
+      const updated = await this.repo.setMargin(
+        existing.id,
+        formatMarginPct(pct),
+        body.expectedVersion,
+        actor,
+        true,
+        tx,
+      );
+      if (!updated) {
+        const cur = await this.repo.findGoalById(key.tenantId, existing.id, tx);
+        throw new VersionConflictError(cur?.version ?? existing.version, body.expectedVersion, key.domain, key.year);
+      }
+
+      await this.appendMarginHistory(updated.id, oldPct, pct, updated.version, actor, key.year, tx);
+      return updated;
+    });
+
+    return this.marginResult(key, cfg, goal);
+  }
+
+  /**
+   * Clears the margin (back to "no overlay"). 404 when the (domain, year) has
+   * no goal at all; clearing an already-absent margin is a no-op.
+   */
+  async clearMargin(
+    key: GoalKey,
+    expectedVersion: number | undefined,
+    actor: string | null,
+  ): Promise<GoalGetResult> {
+    const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
+
+    const goal = await this.repo.withTransaction(async (tx) => {
+      const existing = await this.repo.findGoal(key, tx);
+      if (!existing) {
+        throw new NotFoundError(`No ${key.domain} goal for year ${key.year}`);
+      }
+
+      this.assertVersion(existing, expectedVersion, key);
+
+      const oldPct = marginPctOf(existing);
+      if (oldPct === null) return existing; // no-op
+
+      const updated = await this.repo.setMargin(existing.id, null, expectedVersion, actor, true, tx);
+      if (!updated) {
+        const cur = await this.repo.findGoalById(key.tenantId, existing.id, tx);
+        throw new VersionConflictError(cur?.version ?? existing.version, expectedVersion, key.domain, key.year);
+      }
+
+      await this.appendMarginHistory(updated.id, oldPct, null, updated.version, actor, key.year, tx);
+      return updated;
+    });
+
+    return this.marginResult(key, cfg, goal);
+  }
+
+  /** Post-margin-write response: month-granularity tree with the overlay applied. */
+  private async marginResult(
+    key: GoalKey,
+    cfg: { aggregationMethod: GoalAggregationMethod; unit: string },
+    goal: ConsumptionGoalRow,
+  ): Promise<GoalGetResult> {
+    const tree = await this.readTreeAt(goal.id, 'month', cfg.aggregationMethod);
+    this.overlayMargin(tree, marginPctOf(goal));
+    return {
+      customerId: key.customerId,
+      domain: key.domain,
+      unit: goal.unit,
+      aggregationMethod: cfg.aggregationMethod,
+      year: key.year,
+      version: goal.version,
+      goalMargin: marginInfoOf(goal),
+      tree,
+    };
+  }
+
+  /** One MARGIN history row per effective change (old pct → new pct; null = unset). */
+  private async appendMarginHistory(
+    goalId: string,
+    oldPct: number | null,
+    newPct: number | null,
+    version: number,
+    actor: string | null,
+    year: number,
+    tx: GoalTx,
+  ): Promise<void> {
+    await this.repo.appendHistory(
+      {
+        goalId,
+        actor,
+        source: 'MARGIN',
+        actionLevel: 'YEAR',
+        bucketRef: String(year),
+        oldValue: oldPct === null ? null : formatMarginPct(oldPct),
+        newValue: newPct === null ? null : formatMarginPct(newPct),
+        bucketCount: 0,
+        details: [],
+        distributed: false,
+        hoursAffected: 0,
+        version,
+      },
+      tx,
+    );
+  }
+
+  /** Applies the RFC-0052 overlay: adjustedValue on every node (== value when no margin). */
+  private overlayMargin(tree: GoalTree, pct: number | null): void {
+    const factor = 1 + (pct ?? 0) / 100;
+    const apply = (node?: GoalTreeNode) => {
+      if (node) node.adjustedValue = round3(node.value * factor);
+    };
+    apply(tree.annual);
+    for (const n of Object.values(tree.monthly ?? {})) apply(n);
+    for (const n of Object.values(tree.daily ?? {})) apply(n);
+    for (const n of Object.values(tree.hourly ?? {})) apply(n);
   }
 
   // ---------------------------------------------------------------------------
@@ -1117,6 +1288,38 @@ function formatNumeric(value: number): string {
 /** Output rounding for derived tree values (avoids 99999.99999997 artefacts). */
 function roundOut(value: number): number {
   return Math.round((value + Number.EPSILON) * 1e6) / 1e6;
+}
+
+/** RFC-0052 adjustedValue rounding — 3 decimal places, matching the import CSVs. */
+function round3(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1e3) / 1e3;
+}
+
+/** RFC-0052 — numeric(6,2) margin column, formatted on the boundary. */
+function formatMarginPct(pct: number): string {
+  return pct.toFixed(2);
+}
+
+/** Reads the margin column (numeric → string in Drizzle) back as a number. */
+function marginPctOf(goal: ConsumptionGoalRow): number | null {
+  const raw = goal.goalMarginPct;
+  return raw === null || raw === undefined ? null : Number(raw);
+}
+
+/** The `goalMargin` response block; null when no margin was ever set. */
+function marginInfoOf(goal: ConsumptionGoalRow): GoalMarginInfo | null {
+  const pct = marginPctOf(goal);
+  if (pct === null) return null;
+  return {
+    goalMarginPct: pct,
+    updatedBy: goal.goalMarginUpdatedBy ?? null,
+    updatedAt: goal.goalMarginUpdatedAt
+      ? (goal.goalMarginUpdatedAt instanceof Date
+          ? goal.goalMarginUpdatedAt
+          : new Date(goal.goalMarginUpdatedAt)
+        ).toISOString()
+      : null,
+  };
 }
 
 const LEVEL_RANK: Record<GoalSourceLevel, number> = { YEAR: 0, MONTH: 1, DAY: 2, HOUR: 3 };
