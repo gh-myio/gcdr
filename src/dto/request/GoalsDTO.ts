@@ -300,6 +300,37 @@ export const ImportGoalsQuerySchema = z.object({
 export type ImportGoalsQueryDTO = z.infer<typeof ImportGoalsQuerySchema>;
 
 // -----------------------------------------------------------------------------
+// RFC-0052 — Goal margin ("Margem da meta")
+//
+// PUT /customers/:id/goals/margin?domain=&year=
+// One signed percentage per (customer, domain, year): -100..+100, at most two
+// decimal places. `multipleOf` is avoided on purpose (float remainder noise);
+// the two-decimal cap is checked against the value scaled to cents.
+// -----------------------------------------------------------------------------
+
+export const SetGoalMarginBodySchema = z.object({
+  goalMarginPct: z
+    .number()
+    .finite()
+    .min(-100, 'goalMarginPct must be >= -100')
+    .max(100, 'goalMarginPct must be <= 100')
+    .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9, {
+      message: 'goalMarginPct supports at most 2 decimal places',
+    }),
+  /** Optimistic concurrency: expected current version (omit to force-write). */
+  expectedVersion: z.number().int().positive().optional(),
+});
+export type SetGoalMarginBodyDTO = z.infer<typeof SetGoalMarginBodySchema>;
+
+/** DELETE margin body — optional optimistic guard only. */
+export const ClearGoalMarginBodySchema = z
+  .object({
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .optional();
+export type ClearGoalMarginBodyDTO = z.infer<typeof ClearGoalMarginBodySchema>;
+
+// -----------------------------------------------------------------------------
 // Cross-field validators (need `domain` and `year` from the query, which the
 // static Zod schemas cannot see). Call these in the service/controller after the
 // body and query have both parsed.

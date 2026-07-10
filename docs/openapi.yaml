@@ -5132,7 +5132,7 @@ components:
       type: object
       description: One audit row — one per operation (a mutation = a version = one entry).
       properties:
-        source:        { type: string, enum: [IMPORT, REPLACE, MERGE, DELETE, EDIT] }
+        source:        { type: string, enum: [IMPORT, REPLACE, MERGE, DELETE, EDIT, MARGIN] }
         actionLevel:   { type: string, enum: [YEAR, MONTH, DAY, HOUR], description: Coarsest level the operation touched }
         bucketRef:     { type: string, description: 'Representative ref (the single bucket, else the year)' }
         oldValue:      { type: number, nullable: true }
@@ -5152,8 +5152,19 @@ components:
         grain; year/month/day views are rolled up on read (SUM domains) or weighted-
         averaged (TEMPERATURE), and every node declares its `method`. The nested tree
         fields are passed through — see RFC-0046-Goals-API.md §2 for the full shape.
+        RFC-0052: every tree node also carries `adjustedValue` (= value with the
+        margin overlay applied; equal to `value` when no margin is set) and the
+        response carries the `goalMargin` block (null when never set).
       additionalProperties: true
       properties:
+        goalMargin:
+          type: object
+          nullable: true
+          description: 'RFC-0052 margin overlay; null when no margin was ever set.'
+          properties:
+            goalMarginPct: { type: number, minimum: -100, maximum: 100, example: -5 }
+            updatedBy:     { type: string, format: uuid, nullable: true }
+            updatedAt:     { type: string, format: date-time, nullable: true }
         domain:  { type: string, enum: [ENERGY, WATER, TEMPERATURE] }
         year:    { type: integer, example: 2026 }
         unit:    { type: string, example: kWh, description: 'kWh | m3 | C — fixed per domain' }
@@ -6371,6 +6382,81 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } }
         '204':
           description: Deleted (no guard)
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /customers/{customerId}/goals/margin:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Consumption Goals]
+      summary: Set the goal margin overlay (RFC-0052)
+      description: |
+        Sets one signed percentage per (customer, domain, year) — "Margem da
+        meta". Read-time overlay: buckets stay raw; reads gain `adjustedValue =
+        value × (1 + goalMarginPct/100)` on every tree node. Upsert (creates the
+        parent goal when absent); shares the goal's optimistic `version`
+        (mismatch → 409); writing the same pct is a no-op. Every effective
+        change appends a history entry with `source: MARGIN` and is audited
+        (GOAL_MARGIN_CHANGED). Scope `goals:write`.
+      operationId: setGoalMargin
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [goalMarginPct]
+              properties:
+                goalMarginPct: { type: number, minimum: -100, maximum: 100, multipleOf: 0.01, example: -5 }
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Margin applied (month-granularity tree with adjustedValue)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/GoalTree' }
+        '400':
+          description: Invalid pct (range/precision) or params
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    delete:
+      tags: [Consumption Goals]
+      summary: Clear the goal margin overlay (RFC-0052)
+      description: 'Removes the margin (back to raw targets). History records old pct → null. 404 when the (domain, year) has no goal; clearing an absent margin is a no-op. Scope `goals:write`.'
+      operationId: clearGoalMargin
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Margin cleared
+          content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } }
+        '404':
+          description: No goal for this (customer, domain, year)
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '409':
           description: VERSION_CONFLICT
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }

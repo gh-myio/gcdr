@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   consumptionGoalService,
   VersionConflictError,
-} from '../services/consumptionGoalService';
+} from '../services/ConsumptionGoalService';
 import {
   GetGoalsQuerySchema,
   GoalsTargetQuerySchema,
@@ -11,12 +11,14 @@ import {
   ReplaceGoalsBodySchema,
   MergeGoalsBodySchema,
   DeleteGoalsBodySchema,
+  SetGoalMarginBodySchema,
+  ClearGoalMarginBodySchema,
   validateReplaceTreeCalendar,
 } from '../dto/request/GoalsDTO';
 import { customerService } from '../services/CustomerService';
-import { sendSuccess, sendNoContent } from '../middleware';
+import { sendSuccess, sendNoContent, logEvent } from '../middleware';
 import { ValidationError } from '../shared/errors/AppError';
-import { ApiResponse } from '../shared/types';
+import { ApiResponse, EventType } from '../shared/types';
 
 // =============================================================================
 // RFC-0046 — Customer Consumption Goals (controller)
@@ -206,6 +208,77 @@ router.post('/import', async (req: Request, res: Response, next: NextFunction) =
     next(err);
   }
 });
+
+/**
+ * PUT /customers/:customerId/goals/margin?domain=&year=
+ * RFC-0052: sets (or changes) the margin overlay — upsert, optimistic lock via
+ * body.expectedVersion, one MARGIN history row per effective change, audited.
+ */
+router.put(
+  '/margin',
+  logEvent({
+    eventType: EventType.GOAL_MARGIN_CHANGED,
+    description: (req) =>
+      `Goal margin set to ${req.body?.goalMarginPct}% (${req.query.domain}/${req.query.year}) for customer ${req.params.customerId}`,
+    getEntityId: (req) => req.params.customerId,
+    getCustomerId: (req) => req.params.customerId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { customerId } = req.params;
+      await ensureCustomer(tenantId, customerId);
+
+      const { domain, year } = GoalsTargetQuerySchema.parse(req.query);
+      const body = SetGoalMarginBodySchema.parse(req.body ?? {});
+
+      const result = await consumptionGoalService.setMargin(
+        { tenantId, customerId, domain, year },
+        body,
+        actorOf(req),
+      );
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      if (handleVersionConflict(err, req, res)) return;
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /customers/:customerId/goals/margin?domain=&year=
+ * RFC-0052: clears the margin overlay (history records old pct → null).
+ */
+router.delete(
+  '/margin',
+  logEvent({
+    eventType: EventType.GOAL_MARGIN_CHANGED,
+    description: (req) =>
+      `Goal margin cleared (${req.query.domain}/${req.query.year}) for customer ${req.params.customerId}`,
+    getEntityId: (req) => req.params.customerId,
+    getCustomerId: (req) => req.params.customerId,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { customerId } = req.params;
+      await ensureCustomer(tenantId, customerId);
+
+      const { domain, year } = GoalsTargetQuerySchema.parse(req.query);
+      const body = ClearGoalMarginBodySchema.parse(req.body ?? undefined);
+
+      const result = await consumptionGoalService.clearMargin(
+        { tenantId, customerId, domain, year },
+        body?.expectedVersion,
+        actorOf(req),
+      );
+      sendSuccess(res, result, 200, requestId);
+    } catch (err) {
+      if (handleVersionConflict(err, req, res)) return;
+      next(err);
+    }
+  },
+);
 
 /**
  * DELETE /customers/:customerId/goals?domain=&year=

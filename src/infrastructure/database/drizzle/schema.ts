@@ -2219,6 +2219,10 @@ export const consumptionGoals = pgTable('consumption_goals', {
   year:       smallint('year').notNull(),
   unit:       text('unit').notNull(),                    // kWh | m3 | C (from domain config)
   version:    integer('version').notNull().default(1),
+  // RFC-0052 — read-time margin overlay ("Margem da meta"); buckets stay raw.
+  goalMarginPct:       numeric('goal_margin_pct', { precision: 6, scale: 2 }),
+  goalMarginUpdatedBy: uuid('goal_margin_updated_by'),
+  goalMarginUpdatedAt: timestamp('goal_margin_updated_at', { withTimezone: true }),
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy:  uuid('created_by'),
   updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -2229,6 +2233,10 @@ export const consumptionGoals = pgTable('consumption_goals', {
   domainCheck: check(
     'consumption_goals_domain_check',
     sql`${table.domain} IN ('ENERGY','WATER','TEMPERATURE')`
+  ),
+  marginRangeCheck: check(
+    'consumption_goals_margin_range_check',
+    sql`${table.goalMarginPct} IS NULL OR (${table.goalMarginPct} >= -100 AND ${table.goalMarginPct} <= 100)`
   ),
 }));
 
