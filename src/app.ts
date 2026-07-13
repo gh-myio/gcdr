@@ -97,6 +97,7 @@ import {
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
+import { singleDashboardController } from './controllers/single-dashboard.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
@@ -302,6 +303,14 @@ apiV1Router.use(
   goalsRateLimiter,
   hybridAuthByMethod('goals:read', 'goals:write'),
   consumptionGoalsController,
+);
+
+// RFC-0053: One-Store Dash aggregation (nested — must come before general /customers router).
+// Read-only composition of devices/goals/health/insights for the store dashboard.
+apiV1Router.use(
+  '/customers/:customerId/single-dashboard',
+  hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'),
+  singleDashboardController,
 );
 
 // Customers (general router - must come after specific nested routes)
