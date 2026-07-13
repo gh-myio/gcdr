@@ -90,7 +90,19 @@ ancora a visibilidade por hierarquia de customer.
 `entityType` + `entityId` (o par usual — "tudo deste device/OS"),
 `customerId`, `type`, `status` (`created` / `modified` / `archived`),
 `importance`, `mentionedUserId`, `mentionedDeviceId`, `hasAttachments`,
-`includeArchived`, mais paginação padrão (`page`, `limit`).
+`includeArchived`, `limit` (1–100, padrão 20), `cursor`.
+
+**Paginação é por cursor, não por `page`.** Peça a primeira página só com
+`limit`; a resposta traz `data.items` + `data.pagination`:
+
+```json
+{ "data": { "items": [ /* Annotation[] */ ],
+  "pagination": { "total": 137, "totalPages": 3, "hasMore": true, "nextCursor": "eyJpZCI6Ii4uLiJ9" } } }
+```
+
+Enquanto `hasMore: true`, repita a chamada passando `cursor=<nextCursor>` (o
+valor é opaco — não construa nem decodifique no client). Não existe parâmetro
+`page`.
 
 A listagem retorna o shape **resumido** (`Annotation`); responses, eventos,
 menções e anexos só vêm no `GET /annotations/:id` (`AnnotationDetail`).
