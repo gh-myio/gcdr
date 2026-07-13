@@ -9,8 +9,23 @@ import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { db } from '../../infrastructure/database/drizzle/db';
+import { db, executeRawScript } from '../../infrastructure/database/drizzle/db';
 import { sql } from 'drizzle-orm';
+
+/**
+ * Normalizes a postgres.js unsafe() result for the console UI: a single
+ * statement yields its row array; a multi-statement script yields an array of
+ * per-statement results — display the LAST non-empty one (matches the mental
+ * model of "the final SELECT of my script").
+ */
+function normalizeScriptResult(result: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(result)) return [];
+  if (result.length > 0 && Array.isArray(result[0])) {
+    const nonEmpty = (result as unknown[][]).filter((r) => Array.isArray(r) && r.length > 0);
+    return (nonEmpty.length > 0 ? nonEmpty[nonEmpty.length - 1] : []) as Record<string, unknown>[];
+  }
+  return result as Record<string, unknown>[];
+}
 
 const router = Router();
 
@@ -242,7 +257,7 @@ router.post('/api/scripts/:name/run', async (req: Request, res: Response) => {
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
 
     // Execute SQL directly using database connection
-    await db.execute(sql.raw(sqlContent));
+    await executeRawScript(sqlContent);
 
     const duration = Date.now() - startTime;
     addLog('success', `${name} - Done (${duration}ms)`);
@@ -287,7 +302,7 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
         const sqlContent = fs.readFileSync(filepath, 'utf-8');
 
         // Execute SQL directly using database connection
-        await db.execute(sql.raw(sqlContent));
+        await executeRawScript(sqlContent);
 
         const duration = Date.now() - scriptStart;
         addLog('success', `${file} - Done (${duration}ms)`);
@@ -329,7 +344,7 @@ router.post('/api/clear', async (req: Request, res: Response) => {
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
 
     // Execute SQL directly using database connection
-    await db.execute(sql.raw(sqlContent));
+    await executeRawScript(sqlContent);
 
     const duration = Date.now() - startTime;
     addLog('success', `Data cleared (${duration}ms)`);
@@ -352,7 +367,7 @@ router.post('/api/verify', async (req: Request, res: Response) => {
     const sqlContent = fs.readFileSync(filepath, 'utf-8');
 
     // Execute SQL directly using database connection
-    const result = await db.execute(sql.raw(sqlContent));
+    const result = await executeRawScript(sqlContent);
 
     const duration = Date.now() - startTime;
     addLog('success', `Verification complete (${duration}ms)`);
@@ -386,8 +401,10 @@ router.post('/api/query', async (req: Request, res: Response) => {
   }
 
   // Security: block write operations unless explicitly allowed
-  const upperQuery = query.toUpperCase().trim();
-  const isWriteOperation = /^(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE)\b/.test(upperQuery);
+  // Scans the WHOLE script with word boundaries — the previous ^-anchored
+  // check let any script starting with a comment or BEGIN bypass the gate.
+  const upperQuery = query.toUpperCase();
+  const isWriteOperation = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE)\b/.test(upperQuery);
 
   if (isWriteOperation && !allowWrite) {
     return res.status(403).json({
@@ -401,17 +418,18 @@ router.post('/api/query', async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   try {
-    const result = await db.execute(sql.raw(query));
+    const result = await executeRawScript(query);
+    const rows = normalizeScriptResult(result);
     const duration = Date.now() - startTime;
 
-    addLog('success', `Query executed (${duration}ms, ${Array.isArray(result) ? result.length : 0} rows)`);
+    addLog('success', `Query executed (${duration}ms, ${rows.length} rows)`);
 
     res.json({
       success: true,
       duration,
-      rowCount: Array.isArray(result) ? result.length : 0,
-      rows: result,
-      columns: Array.isArray(result) && result.length > 0 ? Object.keys(result[0]) : [],
+      rowCount: rows.length,
+      rows,
+      columns: rows.length > 0 ? Object.keys(rows[0]) : [],
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;

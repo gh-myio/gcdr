@@ -20,6 +20,37 @@ const queryClient = postgres(connectionString);
 // Create Drizzle instance with schema
 export const db = drizzle(queryClient, { schema });
 
+/**
+ * Executes a raw (possibly multi-statement, possibly transactional) SQL script
+ * on a RESERVED connection from the pool. postgres.js forbids explicit
+ * BEGIN/COMMIT on pooled connections (UNSAFE_TRANSACTION) because statements
+ * could land on different sockets; a reserved connection pins the whole script
+ * to ONE socket, so ops scripts with BEGIN/COMMIT + temp tables run with real
+ * transactional semantics (same class of fix as the {max: 1} one-liners used
+ * during incident response).
+ *
+ * Returns: for a single statement, its rows; for multi-statement scripts, an
+ * array with each statement's result (postgres.js semantics).
+ */
+export async function executeRawScript(sqlText: string): Promise<unknown> {
+  const reserved = await queryClient.reserve();
+  try {
+    return await reserved.unsafe(sqlText);
+  } finally {
+    // The reserved socket goes BACK TO THE POOL: if the script failed mid-
+    // transaction (or did BEGIN without COMMIT), the open aborted transaction
+    // would poison every later query on this connection ("current transaction
+    // is aborted..."). Defensive ROLLBACK — a no-op warning when there is no
+    // transaction — guarantees the connection is returned clean.
+    try {
+      await reserved.unsafe('ROLLBACK');
+    } catch {
+      // connection-level failure; the pool will recycle the socket.
+    }
+    reserved.release();
+  }
+}
+
 // Export schema for use in queries
 export { schema };
 
