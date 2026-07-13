@@ -6,7 +6,6 @@
 // =============================================================================
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { db, executeRawScript } from '../../infrastructure/database/drizzle/db';
@@ -34,8 +33,6 @@ const router = Router();
 // =============================================================================
 
 const SEEDS_DIR = path.join(process.cwd(), 'scripts', 'db', 'seeds');
-const DB_USER = process.env.DB_USER || 'postgres';
-const DB_NAME = process.env.DB_NAME || 'db_gcdr';
 
 // In-memory log storage
 const executionLogs: Array<{
@@ -49,31 +46,36 @@ const executionLogs: Array<{
  * Extract meaningful PostgreSQL error from Drizzle error object.
  * Drizzle wraps errors and includes the full query in message, making it unreadable.
  */
-function extractPgError(error: any): string {
+function extractPgError(error: unknown): string {
+  const err = (error ?? {}) as {
+    cause?: { message?: string };
+    detail?: string;
+    column?: string;
+    constraint?: string;
+    message?: string;
+  };
+
   // Try to get the underlying PostgreSQL error details
-  if (error.cause) {
+  if (err.cause?.message) {
     // Drizzle often wraps the real error in cause
-    const cause = error.cause;
-    if (cause.message) {
-      return cause.message;
-    }
+    return err.cause.message;
   }
 
   // Check for PostgreSQL-specific error properties
-  if (error.detail) {
-    return `${error.message?.split('\n')[0] || 'Error'}: ${error.detail}`;
+  if (err.detail) {
+    return `${err.message?.split('\n')[0] || 'Error'}: ${err.detail}`;
   }
 
   // Check for constraint/column info
-  if (error.column || error.constraint) {
+  if (err.column || err.constraint) {
     const parts = [];
-    if (error.column) parts.push(`column: ${error.column}`);
-    if (error.constraint) parts.push(`constraint: ${error.constraint}`);
-    return `${error.message?.split('\n')[0] || 'Error'} (${parts.join(', ')})`;
+    if (err.column) parts.push(`column: ${err.column}`);
+    if (err.constraint) parts.push(`constraint: ${err.constraint}`);
+    return `${err.message?.split('\n')[0] || 'Error'} (${parts.join(', ')})`;
   }
 
   // If message starts with "Failed query:", try to extract the actual error
-  const msg = error.message || String(error);
+  const msg = err.message || String(error);
   if (msg.includes('Failed query:')) {
     // The actual PostgreSQL error is usually at the end or in a separate property
     // Try to find common PostgreSQL error patterns
@@ -156,7 +158,7 @@ router.get('/api/stats', async (req: Request, res: Response) => {
     for (const table of tables) {
       try {
         const result = await db.execute(sql`SELECT COUNT(*)::int as count FROM ${sql.identifier(table)}`);
-        const count = Array.isArray(result) && result[0] ? (result[0] as any).count : 0;
+        const count = Array.isArray(result) && result[0] ? (result[0] as { count: number }).count : 0;
         tableCounts.push({ table_name: table, count });
       } catch {
         tableCounts.push({ table_name: table, count: 0 });
@@ -172,7 +174,7 @@ router.get('/api/stats', async (req: Request, res: Response) => {
         GROUP BY status
         ORDER BY status
       `);
-      usersByStatus = Array.isArray(result) ? result as any : [];
+      usersByStatus = Array.isArray(result) ? (result as unknown as Array<{ status: string; count: number }>) : [];
     } catch {
       // Table might not exist
     }
@@ -186,7 +188,7 @@ router.get('/api/stats', async (req: Request, res: Response) => {
         GROUP BY type
         ORDER BY type
       `);
-      customersByType = Array.isArray(result) ? result as any : [];
+      customersByType = Array.isArray(result) ? (result as unknown as Array<{ type: string; count: number }>) : [];
     } catch {
       // Table might not exist
     }
@@ -200,7 +202,7 @@ router.get('/api/stats', async (req: Request, res: Response) => {
         GROUP BY status
         ORDER BY status
       `);
-      devicesByStatus = Array.isArray(result) ? result as any : [];
+      devicesByStatus = Array.isArray(result) ? (result as unknown as Array<{ status: string; count: number }>) : [];
     } catch {
       // Table might not exist
     }
@@ -212,8 +214,8 @@ router.get('/api/stats', async (req: Request, res: Response) => {
       devicesByStatus,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    res.status(500).json({ error: extractPgError(error) });
   }
 });
 
@@ -236,8 +238,8 @@ router.get('/api/scripts', (req: Request, res: Response) => {
         };
       });
     res.json({ scripts: files });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    res.status(500).json({ error: extractPgError(error) });
   }
 });
 
@@ -268,7 +270,7 @@ router.post('/api/scripts/:name/run', async (req: Request, res: Response) => {
       duration,
       output: 'Script executed successfully',
     });
-  } catch (error: any) {
+  } catch (error) {
     const duration = Date.now() - startTime;
     const errorMsg = extractPgError(error);
     addLog('error', `${name} - Failed (${duration}ms)`, errorMsg);
@@ -307,7 +309,7 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
         const duration = Date.now() - scriptStart;
         addLog('success', `${file} - Done (${duration}ms)`);
         results.push({ script: file, success: true, duration });
-      } catch (error: any) {
+      } catch (error) {
         const duration = Date.now() - scriptStart;
         const errorMsg = extractPgError(error);
         addLog('error', `${file} - Failed (${duration}ms)`, errorMsg);
@@ -328,7 +330,7 @@ router.post('/api/seed-all', async (req: Request, res: Response) => {
       failCount,
       results,
     });
-  } catch (error: any) {
+  } catch (error) {
     addLog('error', 'Seed failed', extractPgError(error));
     res.status(500).json({ error: extractPgError(error) });
   }
@@ -350,7 +352,7 @@ router.post('/api/clear', async (req: Request, res: Response) => {
     addLog('success', `Data cleared (${duration}ms)`);
 
     res.json({ success: true, duration, output: 'Data cleared successfully' });
-  } catch (error: any) {
+  } catch (error) {
     const duration = Date.now() - startTime;
     addLog('error', `Clear failed (${duration}ms)`, extractPgError(error));
     res.status(500).json({ success: false, error: extractPgError(error) });
@@ -373,7 +375,7 @@ router.post('/api/verify', async (req: Request, res: Response) => {
     addLog('success', `Verification complete (${duration}ms)`);
 
     res.json({ success: true, duration, output: JSON.stringify(result, null, 2) });
-  } catch (error: any) {
+  } catch (error) {
     const duration = Date.now() - startTime;
     addLog('error', `Verification failed (${duration}ms)`, extractPgError(error));
     res.status(500).json({ success: false, error: extractPgError(error) });
@@ -431,7 +433,7 @@ router.post('/api/query', async (req: Request, res: Response) => {
       rows,
       columns: rows.length > 0 ? Object.keys(rows[0]) : [],
     });
-  } catch (error: any) {
+  } catch (error) {
     const duration = Date.now() - startTime;
     addLog('error', `Query failed (${duration}ms)`, extractPgError(error));
     res.status(500).json({
@@ -632,7 +634,8 @@ function sqlLit(val: unknown, colType?: { dataType: string; udtName: string }): 
         ? 'NULL'
         : `"${String(e).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`))
       .join(',');
-    return `'${`{${elems}}`.replace(/'/g, "''")}'::${cast}`;
+    const arrayBody = `{${elems}}`.replace(/'/g, "''");
+    return `'${arrayBody}'::${cast}`;
   }
   if (typeof val === 'object') {
     return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
@@ -670,6 +673,41 @@ const CUSTOMER_EXPORT_TABLES: string[] = [
   'annotations', 'annotation_responses',
 ];
 
+/** One exportable table: a WHERE (or full custom query) joined up to the
+ * customer footprint, with optional ordering/limit/note and columns to strip. */
+interface ExportSpec {
+  table: string; where: string; order?: string; limit?: number; note?: string;
+  query?: string; strip?: string[];
+}
+
+/** Emit the INSERTs for one spec into `lines`. Tables absent from this DB are
+ * skipped via the to_regclass guard (safe against schemas where a recent RFC
+ * table is not deployed yet). */
+async function appendSpecInserts(spec: ExportSpec, lines: string[]): Promise<void> {
+  const guard = await db.execute(sql.raw(`SELECT to_regclass('public.${spec.table}') IS NOT NULL AS present`));
+  const present = Array.isArray(guard) && guard.length > 0 && (guard[0] as { present?: boolean }).present === true;
+  if (!present) return;
+
+  let q = spec.query ?? `SELECT * FROM ${spec.table} WHERE ${spec.where}`;
+  if (!spec.query) {
+    if (spec.order) q += ` ORDER BY ${spec.order}`;
+    if (spec.limit) q += ` LIMIT ${spec.limit}`;
+  }
+  const rows = await db.execute(sql.raw(q));
+  const arr = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+  if (arr.length === 0) return;
+
+  lines.push(`  -- ----- ${spec.table} (${arr.length}) -----`);
+  if (spec.note) lines.push(`  -- NOTE: ${spec.note}`);
+  for (const row of arr) {
+    const clean = spec.strip
+      ? Object.fromEntries(Object.entries(row).filter(([k]) => !spec.strip!.includes(k)))
+      : row;
+    lines.push(`  ${buildInsert(spec.table, clean)}`);
+  }
+  lines.push('');
+}
+
 /** Generate a SQL seed script for a specific customer (and optional descendants) */
 async function generateSeedExport(
   customerId: string,
@@ -704,132 +742,28 @@ async function generateSeedExport(
       )
       SELECT id FROM descendants
     `);
-    customerIds = (Array.isArray(descRows) ? descRows : []).map((r: any) => r.id as string);
+    customerIds = (Array.isArray(descRows) ? (descRows as unknown as Array<{ id: string }>) : []).map((r) => r.id);
   }
 
   const idList = customerIds.map(id => `'${id}'`).join(', ');
+  const idIn = `(${idList})`;
 
-  // ── 2. CUSTOMERS ─────────────────────────────────────────────────────────
-  if (tables.includes('customers')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM customers WHERE id IN (${idList}) ORDER BY depth, name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- customers (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('customers', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 3. ASSETS ─────────────────────────────────────────────────────────────
-  if (tables.includes('assets')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM assets WHERE customer_id IN (${idList}) ORDER BY depth, name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- assets (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('assets', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 4. DEVICES ────────────────────────────────────────────────────────────
-  if (tables.includes('devices')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM devices WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- devices (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('devices', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 5. CENTRALS ───────────────────────────────────────────────────────────
-  if (tables.includes('centrals')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM centrals WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- centrals (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('centrals', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 6. RULES ──────────────────────────────────────────────────────────────
-  if (tables.includes('rules')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM rules WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- rules (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('rules', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 7. CUSTOMER API KEYS ──────────────────────────────────────────────────
-  if (tables.includes('customer_api_keys')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM customer_api_keys WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- customer_api_keys (${rows.length}) -----`);
-      lines.push(`  -- NOTE: key_hash values are hashed — keys are NOT recoverable from this export`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('customer_api_keys', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 8. GROUPS ─────────────────────────────────────────────────────────────
-  if (tables.includes('groups')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM groups WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- groups (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('groups', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 9. LOOK AND FEELS (themes) ────────────────────────────────────────────
-  if (tables.includes('look_and_feels')) {
-    const rows = await db.execute(sql.raw(`SELECT * FROM look_and_feels WHERE customer_id IN (${idList}) ORDER BY name`));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- look_and_feels (${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('look_and_feels', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 10. ALARM BUNDLE VERSIONS (last 10 per customer) ─────────────────────
-  if (tables.includes('alarm_bundle_versions')) {
-    const rows = await db.execute(sql.raw(
-      `SELECT * FROM alarm_bundle_versions WHERE customer_id IN (${idList})
-       ORDER BY created_at DESC LIMIT 50`
-    ));
-    if (Array.isArray(rows) && rows.length > 0) {
-      lines.push(`  -- ----- alarm_bundle_versions (last ${rows.length}) -----`);
-      for (const row of rows as Record<string, unknown>[]) {
-        lines.push(`  ${buildInsert('alarm_bundle_versions', row)}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // ── 11+. Evolved customer-scoped tables (declarative, FK-ordered) ─────────
+  // ── 2. Whole footprint (declarative, FK-ordered — parents before children).
   // Each spec is exported only if (a) requested in `tables` and (b) the table
   // exists in this DB (to_regclass guard → safe against schemas where a recent
   // RFC table is not deployed yet). Indirect relations join up to the customer.
-  const idIn = `(${idList})`;
-  const extraSpecs: Array<{
-    table: string; where: string; order?: string; limit?: number; note?: string;
-    query?: string; strip?: string[];
-  }> = [
+  const specs: ExportSpec[] = [
+    { table: 'customers',                    where: `id IN ${idIn}`, order: 'depth, name' },
+    { table: 'assets',                       where: `customer_id IN ${idIn}`, order: 'depth, name' },
+    { table: 'devices',                      where: `customer_id IN ${idIn}`, order: 'name' },
+    { table: 'centrals',                     where: `customer_id IN ${idIn}`, order: 'name' },
+    { table: 'rules',                        where: `customer_id IN ${idIn}`, order: 'name' },
+    { table: 'customer_api_keys',            where: `customer_id IN ${idIn}`, order: 'name',
+      note: 'key_hash values are hashed — keys are NOT recoverable from this export' },
+    { table: 'groups',                       where: `customer_id IN ${idIn}`, order: 'name' },
+    { table: 'look_and_feels',               where: `customer_id IN ${idIn}`, order: 'name' },
+    { table: 'alarm_bundle_versions',        where: `customer_id IN ${idIn}`, order: 'created_at DESC', limit: 50,
+      note: 'most recent bundle versions only' },
     { table: 'maintenance_groups',           where: `customer_id IN ${idIn}` },
     { table: 'group_channels',               where: `group_id IN (SELECT id FROM groups WHERE customer_id IN ${idIn})` },
     { table: 'group_dispatch_configs',       where: `group_id IN (SELECT id FROM groups WHERE customer_id IN ${idIn})` },
@@ -861,30 +795,9 @@ async function generateSeedExport(
     { table: 'annotation_responses',         where: `annotation_id IN (SELECT id FROM annotations WHERE customer_id IN ${idIn})` },
   ];
 
-  for (const spec of extraSpecs) {
+  for (const spec of specs) {
     if (!tables.includes(spec.table)) continue;
-    const guard = await db.execute(sql.raw(`SELECT to_regclass('public.${spec.table}') IS NOT NULL AS present`));
-    const present = Array.isArray(guard) && guard.length > 0 && (guard[0] as { present?: boolean }).present === true;
-    if (!present) continue;
-
-    let q = spec.query ?? `SELECT * FROM ${spec.table} WHERE ${spec.where}`;
-    if (!spec.query) {
-      if (spec.order) q += ` ORDER BY ${spec.order}`;
-      if (spec.limit) q += ` LIMIT ${spec.limit}`;
-    }
-    const rows = await db.execute(sql.raw(q));
-    const arr = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
-    if (arr.length === 0) continue;
-
-    lines.push(`  -- ----- ${spec.table} (${arr.length}) -----`);
-    if (spec.note) lines.push(`  -- NOTE: ${spec.note}`);
-    for (const row of arr) {
-      const clean = spec.strip
-        ? Object.fromEntries(Object.entries(row).filter(([k]) => !spec.strip!.includes(k)))
-        : row;
-      lines.push(`  ${buildInsert(spec.table, clean)}`);
-    }
-    lines.push('');
+    await appendSpecInserts(spec, lines);
   }
 
   lines.push('END $$;');
@@ -904,8 +817,8 @@ router.get('/api/seed-export/customers', async (req: Request, res: Response) => 
       LIMIT 500
     `);
     res.json({ customers: Array.isArray(rows) ? rows : [] });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    res.status(500).json({ error: extractPgError(error) });
   }
 });
 
@@ -931,7 +844,7 @@ router.post('/api/seed-export', async (req: Request, res: Response) => {
     // Get customer name for filename
     const nameRows = await db.execute(sql`SELECT name FROM customers WHERE id = ${customerId}`);
     const customerName = Array.isArray(nameRows) && nameRows[0]
-      ? String((nameRows[0] as any).name).toLowerCase().replace(/[^a-z0-9]/g, '-')
+      ? String((nameRows[0] as { name: unknown }).name).toLowerCase().replace(/[^a-z0-9]/g, '-')
       : customerId.substring(0, 8);
 
     const filename = `seed-export-${customerName}-${new Date().toISOString().slice(0, 10)}.sql`;
@@ -941,7 +854,7 @@ router.post('/api/seed-export', async (req: Request, res: Response) => {
     res.send(sqlContent);
 
     addLog('success', `Seed export generated: ${filename} (${(sqlContent.length / 1024).toFixed(1)} KB)`);
-  } catch (error: any) {
+  } catch (error) {
     addLog('error', `Seed export failed: ${extractPgError(error)}`);
     res.status(500).json({ error: extractPgError(error) });
   }

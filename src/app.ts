@@ -270,13 +270,16 @@ apiV1Router.get('/customers/:customerId/themes', authMiddleware, themesListByCus
 // RFC-0024: User notification contacts (nested — must come before general /users router)
 apiV1Router.use('/users/:userId/contacts', authMiddleware, userContactsController);
 
+// Scope required by hybridAuthByMethod for mutating customer-scoped routes.
+const SCOPE_CUSTOMERS_WRITE = 'customers:write';
+
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
-apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerChannelsController);
+apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), customerChannelsController);
 
 // RFC-0033: Customer integration sync state (nested — must come before general /customers router)
 // hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
-apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customerIntegrationsController);
+apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), customerIntegrationsController);
 
 // RFC-0046: Customer consumption goals (nested — must come before general /customers router)
 // hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.
@@ -309,13 +312,13 @@ apiV1Router.use(
 // Read-only composition of devices/goals/health/insights for the store dashboard.
 apiV1Router.use(
   '/customers/:customerId/single-dashboard',
-  hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'),
+  hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE),
   singleDashboardController,
 );
 
 // Customers (general router - must come after specific nested routes)
 // hybridAuth: supports JWT + API Key for ThingsBoard integration (RFC-0016)
-apiV1Router.use('/customers', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), customersController);
+apiV1Router.use('/customers', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), customersController);
 
 // Devices (hybridAuth for ThingsBoard integration)
 apiV1Router.use('/devices', hybridAuthByMethod('devices:read', 'devices:write'), devicesController);
@@ -415,7 +418,7 @@ apiV1Router.use('/partners', authMiddleware, partnersController);
 
 // RFC-0024: Group dispatch matrix (nested — must come before general /groups router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
-apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod(PERM_CUSTOMERS_READ, 'customers:write'), groupDispatchController);
+apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), groupDispatchController);
 
 // RFC-0024: Group channel targets (nested — must come before general /groups router)
 apiV1Router.use('/groups/:groupId/channels', authMiddleware, groupChannelsController);
