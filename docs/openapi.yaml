@@ -5145,6 +5145,43 @@ components:
         actor:         { type: string, format: uuid, nullable: true }
         changedAt:     { type: string, format: date-time }
 
+    SingleDashboard:
+      type: object
+      description: |
+        RFC-0053 aggregated snapshot. `groups[].devices[].telemetry` and
+        `goals[].monthConsumption` stay null while the ingestion read-through
+        is pending; consumers must treat every telemetry-derived field as
+        optional. See docs/rfcs/RFC-0053-One-Store-Dashboard.md for the full
+        contract.
+      additionalProperties: true
+      properties:
+        customerId:   { type: string, format: uuid }
+        customerName: { type: string }
+        groups:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            properties:
+              key:         { type: string, enum: [energy, water, temperature, tanks] }
+              deviceCount: { type: integer }
+              online:      { type: integer }
+              offline:     { type: integer }
+              telemetry:
+                type: object
+                properties:
+                  available: { type: boolean }
+                  reason:    { type: string }
+        unassigned: { type: array, items: { type: object, additionalProperties: true } }
+        health:
+          type: object
+          properties:
+            score:      { type: integer, minimum: 0, maximum: 100 }
+            components: { type: array, items: { type: object, additionalProperties: true } }
+        goals:    { type: array, items: { type: object, additionalProperties: true } }
+        insights: { type: array, items: { type: object, additionalProperties: true } }
+        errors:   { type: array, items: { type: object, properties: { section: { type: string }, message: { type: string } } } }
+
     GoalTree:
       type: object
       description: |
@@ -6459,6 +6496,44 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '409':
           description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /customers/{customerId}/single-dashboard:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Single Dashboard]
+      summary: Single Dashboard aggregated snapshot (RFC-0053)
+      description: |
+        Read-only composition for the single-customer operational dashboard (Single Dashboard):
+        device groups (energy | water | temperature | tanks, mapped by
+        profile/type with per-customer overrides in
+        `customer.settings.singleDashboard.groupOverrides`), an explainable
+        health score, goal progress (RFC-0046 targets + RFC-0052
+        `adjustedValue`), heuristic insights and per-section soft errors.
+        Telemetry fields degrade to `available:false` while the ingestion
+        read-through contract is pending (RFC-0053 Q1). Scope `customers:read`.
+      operationId: getSingleDashboard
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date }, description: 'Range start (ISO date/datetime); forwarded to the telemetry read-through.' }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Aggregated store snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/SingleDashboard' }
+        '404':
+          description: Customer not found
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
   /customers/{customerId}/goals/import:
