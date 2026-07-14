@@ -9,7 +9,10 @@ export const COMMAND_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const
 export const WifiPayloadSchema = z.object({
   ssid: z.string().min(1).max(64),
   password: z.string().min(8).max(128),
-  country: z.string().length(2).optional(),
+  country: z
+    .string()
+    .regex(/^[A-Z]{2}$/i, 'country must be a 2-letter ISO code')
+    .optional(),
 });
 export type WifiPayloadDTO = z.infer<typeof WifiPayloadSchema>;
 

@@ -15,7 +15,7 @@ export interface CreateCommandInput {
   centralId: string;
   type: CommandType;
   // SET_WIFI carries { ssid, password, country }; null for payload-less commands.
-  payload?: unknown;
+  payload?: WifiPayloadDTO | null;
   createdBy?: string | null;
 }
 

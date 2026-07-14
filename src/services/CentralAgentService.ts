@@ -7,7 +7,7 @@ import { UpdateRestoreProgressDTO } from '../dto/request/CentralRestoreDTO';
 import { centralCommandRepository } from '../repositories/CentralCommandRepository';
 import { centralRepository } from '../repositories/CentralRepository';
 import { centralCommandService, CentralCommandService } from './CentralCommandService';
-import { UpdateCommandResultDTO } from '../dto/request/CentralCommandDTO';
+import { UpdateCommandResultDTO, WifiPayloadDTO } from '../dto/request/CentralCommandDTO';
 
 const DOWNLOAD_URL_TTL_SECONDS = 3600; // 1 h — central downloads the dump
 
@@ -32,7 +32,7 @@ export interface NextCommandResult {
   type: 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI' | 'SET_WIFI';
   // SET_WIFI carries { ssid, password, country } for the agent to apply via
   // myio-wifi-set; absent for the payload-less commands.
-  payload?: unknown;
+  payload?: WifiPayloadDTO | null;
 }
 
 // Structural deps for unit testing (mirrors CentralRestoreService DI).
@@ -132,7 +132,7 @@ export class CentralAgentService {
   async nextCommand(ctx: CentralAgentContext): Promise<NextCommandResult | null> {
     const cmd = await this.commands.claimNextQueued(ctx.tenantId, ctx.centralId);
     if (!cmd) return null;
-    return { commandId: cmd.id, type: cmd.type, payload: cmd.payload };
+    return { commandId: cmd.id, type: cmd.type, payload: cmd.payload as WifiPayloadDTO | null };
   }
 
   /**
