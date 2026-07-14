@@ -7,6 +7,9 @@ import { NotFoundError } from '../shared/errors/AppError';
 // device registry to build the CentralDetail topology view.
 const CLOUD_SERVER_URL = process.env.CLOUD_SERVER_URL || '';
 const CLOUD_STATUS_TOKEN = process.env.CLOUD_STATUS_TOKEN || '';
+// Best-effort join: cap the cloud-server call so a hung server can't hold the
+// whole topology response until undici's multi-minute default timeout.
+const CLOUD_FETCH_TIMEOUT_MS = 3000;
 
 // centralId flows into a server-to-server URL path; constrain it to a UUID so a
 // caller-supplied value cannot alter the request target (CodeQL SSRF).
@@ -121,7 +124,7 @@ export class CentralTopologyService {
       if (CLOUD_STATUS_TOKEN) headers['x-status-token'] = CLOUD_STATUS_TOKEN;
       const res = await fetch(
         `${CLOUD_SERVER_URL}/centrals/${encodeURIComponent(centralId)}/device-status`,
-        { headers },
+        { headers, signal: AbortSignal.timeout(CLOUD_FETCH_TIMEOUT_MS) },
       );
       if (!res.ok) return { linkBySlave: map, connected: null };
       const body = (await res.json()) as CloudDeviceStatusResponse;
