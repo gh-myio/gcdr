@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MYIO Store Dashboard — Planos</title>
+<style>
+  :root {
+    --violet: #7c3aed; --violet-dark: #5b21b6; --violet-bg: #f6f2fd;
+    --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb;
+    --green: #059669; --amber: #d97706; --navy: #111827;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--ink); background: #fafafa; padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  header.hero { text-align: center; margin-bottom: 48px; }
+  .hero .eyebrow {
+    display: inline-block; background: var(--violet-bg); color: var(--violet);
+    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .hero h1 { font-size: 34px; margin-bottom: 10px; }
+  .hero p { color: var(--muted); max-width: 680px; margin: 0 auto; line-height: 1.6; }
+
+  .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 20px; margin-bottom: 60px; }
+  .tier {
+    background: #fff; border: 1px solid var(--line); border-radius: 16px;
+    padding: 26px 22px; display: flex; flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .tier.featured { border: 2px solid var(--violet); box-shadow: 0 8px 28px rgba(124,58,237,.16); position: relative; }
+  .tier.featured .ribbon,
+  .tier.corporate .ribbon {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    background: var(--violet); color: #fff; font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; padding: 5px 14px; border-radius: 999px; white-space: nowrap;
+  }
+  .tier.corporate { background: var(--navy); color: #e5e7eb; border-color: var(--navy); position: relative; }
+  .tier.corporate .ribbon { background: #f59e0b; color: #1f2937; }
+  .tier.corporate h2, .tier.corporate .plan-icon { color: #fff; }
+  .tier.corporate .verb { color: #c4b5fd; }
+  .tier.corporate .question { color: #9ca3af; }
+  .tier.corporate li small { color: #9ca3af; }
+  .tier .plan-icon { font-size: 28px; margin-bottom: 10px; }
+  .tier .brand { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+  .tier.corporate .brand { color: #9ca3af; }
+  .tier h2 { font-size: 20px; margin-bottom: 2px; }
+  .tier .verb { color: var(--violet); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .tier .question { color: var(--muted); font-style: italic; font-size: 13.5px; margin: 8px 0 6px; }
+  .tier .persona { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .tier.corporate .persona { color: #9ca3af; }
+  .tier ul { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45; }
+  .tier li { padding-left: 22px; position: relative; }
+  .tier li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+  .tier li.inherit::before { content: '⬆'; color: var(--violet); }
+  .tier li.inherit { color: var(--violet-dark); font-weight: 600; }
+  .tier.corporate li.inherit { color: #c4b5fd; }
+  .tier li.minus::before { content: '—'; color: #cbd5e1; }
+  .tier li.minus { color: #9ca3af; }
+  .tier .limits {
+    margin-top: auto; padding-top: 16px; border-top: 1px dashed var(--line);
+    display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px;
+  }
+  .tier .limits span { background: #f3f4f6; border-radius: 999px; padding: 4px 10px; color: var(--muted); }
+  .tier.featured .limits span { background: var(--violet-bg); color: var(--violet-dark); }
+  .tier.corporate .limits { border-top-color: #374151; }
+  .tier.corporate .limits span { background: #1f2937; color: #c4b5fd; }
+
+  section.matrix h2 { text-align: center; font-size: 24px; margin-bottom: 6px; }
+  section.matrix > p { text-align: center; color: var(--muted); margin-bottom: 24px; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13.5px; }
+  th, td { padding: 10px 14px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+  td:first-child, th:first-child { text-align: left; }
+  thead th { background: var(--violet-bg); color: var(--violet-dark); font-size: 12.5px; letter-spacing: .03em; }
+  tbody tr:hover { background: #fafaff; }
+  tbody tr.section td {
+    background: #f8fafc; color: var(--muted); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em; text-align: left;
+  }
+  .yes { color: var(--green); font-weight: 700; }
+  .no  { color: #cbd5e1; }
+  .note { color: var(--amber); font-size: 12px; font-weight: 600; }
+
+  .addons { margin-top: 48px; text-align: center; }
+  .addons h3 { font-size: 17px; margin-bottom: 14px; }
+  .addons .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .addons .chips span {
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; font-size: 13px;
+  }
+  footer { margin-top: 56px; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+  footer code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="eyebrow">MYIO Store Dashboard · RFC-0053</span>
+    <h1>Um plano para cada momento do seu negócio</h1>
+    <p>Energia, água e temperatura da sua operação em uma tela. Do total do mês no Essential
+       à gestão da rede inteira no Corporate — cada plano responde a uma pergunta.</p>
+  </header>
+
+  <div class="tiers">
+    <article class="tier">
+      <div class="plan-icon">📟</div>
+      <div class="brand">MYIO</div>
+      <h2>Essential</h2>
+      <div class="verb">Monitorar</div>
+      <p class="question">"Quanto eu consumi?"</p>
+      <p class="persona">Restaurantes pequenos · clínicas · farmácias · mercadinhos</p>
+      <ul>
+        <li>Mês corrente (dia 1 → hoje) + <strong>mês anterior fechado</strong></li>
+        <li><strong>Totais</strong> de energia e água (sem quebra por dia/hora)</li>
+        <li>Temperatura e reservatório: <strong>média · mín · máx</strong></li>
+        <li><strong>Relatório mensal em PDF</strong></li>
+        <li>Acesso mobile + multiusuário</li>
+        <li>Status online/offline por sensor</li>
+        <li class="minus">Sem alarmes, insights, metas ou KPIs</li>
+      </ul>
+      <div class="limits">
+        <span>5 sensores/tipo</span><span>3 usuários</span><span>12 meses de histórico</span>
+      </div>
+    </article>
+
+    <article class="tier featured">
+      <span class="ribbon">Mais popular</span>
+      <div class="plan-icon">📊</div>
+      <div class="brand">MYIO</div>
+      <h2>Business</h2>
+      <div class="verb">Operar</div>
+      <p class="question">"O que aconteceu e onde?"</p>
+      <p class="persona">Lojas com gestão operacional ativa</p>
+      <ul>
+        <li class="inherit">Tudo do Essential</li>
+        <li>Relatórios de <strong>até 90 dias</strong>, por <strong>hora e dia</strong></li>
+        <li><strong>KPI dashboard</strong>: kWh/m², kWh e litros por cliente, % conformidade de temperatura, autonomia do reservatório</li>
+        <li>Tendências + comparativo entre períodos</li>
+        <li><strong>Até 5 alarmes ativos</strong></li>
+        <li>Export <strong>PDF, Excel e CSV</strong> + <strong>API REST</strong></li>
+        <li>Anotações e Chamados integrados</li>
+      </ul>
+      <div class="limits">
+        <span>10 sensores/tipo</span><span>10 usuários</span><span>24 meses de histórico</span>
+      </div>
+    </article>
+
+    <article class="tier">
+      <div class="plan-icon">🚀</div>
+      <div class="brand">MYIO</div>
+      <h2>Enterprise</h2>
+      <div class="verb">Otimizar</div>
+      <p class="question">"Como otimizar minha operação?"</p>
+      <p class="persona">Operações críticas · franquias maduras</p>
+      <ul>
+        <li class="inherit">Tudo do Business</li>
+        <li><strong>Até 20 alarmes</strong> + tempo real via orquestrador</li>
+        <li><strong>AI Insights</strong>: vazamento de água, HVAC acima do baseline, degradação de refrigeração, otimização de pico</li>
+        <li><strong>Metas e targets</strong> com projeção do mês</li>
+        <li>Performance score + benchmarking + <strong>ranking de equipamentos</strong></li>
+        <li><strong>Manutenção preditiva</strong> e SLA de sensores</li>
+        <li><strong>Digital Twin</strong> da loja</li>
+      </ul>
+      <div class="limits">
+        <span>Sensores ∞*</span><span>Usuários ∞</span><span>36 meses</span><span>Webhooks</span>
+      </div>
+    </article>
+
+    <article class="tier corporate">
+      <span class="ribbon">Para redes</span>
+      <div class="plan-icon">🏢</div>
+      <div class="brand">MYIO</div>
+      <h2>Corporate</h2>
+      <div class="verb">Gerenciar a rede</div>
+      <p class="question">"Como gerencio minha rede inteira?"</p>
+      <p class="persona">Grupos · holdings · shoppings · redes de franquia</p>
+      <ul>
+        <li class="inherit">Tudo do Enterprise</li>
+        <li><strong>Gestão multi-site</strong> consolidada</li>
+        <li>Benchmarking de rede + <strong>ranking de lojas</strong></li>
+        <li>Comparação <strong>cross-site</strong> (N lojas, mesma métrica)</li>
+        <li><strong>Dashboards executivos</strong> (C-level)</li>
+        <li><strong>Score ESG</strong> exportável</li>
+        <li><strong>Metas corporativas</strong> top-down por loja</li>
+      </ul>
+      <div class="limits">
+        <span>Lojas ∞</span><span>48 meses/custom</span><span>SLA dedicado</span>
+      </div>
+    </article>
+  </div>
+
+  <section class="matrix">
+    <h2>Comparativo completo</h2>
+    <p>O que cada plano libera no MYIO Store Dashboard</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Recurso</th><th>Essential</th><th>Business</th><th>Enterprise</th><th>Corporate</th></tr>
+        </thead>
+        <tbody>
+          <tr class="section"><td colspan="5">Consumo &amp; sensores</td></tr>
+          <tr><td>Totais mês corrente + mês fechado (energia/água)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Média / mín / máx (temperatura, reservatório)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Quebra por hora / dia</td><td class="no">—</td><td class="note">até 90 dias</td><td class="note">até 90 dias</td><td class="note">até 90 dias</td></tr>
+
+          <tr class="section"><td colspan="5">Relatórios &amp; KPIs</td></tr>
+          <tr><td>Relatório mensal PDF</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>KPIs (kWh/m², por cliente, conformidade, autonomia)</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Tendências + comparativo entre períodos</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Export</td><td class="note">PDF mensal</td><td class="note">PDF/Excel/CSV</td><td class="note">PDF/Excel/CSV</td><td class="note">PDF/Excel/CSV</td></tr>
+          <tr><td>API REST (leitura)</td><td class="no">—</td><td class="yes">✓</td><td class="note">✓ + webhooks</td><td class="note">✓ + webhooks</td></tr>
+
+          <tr class="section"><td colspan="5">Alarmes &amp; operação</td></tr>
+          <tr><td>Alarmes</td><td class="no">—</td><td class="note">até 5</td><td class="note">até 20</td><td class="note">até 20/loja</td></tr>
+          <tr><td>Alarmes ativos em tempo real (orquestrador)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Anotações + Chamados</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>SLA de sensores</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+
+          <tr class="section"><td colspan="5">Inteligência</td></tr>
+          <tr><td>AI Insights (vazamento, baseline, degradação, pico)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Metas + margem + projeção</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="note">✓ + corporativas</td></tr>
+          <tr><td>Performance score + benchmarking + ranking de equipamentos</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Manutenção preditiva</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Digital Twin</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+
+          <tr class="section"><td colspan="5">Rede (Corporate)</td></tr>
+          <tr><td>Gestão multi-site + ranking de lojas + cross-site</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Dashboards executivos + score ESG</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+
+          <tr class="section"><td colspan="5">Limites</td></tr>
+          <tr><td>Sensores por tipo</td><td>5</td><td>10</td><td>∞*</td><td>∞*</td></tr>
+          <tr><td>Usuários</td><td>3</td><td>10</td><td>∞</td><td>∞</td></tr>
+          <tr><td>Retenção de histórico</td><td>12 meses</td><td>24 meses</td><td>36 meses</td><td>48 meses/custom</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="addons">
+    <h3>Add-ons — qualquer plano</h3>
+    <div class="chips">
+      <span>➕ Sensores extras (pacotes de 5)</span>
+      <span>🗄️ Retenção estendida</span>
+      <span>💬 WhatsApp Business nas notificações</span>
+      <span>🛠️ Onboarding assistido (instalação e calibração)</span>
+    </div>
+  </section>
+
+  <footer>
+    * Fair use. O plano vive em <code>customer.settings.singleDashboard.plan</code> e os limites são aplicados no backend (upgrade instantâneo).<br>
+    MYIO · GCDR — planos do Store Dashboard (RFC-0053) · proposta v2 · draft 2026-07-13 · fontes: MYIO_Dashboard_Plans.md + PLANS.md
+  </footer>
+
+</div>
+</body>
+</html>
