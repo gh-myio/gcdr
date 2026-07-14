@@ -15,6 +15,13 @@ const CLOUD_FETCH_TIMEOUT_MS = 3000;
 // caller-supplied value cannot alter the request target (CodeQL SSRF).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Page the device registry at the API's max page size (100). A NodeHub with
+// 20-30+ slaves, each exposing several channel-rows, can exceed one page.
+const DEVICE_PAGE_LIMIT = 100;
+type TopologyDeviceRow = Awaited<
+  ReturnType<typeof deviceRepository.findByCentralId>
+>['items'][number];
+
 // Shape returned by GET (cloud-server) /centrals/:id/device-status.
 interface CloudDeviceStatus {
   id: number; // erlradio device id == GCDR devices.slaveId
@@ -74,12 +81,19 @@ export class CentralTopologyService {
     // GCDR devices for the central. A board at a slaveId can expose several
     // channel-rows; the star shows ONE node per slaveId (link quality is
     // per-physical-device, not per-channel), so we group by slaveId.
-    const { items } = await deviceRepository.findByCentralId(tenantId, centralId, { limit: 999 });
-    const bySlave = new Map<number, (typeof items)[number]>();
-    for (const d of items) {
-      if (d.slaveId === null || d.slaveId === undefined) continue;
-      if (!bySlave.has(d.slaveId)) bySlave.set(d.slaveId, d);
-    }
+    const bySlave = new Map<number, TopologyDeviceRow>();
+    let cursor: string | undefined;
+    do {
+      const page = await deviceRepository.findByCentralId(tenantId, centralId, {
+        limit: DEVICE_PAGE_LIMIT,
+        cursor,
+      });
+      for (const d of page.items) {
+        if (d.slaveId === null || d.slaveId === undefined) continue;
+        if (!bySlave.has(d.slaveId)) bySlave.set(d.slaveId, d);
+      }
+      cursor = page.pagination.hasMore ? page.pagination.nextCursor : undefined;
+    } while (cursor);
 
     const nodes: TopologyNode[] = [...bySlave.values()].map((d) => {
       const link = linkBySlave.get(d.slaveId as number);
