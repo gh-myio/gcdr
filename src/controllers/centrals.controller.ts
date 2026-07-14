@@ -145,6 +145,11 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
  * Hub-and-spoke topology of the central's devices + per-device link quality
  * (status + average_retries, joined from the cloud-server) for the CentralDetail
  * topology view. One node per physical device (grouped by slaveId).
+ *
+ * NOTE: this GET has side effects — it reconciles the central's connection_status
+ * and each device's connectivity_status from the live cloud link (best-effort).
+ * As a result the centrals-list connected/total counts are only fresh after a
+ * central's topology has been viewed, until a background reconciler exists.
  */
 router.get('/:id/device-topology', async (req: Request, res: Response, next: NextFunction) => {
   try {

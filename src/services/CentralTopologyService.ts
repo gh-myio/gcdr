@@ -55,6 +55,10 @@ export interface CentralTopology {
  * Builds the hub-and-spoke topology for a central: one node per physical device
  * (grouped by slaveId), each carrying its live link quality from the cloud-server.
  * The central is the hub; the edge quality is `signalPct`/`status`.
+ *
+ * SIDE EFFECT: getTopology also reconciles the central's connection_status and
+ * each device's connectivity_status off the same cloud link (best-effort, only on
+ * change). It is a read that mutates — documented here so it isn't a surprise.
  */
 export class CentralTopologyService {
   async getTopology(tenantId: string, centralId: string): Promise<CentralTopology> {
