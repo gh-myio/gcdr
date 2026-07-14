@@ -113,16 +113,25 @@ export class CentralTopologyService {
     // Reflect each device's connectivity off the same cloud link (online|bad ->
     // ONLINE, offline -> OFFLINE; unknown/null left as-is). Best-effort + only on
     // change, so the centrals-list connected/total count reflects reality once a
-    // central has been viewed. The topology response still renders if it fails.
-    await Promise.allSettled(
-      [...bySlave.values()].map((d) => {
-        const link = linkBySlave.get(d.slaveId as number);
-        if (!link?.status) return Promise.resolve();
-        const desired = link.status === 'offline' ? 'OFFLINE' : 'ONLINE';
-        if (d.connectivityStatus === desired) return Promise.resolve();
-        return deviceRepository.setConnectivityStatus(tenantId, d.id, desired);
-      }),
-    );
+    // central has been viewed. The desired status is binary, so the writes batch
+    // into at most two UPDATEs. The topology response still renders if it fails.
+    const toOnline: string[] = [];
+    const toOffline: string[] = [];
+    for (const d of bySlave.values()) {
+      const link = linkBySlave.get(d.slaveId as number);
+      if (!link?.status) continue;
+      const desired = link.status === 'offline' ? 'OFFLINE' : 'ONLINE';
+      if (d.connectivityStatus === desired) continue;
+      (desired === 'ONLINE' ? toOnline : toOffline).push(d.id);
+    }
+    try {
+      await Promise.all([
+        deviceRepository.setConnectivityStatusBatch(tenantId, toOnline, 'ONLINE'),
+        deviceRepository.setConnectivityStatusBatch(tenantId, toOffline, 'OFFLINE'),
+      ]);
+    } catch {
+      // reconcile is best-effort; never fail the topology response on it.
+    }
 
     return { central: { id: central.id, name: central.name }, nodes };
   }
