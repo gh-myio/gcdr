@@ -101,6 +101,7 @@ import { singleDashboardController } from './controllers/single-dashboard.contro
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
+import { requireSingleDashboardRead } from './middleware/requireDashboardPermission';
 import {
   centralEnrollRateLimiter,
   centralPollRateLimiter,
@@ -313,6 +314,9 @@ apiV1Router.use(
 apiV1Router.use(
   '/customers/:customerId/single-dashboard',
   hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE),
+  // RFC-0053: real RBAC for JWT users — evaluates dashboard.single.read with
+  // customer/asset scopes and auto-narrows single-asset grants (?assetId=).
+  requireSingleDashboardRead(),
   singleDashboardController,
 );
 

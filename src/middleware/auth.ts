@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { UnauthorizedError } from '../shared/errors/AppError';
+import { ForbiddenError, UnauthorizedError } from '../shared/errors/AppError';
 import { decodeJWT, JWTUser } from './context';
 import { customerApiKeyService } from '../services/CustomerApiKeyService';
 import { ApiKeyScope } from '../domain/entities/CustomerApiKey';
@@ -47,6 +47,51 @@ function tryMasterApiKey(req: Request): boolean {
   return true;
 }
 
+// =============================================================================
+// RFC-0053 — restricted-role route lock (real server-side enforcement).
+//
+// Users whose ONLY active role is `role:single-dashboard-viewer` exist to see
+// one asset's dashboard. Instead of trusting the frontend (the role:os-only
+// precedent), the JWT auth choke point rejects anything outside the allowlist
+// below — the RBAC engine then narrows WHAT they see inside those routes
+// (see middleware/requireDashboardPermission.ts).
+// =============================================================================
+
+const RESTRICTED_VIEWER_ROLE = 'role:single-dashboard-viewer';
+
+const VIEWER_ALLOWED_PATHS: Array<{ pattern: RegExp; methods?: string[] }> = [
+  { pattern: /^\/api\/v1\/auth(\/|$)/ },
+  { pattern: /^\/api\/v1\/customers\/[0-9a-f-]{36}\/single-dashboard\/?$/, methods: ['GET'] },
+  { pattern: /^\/api\/v1\/annotations(\/|$)/ },
+  { pattern: /^\/api\/v1\/wo\/tickets(\/|$)/ },
+  { pattern: /^\/api\/v1\/devices\/[0-9a-f-]{36}\/?$/, methods: ['GET'] },
+];
+
+/** True when the JWT user is confined to the single-dashboard allowlist. */
+function isRestrictedViewer(user: JWTUser): boolean {
+  return user.roles.length > 0 && user.roles.every((r) => r === RESTRICTED_VIEWER_ROLE);
+}
+
+function viewerMayAccess(req: Request): boolean {
+  const path = (req.originalUrl || req.url).split('?')[0];
+  return VIEWER_ALLOWED_PATHS.some(
+    (rule) => rule.pattern.test(path) && (!rule.methods || rule.methods.includes(req.method)),
+  );
+}
+
+/**
+ * Applies the restricted-viewer route lock right after a JWT is accepted.
+ * 403 (not 401) on purpose: the session is valid — frontends treat 401 as
+ * "token died" and would log the user out.
+ */
+function enforceRestrictedViewer(req: Request, next: NextFunction): boolean {
+  if (req.user && isRestrictedViewer(req.user) && !viewerMayAccess(req)) {
+    next(new ForbiddenError('Acesso restrito ao Single Dashboard'));
+    return false;
+  }
+  return true;
+}
+
 /**
  * Authentication middleware - requires valid JWT token or master API key
  */
@@ -77,6 +122,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   req.user = user;
   req.context.tenantId = user.tenant_id;
   req.context.userId = user.sub;
+
+  if (!enforceRestrictedViewer(req, next)) return;
 
   next();
 }
@@ -154,6 +201,7 @@ export function hybridAuthMiddleware(requiredScope?: ApiKeyScope | ApiKeyScope[]
         req.user = user;
         req.context.tenantId = user.tenant_id;
         req.context.userId = user.sub;
+        if (!enforceRestrictedViewer(req, next)) return;
         next();
         return;
       }
