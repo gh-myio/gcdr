@@ -18,6 +18,13 @@ function stripPayload<T extends { payload?: unknown }>(cmd: T): Omit<T, 'payload
   return rest;
 }
 
+// Defensive redaction: remove a known secret substring from captured command
+// output before persisting it, so a tool that echoes its argument can't leak the
+// SET_WIFI password through stdout/stderr (which are not stripped from responses).
+function redactSecret(text: string, secret: string | undefined): string {
+  return secret ? text.split(secret).join('[redacted]') : text;
+}
+
 // Status may advance QUEUED -> RUNNING -> DONE/FAILED. FAILED is reachable from
 // any non-terminal state; DONE only from RUNNING (the central always claims a
 // command — QUEUED -> RUNNING — before it can report a result, so a direct
@@ -155,10 +162,14 @@ export class CentralCommandService {
         patch.payload = null;
       }
     }
+    // Defense in depth: myio-wifi-set does not echo the password, but stdout/
+    // stderr are not stripped from operator-facing responses, so redact the
+    // SET_WIFI secret from any captured output before persisting it.
+    const secret = (cmd.payload as { password?: string } | null)?.password;
     if (dto.exitCode !== undefined) patch.exitCode = dto.exitCode;
-    if (dto.stdout !== undefined) patch.stdout = dto.stdout;
-    if (dto.stderr !== undefined) patch.stderr = dto.stderr;
-    if (dto.errorMessage !== undefined) patch.errorMessage = dto.errorMessage;
+    if (dto.stdout !== undefined) patch.stdout = redactSecret(dto.stdout, secret);
+    if (dto.stderr !== undefined) patch.stderr = redactSecret(dto.stderr, secret);
+    if (dto.errorMessage !== undefined) patch.errorMessage = redactSecret(dto.errorMessage, secret);
 
     // Compare-and-swap on the status we validated against: if the reaper (or any
     // concurrent terminal transition) changed the command between the read above
