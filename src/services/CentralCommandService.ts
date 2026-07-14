@@ -148,7 +148,12 @@ export class CentralCommandService {
     const patch: UpdateCommandPatch = {};
     if (dto.status) {
       patch.status = dto.status;
-      if (TERMINAL_STATUSES.has(dto.status)) patch.completedAt = new Date();
+      if (TERMINAL_STATUSES.has(dto.status)) {
+        patch.completedAt = new Date();
+        // The agent has already consumed the command; drop the SET_WIFI payload
+        // so the WiFi password is not retained in central_commands afterwards.
+        patch.payload = null;
+      }
     }
     if (dto.exitCode !== undefined) patch.exitCode = dto.exitCode;
     if (dto.stdout !== undefined) patch.stdout = dto.stdout;

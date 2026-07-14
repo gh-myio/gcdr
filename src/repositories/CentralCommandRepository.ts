@@ -2,6 +2,7 @@ import { eq, and, desc, lt, inArray, sql } from 'drizzle-orm';
 import { db, schema, CentralCommand } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
+import { WifiPayloadDTO } from '../dto/request/CentralCommandDTO';
 
 const { centralCommands } = schema;
 
@@ -26,6 +27,8 @@ export interface UpdateCommandPatch {
   errorMessage?: string | null;
   claimedAt?: Date | null;
   completedAt?: Date | null;
+  // Set to null on a terminal transition to purge the consumed SET_WIFI secret.
+  payload?: WifiPayloadDTO | null;
 }
 
 /**
