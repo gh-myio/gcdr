@@ -5163,7 +5163,7 @@ components:
             type: object
             additionalProperties: true
             properties:
-              key:         { type: string, enum: [energy, water, temperature, tanks] }
+              key:         { type: string, enum: [energy, water, temperature] }
               deviceCount: { type: integer }
               online:      { type: integer }
               offline:     { type: integer }
@@ -6510,13 +6510,18 @@ paths:
       summary: Single Dashboard aggregated snapshot (RFC-0053)
       description: |
         Read-only composition for the single-customer operational dashboard (Single Dashboard):
-        device groups (energy | water | temperature | tanks, mapped by
+        device groups (energy | water | temperature — water spans the whole
+        hydric infrastructure including tanks/pumps/level sensors, mapped by
         profile/type with per-customer overrides in
         `customer.settings.singleDashboard.groupOverrides`), an explainable
         health score, goal progress (RFC-0046 targets + RFC-0052
         `adjustedValue`), heuristic insights and per-section soft errors.
         Telemetry fields degrade to `available:false` while the ingestion
         read-through contract is pending (RFC-0053 Q1). Scope `customers:read`.
+        JWT users go through real RBAC (`dashboard.single.read` with
+        `customer:<id>` / `customer:<id>/asset:<id>` scopes); a single-asset
+        grant is auto-narrowed and `?assetId=` filters the snapshot to one
+        asset's devices.
       operationId: getSingleDashboard
       parameters:
         - { name: from, in: query, required: false, schema: { type: string, format: date }, description: 'Range start (ISO date/datetime); forwarded to the telemetry read-through.' }

@@ -17,6 +17,9 @@ jest.mock('../../../src/services/RuleService', () => ({
 jest.mock('../../../src/services/AnnotationService', () => ({
   annotationService: { list: jest.fn() },
 }));
+jest.mock('../../../src/services/AssetService', () => ({
+  assetService: { getById: jest.fn() },
+}));
 
 import { SingleDashboardService } from '../../../src/services/SingleDashboardService';
 import { NullIngestionTelemetryClient } from '../../../src/services/IngestionTelemetryClient';
@@ -25,6 +28,7 @@ import { customerService } from '../../../src/services/CustomerService';
 import { consumptionGoalService } from '../../../src/services/ConsumptionGoalService';
 import { ruleService } from '../../../src/services/RuleService';
 import { annotationService } from '../../../src/services/AnnotationService';
+import { assetService } from '../../../src/services/AssetService';
 
 const tenantId = '11111111-1111-1111-1111-111111111111';
 const customerId = '84e0370e-636a-4741-9874-504b5e0b3577';
@@ -94,9 +98,9 @@ describe('SingleDashboardService — RFC-0053', () => {
 
     const byKey = Object.fromEntries(result.groups.map((g) => [g.key, g.devices.map((d) => d.id)]));
     expect(byKey.energy).toEqual(['d1']);
-    expect(byKey.water).toEqual(['d2']);
+    // Water = whole hydric infrastructure: meters AND tanks/pumps/level sensors.
+    expect(byKey.water).toEqual(expect.arrayContaining(['d2', 'd4', 'd5']));
     expect(byKey.temperature).toEqual(['d3']);
-    expect(byKey.tanks).toEqual(expect.arrayContaining(['d4', 'd5']));
     expect(result.unassigned.map((d) => d.id)).toEqual(['d6']);
   });
 
@@ -105,6 +109,8 @@ describe('SingleDashboardService — RFC-0053', () => {
       id: customerId,
       name: 'Loja',
       displayName: 'Loja Teste',
+      // 'tanks' is a legacy alias kept for overrides written before the
+      // group was folded into water.
       settings: { singleDashboard: { groupOverrides: { d1: 'tanks' } } },
     });
     mockedDevices.mockResolvedValue({
@@ -112,9 +118,9 @@ describe('SingleDashboardService — RFC-0053', () => {
     });
     const result = await makeService().get(tenantId, customerId, {});
 
-    const tanks = result.groups.find((g) => g.key === 'tanks')!;
+    const water = result.groups.find((g) => g.key === 'water')!;
     const energy = result.groups.find((g) => g.key === 'energy')!;
-    expect(tanks.devices.map((d) => d.id)).toEqual(['d1']);
+    expect(water.devices.map((d) => d.id)).toEqual(['d1']);
     expect(energy.deviceCount).toBe(0);
   });
 
@@ -190,6 +196,24 @@ describe('SingleDashboardService — RFC-0053', () => {
     expect(result.annotations?.byType).toEqual({ maintenance: 1, observation: 1 });
     expect(result.annotations?.recent[0]).toMatchObject({ id: 'a1', createdByName: 'Rodrigo' });
     expect(result.annotations?.recent[1]).toMatchObject({ id: 'a2', createdByName: 'x@y.z' });
+  });
+
+  it('narrows the snapshot to one asset (RFC-0053 asset scope)', async () => {
+    (assetService.getById as jest.Mock).mockResolvedValue({
+      id: 'a1',
+      name: 'SCMOXUARAQ303A_L3',
+      customerId,
+    });
+    mockedDevices.mockResolvedValue({
+      items: [
+        device({ id: 'd1', name: 'Medidor', deviceType: '3F_MEDIDOR', assetId: 'a1' }),
+        device({ id: 'd2', name: 'Hidro', deviceType: 'HIDROMETRO', assetId: 'other-asset' }),
+      ],
+    });
+    const result = await makeService().get(tenantId, customerId, {}, { assetId: 'a1' });
+
+    expect(result.asset).toEqual({ id: 'a1', name: 'SCMOXUARAQ303A_L3' });
+    expect(result.groups.flatMap((g) => g.devices.map((d) => d.id))).toEqual(['d1']);
   });
 
   it('collects per-section errors instead of failing the whole snapshot', async () => {

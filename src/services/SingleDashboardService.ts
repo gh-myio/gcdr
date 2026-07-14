@@ -2,7 +2,7 @@
 // RFC-0053 — One-Store Dash: aggregation service
 //
 // Composes the single-store operational snapshot from what GCDR already owns:
-//   - devices (grouped energy/water/temperature/tanks by profile/type, with
+//   - devices (grouped energy/water/temperature by profile/type, with
 //     per-customer overrides in customer.settings.singleDashboard);
 //   - consumption goals with the RFC-0052 margin overlay (raw + adjusted);
 //   - connectivity-derived health score (explainable breakdown, §4.3);
@@ -16,7 +16,9 @@
 
 import { Device } from '../domain/entities/Device';
 import { deviceService } from './DeviceService';
+import { assetService } from './AssetService';
 import { customerService } from './CustomerService';
+import { NotFoundError } from '../shared/errors/AppError';
 import { ruleService } from './RuleService';
 import { annotationService } from './AnnotationService';
 import { consumptionGoalService, GoalGetResult } from './ConsumptionGoalService';
@@ -32,9 +34,9 @@ import type { GoalDomain } from '../dto/request/GoalsDTO';
 // Response shapes (mirrored 1:1 by the frontend types)
 // -----------------------------------------------------------------------------
 
-export type SingleDashGroupKey = 'energy' | 'water' | 'temperature' | 'tanks';
+export type SingleDashGroupKey = 'energy' | 'water' | 'temperature';
 
-export const SINGLE_DASH_GROUP_KEYS: SingleDashGroupKey[] = ['energy', 'water', 'temperature', 'tanks'];
+export const SINGLE_DASH_GROUP_KEYS: SingleDashGroupKey[] = ['energy', 'water', 'temperature'];
 
 export interface SingleDashDeviceCard {
   id: string;
@@ -130,6 +132,8 @@ export interface SingleDashAnnotationsSummary {
 export interface SingleDashboardResult {
   customerId: string;
   customerName: string;
+  /** Present when the snapshot is narrowed to one asset (asset-scoped users). */
+  asset: { id: string; name: string } | null;
   range: TelemetryRange;
   groups: SingleDashGroup[];
   /** Devices no rule or override could place — surfaced, never hidden (§3.3). */
@@ -155,10 +159,14 @@ interface SingleDashboardSettings {
 // -----------------------------------------------------------------------------
 
 const GROUP_RULES: Array<{ group: SingleDashGroupKey; pattern: RegExp }> = [
-  // Tanks first: pump/level/tank names would otherwise leak into water/energy.
-  { group: 'tanks', pattern: /CAIXA|TANQUE|TANK|RESERVAT|NIVEL|N[IÍ]VEL|BOMBA|PRESSURIZA/i },
-  // Solenoid valves belong to the water panel (MAIN_BAS convention).
-  { group: 'water', pattern: /HIDR|WATER|[AÁ]GUA|SOLEN/i },
+  // Water covers the whole hydric infrastructure: meters, solenoid valves
+  // (MAIN_BAS convention) AND tanks/pumps/level sensors — the former 'tanks'
+  // group was folded into water. Water first: pump/level/tank names would
+  // otherwise leak into energy.
+  {
+    group: 'water',
+    pattern: /HIDR|WATER|[AÁ]GUA|SOLEN|CAIXA|TANQUE|TANK|RESERVAT|NIVEL|N[IÍ]VEL|BOMBA|PRESSURIZA/i,
+  },
   { group: 'temperature', pattern: /TERM|TEMP|FREEZER|CAMARA|C[AÂ]MARA|GELADEIRA|ADEGA/i },
   {
     group: 'energy',
@@ -173,15 +181,24 @@ const MAX_STORE_DEVICES = 1000;
 export class SingleDashboardService {
   constructor(private readonly telemetry: IngestionTelemetryClient = ingestionTelemetryClient) {}
 
-  async get(tenantId: string, customerId: string, range: TelemetryRange): Promise<SingleDashboardResult> {
+  async get(
+    tenantId: string,
+    customerId: string,
+    range: TelemetryRange,
+    opts: { assetId?: string } = {},
+  ): Promise<SingleDashboardResult> {
     const errors: SingleDashboardResult['errors'] = [];
 
     // 404s propagate: a dashboard for a missing customer is a client error.
     const customer = await customerService.getById(tenantId, customerId);
     const settings = this.settingsOf(customer.settings);
 
+    const asset = await this.resolveAssetScope(tenantId, customerId, opts.assetId);
+
     const page = await deviceService.listByCustomer(tenantId, customerId, { limit: MAX_STORE_DEVICES });
-    const devices = page.items.filter((d) => !d.deletedAt);
+    let devices = page.items.filter((d) => !d.deletedAt);
+    if (opts.assetId) devices = devices.filter((d) => d.assetId === opts.assetId);
+    const scopedDeviceIds = opts.assetId ? new Set(devices.map((d) => d.id)) : null;
 
     // ── Grouping ──────────────────────────────────────────────────────────────
     const grouped = new Map<SingleDashGroupKey, Device[]>(SINGLE_DASH_GROUP_KEYS.map((k) => [k, []]));
@@ -210,20 +227,7 @@ export class SingleDashboardService {
     );
 
     // ── Goals (raw + RFC-0052 adjusted) ───────────────────────────────────────
-    const goals: SingleDashGoalProgress[] = [];
-    const now = new Date();
-    for (const domain of GOAL_DOMAINS) {
-      try {
-        const result = await consumptionGoalService.get(
-          { tenantId, customerId, domain, year: now.getFullYear() },
-          'month',
-          false,
-        );
-        goals.push(this.buildGoalProgress(domain, result, now));
-      } catch (err) {
-        errors.push({ section: `goals:${domain}`, message: err instanceof Error ? err.message : String(err) });
-      }
-    }
+    const goals = await this.buildGoals(tenantId, customerId, errors);
 
     const health = this.buildHealth(devices);
     const insights = this.evaluateInsights(telemetryResult);
@@ -239,7 +243,7 @@ export class SingleDashboardService {
     // ── Consolidated annotations (RFC-0036, customer-wide) ────────────────────
     let annotations: SingleDashAnnotationsSummary | null = null;
     try {
-      annotations = await this.buildAnnotationsSummary(tenantId, customerId);
+      annotations = await this.buildAnnotationsSummary(tenantId, customerId, scopedDeviceIds);
     } catch (err) {
       errors.push({ section: 'annotations', message: err instanceof Error ? err.message : String(err) });
     }
@@ -247,6 +251,7 @@ export class SingleDashboardService {
     return {
       customerId,
       customerName: customer.displayName || customer.name,
+      asset,
       range,
       groups,
       unassigned: unassigned.map((d) => this.buildDeviceCard(d, telemetryResult)),
@@ -257,6 +262,46 @@ export class SingleDashboardService {
       annotations,
       errors,
     };
+  }
+
+  /**
+   * Asset scope (RFC-0053 asset-scoped users): the snapshot narrows to the
+   * devices of ONE asset, which must belong to this customer (else 404).
+   */
+  private async resolveAssetScope(
+    tenantId: string,
+    customerId: string,
+    assetId?: string,
+  ): Promise<{ id: string; name: string } | null> {
+    if (!assetId) return null;
+    const a = await assetService.getById(tenantId, assetId);
+    if (!a || a.customerId !== customerId) {
+      throw new NotFoundError(`Asset ${assetId} not found for customer ${customerId}`);
+    }
+    return { id: a.id, name: a.name };
+  }
+
+  /** Goals for each domain (raw + RFC-0052 adjusted); failures degrade per domain. */
+  private async buildGoals(
+    tenantId: string,
+    customerId: string,
+    errors: SingleDashboardResult['errors'],
+  ): Promise<SingleDashGoalProgress[]> {
+    const goals: SingleDashGoalProgress[] = [];
+    const now = new Date();
+    for (const domain of GOAL_DOMAINS) {
+      try {
+        const result = await consumptionGoalService.get(
+          { tenantId, customerId, domain, year: now.getFullYear() },
+          'month',
+          false,
+        );
+        goals.push(this.buildGoalProgress(domain, result, now));
+      } catch (err) {
+        errors.push({ section: `goals:${domain}`, message: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    return goals;
   }
 
   /** Rule inventory grouped by priority; `active` stays null until RFC-0053 Q2. */
@@ -271,13 +316,18 @@ export class SingleDashboardService {
     return { rulesTotal: rules.length, rulesEnabled: enabled.length, byPriority, active: null };
   }
 
-  /** Customer-wide annotation roll-up: counts by type + the 5 most recent. */
+  /**
+   * Customer-wide annotation roll-up: counts by type + the 5 most recent.
+   * With an asset scope, only annotations on the asset's devices count.
+   */
   private async buildAnnotationsSummary(
     tenantId: string,
     customerId: string,
+    scopedDeviceIds: Set<string> | null = null,
   ): Promise<SingleDashAnnotationsSummary> {
     const page = await annotationService.list(tenantId, { customerId, limit: 100 });
-    const items = page.items ?? [];
+    let items = page.items ?? [];
+    if (scopedDeviceIds) items = items.filter((a) => scopedDeviceIds.has(a.entityId));
     const byType: Record<string, number> = {};
     for (const a of items) {
       byType[a.type] = (byType[a.type] ?? 0) + 1;
@@ -309,6 +359,9 @@ export class SingleDashboardService {
   /** Override first; then the first matching default rule; else unassigned. */
   private groupOf(device: Device, settings: SingleDashboardSettings): SingleDashGroupKey | null {
     const override = settings.groupOverrides?.[device.id];
+    // Legacy alias: 'tanks' overrides written before the group was folded
+    // into water keep working.
+    if ((override as string) === 'tanks') return 'water';
     if (override && SINGLE_DASH_GROUP_KEYS.includes(override)) return override;
 
     const haystack = [device.deviceProfile, device.deviceType, device.name, device.label]

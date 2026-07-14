@@ -22,6 +22,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const SingleDashboardQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/, 'from must be an ISO date').optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/, 'to must be an ISO date').optional(),
+  // Narrows the snapshot to one asset's devices (asset-scoped users; the
+  // RBAC middleware may inject this for single-asset grants).
+  assetId: z.string().regex(UUID_REGEX, 'assetId must be a UUID').optional(),
 });
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -33,8 +36,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       throw new ValidationError(`Invalid customerId: "${customerId ?? ''}"`);
     }
 
-    const { from, to } = SingleDashboardQuerySchema.parse(req.query);
-    const result = await singleDashboardService.get(tenantId, customerId, { from, to });
+    const { from, to, assetId } = SingleDashboardQuerySchema.parse(req.query);
+    const result = await singleDashboardService.get(tenantId, customerId, { from, to }, { assetId });
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
