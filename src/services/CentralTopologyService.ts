@@ -4,9 +4,8 @@ import { NotFoundError } from '../shared/errors/AppError';
 
 // The cloud-server holds the live per-device link quality (status +
 // average_retries) and exposes it server-to-server. GCDR joins it onto its own
-// device registry to build the CentralDetail topology view.
-const CLOUD_SERVER_URL = process.env.CLOUD_SERVER_URL || '';
-const CLOUD_STATUS_TOKEN = process.env.CLOUD_STATUS_TOKEN || '';
+// device registry to build the CentralDetail topology view. Read at call time
+// (not module load) so runtime config and tests take effect.
 // Best-effort join: cap the cloud-server call so a hung server can't hold the
 // whole topology response until undici's multi-minute default timeout.
 const CLOUD_FETCH_TIMEOUT_MS = 3000;
@@ -144,13 +143,15 @@ export class CentralTopologyService {
     centralId: string
   ): Promise<{ linkBySlave: Map<number, CloudDeviceStatus>; connected: boolean | null }> {
     const map = new Map<number, CloudDeviceStatus>();
-    if (!CLOUD_SERVER_URL) return { linkBySlave: map, connected: null };
+    const cloudUrl = process.env.CLOUD_SERVER_URL || '';
+    const cloudToken = process.env.CLOUD_STATUS_TOKEN || '';
+    if (!cloudUrl) return { linkBySlave: map, connected: null };
     try {
       if (!UUID_RE.test(centralId)) return { linkBySlave: map, connected: null };
       const headers: Record<string, string> = {};
-      if (CLOUD_STATUS_TOKEN) headers['x-status-token'] = CLOUD_STATUS_TOKEN;
+      if (cloudToken) headers['x-status-token'] = cloudToken;
       const res = await fetch(
-        `${CLOUD_SERVER_URL}/centrals/${encodeURIComponent(centralId)}/device-status`,
+        `${cloudUrl}/centrals/${encodeURIComponent(centralId)}/device-status`,
         { headers, signal: AbortSignal.timeout(CLOUD_FETCH_TIMEOUT_MS) },
       );
       if (!res.ok) return { linkBySlave: map, connected: null };
