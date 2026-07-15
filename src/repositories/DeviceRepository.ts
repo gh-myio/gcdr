@@ -11,6 +11,39 @@ import { countWhere } from './helpers/countQuery';
 
 const { devices } = schema;
 
+const DEVICE_NOT_FOUND_MSG = 'Device not found';
+
+/**
+ * UpdateDeviceDTO fields copied verbatim into the row when present. Merge
+ * fields (specs, telemetryConfig, metadata, attributes) are handled explicitly
+ * in `update`.
+ */
+const UPDATE_COPY_FIELDS = [
+  'name',
+  'displayName',
+  'code',
+  'label',
+  'type',
+  'description',
+  'externalId',
+  'credentials',
+  'tags',
+  'status',
+  // RFC-0008
+  'slaveId',
+  'centralId',
+  'identifier',
+  'deviceProfile',
+  'deviceType',
+  'channel',
+  'deviceChannelType',
+  'ingestionId',
+  'ingestionGatewayId',
+  // RFC-0046 Addendum A (DEC-11): set/clear together (validated upstream).
+  'meterRole',
+  'meterDomain',
+] as const;
+
 /**
  * Builds the smart full-text search condition across all relevant text columns.
  * Covers: name, displayName, label, code, serialNumber, externalId, identifier, metadata (as text).
@@ -191,7 +224,7 @@ export class DeviceRepository implements IDeviceRepository {
   async update(tenantId: string, id: string, data: UpdateDeviceDTO, updatedBy: string): Promise<Device> {
     const existing = await this.getById(tenantId, id);
     if (!existing) {
-      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+      throw new AppError('DEVICE_NOT_FOUND', DEVICE_NOT_FOUND_MSG, 404);
     }
 
     const updateData: Record<string, unknown> = {
@@ -200,43 +233,23 @@ export class DeviceRepository implements IDeviceRepository {
       version: existing.version + 1,
     };
 
-    // Only update fields that are provided
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.displayName !== undefined) updateData.displayName = data.displayName;
-    if (data.code !== undefined) updateData.code = data.code;
-    if (data.label !== undefined) updateData.label = data.label;
-    if (data.type !== undefined) updateData.type = data.type;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.externalId !== undefined) updateData.externalId = data.externalId;
+    // Only update fields that are provided (verbatim copies).
+    const patch = data as Record<string, unknown>;
+    for (const field of UPDATE_COPY_FIELDS) {
+      if (patch[field] !== undefined) updateData[field] = patch[field];
+    }
+
+    // Merge fields: shallow-merge over the existing row.
     const specsOverride: Record<string, unknown> = {};
     if (data.manufacturer !== undefined) specsOverride.manufacturer = data.manufacturer;
     if (data.model !== undefined) specsOverride.model = data.model;
     if (data.firmwareVersion !== undefined) specsOverride.firmwareVersion = data.firmwareVersion;
-
     if (data.specs !== undefined || Object.keys(specsOverride).length > 0) {
       updateData.specs = { ...existing.specs, ...(data.specs || {}), ...specsOverride };
     }
-    if (data.credentials !== undefined) updateData.credentials = data.credentials;
     if (data.telemetryConfig !== undefined) updateData.telemetryConfig = { ...existing.telemetryConfig, ...data.telemetryConfig };
-    if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.metadata !== undefined) updateData.metadata = { ...existing.metadata, ...data.metadata };
     if (data.attributes !== undefined) updateData.attributes = { ...existing.attributes, ...data.attributes };
-    if (data.status !== undefined) updateData.status = data.status;
-
-    // RFC-0008: New fields
-    if (data.slaveId !== undefined) updateData.slaveId = data.slaveId;
-    if (data.centralId !== undefined) updateData.centralId = data.centralId;
-    if (data.identifier !== undefined) updateData.identifier = data.identifier;
-    if (data.deviceProfile !== undefined) updateData.deviceProfile = data.deviceProfile;
-    if (data.deviceType !== undefined) updateData.deviceType = data.deviceType;
-    if (data.channel !== undefined) updateData.channel = data.channel;
-    if (data.deviceChannelType !== undefined) updateData.deviceChannelType = data.deviceChannelType;
-    if (data.ingestionId !== undefined) updateData.ingestionId = data.ingestionId;
-    if (data.ingestionGatewayId !== undefined) updateData.ingestionGatewayId = data.ingestionGatewayId;
-
-    // RFC-0046 Addendum A (DEC-11): set/clear together (validated upstream).
-    if (data.meterRole !== undefined) updateData.meterRole = data.meterRole;
-    if (data.meterDomain !== undefined) updateData.meterDomain = data.meterDomain;
 
     const [result] = await db
       .update(devices)
@@ -392,7 +405,7 @@ export class DeviceRepository implements IDeviceRepository {
       .returning();
 
     if (!result) {
-      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+      throw new AppError('DEVICE_NOT_FOUND', 'DEVICE_NOT_FOUND_MSG', 404);
     }
 
     return this.mapToEntity(result);
@@ -411,7 +424,7 @@ export class DeviceRepository implements IDeviceRepository {
       .returning();
 
     if (!result) {
-      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+      throw new AppError('DEVICE_NOT_FOUND', 'DEVICE_NOT_FOUND_MSG', 404);
     }
 
     return this.mapToEntity(result);
@@ -790,7 +803,7 @@ export class DeviceRepository implements IDeviceRepository {
       .returning();
 
     if (!result) {
-      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+      throw new AppError('DEVICE_NOT_FOUND', 'DEVICE_NOT_FOUND_MSG', 404);
     }
 
     return this.mapToEntity(result);
@@ -809,7 +822,7 @@ export class DeviceRepository implements IDeviceRepository {
       .returning();
 
     if (!result) {
-      throw new AppError('DEVICE_NOT_FOUND', 'Device not found', 404);
+      throw new AppError('DEVICE_NOT_FOUND', 'DEVICE_NOT_FOUND_MSG', 404);
     }
 
     return this.mapToEntity(result);

@@ -260,45 +260,45 @@ function summariseCoverageGaps(year: number, covered: Set<number>): GoalCoverage
   const refs: string[] = [];
   let missingHours = 0;
   let truncated = false;
-  const push = (ref: string) => {
-    if (refs.length < GAP_REF_CAP) refs.push(ref);
-    else truncated = true;
-  };
 
   for (let m = 1; m <= 12; m++) {
-    const dim = daysInMonth(year, m);
-    const mm = String(m).padStart(2, '0');
-    const missPerDay: number[] = [];
-    let monthMissing = 0;
-    for (let d = 1; d <= dim; d++) {
-      let miss = 0;
-      for (let h = 0; h < 24; h++) if (!covered.has(m * 10000 + d * 100 + h)) miss++;
-      missPerDay.push(miss);
-      monthMissing += miss;
-    }
-    missingHours += monthMissing;
-    if (monthMissing === 0) continue;
-    if (monthMissing === dim * 24) {
-      push(`${year}-${mm}`);
-      continue;
-    }
-    for (let d = 1; d <= dim; d++) {
-      const miss = missPerDay[d - 1];
-      if (miss === 0) continue;
-      const dd = String(d).padStart(2, '0');
-      if (miss === 24) {
-        push(`${year}-${mm}-${dd}`);
+    const gaps = monthGapRefs(year, m, covered);
+    missingHours += gaps.missing;
+    for (const ref of gaps.refs) {
+      if (refs.length < GAP_REF_CAP) {
+        refs.push(ref);
       } else {
-        for (let h = 0; h < 24; h++) {
-          if (!covered.has(m * 10000 + d * 100 + h)) {
-            push(`${year}-${mm}-${dd}T${String(h).padStart(2, '0')}`);
-          }
-        }
+        truncated = true;
+        break;
       }
     }
   }
 
   return missingHours === 0 ? undefined : { missing: refs, truncated, missingHours };
+}
+
+/** ONE month's compact gap refs: whole month → whole days → single hours. */
+function monthGapRefs(year: number, m: number, covered: Set<number>): { refs: string[]; missing: number } {
+  const dim = daysInMonth(year, m);
+  const mm = String(m).padStart(2, '0');
+  const dayRefs: string[] = [];
+  let missing = 0;
+
+  for (let d = 1; d <= dim; d++) {
+    const dd = String(d).padStart(2, '0');
+    const hourRefs: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      if (!covered.has(m * 10000 + d * 100 + h)) {
+        hourRefs.push(`${year}-${mm}-${dd}T${String(h).padStart(2, '0')}`);
+      }
+    }
+    missing += hourRefs.length;
+    if (hourRefs.length === 24) dayRefs.push(`${year}-${mm}-${dd}`);
+    else dayRefs.push(...hourRefs);
+  }
+
+  if (missing === dim * 24) return { refs: [`${year}-${mm}`], missing };
+  return { refs: dayRefs, missing };
 }
 
 // -----------------------------------------------------------------------------
@@ -462,39 +462,8 @@ export class ConsumptionGoalService {
         fill.push(c);
       }
 
-      const scopeCount = cells.length;
-      const eps = 1e-6 * Math.max(1, Math.abs(bucket.value));
-
-      if (fill.length === 0) {
-        const implied = method === SUM_AGG ? pinnedSum : pinnedSum / scopeCount;
-        if (Math.abs(implied - bucket.value) > eps) {
-          throw new ValidationError('Bucket value conflicts with its finer/confirmed hours', {
-            [bucket.ref]: [
-              `every hour in ${bucket.ref} is already set at a finer level; their ` +
-                `${method === SUM_AGG ? 'sum' : 'average'} (${roundOut(implied)}) differs ` +
-                `from the submitted value (${bucket.value})`,
-            ],
-          });
-        }
-        continue;
-      }
-
-      let perHour: number;
-      if (method === SUM_AGG) {
-        let residual = bucket.value - pinnedSum;
-        if (residual < 0 && Math.abs(residual) <= eps) residual = 0;
-        if (residual < 0) {
-          throw new ValidationError('Bucket value is below its confirmed hours', {
-            [bucket.ref]: [
-              `confirmed/finer hours inside ${bucket.ref} already total ${roundOut(pinnedSum)}, ` +
-                `above the submitted ${bucket.value}; raise the value or clear those hours first`,
-            ],
-          });
-        }
-        perHour = residual / fill.length;
-      } else {
-        perHour = (bucket.value * scopeCount - pinnedSum) / fill.length;
-      }
+      const perHour = this.fillValuePerHour(bucket, method, pinnedSum, cells.length, fill.length);
+      if (perHour === null) continue; // fully pinned & numerically consistent
 
       // A HOUR-level bucket is operator-confirmed for the exact hour it names.
       const derived = bucket.level !== 'HOUR';
@@ -512,6 +481,51 @@ export class ConsumptionGoalService {
     }
 
     return [...out.values()];
+  }
+
+  /**
+   * The value each still-open hour of a bucket receives (P1.1/P1.2 residual
+   * rule), or `null` when the scope is fully pinned AND numerically consistent
+   * with the bucket (nothing to write). Inconsistent/overflowing buckets → 400.
+   */
+  private fillValuePerHour(
+    bucket: ValueBucket,
+    method: GoalAggregationMethod,
+    pinnedSum: number,
+    scopeCount: number,
+    fillCount: number,
+  ): number | null {
+    const eps = 1e-6 * Math.max(1, Math.abs(bucket.value));
+
+    if (fillCount === 0) {
+      const implied = method === SUM_AGG ? pinnedSum : pinnedSum / scopeCount;
+      if (Math.abs(implied - bucket.value) > eps) {
+        throw new ValidationError('Bucket value conflicts with its finer/confirmed hours', {
+          [bucket.ref]: [
+            `every hour in ${bucket.ref} is already set at a finer level; their ` +
+              `${method === SUM_AGG ? 'sum' : 'average'} (${roundOut(implied)}) differs ` +
+              `from the submitted value (${bucket.value})`,
+          ],
+        });
+      }
+      return null;
+    }
+
+    if (method !== SUM_AGG) {
+      return (bucket.value * scopeCount - pinnedSum) / fillCount;
+    }
+
+    let residual = bucket.value - pinnedSum;
+    if (residual < 0 && Math.abs(residual) <= eps) residual = 0;
+    if (residual < 0) {
+      throw new ValidationError('Bucket value is below its confirmed hours', {
+        [bucket.ref]: [
+          `confirmed/finer hours inside ${bucket.ref} already total ${roundOut(pinnedSum)}, ` +
+            `above the submitted ${bucket.value}; raise the value or clear those hours first`,
+        ],
+      });
+    }
+    return residual / fillCount;
   }
 
   /** Operator-confirmed (derived=false) hours as a pinned map for the merge path. */
@@ -683,27 +697,7 @@ export class ConsumptionGoalService {
     target: Device | undefined,
     entrySet: Device[],
   ): Promise<number> {
-    const totals = new Map<string, { value: number; sourceLevel: GoalSourceLevel; derived: boolean }>();
-    if (target) {
-      for (const r of existing) {
-        if (r.deviceId) continue;
-        totals.set(hourKey(r.month, r.day, r.hour), {
-          value: Number(r.value),
-          sourceLevel: r.sourceLevel as GoalSourceLevel,
-          derived: r.derived,
-        });
-      }
-    } else {
-      // Deviceless conversion (PUT granularity=DEVICE): the payload IS the
-      // group's time profile; every meter starts RESIDUAL.
-      for (const g of this.expandBuckets(buckets, key.year, method, actor)) {
-        totals.set(hourKey(g.month, g.day, g.hour), {
-          value: Number(g.value),
-          sourceLevel: g.sourceLevel,
-          derived: g.derived,
-        });
-      }
-    }
+    const totals = this.conversionTotals(existing, buckets, key, method, actor, target);
 
     const targetByHour = new Map<string, GoalHourUpsert>();
     if (target) {
@@ -730,17 +724,9 @@ export class ConsumptionGoalService {
       // it on hours it did not write.
       const pool = tRow ? others : target ? [...others, target] : [...entrySet];
       const explicitAtHour = tRow ? Number(tRow.value) : 0;
-      let residual = total.value - explicitAtHour;
-      const eps = 1e-6 * Math.max(1, Math.abs(total.value));
+      const per = this.residualPerMeter(k, total.value, explicitAtHour, pool.length);
+      if (per === null) continue;
 
-      if (pool.length === 0) {
-        if (Math.abs(residual) > eps) throw goalDeviceOverflow(k, total.value, explicitAtHour);
-        continue;
-      }
-      if (residual < 0 && Math.abs(residual) <= eps) residual = 0;
-      if (residual < 0) throw goalDeviceOverflow(k, total.value, explicitAtHour);
-
-      const per = residual / pool.length;
       for (const meter of pool) {
         upserts.push({
           month: m,
@@ -761,6 +747,65 @@ export class ConsumptionGoalService {
     const hoursWritten = await this.repo.upsertHours(goal.id, upserts, tx);
     await this.repo.updateGranularity(goal.id, 'DEVICE', tx);
     return hoursWritten;
+  }
+
+  /**
+   * The group's per-hour time profile for a conversion: with a `target`, the
+   * existing deviceless rows ARE the totals; deviceless (PUT
+   * granularity=DEVICE), the payload IS the profile and every meter starts
+   * RESIDUAL.
+   */
+  private conversionTotals(
+    existing: ConsumptionGoalHourRow[],
+    buckets: ValueBucket[],
+    key: GoalKey,
+    method: GoalAggregationMethod,
+    actor: string | null,
+    target: Device | undefined,
+  ): Map<string, { value: number; sourceLevel: GoalSourceLevel; derived: boolean }> {
+    const totals = new Map<string, { value: number; sourceLevel: GoalSourceLevel; derived: boolean }>();
+    if (target) {
+      for (const r of existing) {
+        if (r.deviceId) continue;
+        totals.set(hourKey(r.month, r.day, r.hour), {
+          value: Number(r.value),
+          sourceLevel: r.sourceLevel as GoalSourceLevel,
+          derived: r.derived,
+        });
+      }
+      return totals;
+    }
+    for (const g of this.expandBuckets(buckets, key.year, method, actor)) {
+      totals.set(hourKey(g.month, g.day, g.hour), {
+        value: Number(g.value),
+        sourceLevel: g.sourceLevel,
+        derived: g.derived,
+      });
+    }
+    return totals;
+  }
+
+  /**
+   * The DEC-8 residual share each pool meter receives at one hour, `null` when
+   * there is no pool and the explicit value already matches the total.
+   * Overflow (explicit > total beyond eps) → 400 GOAL_DEVICE_OVERFLOW.
+   */
+  private residualPerMeter(
+    hourRef: string,
+    totalValue: number,
+    explicitAtHour: number,
+    poolSize: number,
+  ): number | null {
+    let residual = totalValue - explicitAtHour;
+    const eps = 1e-6 * Math.max(1, Math.abs(totalValue));
+
+    if (poolSize === 0) {
+      if (Math.abs(residual) > eps) throw goalDeviceOverflow(hourRef, totalValue, explicitAtHour);
+      return null;
+    }
+    if (residual < 0 && Math.abs(residual) <= eps) residual = 0;
+    if (residual < 0) throw goalDeviceOverflow(hourRef, totalValue, explicitAtHour);
+    return residual / poolSize;
   }
 
   /**
