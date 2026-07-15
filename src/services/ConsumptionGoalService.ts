@@ -34,6 +34,7 @@ import {
   type GoalHourUpsert,
   type GoalHistorySource,
   type GoalHistoryDetail,
+  type GoalHistoryAppend,
   type GoalKey,
   type GoalTx,
 } from '../repositories/consumptionGoalRepository';
@@ -249,42 +250,123 @@ export class ConsumptionGoalService {
   }
 
   // ---------------------------------------------------------------------------
-  // Distribution (bucket → canonical hour rows) — DEC-3
+  // Distribution (buckets → canonical hour rows) — DEC-3, revised per feedback
+  // P1.1/P1.2: residual-aware, so a bucket's value is honoured as the TOTAL
+  // (SUM) or target MEAN (AVERAGE) of its scope even when finer buckets or
+  // operator-confirmed hours live inside it.
   // ---------------------------------------------------------------------------
 
   /**
-   * Expands one value bucket into the hour upserts it covers.
-   *   SUM     → even split: each hour = value / hoursInScope
-   *   AVERAGE → copy: each hour = value
-   * Generated hours carry `sourceLevel` = the bucket's level and `derived` =
-   * true for every hour except the exact HOUR a HOUR-level bucket names.
+   * Expands value buckets into hour upserts. Buckets are processed finest →
+   * coarsest; an hour already produced by a finer bucket in the same payload —
+   * or an operator-confirmed existing hour (`pinned`, merge path only) — is
+   * PINNED for the coarser bucket:
+   *
+   *   SUM     → pinned hours keep their values; the residual
+   *             (value − Σ pinned) splits evenly across the remaining hours.
+   *             A negative residual is a 400 (SUM domains are non-negative).
+   *   AVERAGE → remaining hours get (value × N − Σ pinned) / remaining, so the
+   *             scope mean equals the bucket value (with nothing pinned this
+   *             degenerates to DEC-3's plain copy).
+   *
+   * A fully-pinned scope accepts the bucket only when it is numerically
+   * consistent with the pinned values (tolerance-checked 400 otherwise).
+   * HOUR-level buckets always write their exact hour (explicit beats pinned).
    */
-  private distributeBucket(
-    bucket: ValueBucket,
+  private expandBuckets(
+    buckets: ValueBucket[],
     year: number,
     method: GoalAggregationMethod,
     updatedBy: string | null,
+    pinned: Map<string, number> = new Map(),
   ): GoalHourUpsert[] {
-    const hours: GoalHourUpsert[] = [];
-    const scope = { month: bucket.month, day: bucket.day, hour: bucket.hour };
-    const count = this.hoursInScope(bucket.level, year, bucket.month, bucket.day);
-    const perHour = method === SUM_AGG ? bucket.value / count : bucket.value;
-    // A HOUR-level bucket is operator-confirmed for the exact hour it names.
-    const derived = bucket.level !== 'HOUR';
+    const out = new Map<string, GoalHourUpsert>();
 
-    this.forEachHourInScope(bucket.level, year, scope, (m, d, h) => {
-      hours.push({
-        month: m,
-        day: d,
-        hour: h,
-        value: formatNumeric(perHour),
-        sourceLevel: bucket.level,
-        derived,
-        updatedBy,
-      });
-    });
+    // Duplicate (level, ref) entries: the last one wins (matches the previous
+    // map-overwrite behavior for repeated PATCH buckets).
+    const deduped = [...new Map(buckets.map((b) => [`${b.level}:${b.ref}`, b])).values()];
+    const ordered = deduped.sort((a, b) => levelRank(b.level) - levelRank(a.level));
 
-    return hours;
+    for (const bucket of ordered) {
+      const scope = { month: bucket.month, day: bucket.day, hour: bucket.hour };
+      const cells: Array<{ m: number; d: number; h: number }> = [];
+      this.forEachHourInScope(bucket.level, year, scope, (m, d, h) => cells.push({ m, d, h }));
+
+      let pinnedSum = 0;
+      const fill: Array<{ m: number; d: number; h: number }> = [];
+      for (const c of cells) {
+        const k = hourKey(c.m, c.d, c.h);
+        const fromFiner = out.get(k);
+        if (fromFiner) {
+          pinnedSum += Number(fromFiner.value);
+          continue;
+        }
+        if (bucket.level !== 'HOUR' && pinned.has(k)) {
+          pinnedSum += pinned.get(k)!;
+          continue;
+        }
+        fill.push(c);
+      }
+
+      const scopeCount = cells.length;
+      const eps = 1e-6 * Math.max(1, Math.abs(bucket.value));
+
+      if (fill.length === 0) {
+        const implied = method === SUM_AGG ? pinnedSum : pinnedSum / scopeCount;
+        if (Math.abs(implied - bucket.value) > eps) {
+          throw new ValidationError('Bucket value conflicts with its finer/confirmed hours', {
+            [bucket.ref]: [
+              `every hour in ${bucket.ref} is already set at a finer level; their ` +
+                `${method === SUM_AGG ? 'sum' : 'average'} (${roundOut(implied)}) differs ` +
+                `from the submitted value (${bucket.value})`,
+            ],
+          });
+        }
+        continue;
+      }
+
+      let perHour: number;
+      if (method === SUM_AGG) {
+        let residual = bucket.value - pinnedSum;
+        if (residual < 0 && Math.abs(residual) <= eps) residual = 0;
+        if (residual < 0) {
+          throw new ValidationError('Bucket value is below its confirmed hours', {
+            [bucket.ref]: [
+              `confirmed/finer hours inside ${bucket.ref} already total ${roundOut(pinnedSum)}, ` +
+                `above the submitted ${bucket.value}; raise the value or clear those hours first`,
+            ],
+          });
+        }
+        perHour = residual / fill.length;
+      } else {
+        perHour = (bucket.value * scopeCount - pinnedSum) / fill.length;
+      }
+
+      // A HOUR-level bucket is operator-confirmed for the exact hour it names.
+      const derived = bucket.level !== 'HOUR';
+      for (const c of fill) {
+        out.set(hourKey(c.m, c.d, c.h), {
+          month: c.m,
+          day: c.d,
+          hour: c.h,
+          value: formatNumeric(perHour),
+          sourceLevel: bucket.level,
+          derived,
+          updatedBy,
+        });
+      }
+    }
+
+    return [...out.values()];
+  }
+
+  /** Operator-confirmed (derived=false) hours as a pinned map for the merge path. */
+  private confirmedHoursOf(existing: ConsumptionGoalHourRow[]): Map<string, number> {
+    const pinned = new Map<string, number>();
+    for (const r of existing) {
+      if (!r.derived) pinned.set(hourKey(r.month, r.day, r.hour), Number(r.value));
+    }
+    return pinned;
   }
 
   // ---------------------------------------------------------------------------
@@ -409,9 +491,10 @@ export class ConsumptionGoalService {
     const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
     const goal = await this.repo.findGoal(key);
 
-    // No goal yet → version 0, empty tree (RFC §3.2).
+    // No goal yet → version 0, empty tree (RFC §3.2). History is still looked
+    // up by key so a deleted year keeps its audit trail visible (P1.5).
     if (!goal) {
-      return {
+      const result: GoalGetResult = {
         customerId: key.customerId,
         domain: key.domain,
         unit: cfg.unit,
@@ -420,8 +503,12 @@ export class ConsumptionGoalService {
         version: 0,
         goalMargin: null,
         tree: {},
-        ...(fetchHistory ? { history: [] } : {}),
       };
+      if (fetchHistory) {
+        const hist = await this.repo.findHistoryByKey(key, 100);
+        result.history = hist.map(mapHistoryRow);
+      }
+      return result;
     }
 
     const rows = await this.repo.findHours(goal.id);
@@ -440,7 +527,9 @@ export class ConsumptionGoalService {
     };
 
     if (fetchHistory) {
-      const hist = await this.repo.findHistory(goal.id, 100);
+      // Key-based read: rows written before AND after a delete/recreate of the
+      // same (customer, domain, year) share one auditable stream.
+      const hist = await this.repo.findHistoryByKey(key, 100);
       result.history = hist.map(mapHistoryRow);
     }
 
@@ -465,15 +554,17 @@ export class ConsumptionGoalService {
     const result = await this.repo.withTransaction(async (tx) => {
       const { goal, created } = await this.openGoalForWrite(key, cfg.unit, body.expectedVersion, actor, tx);
 
-      // REPLACE: wipe every hour, then write exactly the submitted scope.
+      // REPLACE: wipe every hour, then write exactly the submitted scope. The
+      // payload is self-contained, so nothing is pinned besides its own finer
+      // buckets (parent values fill around them — feedback P1.1).
       await this.repo.deleteHours(goal.id, {}, tx);
 
-      const hours = this.materialiseBuckets(buckets, key.year, cfg.aggregationMethod, actor);
+      const hours = this.expandBuckets(buckets, key.year, cfg.aggregationMethod, actor);
       const hoursWritten = await this.repo.upsertHours(goal.id, hours, tx);
 
       const final = await this.commitVersion(goal, created, body.expectedVersion, actor, key, tx);
 
-      await this.appendOperation(goal.id, 'REPLACE', buckets, final.version, actor, tx);
+      await this.appendOperation(key, goal.id, 'REPLACE', buckets, final.version, actor, tx);
 
       return { goal: final, hoursWritten, actionLevel };
     });
@@ -509,16 +600,22 @@ export class ConsumptionGoalService {
     const result = await this.repo.withTransaction(async (tx) => {
       const { goal, created } = await this.openGoalForWrite(key, cfg.unit, body.expectedVersion, actor, tx);
 
-      // MERGE: re-distribute only the sent buckets. For each bucket we overwrite
-      // its derived hours; operator-confirmed hours are preserved by re-applying
-      // them on top (read existing scope, keep derived=false ones unchanged).
+      // MERGE: re-distribute only the sent buckets. Operator-confirmed hours in
+      // scope are pinned: they keep their values and the bucket's residual is
+      // spread over the derived hours (feedback P1.2) — totals stay honest.
       const existing = await this.repo.findHours(goal.id, tx);
-      const hours = this.mergeBuckets(existing, buckets, key.year, cfg.aggregationMethod, actor);
+      const hours = this.expandBuckets(
+        buckets,
+        key.year,
+        cfg.aggregationMethod,
+        actor,
+        this.confirmedHoursOf(existing),
+      );
       const hoursWritten = await this.repo.upsertHours(goal.id, hours, tx);
 
       const final = await this.commitVersion(goal, created, body.expectedVersion, actor, key, tx);
 
-      await this.appendOperation(goal.id, 'MERGE', buckets, final.version, actor, tx);
+      await this.appendOperation(key, goal.id, 'MERGE', buckets, final.version, actor, tx);
 
       return { goal: final, hoursWritten, actionLevel };
     });
@@ -565,7 +662,7 @@ export class ConsumptionGoalService {
         const created = await this.repo.createGoal({ ...key, unit: cfg.unit, createdBy: actor }, tx);
         const updated = await this.repo.setMargin(created.id, formatMarginPct(pct), undefined, actor, false, tx);
         const final = updated ?? created;
-        await this.appendMarginHistory(final.id, null, pct, final.version, actor, key.year, tx);
+        await this.appendMarginHistory(key, final.id, null, pct, final.version, actor, key.year, tx);
         return final;
       }
 
@@ -587,7 +684,7 @@ export class ConsumptionGoalService {
         throw new VersionConflictError(cur?.version ?? existing.version, body.expectedVersion, key.domain, key.year);
       }
 
-      await this.appendMarginHistory(updated.id, oldPct, pct, updated.version, actor, key.year, tx);
+      await this.appendMarginHistory(key, updated.id, oldPct, pct, updated.version, actor, key.year, tx);
       return updated;
     });
 
@@ -622,7 +719,7 @@ export class ConsumptionGoalService {
         throw new VersionConflictError(cur?.version ?? existing.version, expectedVersion, key.domain, key.year);
       }
 
-      await this.appendMarginHistory(updated.id, oldPct, null, updated.version, actor, key.year, tx);
+      await this.appendMarginHistory(key, updated.id, oldPct, null, updated.version, actor, key.year, tx);
       return updated;
     });
 
@@ -651,6 +748,7 @@ export class ConsumptionGoalService {
 
   /** One MARGIN history row per effective change (old pct → new pct; null = unset). */
   private async appendMarginHistory(
+    key: GoalKey,
     goalId: string,
     oldPct: number | null,
     newPct: number | null,
@@ -662,6 +760,7 @@ export class ConsumptionGoalService {
     await this.repo.appendHistory(
       {
         goalId,
+        ...historyKeyOf(key),
         actor,
         source: 'MARGIN',
         actionLevel: 'YEAR',
@@ -718,7 +817,13 @@ export class ConsumptionGoalService {
       // top of the current hours and roll up.
       const goal = await this.repo.findGoal(key);
       const existing = goal ? await this.repo.findHours(goal.id) : [];
-      const merged = this.mergeBuckets(existing, buckets, key.year, cfg.aggregationMethod, actor);
+      const merged = this.expandBuckets(
+        buckets,
+        key.year,
+        cfg.aggregationMethod,
+        actor,
+        this.confirmedHoursOf(existing),
+      );
       const previewRows = this.simulateRows(existing, merged);
       const preview =
         previewRows.length === 0 ? {} : this.buildTree(previewRows, 'month', cfg.aggregationMethod);
@@ -736,11 +841,17 @@ export class ConsumptionGoalService {
       const { goal, created } = await this.openGoalForWrite(key, cfg.unit, expectedVersion, actor, tx);
 
       const existing = await this.repo.findHours(goal.id, tx);
-      const hours = this.mergeBuckets(existing, buckets, key.year, cfg.aggregationMethod, actor);
+      const hours = this.expandBuckets(
+        buckets,
+        key.year,
+        cfg.aggregationMethod,
+        actor,
+        this.confirmedHoursOf(existing),
+      );
       await this.repo.upsertHours(goal.id, hours, tx);
 
       const final = await this.commitVersion(goal, created, expectedVersion, actor, key, tx);
-      await this.appendOperation(goal.id, 'IMPORT', buckets, final.version, actor, tx);
+      await this.appendOperation(key, goal.id, 'IMPORT', buckets, final.version, actor, tx);
 
       const rows = await this.repo.findHours(goal.id, tx);
       return { goal: final, rows };
@@ -770,27 +881,45 @@ export class ConsumptionGoalService {
     body: DeleteGoalsBodyDTO,
     actor: string | null,
   ): Promise<GoalDeleteResult | null> {
-    const goal = await this.repo.findGoal(key);
-    if (!goal) {
-      throw new NotFoundError(`No ${key.domain} goal for year ${key.year}`);
-    }
-
     const bucket = body?.bucket;
     const expectedVersion = body?.expectedVersion;
 
-    // Whole-year delete with no sub-bucket → remove parent (cascade) entirely.
+    // Whole-year delete with no sub-bucket → remove parent + hours entirely.
+    // Feedback P1.5: the whole operation (guard, wipe, audit row, parent
+    // delete) runs in ONE transaction, and a DELETE history row is written
+    // BEFORE the parent goes away. History carries the goal key columns, so
+    // the audit trail of a deleted year stays reachable via findHistoryByKey.
     if (!bucket) {
-      this.assertVersion(goal, expectedVersion, key);
-      // bump-guard first so an expectedVersion mismatch 409s before we delete.
-      if (expectedVersion !== undefined) {
-        const guarded = await this.repo.bumpVersion(goal.id, expectedVersion, actor);
-        if (!guarded) {
-          const cur = await this.repo.findGoalById(key.tenantId, goal.id);
-          throw new VersionConflictError(cur?.version ?? goal.version, expectedVersion, key.domain, key.year);
+      const removed = await this.repo.withTransaction(async (tx) => {
+        const goal = await this.repo.findGoal(key, tx);
+        if (!goal) {
+          throw new NotFoundError(`No ${key.domain} goal for year ${key.year}`);
         }
-      }
-      const removed = await this.repo.deleteHours(goal.id);
-      await this.repo.deleteGoal(goal.id);
+        this.assertVersion(goal, expectedVersion, key);
+        const bumped = await this.bumpOrConflict(goal, expectedVersion, actor, key, tx);
+        const hoursRemoved = await this.repo.deleteHours(goal.id, {}, tx);
+        await this.repo.appendHistory(
+          {
+            goalId: goal.id,
+            ...historyKeyOf(key),
+            actor,
+            source: 'DELETE',
+            actionLevel: 'YEAR',
+            bucketRef: String(key.year),
+            oldValue: null,
+            newValue: null,
+            bucketCount: 1,
+            details: [{ ref: String(key.year), value: null }],
+            distributed: true,
+            hoursAffected: hoursRemoved,
+            version: bumped.version,
+          },
+          tx,
+        );
+        await this.repo.deleteGoal(goal.id, tx);
+        return hoursRemoved;
+      });
+
       return {
         customerId: key.customerId,
         domain: key.domain,
@@ -800,17 +929,23 @@ export class ConsumptionGoalService {
       };
     }
 
-    // Sub-bucket delete: remove its hours, bump version, append history.
+    // Sub-bucket delete: remove its hours, bump version, append history — the
+    // goal is re-read inside the transaction so the guard has no stale window.
     const parsed = this.parseBucketRef(bucket.level, bucket.ref, key.year);
     const scope = { month: parsed.month, day: parsed.day, hour: parsed.hour };
 
     const result = await this.repo.withTransaction(async (tx) => {
+      const goal = await this.repo.findGoal(key, tx);
+      if (!goal) {
+        throw new NotFoundError(`No ${key.domain} goal for year ${key.year}`);
+      }
       this.assertVersion(goal, expectedVersion, key);
       const hoursRemoved = await this.repo.deleteHours(goal.id, scope, tx);
       const bumped = await this.bumpOrConflict(goal, expectedVersion, actor, key, tx);
       await this.repo.appendHistory(
         {
           goalId: goal.id,
+          ...historyKeyOf(key),
           actor,
           source: 'DELETE',
           actionLevel: bucket.level,
@@ -858,6 +993,12 @@ export class ConsumptionGoalService {
     if (existing) {
       this.assertVersion(existing, expected, key);
       return { goal: existing, created: false };
+    }
+    // Feedback P1.4: a positive guard against a non-existent goal must 409
+    // (currentVersion 0), not silently create. First write omits the guard
+    // (or states version 0 explicitly).
+    if (expected !== undefined && expected !== 0) {
+      throw new VersionConflictError(0, expected, key.domain, key.year);
     }
     const goal = await this.repo.createGoal({ ...key, unit, createdBy: actor }, tx);
     return { goal, created: true };
@@ -907,54 +1048,6 @@ export class ConsumptionGoalService {
     return bumped;
   }
 
-  /** Materialises a set of disjoint buckets into hour upserts (replace path). */
-  private materialiseBuckets(
-    buckets: ValueBucket[],
-    year: number,
-    method: GoalAggregationMethod,
-    actor: string | null,
-  ): GoalHourUpsert[] {
-    // Finest-wins: a later, finer bucket overrides a coarser one for the same hour.
-    const map = new Map<string, GoalHourUpsert>();
-    const ordered = [...buckets].sort((a, b) => levelRank(a.level) - levelRank(b.level));
-    for (const b of ordered) {
-      for (const h of this.distributeBucket(b, year, method, actor)) {
-        map.set(hourKey(h.month, h.day, h.hour), h);
-      }
-    }
-    return [...map.values()];
-  }
-
-  /**
-   * Merge path: start from existing hours, then for each sent bucket re-distribute
-   * over its scope — but preserve operator-confirmed (derived=false) hours that the
-   * bucket would have touched, unless the bucket itself is HOUR-level (explicit).
-   */
-  private mergeBuckets(
-    existing: ConsumptionGoalHourRow[],
-    buckets: ValueBucket[],
-    year: number,
-    method: GoalAggregationMethod,
-    actor: string | null,
-  ): GoalHourUpsert[] {
-    const confirmed = new Set<string>();
-    for (const r of existing) {
-      if (!r.derived) confirmed.add(hourKey(r.month, r.day, r.hour));
-    }
-
-    const out = new Map<string, GoalHourUpsert>();
-    const ordered = [...buckets].sort((a, b) => levelRank(a.level) - levelRank(b.level));
-    for (const b of ordered) {
-      for (const h of this.distributeBucket(b, year, method, actor)) {
-        const k = hourKey(h.month, h.day, h.hour);
-        // Preserve operator-confirmed hours on a coarser re-distribution.
-        if (b.level !== 'HOUR' && confirmed.has(k)) continue;
-        out.set(k, h);
-      }
-    }
-    return [...out.values()];
-  }
-
   /** Overlays the upsert set onto the existing rows to simulate a post-write state. */
   private simulateRows(
     existing: ConsumptionGoalHourRow[],
@@ -1000,6 +1093,7 @@ export class ConsumptionGoalService {
    * a compact `details` sample ([{ ref, value }], capped) for the breakdown.
    */
   private async appendOperation(
+    key: GoalKey,
     goalId: string,
     source: GoalHistorySource,
     buckets: ValueBucket[],
@@ -1021,6 +1115,7 @@ export class ConsumptionGoalService {
     await this.repo.appendHistory(
       {
         goalId,
+        ...historyKeyOf(key),
         actor,
         source,
         actionLevel,
@@ -1062,6 +1157,10 @@ export class ConsumptionGoalService {
       buckets.push({ ...b, ref: bucketRefOf(b as ValueBucket, year) });
     };
 
+    // Feedback P1.1: a parent node with finer children is KEPT — it fills the
+    // rest of its scope as the default while the children override their own
+    // hours (expandBuckets applies the parent's residual around them). The
+    // previous behavior silently dropped "the month, with finer exceptions".
     if (body.annual) {
       pushCheck(body.annual.value, 'annual.value');
       push({ level: 'YEAR', value: body.annual.value });
@@ -1070,20 +1169,12 @@ export class ConsumptionGoalService {
     for (const [mKey, month] of Object.entries(body.monthly ?? {})) {
       const m = Number(mKey);
       pushCheck(month.value, `monthly.${mKey}.value`);
-      const hasDaily = month.daily && Object.keys(month.daily).length > 0;
-      // A month node contributes a MONTH bucket only when it has no finer children;
-      // otherwise the finer DAY/HOUR buckets fully describe it (finest-wins).
-      if (!hasDaily) {
-        push({ level: 'MONTH', month: m, value: month.value });
-      }
+      push({ level: 'MONTH', month: m, value: month.value });
 
       for (const [dKey, day] of Object.entries(month.daily ?? {})) {
         const d = Number(dKey);
         pushCheck(day.value, `monthly.${mKey}.daily.${dKey}.value`);
-        const hasHourly = day.hourly && Object.keys(day.hourly).length > 0;
-        if (!hasHourly) {
-          push({ level: 'DAY', month: m, day: d, value: day.value });
-        }
+        push({ level: 'DAY', month: m, day: d, value: day.value });
         for (const [hKey, hour] of Object.entries(day.hourly ?? {})) {
           const h = Number(hKey);
           pushCheck(hour.value, `monthly.${mKey}.daily.${dKey}.hourly.${hKey}.value`);
@@ -1242,6 +1333,16 @@ export class ConsumptionGoalService {
 // =============================================================================
 // Pure helpers
 // =============================================================================
+
+/** The stable goal-key columns stamped on every history row (survives the parent). */
+function historyKeyOf(key: GoalKey): Pick<GoalHistoryAppend, 'tenantId' | 'customerId' | 'domain' | 'year'> {
+  return {
+    tenantId: key.tenantId,
+    customerId: key.customerId,
+    domain: key.domain,
+    year: key.year,
+  };
+}
 
 function bucketRefOf(b: ValueBucket, year: number): string {
   switch (b.level) {

@@ -2281,9 +2281,15 @@ export const consumptionGoalDomains = pgTable('consumption_goal_domains', {
 }));
 
 // 4) Append-only history. Records the level the user acted on (DEC-4).
+// goal_id has NO FK on purpose; the stable key columns below (migration 0060)
+// keep the audit trail reachable after a whole-year delete removes the parent.
 export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   id:            uuid('id').primaryKey().defaultRandom(),
   goalId:        uuid('goal_id').notNull(),
+  tenantId:      uuid('tenant_id'),                      // stable goal key (nullable: pre-0060 orphans)
+  customerId:    uuid('customer_id'),
+  domain:        text('domain'),
+  year:          integer('year'),
   actor:         uuid('actor'),                          // who changed it
   source:        text('source').notNull().default('EDIT'), // IMPORT | REPLACE | MERGE | DELETE | EDIT — the operation
   actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — what the user touched
@@ -2298,6 +2304,9 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   changedAt:     timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   goalChronoIdx: index('consumption_goal_history_idx').on(table.goalId, table.changedAt.desc()),
+  goalKeyIdx: index('consumption_goal_history_key_idx').on(
+    table.tenantId, table.customerId, table.domain, table.year, table.changedAt.desc(),
+  ),
   actionLevelCheck: check(
     'consumption_goal_history_action_level_check',
     sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`

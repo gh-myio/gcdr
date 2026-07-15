@@ -98,6 +98,13 @@ export interface GoalHistoryDetail {
 
 export interface GoalHistoryAppend {
   goalId: string;
+  // Stable goal identity (feedback P1.5): duplicated on every history row so
+  // the audit trail stays reachable after the parent goal row is deleted
+  // (consumption_goal_history.goal_id has no FK on purpose).
+  tenantId: string;
+  customerId: string;
+  domain: GoalDomain;
+  year: number;
   actor?: string | null;
   source: GoalHistorySource; // IMPORT | REPLACE | MERGE | DELETE | EDIT
   actionLevel: GoalSourceLevel; // YEAR | MONTH | DAY | HOUR
@@ -383,6 +390,10 @@ export class ConsumptionGoalRepository {
       .insert(consumptionGoalHistory)
       .values({
         goalId: entry.goalId,
+        tenantId: entry.tenantId,
+        customerId: entry.customerId,
+        domain: entry.domain,
+        year: entry.year,
         actor: entry.actor ?? null,
         source: entry.source,
         actionLevel: entry.actionLevel,
@@ -406,6 +417,27 @@ export class ConsumptionGoalRepository {
       .select()
       .from(consumptionGoalHistory)
       .where(eq(consumptionGoalHistory.goalId, goalId))
+      .orderBy(desc(consumptionGoalHistory.changedAt))
+      .limit(limit);
+  }
+
+  /**
+   * Reads history by the stable goal key (feedback P1.5): survives a delete/
+   * recreate of the parent, unifying every generation of the same
+   * (tenant, customer, domain, year) into one auditable stream.
+   */
+  async findHistoryByKey(key: GoalKey, limit = 100, exec: GoalDbClient = db): Promise<ConsumptionGoalHistoryRow[]> {
+    return exec
+      .select()
+      .from(consumptionGoalHistory)
+      .where(
+        and(
+          eq(consumptionGoalHistory.tenantId, key.tenantId),
+          eq(consumptionGoalHistory.customerId, key.customerId),
+          eq(consumptionGoalHistory.domain, key.domain),
+          eq(consumptionGoalHistory.year, key.year),
+        ),
+      )
       .orderBy(desc(consumptionGoalHistory.changedAt))
       .limit(limit);
   }

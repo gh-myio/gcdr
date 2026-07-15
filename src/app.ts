@@ -11,6 +11,7 @@ import {
   hybridAuthByMethod,
   errorHandler,
   notFoundHandler,
+  requireGoalsAccess,
 } from './middleware';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { clientIp } from './middleware/rateLimit';
@@ -306,6 +307,10 @@ apiV1Router.use(
   '/customers/:customerId/goals',
   goalsRateLimiter,
   hybridAuthByMethod('goals:read', 'goals:write'),
+  // Feedback P0.1: hybridAuth authenticates but does not scope. This guard
+  // enforces the API-key hierarchy (SELF/SUBTREE/TENANT) against :customerId
+  // and evaluates goals.goal.read / goals.goal.update RBAC for JWT users.
+  requireGoalsAccess(),
   consumptionGoalsController,
 );
 
