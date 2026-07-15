@@ -5291,6 +5291,10 @@ components:
           properties:
             ref: { type: string, minLength: 4, maxLength: 13 }
         expectedVersion: { type: integer }
+        mode:
+          type: string
+          enum: [redistribute, shrink-total]
+          description: 'Addendum A (DEC-12): removing an EXPLICIT meter''s goal redistributes its share to the RESIDUAL meters; with none left, `shrink-total` must be stated or the call answers 409 GOAL_REMOVAL_MODE_REQUIRED.'
 
 paths:
   # Health
@@ -6331,7 +6335,9 @@ paths:
       parameters:
         - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
         - { name: year, in: query, required: true, schema: { type: integer, example: 2026 } }
+        - { name: granularity, in: query, required: false, description: 'Derived view depth (default month)', schema: { type: string, enum: [year, month, day, hour], default: month } }
         - { name: fetchHistory, in: query, required: false, description: 'Include ≤100 history entries (newest-first)', schema: { type: boolean } }
+        - { name: deviceId, in: query, required: false, description: 'Addendum A: narrow the tree to ONE meter of a DEVICE-granular year. The response also carries granularity, devices[], hoursCovered and coverageGaps — see RFC-0046-Goals-API.md §7.', schema: { type: string, format: uuid } }
       responses:
         '200':
           description: Resolved goal
@@ -6356,6 +6362,7 @@ paths:
       parameters:
         - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
         - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: deviceId, in: query, required: false, description: 'Addendum A: target ONE entry meter (implicit CUSTOMER→DEVICE conversion on the first device write). A deviceless PUT on a DEVICE year must state body.granularity.', schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/GoalsReplaceBody' } } }
@@ -6383,6 +6390,7 @@ paths:
       parameters:
         - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
         - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: deviceId, in: query, required: false, description: 'Addendum A: target ONE entry meter.', schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/GoalsMergeBody' } } }
@@ -6410,6 +6418,7 @@ paths:
       parameters:
         - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
         - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: deviceId, in: query, required: false, description: 'Addendum A: scope the delete to ONE meter (removal modes — see GoalsDeleteBody.mode).', schema: { type: string, format: uuid } }
       requestBody:
         required: false
         content: { application/json: { schema: { $ref: '#/components/schemas/GoalsDeleteBody' } } }
@@ -6557,6 +6566,7 @@ paths:
         - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
         - { name: year, in: query, required: true, schema: { type: integer } }
         - { name: dryRun, in: query, required: false, description: 'true (default) = preview only; false = persist', schema: { type: boolean, default: true } }
+        - { name: deviceId, in: query, required: false, description: 'Addendum A: import ONE meter''s spreadsheet (the per-sensor flow).', schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/GoalsImportBody' } } }
@@ -6569,6 +6579,41 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '409':
           description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /customers/{customerId}/goals/rebalance:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Consumption Goals]
+      summary: Rebalance the residual allocation (Addendum A, DEC-12)
+      description: 'Recomputes the RESIDUAL allocation of a DEVICE-granular year against the CURRENT entry-meter set — registering/reclassifying a meter never alters goals by itself. `dryRun=true` (default) previews the before/after per meter (entering/leaving) without writing; `dryRun=false` applies under `body.expectedVersion` with ONE version bump and ONE REBALANCE history entry. Full shape: RFC-0046-Goals-API.md §7.3. Scope `goals:write`.'
+      operationId: rebalanceConsumptionGoals
+      parameters:
+        - { name: domain, in: query, required: true, schema: { type: string, enum: [ENERGY, WATER, TEMPERATURE] } }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: dryRun, in: query, required: false, description: 'true (default) = preview only; false = apply', schema: { type: boolean, default: true } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedVersion: { type: integer }
+      responses:
+        '200':
+          description: Preview (dryRun) or applied result — per-meter before/after, entering/leaving deviceIds
+          content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } }
+        '409':
+          description: VERSION_CONFLICT
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '422':
+          description: 'GOAL_ENTRY_SET_UNDEFINED — no ACTIVE ENTRY meter classified for the domain'
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
   # Partners

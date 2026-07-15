@@ -9,7 +9,8 @@ This is the authoritative wire contract derived from [`RFC-0046-Customer-Consump
 - **Scopes:** reads need `goals:read` (or `*:read`); writes need `goals:write`.
 - **Audit:** every change appends a per-goal `consumption_goal_history` row (one per operation — see §1.7). A global `CUSTOMER_GOALS_UPDATED` event is designed but **not yet emitted**.
 - **Storage note:** a fully-specified year is **8 760 hour rows**; the hourly upsert is **chunked** (1 000 rows/batch) so a whole-year write stays under postgres' 65 534 bind-parameter limit (`consumptionGoalRepository`).
-- **Last updated:** 2026-06-30
+- **Addendum A (device-granular goals):** implemented on `feat/rfc-0046-addendum-a-device-goals` (migration `0061`) — the wire deltas are in **§7**; §§1–6 remain valid for CUSTOMER-granular goals (the default, untouched).
+- **Last updated:** 2026-07-15
 
 ---
 
@@ -549,4 +550,96 @@ curl ".../goals?domain=ENERGY&year=2026&granularity=month&fetchHistory=true" -H 
 
 ---
 
-**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) + the implementation. · **Last updated:** 2026-06-30
+## 7. Addendum A — device-granular goals (wire deltas)
+
+Full design: [`RFC-0046-Addendum-A-Device-Granular-Goals.md`](./RFC-0046-Addendum-A-Device-Granular-Goals.md) (APPROVED rev. 2). Everything here is **additive**: a year that was never written with a `deviceId` behaves exactly as §§1–6 describe.
+
+### 7.1 Concepts
+
+- A goal year has a header **`granularity`**: `CUSTOMER` (legacy default — one value per hour) or `DEVICE` (one value per *(hour, entry meter)*). v1 restricts DEVICE to **SUM domains** (ENERGY/WATER) — a `deviceId` on TEMPERATURE → `400`.
+- The participating pool is the customer's **ENTRY meters**: devices explicitly registered with `meterRole: 'ENTRY'` + `meterDomain` matching the goal domain (DEC-11 — never inferred from type/name/channel). No classified meter → device writes fail `422 GOAL_ENTRY_SET_UNDEFINED`.
+- **Mixed allocation with residual (DEC-8):** the operator states a group total and/or explicit per-meter values. Explicit values are pinned; the remainder (total − Σ explicit) splits evenly among the meters without one (`allocation: RESIDUAL`). Negative residual → `400 GOAL_DEVICE_OVERFLOW`.
+- The first write carrying `?deviceId=` on a CUSTOMER year **converts it implicitly**: existing hour values become the group total per hour, the target meter gets its stated values (EXPLICIT), the other entry meters absorb the residual — hour-exact totals preserved, ONE version bump, the granularity switch recorded in the history entry. DEVICE→CUSTOMER only via a deviceless `PUT` stating `body.granularity: 'CUSTOMER'` (deliberate collapse).
+- A **deviceless write on a DEVICE year edits the group total** (DEC-9): explicit meters stay pinned, residuals rebalance; hours with no rows yet materialise across the entry set.
+
+### 7.2 Parameter / body deltas
+
+| Where | Addition |
+|---|---|
+| `GET /goals` (tree read) | `?deviceId=<uuid>` — narrows the tree to ONE meter of a DEVICE year |
+| `PUT` / `PATCH` / `POST /goals/import` | `?deviceId=<uuid>` — targets one entry meter (triggers the implicit conversion on a CUSTOMER year) |
+| `PUT` body | `granularity?: 'CUSTOMER' \| 'DEVICE'` — REQUIRED on a deviceless PUT of a DEVICE year (ambiguous otherwise → `400`): `CUSTOMER` collapses, `DEVICE` restates group totals |
+| `DELETE` body | `mode?: 'redistribute' \| 'shrink-total'` — removing an EXPLICIT meter's goal redistributes its share to the RESIDUAL meters (total preserved); with no residual left, `shrink-total` must be stated or the call answers `409 GOAL_REMOVAL_MODE_REQUIRED` |
+| `DELETE` / bucket ops | `?deviceId=` scopes bucket deletes to one meter |
+
+### 7.3 New endpoint — explicit rebalance (DEC-12)
+
+```
+POST /customers/:customerId/goals/rebalance?domain=&year=&dryRun=
+body: { expectedVersion? }
+```
+
+Recomputes the RESIDUAL allocation against the **current** ENTRY set — registering/reclassifying a meter never alters goals by itself. `dryRun=true` (default) returns the before/after per meter without writing; `dryRun=false` applies under the optimistic guard: ONE version bump + ONE `REBALANCE` history entry. Response:
+
+```jsonc
+{
+  "customerId": "…", "domain": "ENERGY", "year": 2026,
+  "dryRun": true, "version": 7,
+  "entering": ["<deviceId>"],      // joining the residual pool
+  "leaving":  ["<deviceId>"],      // RESIDUAL holders that left the ENTRY set
+  "devices": [ { "deviceId": "…", "code": "…", "label": "…",
+                 "allocation": "EXPLICIT|RESIDUAL",
+                 "annualBefore": 123.4, "annualAfter": 130.0 } ]
+}
+```
+
+### 7.4 Read response deltas (GET)
+
+```jsonc
+{
+  "granularity": "DEVICE",          // 'CUSTOMER' on legacy years
+  "devices": [                       // present on DEVICE years only
+    { "deviceId": "…", "code": "…", "label": "…",
+      "allocation": "EXPLICIT",     // dominant allocation of the meter
+      "annual": 13465346.813,
+      "annualAdjusted": 12792079.472,   // with the RFC-0052 margin applied
+      "hoursCovered": 8760,
+      "coverageGaps": {              // absent when coverage is complete
+        "missing": ["2026-03", "2026-04-15", "2026-05-01T08"],
+        "truncated": false, "missingHours": 1440 } }
+  ],
+  "hoursCovered": 8760,              // consolidated distinct hour slots (ignores ?deviceId)
+  "coverageGaps": { … }              // consolidated holes; absent when complete
+}
+```
+
+- Consolidated tree nodes of a DEVICE year **omit `sourceLevel`/`derived`** (ambiguous across meters); a `?deviceId=`-filtered read keeps them.
+- `coverageGaps.missing` uses the coarsest form per hole — whole month `YYYY-MM`, whole day `YYYY-MM-DD`, else `YYYY-MM-DDThh` — capped at 12 refs (`truncated: true` when more exist). It feeds the UI's "metas incompletas" warning.
+- `hoursCovered`/`coverageGaps` appear on **GET reads only** (not on write/margin responses — re-GET after saving).
+
+### 7.5 New error codes
+
+| Status | `code` | When |
+|---|---|---|
+| `400` | `GOAL_DEVICE_OVERFLOW` | Σ explicit metas exceed the group total on some hour |
+| `422` | `GOAL_ENTRY_SET_UNDEFINED` | no ACTIVE ENTRY meter classified for the domain |
+| `422` | `GOAL_DEVICE_NOT_ENTRY` | target device exists but is not an ENTRY meter of the domain |
+| `409` | `GOAL_REMOVAL_MODE_REQUIRED` | removal would orphan hours and no `mode` was stated |
+| `404` | `NOT_FOUND` | `deviceId` belongs to another customer (no existence leak) |
+
+### 7.6 Per-sensor CSV import (the spreadsheet flow)
+
+One CSV per meter (§3.5 format unchanged), imported with `?deviceId=`:
+
+```bash
+# sensor A (converts the year to DEVICE on the first import)
+POST …/goals/import?domain=ENERGY&year=2026&dryRun=false&deviceId=<meterA>   body {csv, expectedVersion}
+# sensor B (chains the fresh version)
+POST …/goals/import?domain=ENERGY&year=2026&dryRun=false&deviceId=<meterB>   body {csv, expectedVersion}
+```
+
+A consolidated CSV with a `device` column is **out of scope** in v1 (backlog).
+
+---
+
+**Source of truth:** [`RFC-0046-Customer-Consumption-Goals.md`](./RFC-0046-Customer-Consumption-Goals.md) + [`RFC-0046-Addendum-A-Device-Granular-Goals.md`](./RFC-0046-Addendum-A-Device-Granular-Goals.md) + the implementation. · **Last updated:** 2026-07-15

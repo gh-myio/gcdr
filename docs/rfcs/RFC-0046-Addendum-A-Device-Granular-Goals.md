@@ -402,3 +402,32 @@ domain, one year — then generalize.
 5. ~~Explicit-removal policy~~ — **RESOLVED (DEC-12)**: share returns to
    RESIDUAL meters (total preserved) while any exist; otherwise the operator
    must state `shrink-total` or `rebalance` — no implicit shrinking.
+
+## 11. Post-approval implementation notes (2026-07-15)
+
+Additions made during implementation, beyond the approved scope — all additive:
+
+1. **Coverage on reads** — `GET` responses expose `hoursCovered` (consolidated
+   + per meter in `devices[]`) and `coverageGaps` (compact missing refs,
+   coarsest-first: whole month `YYYY-MM` → whole day `YYYY-MM-DD` → hour
+   `YYYY-MM-DDThh`; capped at 12 refs, with `truncated` and total
+   `missingHours`; absent when complete). Wire detail: RFC-0046-Goals-API.md
+   §7.4.
+2. **UI tab badge semantics** — the customer-detail Goals tab badge counts
+   goal SERIES for the visible (domain, year): 1 customer-wide, N meters on a
+   DEVICE year, 0 when empty. A series short of 100% of the year's hour slots
+   shows a warning icon + InfoTooltip naming the short series (general or
+   meter X) and pointing at the holes (fed by `coverageGaps`). Pinned to the
+   consolidated view.
+3. **Migration `0061` fix** — the pre-existing uniqueness was created by
+   `0047` as a table CONSTRAINT; the migration drops it via
+   `ALTER TABLE … DROP CONSTRAINT IF EXISTS` (a plain `DROP INDEX` fails with
+   `2BP01`), with a `DROP INDEX IF EXISTS` fallback for environments holding
+   it as a plain index.
+4. **SDI pilot data** — the per-sensor split for Shopping da Ilha lives in
+   `docs/goals/sa-cavalcante/2026-v2/goals-2026-SDI-{CAG,CONDOMINIO}-Energy-import.csv`,
+   generated from the seasonalized CAG × Condomínio apportionment workbook
+   (`2026/SDI_Rateio_CAG_Condominio_Sazonalizado_2026-v1.xlsx`, columns G/H,
+   conference column I validated row-by-row). The pre-addendum production
+   goal equals the Condomínio column exactly (13 465 346.8 kWh); the complete
+   two-sensor total is 16 984 541.1 kWh.
