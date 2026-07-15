@@ -65,25 +65,41 @@ export class CentralTopologyService {
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
     const { linkBySlave, connected } = await this.fetchLinkQuality(centralId);
+    await this.reconcileCentralStatus(tenantId, centralId, central.connectionStatus, connected);
 
-    // Reflect the central ONLINE/OFFLINE off the SAME cloud link the topology
-    // uses: the cloud-server knows central_connected/disconnected, so GCDR needn't
-    // depend on the central sending heartbeats. Best-effort + only on change, so
-    // the topology still renders if this write fails.
-    if (connected !== null) {
-      const desired = connected ? 'ONLINE' : 'OFFLINE';
-      if (central.connectionStatus !== desired) {
-        try {
-          await centralRepository.updateConnectionStatus(tenantId, centralId, desired);
-        } catch {
-          // reconcile is best-effort; never fail the topology response on it.
-        }
-      }
+    // One node per physical device (grouped by slaveId), carrying its live link.
+    const bySlave = await this.loadDevicesBySlave(tenantId, centralId);
+    const nodes = [...bySlave.values()].map((d) => this.toNode(d, linkBySlave));
+    await this.reconcileDeviceStatus(tenantId, bySlave, linkBySlave);
+
+    return { central: { id: central.id, name: central.name }, nodes };
+  }
+
+  // Reflect the central ONLINE/OFFLINE off the SAME cloud link the topology uses,
+  // so GCDR needn't depend on the central sending heartbeats. Best-effort + only
+  // on change; the topology still renders if this write fails.
+  private async reconcileCentralStatus(
+    tenantId: string,
+    centralId: string,
+    current: string | null,
+    connected: boolean | null,
+  ): Promise<void> {
+    if (connected === null) return;
+    const desired = connected ? 'ONLINE' : 'OFFLINE';
+    if (current === desired) return;
+    try {
+      await centralRepository.updateConnectionStatus(tenantId, centralId, desired);
+    } catch {
+      // reconcile is best-effort; never fail the topology response on it.
     }
+  }
 
-    // GCDR devices for the central. A board at a slaveId can expose several
-    // channel-rows; the star shows ONE node per slaveId (link quality is
-    // per-physical-device, not per-channel), so we group by slaveId.
+  // One row per slaveId (a board can expose several channel-rows; first wins),
+  // paged through the registry at the API's max page size.
+  private async loadDevicesBySlave(
+    tenantId: string,
+    centralId: string,
+  ): Promise<Map<number, TopologyDeviceRow>> {
     const bySlave = new Map<number, TopologyDeviceRow>();
     let cursor: string | undefined;
     do {
@@ -97,27 +113,33 @@ export class CentralTopologyService {
       }
       cursor = page.pagination.hasMore ? page.pagination.nextCursor : undefined;
     } while (cursor);
+    return bySlave;
+  }
 
-    const nodes: TopologyNode[] = [...bySlave.values()].map((d) => {
-      const link = linkBySlave.get(d.slaveId as number);
-      const avg = link?.average_retries ?? null;
-      return {
-        deviceId: d.id,
-        slaveId: d.slaveId as number,
-        name: d.name,
-        type: d.deviceType ?? null,
-        status: link?.status ?? null,
-        averageRetries: avg,
-        signalPct: avg === null ? null : Math.max(0, Math.min(100, Math.round(100 - avg * 10))),
-        updatedAt: link?.updated_at ?? null,
-      };
-    });
+  private toNode(d: TopologyDeviceRow, linkBySlave: Map<number, CloudDeviceStatus>): TopologyNode {
+    const link = linkBySlave.get(d.slaveId as number);
+    const avg = link?.average_retries ?? null;
+    return {
+      deviceId: d.id,
+      slaveId: d.slaveId as number,
+      name: d.name,
+      type: d.deviceType ?? null,
+      status: link?.status ?? null,
+      averageRetries: avg,
+      signalPct: avg === null ? null : Math.max(0, Math.min(100, Math.round(100 - avg * 10))),
+      updatedAt: link?.updated_at ?? null,
+    };
+  }
 
-    // Reflect each device's connectivity off the same cloud link (online|bad ->
-    // ONLINE, offline -> OFFLINE; unknown/null left as-is). Best-effort + only on
-    // change, so the centrals-list connected/total count reflects reality once a
-    // central has been viewed. The desired status is binary, so the writes batch
-    // into at most two UPDATEs. The topology response still renders if it fails.
+  // Reflect each device's connectivity off the same cloud link (online|bad ->
+  // ONLINE, offline -> OFFLINE; unknown/null left as-is). Best-effort + only on
+  // change; the desired status is binary, so the writes batch into at most two
+  // UPDATEs. The topology response still renders if it fails.
+  private async reconcileDeviceStatus(
+    tenantId: string,
+    bySlave: Map<number, TopologyDeviceRow>,
+    linkBySlave: Map<number, CloudDeviceStatus>,
+  ): Promise<void> {
     const toOnline: string[] = [];
     const toOffline: string[] = [];
     for (const d of bySlave.values()) {
@@ -135,8 +157,6 @@ export class CentralTopologyService {
     } catch {
       // reconcile is best-effort; never fail the topology response on it.
     }
-
-    return { central: { id: central.id, name: central.name }, nodes };
   }
 
   private async fetchLinkQuality(
