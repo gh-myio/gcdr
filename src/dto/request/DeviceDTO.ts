@@ -108,6 +108,10 @@ export const CreateDeviceSchema = z.object({
   deviceChannelType: z.string().max(100).optional(),     // RFC-0008 follow-up: channel sub-type (e.g. "lamp")
   ingestionId: z.string().uuid().optional(),             // Ingestion system ID
   ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
+  // RFC-0046 Addendum A (DEC-11): explicit meter purpose. Set/clear TOGETHER —
+  // the pairing is enforced in DeviceService (and a DB CHECK backs it up).
+  meterRole: z.enum(['ENTRY', 'SUBMETER']).nullable().optional(),
+  meterDomain: z.enum(['ENERGY', 'WATER']).nullable().optional(),
 });
 
 export type CreateDeviceDTO = z.infer<typeof CreateDeviceSchema>;
@@ -144,6 +148,10 @@ export const UpdateDeviceSchema = z.object({
   deviceChannelType: z.string().max(100).optional(),     // RFC-0008 follow-up: channel sub-type (e.g. "lamp")
   ingestionId: z.string().uuid().optional(),             // Ingestion system ID
   ingestionGatewayId: z.string().uuid().optional(),      // Ingestion gateway ID
+  // RFC-0046 Addendum A (DEC-11): explicit meter purpose. Set/clear TOGETHER —
+  // the pairing is enforced in DeviceService (and a DB CHECK backs it up).
+  meterRole: z.enum(['ENTRY', 'SUBMETER']).nullable().optional(),
+  meterDomain: z.enum(['ENERGY', 'WATER']).nullable().optional(),
 });
 
 export type UpdateDeviceDTO = z.infer<typeof UpdateDeviceSchema>;

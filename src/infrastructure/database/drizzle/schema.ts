@@ -435,6 +435,12 @@ export const devices = pgTable('devices', {
   channel: smallint('channel'),                              // channel index on the board (optional)
   deviceChannelType: varchar('device_channel_type', { length: 100 }),  // e.g. 'lamp', 'presence_sensor' (optional)
 
+  // RFC-0046 Addendum A (DEC-11, migration 0061): explicit meter purpose —
+  // ENTRY meters participate in the goals residual allocation for their
+  // domain. Never inferred from channel/tags; both-or-neither with meterDomain.
+  meterRole: text('meter_role'),      // ENTRY | SUBMETER (nullable = unclassified)
+  meterDomain: text('meter_domain'),  // ENERGY | WATER — the domain the role applies to
+
   // Identification Extended
   identifier: varchar('identifier', { length: 255 }),  // Human-readable unique identifier
   deviceProfile: varchar('device_profile', { length: 100 }),  // Device profile (e.g., HIDROMETRO_AREA_COMUM)
@@ -2219,6 +2225,10 @@ export const consumptionGoals = pgTable('consumption_goals', {
   year:       smallint('year').notNull(),
   unit:       text('unit').notNull(),                    // kWh | m3 | C (from domain config)
   version:    integer('version').notNull().default(1),
+  // RFC-0046 Addendum A (DEC-8, migration 0061): stated on the header, never
+  // inferred from row shape. CUSTOMER = device_id NULL rows (legacy);
+  // DEVICE = every row carries a device_id.
+  granularity: text('granularity').notNull().default('CUSTOMER'),
   // RFC-0052 — read-time margin overlay ("Margem da meta"); buckets stay raw.
   goalMarginPct:       numeric('goal_margin_pct', { precision: 6, scale: 2 }),
   goalMarginUpdatedBy: uuid('goal_margin_updated_by'),
@@ -2238,6 +2248,10 @@ export const consumptionGoals = pgTable('consumption_goals', {
     'consumption_goals_margin_range_check',
     sql`${table.goalMarginPct} IS NULL OR (${table.goalMarginPct} >= -100 AND ${table.goalMarginPct} <= 100)`
   ),
+  granularityCheck: check(
+    'consumption_goals_granularity_check',
+    sql`${table.granularity} IN ('CUSTOMER','DEVICE')`
+  ),
 }));
 
 // 2) Canonical hourly grain. One row per (goal, month, day, hour).
@@ -2249,16 +2263,35 @@ export const consumptionGoalHours = pgTable('consumption_goal_hours', {
   value:       numeric('value').notNull(),
   sourceLevel: text('source_level').notNull(),           // YEAR | MONTH | DAY | HOUR — level the user set
   derived:     boolean('derived').notNull(),             // true = system-distributed
+  // RFC-0046 Addendum A (DEC-7/8, migration 0061): optional device coordinate.
+  // NULL = CUSTOMER-granular row (legacy shape). RESTRICT on purpose — goal
+  // hours are operator-authored targets.
+  deviceId:    uuid('device_id').references(() => devices.id, { onDelete: 'restrict' }),
+  // Stored generated column (COALESCE(device_id, zero-uuid)) so the upsert's
+  // conflict target stays on plain columns (Drizzle can't hit expression
+  // indexes). NEVER write this column.
+  deviceKey:   uuid('device_key').generatedAlwaysAs(
+    sql`COALESCE(device_id, '00000000-0000-0000-0000-000000000000'::uuid)`,
+  ),
+  // EXPLICIT = operator stated this device's value; RESIDUAL = allocated from
+  // the group total (DEC-8 residual rule).
+  deviceAllocation: text('device_allocation').notNull().default('EXPLICIT'),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   updatedBy:   uuid('updated_by'),
 }, (table) => ({
-  uq: uniqueIndex('consumption_goal_hours_uq').on(table.goalId, table.month, table.day, table.hour),
+  uq: uniqueIndex('consumption_goal_hours_device_uq').on(
+    table.goalId, table.deviceKey, table.month, table.day, table.hour,
+  ),
   monthRange:  check('consumption_goal_hours_month_check', sql`${table.month} BETWEEN 1 AND 12`),
   dayRange:    check('consumption_goal_hours_day_check',   sql`${table.day} BETWEEN 1 AND 31`),
   hourRange:   check('consumption_goal_hours_hour_check',  sql`${table.hour} BETWEEN 0 AND 23`),
   sourceLevelCheck: check(
     'consumption_goal_hours_source_level_check',
     sql`${table.sourceLevel} IN ('YEAR','MONTH','DAY','HOUR')`
+  ),
+  allocationCheck: check(
+    'consumption_goal_hours_allocation_check',
+    sql`${table.deviceAllocation} IN ('EXPLICIT','RESIDUAL')`
   ),
 }));
 
@@ -2290,6 +2323,7 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   customerId:    uuid('customer_id'),
   domain:        text('domain'),
   year:          integer('year'),
+  deviceId:      uuid('device_id'),                      // Addendum A: device the operation targeted (nullable)
   actor:         uuid('actor'),                          // who changed it
   source:        text('source').notNull().default('EDIT'), // IMPORT | REPLACE | MERGE | DELETE | EDIT — the operation
   actionLevel:   text('action_level').notNull(),         // YEAR | MONTH | DAY | HOUR — what the user touched
@@ -2313,6 +2347,6 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   ),
   sourceCheck: check(
     'consumption_goal_history_source_check',
-    sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT')`
+    sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT','MARGIN','REBALANCE')`
   ),
 }));

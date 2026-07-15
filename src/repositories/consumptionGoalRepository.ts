@@ -24,7 +24,7 @@
 //     (seeded on demand if missing).
 // =============================================================================
 
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, isNull, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import type { GoalAggregationMethod, GoalDomain, GoalSourceLevel } from '../dto/request/GoalsDTO';
 
@@ -79,14 +79,30 @@ export interface GoalHourUpsert {
   value: string; // numeric, as a string
   sourceLevel: GoalSourceLevel; // YEAR | MONTH | DAY | HOUR
   derived: boolean; // true = system-distributed
+  // Addendum A: device coordinate (null/undefined = CUSTOMER-granular row)
+  // and how its value was produced (EXPLICIT operator-stated vs RESIDUAL
+  // allocated from the group total). device_key is GENERATED — never written.
+  deviceId?: string | null;
+  deviceAllocation?: GoalDeviceAllocation;
   updatedBy?: string | null;
 }
 
-/** Scope for deleting hour rows; omit a field to leave that level unconstrained. */
+/** Addendum A — header granularity and per-row device allocation. */
+export type GoalHeaderGranularity = 'CUSTOMER' | 'DEVICE';
+export type GoalDeviceAllocation = 'EXPLICIT' | 'RESIDUAL';
+
+/**
+ * Scope for deleting hour rows; omit a field to leave that level
+ * unconstrained. `deviceId`: undefined = all rows; null = only the
+ * CUSTOMER-granular (device_id NULL) rows; a uuid = only that device's rows.
+ */
 export interface GoalHourScope {
   month?: number;
   day?: number;
   hour?: number;
+  deviceId?: string | null;
+  /** Narrow to EXPLICIT or RESIDUAL rows (rebalance removes RESIDUAL only). */
+  allocation?: GoalDeviceAllocation;
 }
 
 /** A history row to append (the version it produced is supplied by the caller). */
@@ -94,6 +110,8 @@ export interface GoalHourScope {
 export interface GoalHistoryDetail {
   ref: string; // "2026-03-15T08"
   value: number | null; // value at the bucket level (null on delete)
+  /** Free-form annotation (e.g. "granularity CUSTOMER->DEVICE", rebalance moves). */
+  note?: string;
 }
 
 export interface GoalHistoryAppend {
@@ -105,6 +123,8 @@ export interface GoalHistoryAppend {
   customerId: string;
   domain: GoalDomain;
   year: number;
+  /** Addendum A: the device the operation targeted (null on group-level ops). */
+  deviceId?: string | null;
   actor?: string | null;
   source: GoalHistorySource; // IMPORT | REPLACE | MERGE | DELETE | EDIT
   actionLevel: GoalSourceLevel; // YEAR | MONTH | DAY | HOUR
@@ -118,7 +138,7 @@ export interface GoalHistoryAppend {
   version: number; // the version this change produced
 }
 
-export type GoalHistorySource = 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT' | 'MARGIN';
+export type GoalHistorySource = 'IMPORT' | 'REPLACE' | 'MERGE' | 'DELETE' | 'EDIT' | 'MARGIN' | 'REBALANCE';
 
 /** Default aggregation config per domain (DEC: fixed; seed if missing). */
 const DEFAULT_DOMAIN_CONFIG: Record<GoalDomain, { aggregationMethod: GoalAggregationMethod; unit: string }> = {
@@ -286,6 +306,22 @@ export class ConsumptionGoalRepository {
     return row ?? null;
   }
 
+  /**
+   * Addendum A (DEC-8): sets the header granularity — used by the implicit
+   * CUSTOMER→DEVICE conversion and the explicit DEVICE→CUSTOMER collapse,
+   * always inside the same version-guarded transaction as the row rewrite.
+   */
+  async updateGranularity(
+    goalId: string,
+    granularity: GoalHeaderGranularity,
+    exec: GoalDbClient = db,
+  ): Promise<void> {
+    await exec
+      .update(consumptionGoals)
+      .set({ granularity })
+      .where(eq(consumptionGoals.id, goalId));
+  }
+
   /** Deletes the parent goal (cascades to its hours via FK). Returns rows removed. */
   async deleteGoal(goalId: string, exec: GoalDbClient = db): Promise<number> {
     const rows = await exec.delete(consumptionGoals).where(eq(consumptionGoals.id, goalId)).returning({
@@ -325,13 +361,15 @@ export class ConsumptionGoalRepository {
       value: h.value,
       sourceLevel: h.sourceLevel,
       derived: h.derived,
+      deviceId: h.deviceId ?? null,
+      deviceAllocation: h.deviceAllocation ?? 'EXPLICIT',
       updatedAt: now,
       updatedBy: h.updatedBy ?? null,
     }));
 
-    // A full year of hour rows (8760) × 9 bound columns blows past postgres'
-    // 65534-parameter limit in a single INSERT, so chunk the upsert. With 9
-    // columns the hard cap is floor(65534/9)=7281 rows; 1000 keeps a wide margin.
+    // A full year of hour rows (8760) × 11 bound columns blows past postgres'
+    // 65534-parameter limit in a single INSERT, so chunk the upsert. With 11
+    // columns the hard cap is floor(65534/11)=5957 rows; 1000 keeps a wide margin.
     const CHUNK_SIZE = 1000;
     let affected = 0;
     for (let i = 0; i < values.length; i += CHUNK_SIZE) {
@@ -340,8 +378,11 @@ export class ConsumptionGoalRepository {
         .insert(consumptionGoalHours)
         .values(chunk)
         .onConflictDoUpdate({
+          // device_key is the STORED generated COALESCE(device_id, zero-uuid)
+          // behind the unique index consumption_goal_hours_device_uq.
           target: [
             consumptionGoalHours.goalId,
+            consumptionGoalHours.deviceKey,
             consumptionGoalHours.month,
             consumptionGoalHours.day,
             consumptionGoalHours.hour,
@@ -350,6 +391,7 @@ export class ConsumptionGoalRepository {
             value: sqlExcluded('value'),
             sourceLevel: sqlExcluded('source_level'),
             derived: sqlExcluded('derived'),
+            deviceAllocation: sqlExcluded('device_allocation'),
             updatedAt: now,
             updatedBy: sqlExcluded('updated_by'),
           },
@@ -371,6 +413,16 @@ export class ConsumptionGoalRepository {
     if (scope.month !== undefined) conditions.push(eq(consumptionGoalHours.month, scope.month));
     if (scope.day !== undefined) conditions.push(eq(consumptionGoalHours.day, scope.day));
     if (scope.hour !== undefined) conditions.push(eq(consumptionGoalHours.hour, scope.hour));
+    if (scope.deviceId !== undefined) {
+      conditions.push(
+        scope.deviceId === null
+          ? isNull(consumptionGoalHours.deviceId)
+          : eq(consumptionGoalHours.deviceId, scope.deviceId),
+      );
+    }
+    if (scope.allocation !== undefined) {
+      conditions.push(eq(consumptionGoalHours.deviceAllocation, scope.allocation));
+    }
 
     const rows = await exec
       .delete(consumptionGoalHours)
@@ -394,6 +446,7 @@ export class ConsumptionGoalRepository {
         customerId: entry.customerId,
         domain: entry.domain,
         year: entry.year,
+        deviceId: entry.deviceId ?? null,
         actor: entry.actor ?? null,
         source: entry.source,
         actionLevel: entry.actionLevel,

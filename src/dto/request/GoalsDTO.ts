@@ -130,16 +130,21 @@ export const GetGoalsQuerySchema = z.object({
   year: z.coerce.number().pipe(YearSchema),
   granularity: GoalGranularitySchema.default('month'),
   fetchHistory: booleanQueryFlag('false'),
+  /** Addendum A: filter the tree to ONE device of a DEVICE-granular goal. */
+  deviceId: z.string().uuid().optional(),
 });
 export type GetGoalsQueryDTO = z.infer<typeof GetGoalsQuerySchema>;
 
 /**
  * Discriminator-only query for PUT / PATCH / POST import / DELETE.
  * `domain` and `year` identify the `(customer, domain, year)` tree.
+ * Addendum A: `deviceId` targets one entry meter — on a CUSTOMER goal it
+ * triggers the implicit conversion to DEVICE granularity (DEC-8).
  */
 export const GoalsTargetQuerySchema = z.object({
   domain: GoalDomainSchema,
   year: z.coerce.number().pipe(YearSchema),
+  deviceId: z.string().uuid().optional(),
 });
 export type GoalsTargetQueryDTO = z.infer<typeof GoalsTargetQuerySchema>;
 
@@ -215,6 +220,13 @@ export const ReplaceGoalsBodySchema = z
     monthly: z.record(MonthKeySchema, ReplaceMonthNodeSchema).optional(),
     /** Optimistic concurrency: expected current version (omit on first write). */
     expectedVersion: z.number().int().positive().optional(),
+    /**
+     * Addendum A (DEC-8): a deviceless PUT on a DEVICE-granular year is
+     * ambiguous — state the target: 'CUSTOMER' collapses the device structure
+     * (destructive, deliberate); 'DEVICE' restates the group totals keeping
+     * explicit meters pinned.
+     */
+    granularity: z.enum(['CUSTOMER', 'DEVICE']).optional(),
   })
   .refine(
     (b) => b.annual !== undefined || (b.monthly !== undefined && Object.keys(b.monthly).length > 0),
@@ -281,6 +293,13 @@ export const DeleteGoalsBodySchema = z
       })
       .optional(),
     expectedVersion: z.number().int().positive().optional(),
+    /**
+     * Addendum A (DEC-12): removing an EXPLICIT device's goal redistributes
+     * its share to the RESIDUAL meters (total preserved). With no residual
+     * meter left the caller must state mode 'shrink-total' — the total drops
+     * by the removed share; omitting it answers 409 GOAL_REMOVAL_MODE_REQUIRED.
+     */
+    mode: z.enum(['redistribute', 'shrink-total']).optional(),
   })
   .optional();
 export type DeleteGoalsBodyDTO = z.infer<typeof DeleteGoalsBodySchema>;
@@ -296,8 +315,29 @@ export const ImportGoalsQuerySchema = z.object({
   domain: GoalDomainSchema,
   year: z.coerce.number().pipe(YearSchema),
   dryRun: booleanQueryFlag('true'),
+  /** Addendum A: import ONE meter's spreadsheet (the per-sensor flow). */
+  deviceId: z.string().uuid().optional(),
 });
 export type ImportGoalsQueryDTO = z.infer<typeof ImportGoalsQuerySchema>;
+
+/**
+ * Addendum A (DEC-12) — POST /goals/rebalance?domain=&year=&dryRun=
+ * Recomputes the residual allocation against the current ENTRY set.
+ * dryRun=true (default) previews before/after without writing.
+ */
+export const RebalanceGoalsQuerySchema = z.object({
+  domain: GoalDomainSchema,
+  year: z.coerce.number().pipe(YearSchema),
+  dryRun: booleanQueryFlag('true'),
+});
+export type RebalanceGoalsQueryDTO = z.infer<typeof RebalanceGoalsQuerySchema>;
+
+export const RebalanceGoalsBodySchema = z
+  .object({
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .optional();
+export type RebalanceGoalsBodyDTO = z.infer<typeof RebalanceGoalsBodySchema>;
 
 // -----------------------------------------------------------------------------
 // RFC-0052 — Goal margin ("Margem da meta")

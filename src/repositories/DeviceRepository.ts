@@ -117,6 +117,9 @@ export class DeviceRepository implements IDeviceRepository {
       deviceChannelType: data.deviceChannelType,
       ingestionId: data.ingestionId,
       ingestionGatewayId: data.ingestionGatewayId,
+      // RFC-0046 Addendum A (DEC-11)
+      meterRole: data.meterRole ?? null,
+      meterDomain: data.meterDomain ?? null,
     }).returning();
 
     return this.mapToEntity(result);
@@ -230,6 +233,10 @@ export class DeviceRepository implements IDeviceRepository {
     if (data.deviceChannelType !== undefined) updateData.deviceChannelType = data.deviceChannelType;
     if (data.ingestionId !== undefined) updateData.ingestionId = data.ingestionId;
     if (data.ingestionGatewayId !== undefined) updateData.ingestionGatewayId = data.ingestionGatewayId;
+
+    // RFC-0046 Addendum A (DEC-11): set/clear together (validated upstream).
+    if (data.meterRole !== undefined) updateData.meterRole = data.meterRole;
+    if (data.meterDomain !== undefined) updateData.meterDomain = data.meterDomain;
 
     const [result] = await db
       .update(devices)
@@ -497,11 +504,54 @@ export class DeviceRepository implements IDeviceRepository {
       deviceType: row.deviceType || undefined,
       channel: row.channel ?? undefined,
       deviceChannelType: row.deviceChannelType || undefined,
+      meterRole: (row.meterRole as Device['meterRole']) || undefined,
+      meterDomain: (row.meterDomain as Device['meterDomain']) || undefined,
       ingestionId: row.ingestionId || undefined,
       ingestionGatewayId: row.ingestionGatewayId || undefined,
       lastActivityTime: row.lastActivityTime?.toISOString(),
       lastAlarmTime: row.lastAlarmTime?.toISOString(),
     };
+  }
+
+  // ===========================================================================
+  // RFC-0046 Addendum A (DEC-11): entry-meter resolution for goal allocation
+  // ===========================================================================
+
+  /**
+   * The authoritative ENTRY-meter set for a (tenant, customer, goal domain):
+   * active, not soft-deleted, explicitly classified `meter_role='ENTRY'` with
+   * the matching `meter_domain`. NOTHING is inferred — an unclassified meter
+   * never enters the residual pool (DEC-11).
+   */
+  async findEntryMeters(
+    tenantId: string,
+    customerId: string,
+    meterDomain: 'ENERGY' | 'WATER',
+  ): Promise<Device[]> {
+    const rows = await db
+      .select()
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.customerId, customerId),
+        eq(devices.meterRole, 'ENTRY'),
+        eq(devices.meterDomain, meterDomain),
+        eq(devices.status, 'ACTIVE'),
+        isNull(devices.deletedAt),
+      ))
+      .orderBy(devices.code, devices.name);
+
+    return rows.map((r) => this.mapToEntity(r));
+  }
+
+  /** Bulk fetch by ids (tenant-scoped) — used to label goal device summaries. */
+  async findByIds(tenantId: string, ids: string[]): Promise<Device[]> {
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select()
+      .from(devices)
+      .where(and(eq(devices.tenantId, tenantId), inArray(devices.id, ids)));
+    return rows.map((r) => this.mapToEntity(r));
   }
 
   // ===========================================================================

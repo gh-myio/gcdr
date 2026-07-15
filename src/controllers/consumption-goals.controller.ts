@@ -8,6 +8,8 @@ import {
   GetGoalsQuerySchema,
   GoalsTargetQuerySchema,
   ImportGoalsQuerySchema,
+  RebalanceGoalsQuerySchema,
+  RebalanceGoalsBodySchema,
   ReplaceGoalsBodySchema,
   MergeGoalsBodySchema,
   DeleteGoalsBodySchema,
@@ -118,6 +120,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       { tenantId, customerId, domain: query.domain, year: query.year },
       query.granularity,
       query.fetchHistory,
+      query.deviceId,
     );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
@@ -135,7 +138,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
     const { customerId } = req.params;
     await ensureCustomer(tenantId, customerId);
 
-    const { domain, year } = GoalsTargetQuerySchema.parse(req.query);
+    const { domain, year, deviceId } = GoalsTargetQuerySchema.parse(req.query);
     const body = ReplaceGoalsBodySchema.parse(req.body ?? {});
 
     // Cross-field calendar validity (leap-year aware) — needs the year from query.
@@ -148,6 +151,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
       { tenantId, customerId, domain, year },
       body,
       actorOf(req),
+      deviceId,
     );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
@@ -166,13 +170,14 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
     const { customerId } = req.params;
     await ensureCustomer(tenantId, customerId);
 
-    const { domain, year } = GoalsTargetQuerySchema.parse(req.query);
+    const { domain, year, deviceId } = GoalsTargetQuerySchema.parse(req.query);
     const body = MergeGoalsBodySchema.parse(req.body ?? {});
 
     const result = await consumptionGoalService.merge(
       { tenantId, customerId, domain, year },
       body,
       actorOf(req),
+      deviceId,
     );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
@@ -192,7 +197,7 @@ router.post('/import', async (req: Request, res: Response, next: NextFunction) =
     const { customerId } = req.params;
     await ensureCustomer(tenantId, customerId);
 
-    const { domain, year, dryRun } = ImportGoalsQuerySchema.parse(req.query);
+    const { domain, year, dryRun, deviceId } = ImportGoalsQuerySchema.parse(req.query);
     const body = ImportGoalsBodySchema.parse(req.body ?? {});
 
     const result = await consumptionGoalService.importData(
@@ -201,6 +206,7 @@ router.post('/import', async (req: Request, res: Response, next: NextFunction) =
       dryRun,
       body.expectedVersion,
       actorOf(req),
+      deviceId,
     );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
@@ -281,6 +287,35 @@ router.delete(
 );
 
 /**
+ * POST /customers/:customerId/goals/rebalance?domain=&year=&dryRun=
+ * Addendum A (DEC-12): recomputes the RESIDUAL allocation against the current
+ * ENTRY-meter set. dryRun=true (default) previews the before/after per meter;
+ * dryRun=false applies under the optimistic guard (body.expectedVersion),
+ * bumps `version` once and appends ONE REBALANCE history entry.
+ */
+router.post('/rebalance', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { customerId } = req.params;
+    await ensureCustomer(tenantId, customerId);
+
+    const { domain, year, dryRun } = RebalanceGoalsQuerySchema.parse(req.query);
+    const body = RebalanceGoalsBodySchema.parse(req.body ?? undefined);
+
+    const result = await consumptionGoalService.rebalance(
+      { tenantId, customerId, domain, year },
+      dryRun,
+      body?.expectedVersion,
+      actorOf(req),
+    );
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    if (handleVersionConflict(err, req, res)) return;
+    next(err);
+  }
+});
+
+/**
  * DELETE /customers/:customerId/goals?domain=&year=
  * Removes the whole year (or a sub-bucket via body.bucket). A whole-year delete
  * with no expectedVersion returns 204; with a guard it returns 200 + body.
@@ -291,13 +326,14 @@ router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
     const { customerId } = req.params;
     await ensureCustomer(tenantId, customerId);
 
-    const { domain, year } = GoalsTargetQuerySchema.parse(req.query);
+    const { domain, year, deviceId } = GoalsTargetQuerySchema.parse(req.query);
     const body = DeleteGoalsBodySchema.parse(req.body ?? undefined);
 
     const result = await consumptionGoalService.remove(
       { tenantId, customerId, domain, year },
       body,
       actorOf(req),
+      deviceId,
     );
 
     // Whole-year delete with no optimistic guard → 204 No Content (RFC §3.6).

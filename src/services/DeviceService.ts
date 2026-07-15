@@ -45,7 +45,25 @@ export class DeviceService {
     this.ruleRepository = ruleRepository || new RuleRepository();
   }
 
+  /**
+   * RFC-0046 Addendum A (DEC-11): meterRole/meterDomain are set or cleared
+   * TOGETHER — a role without its domain cannot safely name which residual
+   * pool (ENERGY vs WATER) the meter belongs to. DB CHECK backs this up.
+   */
+  private assertMeterPair(data: Pick<UpdateDeviceDTO, 'meterRole' | 'meterDomain'>): void {
+    const rolePresent = data.meterRole !== undefined;
+    const domainPresent = data.meterDomain !== undefined;
+    if (rolePresent !== domainPresent) {
+      throw new ValidationError('meterRole and meterDomain must be set (or cleared) together');
+    }
+    if (rolePresent && (data.meterRole === null) !== (data.meterDomain === null)) {
+      throw new ValidationError('meterRole and meterDomain must be set (or cleared) together');
+    }
+  }
+
   async create(tenantId: string, data: CreateDeviceDTO, userId: string): Promise<Device> {
+    this.assertMeterPair(data);
+
     // Validate asset exists
     const asset = await this.assetRepository.getById(tenantId, data.assetId);
     if (!asset) {
@@ -136,6 +154,7 @@ export class DeviceService {
   }
 
   async update(tenantId: string, id: string, data: UpdateDeviceDTO, userId: string): Promise<Device> {
+    this.assertMeterPair(data);
     const existing = await this.getById(tenantId, id);
 
     // Check for duplicate external ID if updating

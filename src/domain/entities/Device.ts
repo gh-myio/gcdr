@@ -2,6 +2,10 @@ import { BaseEntity, EntityStatus } from '../../shared/types';
 
 export type DeviceType = 'SENSOR' | 'ACTUATOR' | 'GATEWAY' | 'CONTROLLER' | 'METER' | 'CAMERA' | 'OUTLET' | 'INFRARED' | 'OTHER';
 export type DeviceProtocol = 'MQTT' | 'HTTP' | 'MODBUS' | 'BACNET' | 'LORAWAN' | 'ZIGBEE' | 'OTHER';
+
+// RFC-0046 Addendum A (DEC-11): explicit meter purpose for goal allocation.
+export type MeterRole = 'ENTRY' | 'SUBMETER';
+export type MeterDomain = 'ENERGY' | 'WATER';
 export type ConnectivityStatus = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
 
 export interface DeviceCredentials {
@@ -158,6 +162,12 @@ export interface Device extends BaseEntity {
   // uniqueness key when present.
   channel?: number;              // channel index on the board (e.g., 0, 1)
   deviceChannelType?: string;    // channel sub-type (e.g., "lamp", "presence_sensor")
+
+  // RFC-0046 Addendum A (DEC-11): explicit meter purpose — ENTRY meters
+  // participate in the goals residual allocation for their domain. Set and
+  // cleared together (DB CHECK enforces both-or-neither).
+  meterRole?: MeterRole;         // 'ENTRY' | 'SUBMETER'
+  meterDomain?: MeterDomain;     // 'ENERGY' | 'WATER'
 
   // Ingestion Integration
   ingestionId?: string;          // UUID in ingestion system
