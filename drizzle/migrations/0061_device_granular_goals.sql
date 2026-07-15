@@ -54,6 +54,10 @@ ALTER TABLE "consumption_goal_hours" ADD CONSTRAINT "consumption_goal_hours_allo
 CREATE UNIQUE INDEX IF NOT EXISTS "consumption_goal_hours_device_uq"
   ON "consumption_goal_hours" ("goal_id", "device_key", "month", "day", "hour");
 
+-- 0047 created this uniqueness as a table CONSTRAINT (whose backing index
+-- cannot be dropped directly — 2BP01); other environments may hold it as a
+-- plain index. Drop whichever form exists.
+ALTER TABLE "consumption_goal_hours" DROP CONSTRAINT IF EXISTS "consumption_goal_hours_uq";
 DROP INDEX IF EXISTS "consumption_goal_hours_uq";
 
 -- 4) DEC-8 — explicit granularity on the header
