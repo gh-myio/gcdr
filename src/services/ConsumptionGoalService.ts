@@ -130,6 +130,11 @@ export interface GoalDeviceSummary {
   allocation: GoalDeviceAllocation;
   annual: number;
   annualAdjusted: number;
+  /**
+   * Hour slots this meter has a stored value for. Coverage is complete when it
+   * equals the year's hour count (8760/8784) — the UI badges anything short.
+   */
+  hoursCovered: number;
 }
 
 export interface GoalGetResult {
@@ -143,6 +148,12 @@ export interface GoalGetResult {
   granularity: GoalHeaderGranularity;
   /** Addendum A: present on DEVICE-granular goals — one entry per meter. */
   devices?: GoalDeviceSummary[];
+  /**
+   * Distinct hour slots of the year covered by ANY stored value (consolidated,
+   * ignoring the `deviceId` filter). Complete = the year's hour count
+   * (8760/8784). Present on GET reads; omitted on write/margin responses.
+   */
+  hoursCovered?: number;
   /** RFC-0052: null when no margin was ever set for this (domain, year). */
   goalMargin?: GoalMarginInfo | null;
   tree: GoalTree;
@@ -988,6 +999,7 @@ export class ConsumptionGoalService {
         granularity: 'CUSTOMER',
         goalMargin: null,
         tree: {},
+        hoursCovered: 0,
       };
       if (fetchHistory) {
         const hist = await this.repo.findHistoryByKey(key, 100);
@@ -1007,6 +1019,11 @@ export class ConsumptionGoalService {
     if (headerGranularity === 'DEVICE' && !deviceId) stripAggMetaDeep(tree);
     this.overlayMargin(tree, marginPctOf(goal));
 
+    // Consolidated coverage: distinct hour slots with ANY value, regardless of
+    // the deviceId filter — the tab badge reads this against 8760/8784.
+    const hourSlots = new Set<number>();
+    for (const r of allRows) hourSlots.add(r.month * 10000 + r.day * 100 + r.hour);
+
     const result: GoalGetResult = {
       customerId: key.customerId,
       domain: key.domain,
@@ -1017,6 +1034,7 @@ export class ConsumptionGoalService {
       granularity: headerGranularity,
       goalMargin: marginInfoOf(goal),
       tree,
+      hoursCovered: hourSlots.size,
     };
 
     if (headerGranularity === 'DEVICE') {
@@ -1039,11 +1057,12 @@ export class ConsumptionGoalService {
     rows: ConsumptionGoalHourRow[],
     marginPct: number | null,
   ): Promise<GoalDeviceSummary[]> {
-    const byDevice = new Map<string, { annual: number; explicit: boolean }>();
+    const byDevice = new Map<string, { annual: number; explicit: boolean; hours: number }>();
     for (const r of rows) {
       if (!r.deviceId) continue;
-      const acc = byDevice.get(r.deviceId) ?? { annual: 0, explicit: false };
+      const acc = byDevice.get(r.deviceId) ?? { annual: 0, explicit: false, hours: 0 };
       acc.annual += Number(r.value);
+      acc.hours += 1; // one row per (device, hour) — the unique index guarantees it
       if ((r.deviceAllocation ?? 'EXPLICIT') === 'EXPLICIT') acc.explicit = true;
       byDevice.set(r.deviceId, acc);
     }
@@ -1061,6 +1080,7 @@ export class ConsumptionGoalService {
         allocation: (acc.explicit ? 'EXPLICIT' : 'RESIDUAL') as GoalDeviceAllocation,
         annual: roundOut(acc.annual),
         annualAdjusted: round3(acc.annual * factor),
+        hoursCovered: acc.hours,
       }))
       .sort((a, b) => (a.code ?? '').localeCompare(b.code ?? ''));
   }
