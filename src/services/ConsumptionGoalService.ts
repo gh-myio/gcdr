@@ -121,6 +121,20 @@ export interface GoalHistoryEntry {
   changedAt: string;
 }
 
+/**
+ * Compact description of a series' missing hour slots, coarsest form first:
+ * 'YYYY-MM' = whole month missing, 'YYYY-MM-DD' = whole day, 'YYYY-MM-DDThh' =
+ * single hour. `missing` is capped (GAP_REF_CAP) — enough for the UI to point
+ * at the holes without shipping thousands of refs.
+ */
+export interface GoalCoverageGaps {
+  missing: string[];
+  /** True when more gap refs exist than `missing` lists. */
+  truncated: boolean;
+  /** Total missing hour slots (year hours − covered). */
+  missingHours: number;
+}
+
 /** Addendum A — per-device summary block on DEVICE-granular reads. */
 export interface GoalDeviceSummary {
   deviceId: string;
@@ -135,6 +149,8 @@ export interface GoalDeviceSummary {
    * equals the year's hour count (8760/8784) — the UI badges anything short.
    */
   hoursCovered: number;
+  /** Where this meter's holes are; absent when coverage is complete. */
+  coverageGaps?: GoalCoverageGaps;
 }
 
 export interface GoalGetResult {
@@ -154,6 +170,8 @@ export interface GoalGetResult {
    * (8760/8784). Present on GET reads; omitted on write/margin responses.
    */
   hoursCovered?: number;
+  /** Where the consolidated holes are; absent when coverage is complete. */
+  coverageGaps?: GoalCoverageGaps;
   /** RFC-0052: null when no margin was ever set for this (domain, year). */
   goalMargin?: GoalMarginInfo | null;
   tree: GoalTree;
@@ -228,6 +246,60 @@ const SUM_AGG: GoalAggregationMethod = 'SUM';
 
 /** Max bucket samples persisted in a history row's `details` (timeline breakdown). */
 const HISTORY_DETAIL_CAP = 50;
+
+/** Max compact refs listed in a GoalCoverageGaps (a "smell", not the full map). */
+const GAP_REF_CAP = 12;
+
+/**
+ * Summarises the holes of a covered-slot set (keys `month*10000+day*100+hour`)
+ * into compact refs: a fully-missing month collapses to 'YYYY-MM', a
+ * fully-missing day to 'YYYY-MM-DD', else individual 'YYYY-MM-DDThh'. Returns
+ * undefined when coverage is complete.
+ */
+function summariseCoverageGaps(year: number, covered: Set<number>): GoalCoverageGaps | undefined {
+  const refs: string[] = [];
+  let missingHours = 0;
+  let truncated = false;
+  const push = (ref: string) => {
+    if (refs.length < GAP_REF_CAP) refs.push(ref);
+    else truncated = true;
+  };
+
+  for (let m = 1; m <= 12; m++) {
+    const dim = daysInMonth(year, m);
+    const mm = String(m).padStart(2, '0');
+    const missPerDay: number[] = [];
+    let monthMissing = 0;
+    for (let d = 1; d <= dim; d++) {
+      let miss = 0;
+      for (let h = 0; h < 24; h++) if (!covered.has(m * 10000 + d * 100 + h)) miss++;
+      missPerDay.push(miss);
+      monthMissing += miss;
+    }
+    missingHours += monthMissing;
+    if (monthMissing === 0) continue;
+    if (monthMissing === dim * 24) {
+      push(`${year}-${mm}`);
+      continue;
+    }
+    for (let d = 1; d <= dim; d++) {
+      const miss = missPerDay[d - 1];
+      if (miss === 0) continue;
+      const dd = String(d).padStart(2, '0');
+      if (miss === 24) {
+        push(`${year}-${mm}-${dd}`);
+      } else {
+        for (let h = 0; h < 24; h++) {
+          if (!covered.has(m * 10000 + d * 100 + h)) {
+            push(`${year}-${mm}-${dd}T${String(h).padStart(2, '0')}`);
+          }
+        }
+      }
+    }
+  }
+
+  return missingHours === 0 ? undefined : { missing: refs, truncated, missingHours };
+}
 
 // -----------------------------------------------------------------------------
 // Addendum A — entry-meter resolution (DEC-11). Injected for testability; the
@@ -1036,9 +1108,14 @@ export class ConsumptionGoalService {
       tree,
       hoursCovered: hourSlots.size,
     };
+    // Point the UI at WHERE the holes are (compact refs, capped) — only when
+    // something is actually missing.
+    if (allRows.length > 0) {
+      result.coverageGaps = summariseCoverageGaps(key.year, hourSlots);
+    }
 
     if (headerGranularity === 'DEVICE') {
-      result.devices = await this.buildDeviceSummaries(key.tenantId, allRows, marginPctOf(goal));
+      result.devices = await this.buildDeviceSummaries(key.tenantId, allRows, marginPctOf(goal), key.year);
     }
 
     if (fetchHistory) {
@@ -1056,13 +1133,14 @@ export class ConsumptionGoalService {
     tenantId: string,
     rows: ConsumptionGoalHourRow[],
     marginPct: number | null,
+    year: number,
   ): Promise<GoalDeviceSummary[]> {
-    const byDevice = new Map<string, { annual: number; explicit: boolean; hours: number }>();
+    const byDevice = new Map<string, { annual: number; explicit: boolean; slots: Set<number> }>();
     for (const r of rows) {
       if (!r.deviceId) continue;
-      const acc = byDevice.get(r.deviceId) ?? { annual: 0, explicit: false, hours: 0 };
+      const acc = byDevice.get(r.deviceId) ?? { annual: 0, explicit: false, slots: new Set<number>() };
       acc.annual += Number(r.value);
-      acc.hours += 1; // one row per (device, hour) — the unique index guarantees it
+      acc.slots.add(r.month * 10000 + r.day * 100 + r.hour);
       if ((r.deviceAllocation ?? 'EXPLICIT') === 'EXPLICIT') acc.explicit = true;
       byDevice.set(r.deviceId, acc);
     }
@@ -1080,7 +1158,8 @@ export class ConsumptionGoalService {
         allocation: (acc.explicit ? 'EXPLICIT' : 'RESIDUAL') as GoalDeviceAllocation,
         annual: roundOut(acc.annual),
         annualAdjusted: round3(acc.annual * factor),
-        hoursCovered: acc.hours,
+        hoursCovered: acc.slots.size,
+        coverageGaps: summariseCoverageGaps(year, acc.slots),
       }))
       .sort((a, b) => (a.code ?? '').localeCompare(b.code ?? ''));
   }
