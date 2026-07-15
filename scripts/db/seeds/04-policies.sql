@@ -244,6 +244,25 @@ BEGIN
         1
     );
 
+    -- Goals Management Policy - RFC-0046 consumption goals (read + write).
+    -- Enforced by requireGoalsAccess() on /customers/:id/goals: JWT users need
+    -- goals.goal.read (GET) / goals.goal.update (writes). full-admin (*.*.*)
+    -- and read-only (*.*.read) match without this policy.
+    INSERT INTO policies (id, tenant_id, key, display_name, description, allow, deny, risk_level, is_system, version)
+    VALUES (
+        'cccc1313-1313-1313-1313-131313131313',
+        v_tenant_id,
+        'policy:goals-management',
+        'Consumption Goals Management',
+        'Read and edit customer consumption goals (RFC-0046), including margin and CSV import',
+        '["goals.goal.read", "goals.goal.update"]',
+        '[]',
+        'medium',
+        false,
+        1
+    )
+    ON CONFLICT DO NOTHING;
+
     -- Work Orders Only Policy - access confined to the OS (Work Orders) domain
     -- Backs role:os-only (frontend confines such users to the /os area).
     INSERT INTO policies (id, tenant_id, key, display_name, description, allow, deny, risk_level, is_system, version)

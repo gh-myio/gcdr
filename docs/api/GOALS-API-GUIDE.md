@@ -48,9 +48,12 @@ Base: `/api/v1/customers/:customerId/goals`
 | Mesclar buckets | `PATCH /goals?domain=&year=` | MERGE: só os buckets enviados mudam (1..8760) |
 | Importar CSV | `POST /goals/import?domain=&year=&dryRun=` | `dryRun=true` (padrão) = preview sem persistir |
 | Apagar | `DELETE /goals?domain=&year=` | ano inteiro (204) ou sub-bucket via body (200) |
+| Rebalancear medidores | `POST /goals/rebalance?domain=&year=&dryRun=` | Addendum A — ver §7 |
 
 Todas as escritas aceitam **`expectedVersion`** no body (lock otimista);
 divergência → `409 VERSION_CONFLICT` com `currentVersion` no erro.
+Todos os endpoints (menos o rebalance) aceitam **`?deviceId=`** para operar
+sobre UM medidor de entrada — ver §7 (metas por medidor).
 
 ## 4. Leitura
 
@@ -163,11 +166,11 @@ curl -s -X DELETE ".../goals?domain=ENERGY&year=2026" \
   relendo (`GET`) e reavaliando — nunca retry cego.
 - **Valores**: finitos; ≥ 0 para ENERGY/WATER; TEMPERATURE aceita negativos.
   Fora disso → `400/422 VALIDATION_ERROR` com o path do bucket ofensor.
-- **Parser tolerante** — novos campos podem aparecer nos nós da árvore;
-  ignore o que não conhecer. Em particular, o **RFC-0052 (draft)** adicionará
-  `adjustedValue` ao lado de `value` e um bloco `goalMargin` (margem
-  percentual por customer × domain × year) — consumidores estritos devem
-  prever campos opcionais desde já.
+- **Parser tolerante** — novos campos podem aparecer nos nós da árvore e no
+  envelope; ignore o que não conhecer. Já no ar: `adjustedValue` ao lado de
+  `value` + bloco `goalMargin` (**RFC-0052**, margem percentual por
+  customer × domain × year) e, no GET, `granularity`, `devices[]`,
+  `hoursCovered` e `coverageGaps` (**Addendum A** — §7).
 - **Não recalcule roll-ups no cliente** — peça a `granularity` desejada; o
   servidor deriva com o método correto por domínio (SUM vs média ponderada).
 - **Auditoria**: não logue mudanças por fora — `fetchHistory=true` traz quem,
@@ -175,13 +178,56 @@ curl -s -X DELETE ".../goals?domain=ENERGY&year=2026" \
 - **Ano-alvo**: um CSV com refs de ano diferente do `year` da query é
   rejeitado no preview — o discriminador é a query, não o CSV.
 
+## 7. Metas por medidor (Addendum A)
+
+Um ano de meta pode ser detalhado **por medidor de entrada** (`granularity:
+'DEVICE'`). Regras essenciais para consumidores:
+
+- **Pré-requisito**: os medidores participantes são os devices do customer
+  cadastrados com `meterRole: 'ENTRY'` + `meterDomain` igual ao domínio da
+  meta (classificação explícita no cadastro — nada é inferido). Sem medidor
+  classificado, writes com `deviceId` → `422 GOAL_ENTRY_SET_UNDEFINED`.
+  v1 só cobre domínios SUM (ENERGY/WATER).
+- **`?deviceId=`** em GET/PUT/PATCH/import/DELETE opera sobre UM medidor.
+  O primeiro write com `deviceId` num ano CUSTOMER **converte** o ano:
+  valores existentes viram total do grupo por hora, o alvo fica EXPLICIT e
+  os demais medidores absorvem o residual (total preservado, 1 versão).
+- **Alocação mista**: valores explícitos são pinados; o residual
+  (total − Σ explícitos) divide igual entre os medidores sem meta
+  (`allocation: RESIDUAL`). Estourou o total → `400 GOAL_DEVICE_OVERFLOW`.
+- **Escrita sem `deviceId`** num ano DEVICE edita o **total do grupo**
+  (explícitos pinados, residuais rebalanceiam). Um `PUT` sem device precisa
+  declarar `granularity: 'CUSTOMER'` (colapsa, destrutivo) ou `'DEVICE'`.
+- **Remoção**: apagar a meta de um medidor EXPLICIT redistribui a parcela
+  aos RESIDUAL (total preservado); sem residual, declare
+  `mode: 'shrink-total'` no body ou receba `409 GOAL_REMOVAL_MODE_REQUIRED`.
+- **Rebalance explícito**: cadastrar/reclassificar medidor **nunca** mexe em
+  metas. Para convergir ao ENTRY set atual:
+  `POST /goals/rebalance?domain=&year=&dryRun=true` (preview antes/depois
+  por medidor, `entering`/`leaving`) e depois `dryRun=false` com
+  `expectedVersion` (1 versão, 1 entrada `REBALANCE` no histórico).
+- **Leitura (GET)** ganha: `granularity`, `devices[]`
+  (`{deviceId, code, label, allocation, annual, annualAdjusted,
+  hoursCovered, coverageGaps?}`), `hoursCovered` consolidado e
+  `coverageGaps` (refs compactas dos buracos: mês inteiro `YYYY-MM` > dia
+  `YYYY-MM-DD` > hora `YYYY-MM-DDThh`; cap de 12 + `truncated` +
+  `missingHours`). O consolidado de um ano DEVICE omite
+  `sourceLevel`/`derived` nos nós (ambíguos entre medidores).
+- **Import por sensor**: 1 CSV por medidor (mesmo formato do §5.1),
+  importado com `?deviceId=`. CSV único com coluna `device` está no backlog.
+
 ## Referências
 
 - `docs/openapi.yaml` — spec formal (tag **Goals**, schemas `GoalTree`,
   `GoalHistoryEntry`)
 - `docs/rfcs/RFC-0046-Customer-Consumption-Goals.md` — design do domínio
-- `docs/rfcs/RFC-0046-Goals-API.md` — contrato detalhado (§2 árvore, §4.4 conflito de versão)
-- `docs/rfcs/RFC-0052-Goal-Margin-Adjustment.md` — **draft**: margem
-  percentual (`goalMarginPct`) com `adjustedValue` na leitura
+- `docs/rfcs/RFC-0046-Goals-API.md` — contrato detalhado (§2 árvore, §4.4
+  conflito de versão, **§7 deltas do Addendum A**)
+- `docs/rfcs/RFC-0046-Addendum-A-Device-Granular-Goals.md` — metas por
+  medidor (APPROVED rev. 2)
+- `docs/goals/GOALS-RELEASE-NOTES-2026-07.md` — release notes desta leva
+  (backend, regras e UI)
+- `docs/rfcs/RFC-0052-Goal-Margin-Adjustment.md` — margem percentual
+  (`goalMarginPct`) com `adjustedValue` na leitura
 - `docs/api/API-KEYS-CONSUMERS.md` — API keys e `hierarchyAccess`
 - Exemplos reais de CSV horário: `docs/examples/goals-2026-*-Energy-import.csv`
