@@ -121,6 +121,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       query.granularity,
       query.fetchHistory,
       query.deviceId,
+      query.withMoney,
     );
     sendSuccess(res, result, 200, requestId);
   } catch (err) {

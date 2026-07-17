@@ -132,6 +132,8 @@ export const GetGoalsQuerySchema = z.object({
   fetchHistory: booleanQueryFlag('false'),
   /** Addendum A: filter the tree to ONE device of a DEVICE-granular goal. */
   deviceId: z.string().uuid().optional(),
+  /** RFC-0054 Phase 2: add the tariff-derived money overlay (DEVICE goals only). */
+  withMoney: booleanQueryFlag('false'),
 });
 export type GetGoalsQueryDTO = z.infer<typeof GetGoalsQuerySchema>;
 

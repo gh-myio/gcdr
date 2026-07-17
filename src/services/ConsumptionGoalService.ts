@@ -42,6 +42,15 @@ import {
 } from '../repositories/consumptionGoalRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import type { Device } from '../domain/entities/Device';
+import { customerTariffRepository, type CustomerTariffRepository } from '../repositories/customerTariffRepository';
+import type { TariffCategory } from '../dto/request/TariffsDTO';
+import {
+  goalMoneyService,
+  type GoalMoneyService,
+  type GoalMoneyBlock,
+  type GoalMoneyUnavailable,
+  type MoneyDevice,
+} from './GoalMoneyService';
 import {
   daysInMonth,
   isValidValueForDomain,
@@ -90,6 +99,10 @@ export interface GoalTreeNode {
   sourceLevel?: GoalSourceLevel;
   /** true = every contributing hour was system-distributed. */
   derived?: boolean;
+  /** RFC-0054 Phase 2: tariff-derived cost of the (margin-adjusted) quantity. */
+  monetaryValue?: string;
+  /** RFC-0054 Phase 2: tariff-derived cost of the RAW (pre-margin) quantity. */
+  monetaryRawValue?: string;
 }
 
 /** RFC-0052 — the margin overlay block returned alongside the tree. */
@@ -174,6 +187,12 @@ export interface GoalGetResult {
   coverageGaps?: GoalCoverageGaps;
   /** RFC-0052: null when no margin was ever set for this (domain, year). */
   goalMargin?: GoalMarginInfo | null;
+  /**
+   * RFC-0054 Phase 2: present only when `?withMoney=true`. On a DEVICE goal it
+   * is the coverage block (per-node monetaryValue is injected into the tree);
+   * on a CUSTOMER goal it is `{ reason: 'MONEY_REQUIRES_DEVICE_GRANULARITY' }`.
+   */
+  money?: GoalMoneyBlock | GoalMoneyUnavailable;
   tree: GoalTree;
   history?: GoalHistoryEntry[];
 }
@@ -351,13 +370,22 @@ export interface GoalRebalanceResult {
 export class ConsumptionGoalService {
   private readonly entryMeters: EntryMeterResolver;
   private readonly deviceLookup: DeviceLookup;
+  private readonly tariffRepo: CustomerTariffRepository;
+  private readonly money: GoalMoneyService;
 
   constructor(
     private readonly repo: ConsumptionGoalRepository = consumptionGoalRepository,
-    deps?: { entryMeters?: EntryMeterResolver; deviceLookup?: DeviceLookup },
+    deps?: {
+      entryMeters?: EntryMeterResolver;
+      deviceLookup?: DeviceLookup;
+      tariffRepo?: CustomerTariffRepository;
+      money?: GoalMoneyService;
+    },
   ) {
     this.entryMeters = deps?.entryMeters ?? defaultEntryMeterResolver();
     this.deviceLookup = deps?.deviceLookup ?? defaultDeviceLookup();
+    this.tariffRepo = deps?.tariffRepo ?? customerTariffRepository;
+    this.money = deps?.money ?? goalMoneyService;
   }
 
   // ---------------------------------------------------------------------------
@@ -1099,6 +1127,7 @@ export class ConsumptionGoalService {
     granularity: GoalGranularity,
     fetchHistory: boolean,
     deviceId?: string,
+    withMoney = false,
   ): Promise<GoalGetResult> {
     const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
     const goal = await this.repo.findGoal(key);
@@ -1163,6 +1192,16 @@ export class ConsumptionGoalService {
       result.devices = await this.buildDeviceSummaries(key.tenantId, allRows, marginPctOf(goal), key.year);
     }
 
+    // RFC-0054 Phase 2 — money overlay. DEVICE goals price per-device against
+    // the hourly tariffs; CUSTOMER goals cannot resolve a category → null+reason.
+    if (withMoney) {
+      if (headerGranularity !== 'DEVICE') {
+        result.money = { reason: 'MONEY_REQUIRES_DEVICE_GRANULARITY' } as GoalMoneyUnavailable;
+      } else {
+        result.money = await this.computeGoalMoney(key, rows, marginPctOf(goal), tree);
+      }
+    }
+
     if (fetchHistory) {
       // Key-based read: rows written before AND after a delete/recreate of the
       // same (customer, domain, year) share one auditable stream.
@@ -1171,6 +1210,66 @@ export class ConsumptionGoalService {
     }
 
     return result;
+  }
+
+  /**
+   * RFC-0054 Phase 2 — computes the money overlay for a DEVICE goal and injects
+   * per-node monetaryValue/monetaryRawValue into `tree`. Prices come from the
+   * hourly tariffs of the categories the goal's devices belong to.
+   */
+  private async computeGoalMoney(
+    key: GoalKey,
+    rows: ConsumptionGoalHourRow[],
+    marginPct: number | null,
+    tree: GoalTree,
+  ): Promise<GoalMoneyBlock> {
+    const deviceIds = [...new Set(rows.map((r) => r.deviceId).filter((id): id is string => !!id))];
+    const devices = deviceIds.length > 0 ? await this.deviceLookup(key.tenantId, deviceIds) : [];
+    const moneyDevices: MoneyDevice[] = devices.map((d) => ({
+      id: d.id, code: d.code ?? null, label: d.label ?? null,
+      tariffCategory: (d.tariffCategory as TariffCategory | undefined) ?? null,
+    }));
+
+    // Load the hourly price map for each category actually present among the
+    // goal's devices (at most COMMON_AREA + SPECIFIC).
+    const categories = [...new Set(moneyDevices.map((d) => d.tariffCategory).filter((c): c is TariffCategory => !!c))];
+    const priceMaps = new Map<TariffCategory, Map<number, string>>();
+    for (const category of categories) {
+      const header = await this.tariffRepo.findHeader({
+        tenantId: key.tenantId, customerId: key.customerId, domain: key.domain as 'ENERGY' | 'WATER', category, year: key.year,
+      });
+      const map = new Map<number, string>();
+      if (header) {
+        for (const h of await this.tariffRepo.findHours(header.id)) {
+          map.set(h.month * 10000 + h.day * 100 + h.hour, String(h.price));
+        }
+      }
+      priceMaps.set(category, map);
+    }
+    const priceAt = (category: TariffCategory, m: number, d: number, h: number): string | null =>
+      priceMaps.get(category)?.get(m * 10000 + d * 100 + h) ?? null;
+
+    const computed = this.money.compute({
+      year: key.year,
+      marginPct,
+      rows: rows.map((r) => ({ deviceId: r.deviceId, month: r.month, day: r.day, hour: r.hour, value: String(r.value) })),
+      devices: moneyDevices,
+      priceAt,
+    });
+
+    // Inject per-node money into the derived tree (same node keys).
+    if (tree.annual && computed.annual) Object.assign(tree.annual, computed.annual);
+    for (const [k, node] of Object.entries(tree.monthly ?? {})) {
+      if (computed.monthly[k]) Object.assign(node, computed.monthly[k]);
+    }
+    for (const [k, node] of Object.entries(tree.daily ?? {})) {
+      if (computed.daily[k]) Object.assign(node, computed.daily[k]);
+    }
+    for (const [k, node] of Object.entries(tree.hourly ?? {})) {
+      if (computed.hourly[k]) Object.assign(node, computed.hourly[k]);
+    }
+
+    return computed.money;
   }
 
   /** Addendum A — per-meter summary block (annual SUM + dominant allocation). */
