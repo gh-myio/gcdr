@@ -441,6 +441,11 @@ export const devices = pgTable('devices', {
   meterRole: text('meter_role'),      // ENTRY | SUBMETER (nullable = unclassified)
   meterDomain: text('meter_domain'),  // ENERGY | WATER — the domain the role applies to
 
+  // RFC-0054 (DEC-2, migration 0062): explicit tariff category — the join key
+  // between a device's consumption and the hourly tariff. Never inferred; a
+  // NULL device is excluded from the money overlay and reported as uncategorized.
+  tariffCategory: text('tariff_category'),  // COMMON_AREA | SPECIFIC (nullable = unclassified)
+
   // Identification Extended
   identifier: varchar('identifier', { length: 255 }),  // Human-readable unique identifier
   deviceProfile: varchar('device_profile', { length: 100 }),  // Device profile (e.g., HIDROMETRO_AREA_COMUM)
@@ -2348,5 +2353,107 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   sourceCheck: check(
     'consumption_goal_history_source_check',
     sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT','MARGIN','REBALANCE')`
+  ),
+}));
+
+// ===========================================================================
+// RFC-0054 (APPROVED rev. 3) — Phase 1: hourly customer tariffs (migration 0062)
+//
+// A tariff is (customer, domain, category, year) distributed to an HOURLY
+// canonical grain — a sibling of a goal. `category` (COMMON_AREA | SPECIFIC)
+// is an explicit device attribute (DEC-2). Hourly grain + a plain UNIQUE on
+// (tariff_id, month, day, hour) makes overlap impossible by construction —
+// NO daterange/EXCLUDE/btree_gist. Calendar is nominal civil hours (DEC-8).
+// Phase 1 is additive and never touches `consumption_goals` (DEC-12).
+// ===========================================================================
+
+// 1) Tariff header — one per (tenant, customer, domain, category, year).
+export const customerTariffs = pgTable('customer_tariffs', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  customerId:  uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+  domain:      text('domain').notNull(),                 // ENERGY | WATER (priced SUM domains)
+  category:    text('category').notNull(),               // COMMON_AREA | SPECIFIC
+  year:        smallint('year').notNull(),
+  unit:        text('unit').notNull(),                   // kWh | m3 (from domain)
+  currency:    text('currency').notNull().default('BRL'),
+  tariffModel: text('tariff_model').notNull().default('FLAT'), // v1 = FLAT; evolution axis
+  timezone:    text('timezone').notNull().default('America/Sao_Paulo'), // nominal civil-hour calendar (DEC-8)
+  version:     integer('version').notNull().default(1),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:   uuid('created_by'),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:   uuid('updated_by'),
+}, (table) => ({
+  uq:          uniqueIndex('customer_tariffs_uq').on(table.tenantId, table.customerId, table.domain, table.category, table.year),
+  customerIdx: index('customer_tariffs_customer_idx').on(table.tenantId, table.customerId),
+  domainCheck:   check('customer_tariffs_domain_check',   sql`${table.domain} IN ('ENERGY','WATER')`),
+  categoryCheck: check('customer_tariffs_category_check', sql`${table.category} IN ('COMMON_AREA','SPECIFIC')`),
+  unitCheck:     check('customer_tariffs_unit_check',     sql`${table.unit} IN ('kWh','m3')`),
+  currencyCheck: check('customer_tariffs_currency_check', sql`${table.currency} = 'BRL'`),
+  modelCheck:    check('customer_tariffs_model_check',    sql`${table.tariffModel} IN ('FLAT')`),
+  // unit is derived from domain (RFC-0054): ENERGY→kWh, WATER→m3.
+  domainUnitCheck: check(
+    'customer_tariffs_domain_unit_check',
+    sql`(${table.domain} = 'ENERGY' AND ${table.unit} = 'kWh') OR (${table.domain} = 'WATER' AND ${table.unit} = 'm3')`
+  ),
+}));
+
+// 2) Canonical hourly grain. One row per (tariff, month, day, hour). The plain
+// UNIQUE is the whole no-overlap story — a band is a contiguous set of rows.
+export const customerTariffHours = pgTable('customer_tariff_hours', {
+  tariffId:    uuid('tariff_id').notNull().references(() => customerTariffs.id, { onDelete: 'cascade' }),
+  month:       smallint('month').notNull(),              // 1..12
+  day:         smallint('day').notNull(),                // 1..31 (valid for month/year; 29 Feb in leap years)
+  hour:        smallint('hour').notNull(),               // 0..23 (nominal civil hour)
+  price:       numeric('price', { precision: 14, scale: 6 }).notNull(), // R$ per unit
+  sourceLevel: text('source_level').notNull(),           // YEAR | MONTH | DAY | HOUR
+  derived:     boolean('derived').notNull(),             // true = system-distributed
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:   uuid('updated_by'),
+}, (table) => ({
+  uq:          uniqueIndex('customer_tariff_hours_uq').on(table.tariffId, table.month, table.day, table.hour),
+  monthRange:  check('customer_tariff_hours_month_check', sql`${table.month} BETWEEN 1 AND 12`),
+  dayRange:    check('customer_tariff_hours_day_check',   sql`${table.day} BETWEEN 1 AND 31`),
+  hourRange:   check('customer_tariff_hours_hour_check',  sql`${table.hour} BETWEEN 0 AND 23`),
+  priceCheck:  check('customer_tariff_hours_price_check', sql`${table.price} > 0`),
+  sourceLevelCheck: check(
+    'customer_tariff_hours_source_level_check',
+    sql`${table.sourceLevel} IN ('YEAR','MONTH','DAY','HOUR')`
+  ),
+}));
+
+// 3) Append-only audit; stable key survives a header delete (mirrors goal history).
+// Stable-key columns are NOT NULL by design (greenfield; the trail must stay
+// reachable by identity after a header delete).
+export const customerTariffHistory = pgTable('customer_tariff_history', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tariffId:      uuid('tariff_id').notNull(),             // no FK: audit outlives the header
+  tenantId:      uuid('tenant_id').notNull(),
+  customerId:    uuid('customer_id').notNull(),
+  domain:        text('domain').notNull(),
+  category:      text('category').notNull(),
+  year:          integer('year').notNull(),
+  actor:         uuid('actor'),
+  source:        text('source').notNull().default('EDIT'),   // IMPORT | REPLACE | MERGE | DELETE | EDIT
+  actionLevel:   text('action_level').notNull(),             // YEAR | MONTH | DAY | HOUR
+  bucketRef:     text('bucket_ref').notNull(),               // "2026" | "2026-07" | "2026-07-01" | "2026-07-01T15"
+  oldPrice:      numeric('old_price', { precision: 14, scale: 6 }),
+  newPrice:      numeric('new_price', { precision: 14, scale: 6 }),
+  bucketCount:   integer('bucket_count').notNull().default(1),
+  hoursAffected: integer('hours_affected').notNull(),
+  version:       integer('version').notNull(),
+  changedAt:     timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  keyIdx: index('customer_tariff_history_key_idx').on(
+    table.tenantId, table.customerId, table.domain, table.category, table.year, table.changedAt.desc(),
+  ),
+  sourceCheck: check(
+    'customer_tariff_history_source_check',
+    sql`${table.source} IN ('IMPORT','REPLACE','MERGE','DELETE','EDIT')`
+  ),
+  actionLevelCheck: check(
+    'customer_tariff_history_action_level_check',
+    sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`
   ),
 }));
