@@ -17,6 +17,8 @@ export const ApiKeyScopeSchema = z.enum([
   'sync:write',        // RFC-0016 integration mapping fields
   'goals:read',        // RFC-0046 consumption goals
   'goals:write',       // RFC-0046 consumption goals
+  'tariffs:read',      // RFC-0054 customer tariffs
+  'tariffs:write',     // RFC-0054 customer tariffs
   'entities:read',     // RFC-0047 generic entity registry (read/resolve)
   'entities:write',    // RFC-0047 generic entity registry (write)
   'entities:admin',    // RFC-0047 entity_types + is_system mutation

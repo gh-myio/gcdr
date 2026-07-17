@@ -112,6 +112,9 @@ export const CreateDeviceSchema = z.object({
   // the pairing is enforced in DeviceService (and a DB CHECK backs it up).
   meterRole: z.enum(['ENTRY', 'SUBMETER']).nullable().optional(),
   meterDomain: z.enum(['ENERGY', 'WATER']).nullable().optional(),
+  // RFC-0054 (DEC-2): explicit tariff category — the join key between a device's
+  // consumption and the hourly tariff. Never inferred; NULL = unclassified.
+  tariffCategory: z.enum(['COMMON_AREA', 'SPECIFIC']).nullable().optional(),
 });
 
 export type CreateDeviceDTO = z.infer<typeof CreateDeviceSchema>;
@@ -152,6 +155,9 @@ export const UpdateDeviceSchema = z.object({
   // the pairing is enforced in DeviceService (and a DB CHECK backs it up).
   meterRole: z.enum(['ENTRY', 'SUBMETER']).nullable().optional(),
   meterDomain: z.enum(['ENERGY', 'WATER']).nullable().optional(),
+  // RFC-0054 (DEC-2): explicit tariff category — the join key between a device's
+  // consumption and the hourly tariff. Never inferred; NULL = unclassified.
+  tariffCategory: z.enum(['COMMON_AREA', 'SPECIFIC']).nullable().optional(),
 });
 
 export type UpdateDeviceDTO = z.infer<typeof UpdateDeviceSchema>;
