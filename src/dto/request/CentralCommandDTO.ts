@@ -9,9 +9,13 @@ export const COMMAND_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const
 export const WifiPayloadSchema = z.object({
   ssid: z.string().min(1).max(64),
   password: z.string().min(8).max(128),
+  // Normalized to upper case on the way in: the regex accepts `br` but
+  // wpa_supplicant expects an upper-case ISO 3166-1 alpha-2 code, and the value
+  // is handed to myio-wifi-set verbatim.
   country: z
     .string()
     .regex(/^[A-Z]{2}$/i, 'country must be a 2-letter ISO code')
+    .transform((c) => c.toUpperCase())
     .optional(),
 });
 export type WifiPayloadDTO = z.infer<typeof WifiPayloadSchema>;

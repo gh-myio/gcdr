@@ -37,6 +37,14 @@ describe('CentralCommandDTO', () => {
         CreateCommandSchema.parse({ type: 'SET_WIFI', payload: { ssid: 'net', password: 'short' } }),
       ).toThrow();
     });
+
+    it('normalizes the country code to upper case', () => {
+      const r = CreateCommandSchema.parse({
+        type: 'SET_WIFI',
+        payload: { ssid: 'test-ssid', password: 'test-password-123', country: 'br' },
+      });
+      expect(r.payload?.country).toBe('BR');
+    });
   });
 
   describe('UpdateCommandResultSchema', () => {
