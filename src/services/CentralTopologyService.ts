@@ -116,9 +116,20 @@ export class CentralTopologyService {
     return bySlave;
   }
 
+  // The factor of 10 is not arbitrary: erlradio retries a device transmission at
+  // most ?MAX_RETRIES = 10 times before giving up (light_switch.erl), and
+  // average_retries is the mean retry_count over the last transmissions. So the
+  // reported value spans 0..10 — 0 retries is a perfect link, 10 is the ceiling
+  // where the device is declared offline — and *10 maps that onto 0..100%.
+  private static readonly MAX_RETRIES = 10;
+
   private toNode(d: TopologyDeviceRow, linkBySlave: Map<number, CloudDeviceStatus>): TopologyNode {
     const link = linkBySlave.get(d.slaveId as number);
-    const avg = link?.average_retries ?? null;
+    // erlradio reports -1 for "no sample yet" (calculate_avg_retries on an empty
+    // window). Treat it as unknown, otherwise the clamp below would round a
+    // never-polled device up to a perfect 100%.
+    const raw = link?.average_retries ?? null;
+    const avg = raw === null || raw < 0 ? null : raw;
     return {
       deviceId: d.id,
       slaveId: d.slaveId as number,
@@ -126,7 +137,10 @@ export class CentralTopologyService {
       type: d.deviceType ?? null,
       status: link?.status ?? null,
       averageRetries: avg,
-      signalPct: avg === null ? null : Math.max(0, Math.min(100, Math.round(100 - avg * 10))),
+      signalPct:
+        avg === null
+          ? null
+          : Math.max(0, Math.min(100, Math.round(100 - (avg * 100) / CentralTopologyService.MAX_RETRIES))),
       updatedAt: link?.updated_at ?? null,
     };
   }

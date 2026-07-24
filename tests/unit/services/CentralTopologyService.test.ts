@@ -86,6 +86,19 @@ describe('CentralTopologyService', () => {
     expect(bySlave[4].status).toBeNull();
   });
 
+  it('treats the erlradio -1 "no sample yet" sentinel as unknown quality', async () => {
+    findByCentralId.mockResolvedValue(onePage([device({ id: 'a', slaveId: 1 })]));
+    fetchMock.mockResolvedValue(
+      cloud([{ id: 1, status: 'online', average_retries: -1, updated_at: 10 }]),
+    );
+
+    const topo = await svc.getTopology(TENANT, CID);
+    // Without the guard the clamp would round -1 up to a perfect 100%.
+    expect(topo.nodes[0].signalPct).toBeNull();
+    expect(topo.nodes[0].averageRetries).toBeNull();
+    expect(topo.nodes[0].status).toBe('online');
+  });
+
   it('groups multiple channel rows for the same slaveId into a single node', async () => {
     findByCentralId.mockResolvedValue(
       onePage([

@@ -207,22 +207,12 @@ export class DeviceRepository implements IDeviceRepository {
   }
 
   /**
-   * Set a device's connectivity_status (reconciled from the cloud-server link).
+   * Set the same connectivity_status on many devices in one UPDATE (reconciled
+   * from the cloud-server link). No-op for an empty id list.
+   *
    * Deliberately does NOT bump `version`: connectivity_status is a derived,
    * reconciled field, so it must not invalidate the optimistic-locking version
    * that guards operator edits.
-   */
-  async setConnectivityStatus(tenantId: string, id: string, status: ConnectivityStatus): Promise<void> {
-    await db
-      .update(devices)
-      .set({ connectivityStatus: status, updatedAt: new Date(now()) })
-      .where(and(eq(devices.tenantId, tenantId), eq(devices.id, id)));
-  }
-
-  /**
-   * Batch variant: set the same connectivity_status on many devices in one
-   * UPDATE. Same version semantics as setConnectivityStatus (does not bump
-   * `version`). No-op for an empty id list.
    */
   async setConnectivityStatusBatch(
     tenantId: string,

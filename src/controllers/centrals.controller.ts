@@ -131,6 +131,9 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
     // Merge live device counts (physical devices / of those ONLINE) into the
     // stats passthrough so CentralDetail shows connected/total from the real
     // device registry instead of the (unpopulated) stats blob.
+    // devicesConnected counts REACHABLE devices: the cloud-server's online AND
+    // bad radio states both map to ONLINE, only offline is excluded. See the
+    // `statistics` field on the Central entity.
     const counts = await deviceRepository.countsByCentralIds(tenantId, [id]);
     const deviceCounts = counts.get(id) ?? { devicesTotal: 0, devicesConnected: 0 };
 
