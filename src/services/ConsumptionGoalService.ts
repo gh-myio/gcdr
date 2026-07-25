@@ -1611,6 +1611,9 @@ export class ConsumptionGoalService {
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: goal.version,
+      // RFC-0054 Phase 3: carry the goal's measure on the margin-write response
+      // too (required on GoalGetResult).
+      measure: (goal.measure ?? 'QUANTITY') as GoalMeasure,
       granularity: granularityOfGoal(goal),
       goalMargin: marginInfoOf(goal),
       tree,
