@@ -57,12 +57,14 @@ import {
   type GoalAggregationMethod,
   type GoalDomain,
   type GoalGranularity,
+  type GoalMeasure,
   type GoalSourceLevel,
   type ReplaceGoalsBodyDTO,
   type MergeGoalsBodyDTO,
   type DeleteGoalsBodyDTO,
   type SetGoalMarginBodyDTO,
 } from '../dto/request/GoalsDTO';
+import { parseScaled, roundHalfUpDiv, centsToDecimalString, marginFactorNum } from '../shared/utils/money';
 import { ValidationError, NotFoundError, AppError } from '../shared/errors/AppError';
 
 // -----------------------------------------------------------------------------
@@ -166,6 +168,16 @@ export interface GoalDeviceSummary {
   coverageGaps?: GoalCoverageGaps;
 }
 
+/** RFC-0054 Phase 2/3 — projected (overlay) vs budget (native CURRENCY goal). */
+export interface GoalBudgetBlock {
+  projected: { amount: string; source: 'OVERLAY'; coverageComplete: boolean };
+  target: { amount: string; source: 'NATIVE' };
+  /** projected − target; null while the projection's coverage is incomplete. */
+  variance: string | null;
+  /** boolean only when the projection is fully covered; else null (DEC-6). */
+  withinBudget: boolean | null;
+}
+
 export interface GoalGetResult {
   customerId: string;
   domain: GoalDomain;
@@ -173,6 +185,8 @@ export interface GoalGetResult {
   aggregationMethod: GoalAggregationMethod;
   year: number;
   version: number;
+  /** RFC-0054 Phase 3: the goal's measure (QUANTITY default, or CURRENCY). */
+  measure: GoalMeasure;
   /** Addendum A: CUSTOMER (legacy, default) or DEVICE (per-entry-meter rows). */
   granularity: GoalHeaderGranularity;
   /** Addendum A: present on DEVICE-granular goals — one entry per meter. */
@@ -193,6 +207,12 @@ export interface GoalGetResult {
    * on a CUSTOMER goal it is `{ reason: 'MONEY_REQUIRES_DEVICE_GRANULARITY' }`.
    */
   money?: GoalMoneyBlock | GoalMoneyUnavailable;
+  /**
+   * RFC-0054 Phase 3: present on a QUANTITY read with `?withMoney=true` when a
+   * CURRENCY budget exists for the same (customer, domain, year) — the tariff
+   * projection compared against the native budget.
+   */
+  budget?: GoalBudgetBlock;
   tree: GoalTree;
   history?: GoalHistoryEntry[];
 }
@@ -1091,6 +1111,26 @@ export class ConsumptionGoalService {
     return { aggregationMethod: cfg.aggregationMethod as GoalAggregationMethod, unit: cfg.unit };
   }
 
+  /**
+   * RFC-0054 Phase 3 — the unit the goal stores: 'BRL' for a CURRENCY goal, the
+   * domain unit (kWh/m3/C) otherwise. Aggregation is unchanged (CURRENCY is only
+   * valid on SUM domains, which already SUM).
+   */
+  private effectiveUnit(cfg: { unit: string }, measure: GoalMeasure | undefined): string {
+    return (measure ?? 'QUANTITY') === 'CURRENCY' ? 'BRL' : cfg.unit;
+  }
+
+  /** CURRENCY goals require a SUM domain (money aggregates by SUM) — else 422. */
+  private assertMeasureValid(measure: GoalMeasure | undefined, cfg: { aggregationMethod: GoalAggregationMethod }): void {
+    if ((measure ?? 'QUANTITY') === 'CURRENCY' && cfg.aggregationMethod !== 'SUM') {
+      throw new AppError('GOAL_MEASURE_INVALID', 'CURRENCY goals require a SUM domain (ENERGY/WATER)', 422);
+    }
+  }
+
+  private measureOf(key: GoalKey): GoalMeasure {
+    return key.measure ?? 'QUANTITY';
+  }
+
   // ---------------------------------------------------------------------------
   // GET — list domains with goals (RFC §3.1)
   // ---------------------------------------------------------------------------
@@ -1130,6 +1170,8 @@ export class ConsumptionGoalService {
     withMoney = false,
   ): Promise<GoalGetResult> {
     const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
+    this.assertMeasureValid(key.measure, cfg);
+    const measure = this.measureOf(key);
     const goal = await this.repo.findGoal(key);
 
     // No goal yet → version 0, empty tree (RFC §3.2). History is still looked
@@ -1138,10 +1180,11 @@ export class ConsumptionGoalService {
       const result: GoalGetResult = {
         customerId: key.customerId,
         domain: key.domain,
-        unit: cfg.unit,
+        unit: this.effectiveUnit(cfg, measure),
         aggregationMethod: cfg.aggregationMethod,
         year: key.year,
         version: 0,
+        measure,
         granularity: 'CUSTOMER',
         goalMargin: null,
         tree: {},
@@ -1177,6 +1220,7 @@ export class ConsumptionGoalService {
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: goal.version,
+      measure,
       granularity: headerGranularity,
       goalMargin: marginInfoOf(goal),
       tree,
@@ -1192,13 +1236,19 @@ export class ConsumptionGoalService {
       result.devices = await this.buildDeviceSummaries(key.tenantId, allRows, marginPctOf(goal), key.year);
     }
 
-    // RFC-0054 Phase 2 — money overlay. DEVICE goals price per-device against
-    // the hourly tariffs; CUSTOMER goals cannot resolve a category → null+reason.
-    if (withMoney) {
+    // RFC-0054 Phase 2/3 — money overlay. Only a QUANTITY goal gets the overlay
+    // (a CURRENCY goal IS money → withMoney is a no-op). DEVICE goals price
+    // per-device; CUSTOMER goals cannot resolve a category → null+reason.
+    if (withMoney && measure === 'QUANTITY') {
       if (headerGranularity !== 'DEVICE') {
         result.money = { reason: 'MONEY_REQUIRES_DEVICE_GRANULARITY' } as GoalMoneyUnavailable;
       } else {
-        result.money = await this.computeGoalMoney(key, rows, marginPctOf(goal), tree);
+        const money = await this.computeGoalMoney(key, rows, marginPctOf(goal), tree);
+        result.money = money;
+        // Phase 3 (DEC-6): compare the projection against a native CURRENCY
+        // budget for the same (customer, domain, year), if one exists.
+        const budget = await this.buildBudgetBlock(key, tree.annual?.monetaryValue ?? null, money.coverageComplete);
+        if (budget) result.budget = budget;
       }
     }
 
@@ -1272,6 +1322,40 @@ export class ConsumptionGoalService {
     return computed.money;
   }
 
+  /**
+   * RFC-0054 Phase 3 (DEC-6) — builds the budget block comparing the QUANTITY
+   * goal's tariff projection against a native CURRENCY budget for the same
+   * (customer, domain, year). Returns null when no CURRENCY goal exists.
+   * `withinBudget`/`variance` are withheld (null) while coverage is incomplete.
+   */
+  private async buildBudgetBlock(
+    key: GoalKey,
+    projectedAmount: string | null,
+    coverageComplete: boolean,
+  ): Promise<GoalBudgetBlock | null> {
+    if (projectedAmount === null) return null;
+    const budgetGoal = await this.repo.findGoal({ ...key, measure: 'CURRENCY' });
+    if (!budgetGoal) return null;
+
+    const budgetRows = await this.repo.findHours(budgetGoal.id);
+    const targetAmount = sumCurrencyToCentsString(budgetRows, marginPctOf(budgetGoal));
+
+    const block: GoalBudgetBlock = {
+      projected: { amount: projectedAmount, source: 'OVERLAY', coverageComplete },
+      target: { amount: targetAmount, source: 'NATIVE' },
+      variance: null,
+      withinBudget: null,
+    };
+    // A partial projection is never declared in/over budget (DEC-6).
+    if (coverageComplete) {
+      const projCents = parseScaled(projectedAmount, 2);
+      const targetCents = parseScaled(targetAmount, 2);
+      block.variance = centsToDecimalString(projCents - targetCents);
+      block.withinBudget = projCents <= targetCents;
+    }
+    return block;
+  }
+
   /** Addendum A — per-meter summary block (annual SUM + dominant allocation). */
   private async buildDeviceSummaries(
     tenantId: string,
@@ -1319,13 +1403,14 @@ export class ConsumptionGoalService {
     deviceId?: string,
   ): Promise<GoalWriteResult> {
     const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
+    this.assertMeasureValid(key.measure, cfg);
     const buckets = this.flattenReplaceBody(body, key.domain, key.year);
 
     // The action level recorded in history = the coarsest level the operator set.
     const actionLevel = coarsestLevel(buckets.map((b) => b.level));
 
     const result = await this.repo.withTransaction(async (tx) => {
-      const { goal, created } = await this.openGoalForWrite(key, cfg.unit, body.expectedVersion, actor, tx);
+      const { goal, created } = await this.openGoalForWrite(key, this.effectiveUnit(cfg, key.measure), body.expectedVersion, actor, tx);
 
       // REPLACE: the payload is the whole statement for its grain — nothing is
       // pinned besides its own finer buckets (P1.1). Device-targeted or
@@ -1360,11 +1445,12 @@ export class ConsumptionGoalService {
     deviceId?: string,
   ): Promise<GoalWriteResult> {
     const cfg = await this.resolveDomainConfig(key.tenantId, key.domain);
+    this.assertMeasureValid(key.measure, cfg);
     const buckets = this.parseMergeBuckets(body, key.domain, key.year);
     const actionLevel = coarsestLevel(buckets.map((b) => b.level));
 
     const result = await this.repo.withTransaction(async (tx) => {
-      const { goal, created } = await this.openGoalForWrite(key, cfg.unit, body.expectedVersion, actor, tx);
+      const { goal, created } = await this.openGoalForWrite(key, this.effectiveUnit(cfg, key.measure), body.expectedVersion, actor, tx);
 
       // MERGE: re-distribute only the sent buckets. Operator-confirmed hours in
       // scope are pinned (P1.2); device-targeted or DEVICE-granular writes go
@@ -1407,10 +1493,11 @@ export class ConsumptionGoalService {
     return {
       customerId: key.customerId,
       domain: key.domain,
-      unit: cfg.unit,
+      unit: this.effectiveUnit(cfg, key.measure),
       aggregationMethod: cfg.aggregationMethod,
       year: key.year,
       version: finalGoal.version,
+      measure: this.measureOf(key),
       granularity: headerGranularity,
       goalMargin: marginInfoOf(finalGoal),
       tree,
@@ -1442,7 +1529,7 @@ export class ConsumptionGoalService {
 
       if (!existing) {
         // Upsert: the create IS the first change — margin lands on version 1.
-        const created = await this.repo.createGoal({ ...key, unit: cfg.unit, createdBy: actor }, tx);
+        const created = await this.repo.createGoal({ ...key, unit: this.effectiveUnit(cfg, key.measure), createdBy: actor }, tx);
         const updated = await this.repo.setMargin(created.id, formatMarginPct(pct), undefined, actor, false, tx);
         const final = updated ?? created;
         await this.appendMarginHistory(key, final.id, null, pct, final.version, actor, key.year, tx);
@@ -1626,7 +1713,7 @@ export class ConsumptionGoalService {
     }
 
     const persisted = await this.repo.withTransaction(async (tx) => {
-      const { goal, created } = await this.openGoalForWrite(key, cfg.unit, expectedVersion, actor, tx);
+      const { goal, created } = await this.openGoalForWrite(key, this.effectiveUnit(cfg, key.measure), expectedVersion, actor, tx);
 
       const write = await this.materialiseWrite(tx, goal, created, buckets, key, cfg.aggregationMethod, actor, {
         mode: 'MERGE',
@@ -2429,13 +2516,26 @@ export class ConsumptionGoalService {
 // =============================================================================
 
 /** The stable goal-key columns stamped on every history row (survives the parent). */
-function historyKeyOf(key: GoalKey): Pick<GoalHistoryAppend, 'tenantId' | 'customerId' | 'domain' | 'year'> {
+function historyKeyOf(key: GoalKey): Pick<GoalHistoryAppend, 'tenantId' | 'customerId' | 'domain' | 'year' | 'measure'> {
   return {
     tenantId: key.tenantId,
     customerId: key.customerId,
     domain: key.domain,
     year: key.year,
+    measure: key.measure ?? 'QUANTITY',
   };
+}
+
+/**
+ * RFC-0054 Phase 3 — the annual R$ total of a CURRENCY goal's hour rows,
+ * margin-adjusted, as a 2-decimal string. Exact fixed-point: value scaled 1e6,
+ * margin factor over 1e4, rounded half-up to centavos.
+ */
+function sumCurrencyToCentsString(hours: Array<{ value: unknown }>, marginPct: number | null): string {
+  let acc = 0n;
+  for (const h of hours) acc += parseScaled(String(h.value), 6);
+  const factorNum = marginFactorNum(marginPct);
+  return centsToDecimalString(roundHalfUpDiv(acc * factorNum, 10n ** 8n));
 }
 
 function bucketRefOf(b: ValueBucket, year: number): string {

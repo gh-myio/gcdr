@@ -43,6 +43,14 @@ export type GoalSourceLevel = z.infer<typeof GoalSourceLevelSchema>;
 export const GoalAggregationMethodSchema = z.enum(['SUM', 'AVERAGE']);
 export type GoalAggregationMethod = z.infer<typeof GoalAggregationMethodSchema>;
 
+/**
+ * RFC-0054 Phase 3 — the goal's measure. QUANTITY (kWh/m3, default/legacy) or
+ * CURRENCY (a native R$ budget). Part of the goal identity; CURRENCY is valid
+ * only on SUM domains (money aggregates by SUM).
+ */
+export const GoalMeasureSchema = z.enum(['QUANTITY', 'CURRENCY']);
+export type GoalMeasure = z.infer<typeof GoalMeasureSchema>;
+
 // -----------------------------------------------------------------------------
 // Calendar helpers (leap-year aware day validation)
 // -----------------------------------------------------------------------------
@@ -134,6 +142,8 @@ export const GetGoalsQuerySchema = z.object({
   deviceId: z.string().uuid().optional(),
   /** RFC-0054 Phase 2: add the tariff-derived money overlay (DEVICE goals only). */
   withMoney: booleanQueryFlag('false'),
+  /** RFC-0054 Phase 3: select the QUANTITY (default) or CURRENCY goal. */
+  measure: GoalMeasureSchema.default('QUANTITY'),
 });
 export type GetGoalsQueryDTO = z.infer<typeof GetGoalsQuerySchema>;
 
@@ -147,6 +157,8 @@ export const GoalsTargetQuerySchema = z.object({
   domain: GoalDomainSchema,
   year: z.coerce.number().pipe(YearSchema),
   deviceId: z.string().uuid().optional(),
+  /** RFC-0054 Phase 3: select the QUANTITY (default) or CURRENCY goal. */
+  measure: GoalMeasureSchema.default('QUANTITY'),
 });
 export type GoalsTargetQueryDTO = z.infer<typeof GoalsTargetQuerySchema>;
 
@@ -319,6 +331,8 @@ export const ImportGoalsQuerySchema = z.object({
   dryRun: booleanQueryFlag('true'),
   /** Addendum A: import ONE meter's spreadsheet (the per-sensor flow). */
   deviceId: z.string().uuid().optional(),
+  /** RFC-0054 Phase 3: import into the QUANTITY (default) or CURRENCY goal. */
+  measure: GoalMeasureSchema.default('QUANTITY'),
 });
 export type ImportGoalsQueryDTO = z.infer<typeof ImportGoalsQuerySchema>;
 
@@ -331,6 +345,8 @@ export const RebalanceGoalsQuerySchema = z.object({
   domain: GoalDomainSchema,
   year: z.coerce.number().pipe(YearSchema),
   dryRun: booleanQueryFlag('true'),
+  /** RFC-0054 Phase 3: rebalance the QUANTITY (default) or CURRENCY goal. */
+  measure: GoalMeasureSchema.default('QUANTITY'),
 });
 export type RebalanceGoalsQueryDTO = z.infer<typeof RebalanceGoalsQuerySchema>;
 

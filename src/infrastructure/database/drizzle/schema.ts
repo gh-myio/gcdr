@@ -2234,6 +2234,10 @@ export const consumptionGoals = pgTable('consumption_goals', {
   // inferred from row shape. CUSTOMER = device_id NULL rows (legacy);
   // DEVICE = every row carries a device_id.
   granularity: text('granularity').notNull().default('CUSTOMER'),
+  // RFC-0054 Phase 3 (DEC-4, migration 0063): the goal's measure — QUANTITY
+  // (kWh/m3, default/legacy) or CURRENCY (a native R$ budget). Part of the
+  // goal identity (see the uq below) so both can coexist for one (domain, year).
+  measure: text('measure').notNull().default('QUANTITY'),
   // RFC-0052 — read-time margin overlay ("Margem da meta"); buckets stay raw.
   goalMarginPct:       numeric('goal_margin_pct', { precision: 6, scale: 2 }),
   goalMarginUpdatedBy: uuid('goal_margin_updated_by'),
@@ -2243,11 +2247,15 @@ export const consumptionGoals = pgTable('consumption_goals', {
   updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   updatedBy:  uuid('updated_by'),
 }, (table) => ({
-  uq:          uniqueIndex('consumption_goals_uq').on(table.tenantId, table.customerId, table.domain, table.year),
+  uq:          uniqueIndex('consumption_goals_uq').on(table.tenantId, table.customerId, table.domain, table.year, table.measure),
   customerIdx: index('consumption_goals_customer_idx').on(table.tenantId, table.customerId),
   domainCheck: check(
     'consumption_goals_domain_check',
     sql`${table.domain} IN ('ENERGY','WATER','TEMPERATURE')`
+  ),
+  measureCheck: check(
+    'consumption_goals_measure_check',
+    sql`${table.measure} IN ('QUANTITY','CURRENCY')`
   ),
   marginRangeCheck: check(
     'consumption_goals_margin_range_check',
@@ -2328,6 +2336,7 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
   customerId:    uuid('customer_id'),
   domain:        text('domain'),
   year:          integer('year'),
+  measure:       text('measure'),                        // RFC-0054 P3 (0063): QUANTITY | CURRENCY — separate audit streams
   deviceId:      uuid('device_id'),                      // Addendum A: device the operation targeted (nullable)
   actor:         uuid('actor'),                          // who changed it
   source:        text('source').notNull().default('EDIT'), // IMPORT | REPLACE | MERGE | DELETE | EDIT — the operation
@@ -2344,7 +2353,7 @@ export const consumptionGoalHistory = pgTable('consumption_goal_history', {
 }, (table) => ({
   goalChronoIdx: index('consumption_goal_history_idx').on(table.goalId, table.changedAt.desc()),
   goalKeyIdx: index('consumption_goal_history_key_idx').on(
-    table.tenantId, table.customerId, table.domain, table.year, table.changedAt.desc(),
+    table.tenantId, table.customerId, table.domain, table.year, table.measure, table.changedAt.desc(),
   ),
   actionLevelCheck: check(
     'consumption_goal_history_action_level_check',
