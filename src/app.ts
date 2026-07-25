@@ -12,6 +12,7 @@ import {
   errorHandler,
   notFoundHandler,
   requireGoalsAccess,
+  requireTariffAccess,
 } from './middleware';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { clientIp } from './middleware/rateLimit';
@@ -22,6 +23,7 @@ import {
   docsController,
   customersController,
   consumptionGoalsController,
+  customerTariffsController,
   assetsController,
   partnersController,
   groupsController,
@@ -312,6 +314,17 @@ apiV1Router.use(
   // and evaluates goals.goal.read / goals.goal.update RBAC for JWT users.
   requireGoalsAccess(),
   consumptionGoalsController,
+);
+
+// RFC-0054: Customer tariffs (nested — must come before the general /customers
+// router). Same auth shape as goals: hybridAuth scopes tariffs:read/write for
+// API keys; requireTariffAccess enforces hierarchy + tariffs.tariff.* RBAC.
+apiV1Router.use(
+  '/customers/:customerId/tariffs',
+  goalsRateLimiter,
+  hybridAuthByMethod('tariffs:read', 'tariffs:write'),
+  requireTariffAccess(),
+  customerTariffsController,
 );
 
 // RFC-0053: One-Store Dash aggregation (nested — must come before general /customers router).

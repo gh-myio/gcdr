@@ -6,6 +6,8 @@ export type DeviceProtocol = 'MQTT' | 'HTTP' | 'MODBUS' | 'BACNET' | 'LORAWAN' |
 // RFC-0046 Addendum A (DEC-11): explicit meter purpose for goal allocation.
 export type MeterRole = 'ENTRY' | 'SUBMETER';
 export type MeterDomain = 'ENERGY' | 'WATER';
+// RFC-0054 (DEC-2): explicit tariff category (loja vs área comum).
+export type TariffCategory = 'COMMON_AREA' | 'SPECIFIC';
 export type ConnectivityStatus = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
 
 export interface DeviceCredentials {
@@ -168,6 +170,7 @@ export interface Device extends BaseEntity {
   // cleared together (DB CHECK enforces both-or-neither).
   meterRole?: MeterRole;         // 'ENTRY' | 'SUBMETER'
   meterDomain?: MeterDomain;     // 'ENERGY' | 'WATER'
+  tariffCategory?: TariffCategory; // RFC-0054: 'COMMON_AREA' | 'SPECIFIC'
 
   // Ingestion Integration
   ingestionId?: string;          // UUID in ingestion system

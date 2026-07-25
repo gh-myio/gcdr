@@ -189,3 +189,7 @@ scripts/api/examples/email-sender/output/*.html
 
 # Local staging dir for ad-hoc seed scripts (e.g. seed-myio-device-icons.sh)
 TEMP/
+
+# Excel source spreadsheets (CSV exports are the versioned artifact)
+*.xlsx
+~$*

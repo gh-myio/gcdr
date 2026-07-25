@@ -28,6 +28,8 @@ export type ApiKeyScope =
   | 'sync:write'        // Write integration mapping fields (RFC-0016)
   | 'goals:read'        // Read consumption goals (RFC-0046)
   | 'goals:write'       // Write consumption goals (RFC-0046)
+  | 'tariffs:read'      // Read customer tariffs (RFC-0054)
+  | 'tariffs:write'     // Write customer tariffs (RFC-0054)
   | 'entities:read'     // Read/resolve generic entity registry (RFC-0047)
   | 'entities:write'    // Write generic entity registry — MYIO operator only (RFC-0047)
   | 'entities:admin'    // Create entity_types + mutate is_system rows (RFC-0047)

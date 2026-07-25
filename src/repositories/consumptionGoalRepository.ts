@@ -26,7 +26,7 @@
 
 import { and, eq, desc, isNull, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
-import type { GoalAggregationMethod, GoalDomain, GoalSourceLevel } from '../dto/request/GoalsDTO';
+import type { GoalAggregationMethod, GoalDomain, GoalMeasure, GoalSourceLevel } from '../dto/request/GoalsDTO';
 
 const { consumptionGoals, consumptionGoalHours, consumptionGoalDomains, consumptionGoalHistory } = schema;
 
@@ -59,6 +59,12 @@ export interface GoalKey {
   customerId: string;
   domain: GoalDomain;
   year: number;
+  /**
+   * RFC-0054 Phase 3: QUANTITY (default/legacy) or CURRENCY. Part of the goal
+   * identity — omitting it means QUANTITY, keeping every pre-P3 read/write
+   * byte-identical.
+   */
+  measure?: GoalMeasure;
 }
 
 /** Data to create the parent goal row. */
@@ -123,6 +129,8 @@ export interface GoalHistoryAppend {
   customerId: string;
   domain: GoalDomain;
   year: number;
+  /** RFC-0054 P3: QUANTITY | CURRENCY — separate audit streams per measure. */
+  measure?: GoalMeasure;
   /** Addendum A: the device the operation targeted (null on group-level ops). */
   deviceId?: string | null;
   actor?: string | null;
@@ -176,6 +184,7 @@ export class ConsumptionGoalRepository {
           eq(consumptionGoals.customerId, key.customerId),
           eq(consumptionGoals.domain, key.domain),
           eq(consumptionGoals.year, key.year),
+          eq(consumptionGoals.measure, key.measure ?? 'QUANTITY'),
         ),
       )
       .limit(1);
@@ -216,6 +225,7 @@ export class ConsumptionGoalRepository {
         customerId: data.customerId,
         domain: data.domain,
         year: data.year,
+        measure: data.measure ?? 'QUANTITY',
         unit: data.unit,
         createdBy: data.createdBy ?? null,
         updatedBy: data.createdBy ?? null,
@@ -446,6 +456,7 @@ export class ConsumptionGoalRepository {
         customerId: entry.customerId,
         domain: entry.domain,
         year: entry.year,
+        measure: entry.measure ?? 'QUANTITY',
         deviceId: entry.deviceId ?? null,
         actor: entry.actor ?? null,
         source: entry.source,
@@ -489,6 +500,7 @@ export class ConsumptionGoalRepository {
           eq(consumptionGoalHistory.customerId, key.customerId),
           eq(consumptionGoalHistory.domain, key.domain),
           eq(consumptionGoalHistory.year, key.year),
+          eq(consumptionGoalHistory.measure, key.measure ?? 'QUANTITY'),
         ),
       )
       .orderBy(desc(consumptionGoalHistory.changedAt))

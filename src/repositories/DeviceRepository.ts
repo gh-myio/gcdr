@@ -42,6 +42,8 @@ const UPDATE_COPY_FIELDS = [
   // RFC-0046 Addendum A (DEC-11): set/clear together (validated upstream).
   'meterRole',
   'meterDomain',
+  // RFC-0054 (DEC-2): explicit tariff category.
+  'tariffCategory',
 ] as const;
 
 /**
@@ -153,6 +155,8 @@ export class DeviceRepository implements IDeviceRepository {
       // RFC-0046 Addendum A (DEC-11)
       meterRole: data.meterRole ?? null,
       meterDomain: data.meterDomain ?? null,
+      // RFC-0054 (DEC-2)
+      tariffCategory: data.tariffCategory ?? null,
     }).returning();
 
     return this.mapToEntity(result);
@@ -519,6 +523,7 @@ export class DeviceRepository implements IDeviceRepository {
       deviceChannelType: row.deviceChannelType || undefined,
       meterRole: (row.meterRole as Device['meterRole']) || undefined,
       meterDomain: (row.meterDomain as Device['meterDomain']) || undefined,
+      tariffCategory: (row.tariffCategory as Device['tariffCategory']) || undefined,
       ingestionId: row.ingestionId || undefined,
       ingestionGatewayId: row.ingestionGatewayId || undefined,
       lastActivityTime: row.lastActivityTime?.toISOString(),
