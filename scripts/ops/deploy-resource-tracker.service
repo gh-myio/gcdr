@@ -1,0 +1,21 @@
+[Unit]
+Description=Deploy resource tracker (host + docker sampling for freeze post-mortem)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+Environment=INTERVAL=5
+Environment=LOG_DIR=/var/log/deploy-tracker
+Environment=RETENTION_DAYS=7
+ExecStart=/usr/local/bin/deploy-resource-tracker.sh
+Restart=always
+RestartSec=3
+# Never let the tracker add to the load it is measuring.
+Nice=19
+IOSchedulingClass=idle
+CPUWeight=1
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target
