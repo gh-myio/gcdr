@@ -80,9 +80,13 @@ ENV HOST=0.0.0.0
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3015/health || exit 1
 
-# Start application (run migrations first, then start server)
-# Migration errors are logged but don't prevent startup (for cases where DB is already migrated)
-CMD ["sh", "-c", "test -n \"$DATABASE_URL\" || { echo 'ERROR: DATABASE_URL not set'; exit 1; }; node dist/scripts/migrate.js || echo 'Migration warning: check logs above'; node dist/app.js"]
+# Start application. Migrations are NOT run on start: the production image ships
+# only the compiled Drizzle migrator (dist/scripts/migrate.js), whose journal is
+# frozen at 0012 and errors on already-applied objects (e.g. "type actor_type
+# already exists"). Schema is managed out-of-band via the custom runner
+# (npm run db:mig:up / scripts/db/migrate-runner.ts). See docs/DB-MIGRATIONS
+# governance + docs/ops/CI-BUILD-DEPLOY-GHCR-DOKPLOY.md.
+CMD ["sh", "-c", "test -n \"$DATABASE_URL\" || { echo 'ERROR: DATABASE_URL not set'; exit 1; }; node dist/app.js"]
 
 # -----------------------------------------------------------------------------
 # Stage 4: Development (optional, for local development)
