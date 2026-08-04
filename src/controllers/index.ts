@@ -80,6 +80,8 @@ export { default as customerIntegrationsController } from './customer-integratio
 
 // RFC-0043: GCDR Copiloto (assistant)
 export { default as assistantController } from './assistant.controller';
+// RFC-0055 (ED-1080): batch entity enrichment for the Alarms Orchestrator
+export { default as enrichmentController } from './enrichment.controller';
 
 // RFC-0047: Generic Entity Registry
 export { default as entitiesController, entityTypesRouter as entityTypesController } from './entities.controller';

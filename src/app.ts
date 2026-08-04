@@ -95,6 +95,7 @@ import {
   woTicketsController,
   woEventTypesHandler,
   assistantController,
+  enrichmentController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
 } from './controllers';
@@ -525,6 +526,10 @@ apiV1Router.use('/wo/customers', woCustomersController);
 
 // RFC-0043: GCDR Copiloto (read-only LLM assistant over the WO tools).
 apiV1Router.use('/assistant', authMiddleware, assistantController);
+
+// RFC-0055 (ED-1080): batch entity enrichment for the Alarms Orchestrator.
+// M2M consumer — same auth as the bundle to-verify-service (master key + JWT).
+apiV1Router.use('/enrichment', authMiddleware, enrichmentController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
