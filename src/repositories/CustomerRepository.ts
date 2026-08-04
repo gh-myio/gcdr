@@ -72,6 +72,16 @@ export class CustomerRepository implements ICustomerRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  /** RFC-0055 — batch lookup for the enrichment endpoint. */
+  async findByIds(tenantId: string, ids: string[]): Promise<Customer[]> {
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.tenantId, tenantId), inArray(customers.id, ids)));
+    return rows.map((r) => this.mapToEntity(r));
+  }
+
   async getByCode(tenantId: string, code: string): Promise<Customer | null> {
     const [result] = await db
       .select()
