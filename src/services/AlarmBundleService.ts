@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { Rule, isAlarmRule } from '../domain/entities/Rule';
+import { Rule, isAlarmRule, isNoConsumptionRule } from '../domain/entities/Rule';
 import { Device } from '../domain/entities/Device';
 import { Customer } from '../domain/entities/Customer';
 import {
@@ -14,6 +14,7 @@ import {
   SimpleDeviceMapping,
   SimpleBundleMeta,
   RuleIdEntry,
+  NoConsumptionBundleRule,
 } from '../domain/entities/AlarmBundle';
 import { RuleRepository } from '../repositories/RuleRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
@@ -137,8 +138,15 @@ export class AlarmBundleService {
       alarmRules = alarmRules.filter(r => r.enabled);
     }
 
+    // RFC-0055: collect no-consumption rules separately (internal by design, so
+    // not caught by the alarm-threshold filter). Respect the disabled filter.
+    let noConsumptionRules = allRules.filter(isNoConsumptionRule);
+    if (!includeDisabled) {
+      noConsumptionRules = noConsumptionRules.filter(r => r.enabled);
+    }
+
     // Build the bundle structure
-    const bundle = this.buildBundle(customer, devices, alarmRules, tenantId);
+    const bundle = this.buildBundle(customer, devices, alarmRules, tenantId, noConsumptionRules);
 
     // Sign the bundle
     bundle.meta.signature = this.signBundle(bundle);
@@ -209,8 +217,15 @@ export class AlarmBundleService {
       alarmRules = alarmRules.filter(r => r.enabled);
     }
 
+    // RFC-0055: collect no-consumption rules for the target customers (internal
+    // by design, so not caught by the alarm-threshold filter). Respect disabled.
+    let noConsumptionRules = allRules.filter(isNoConsumptionRule);
+    if (!includeDisabled) {
+      noConsumptionRules = noConsumptionRules.filter(r => r.enabled);
+    }
+
     // Build simplified bundle
-    const bundle = this.buildSimplifiedBundle(customer, devices, alarmRules, tenantId);
+    const bundle = this.buildSimplifiedBundle(customer, devices, alarmRules, tenantId, noConsumptionRules);
 
     // Sign the bundle
     bundle.meta.signature = this.signSimplifiedBundle(bundle);
@@ -373,7 +388,8 @@ export class AlarmBundleService {
     customer: Customer,
     devices: Device[],
     rules: Rule[],
-    tenantId: string
+    tenantId: string,
+    noConsumptionRules: Rule[] = []
   ): SimpleAlarmRulesBundle {
     const generatedAt = new Date().toISOString();
 
@@ -479,8 +495,15 @@ export class AlarmBundleService {
     // Merge variant rules (overridden) into the catalog
     Object.assign(rulesCatalog, variantRules);
 
+    // RFC-0055: additive no-consumption section (present only when non-empty).
+    const ncRules = this.toNoConsumptionBundleRules(noConsumptionRules);
+
     // Calculate version hash from content
-    const bundleContent = { deviceIndex, rules: rulesCatalog };
+    const bundleContent = {
+      deviceIndex,
+      rules: rulesCatalog,
+      ...(ncRules.length ? { noConsumptionRules: ncRules } : {}),
+    };
     const version = this.calculateVersionHash(bundleContent);
 
     const meta: SimpleBundleMeta = {
@@ -501,7 +524,24 @@ export class AlarmBundleService {
       meta,
       deviceIndex,
       rules: rulesCatalog,
+      ...(ncRules.length ? { noConsumptionRules: ncRules } : {}),
     };
+  }
+
+  /**
+   * RFC-0055 — map NO_CONSUMPTION rules to the bundle's additive section.
+   */
+  private toNoConsumptionBundleRules(rules: Rule[]): NoConsumptionBundleRule[] {
+    return rules.filter(isNoConsumptionRule).map((r) => ({
+      id: r.id,
+      name: r.name,
+      priority: r.priority,
+      scope: {
+        type: r.scope.type,
+        entityIds: r.scope.entityIds ?? (r.scope.entityId ? [r.scope.entityId] : []),
+      },
+      config: r.noConsumptionConfig,
+    }));
   }
 
   /**
@@ -595,7 +635,8 @@ export class AlarmBundleService {
     customer: Customer,
     devices: Device[],
     rules: Rule[],
-    tenantId: string
+    tenantId: string,
+    noConsumptionRules: Rule[] = []
   ): AlarmRulesBundle {
     const generatedAt = new Date().toISOString();
 
@@ -671,11 +712,15 @@ export class AlarmBundleService {
       };
     }
 
+    // RFC-0055: additive no-consumption section (present only when non-empty).
+    const ncRules = this.toNoConsumptionBundleRules(noConsumptionRules);
+
     // Create bundle without signature (will be added after)
     const bundleContent = {
       rulesByDeviceType,
       deviceIndex,
       rules: rulesCatalog,
+      ...(ncRules.length ? { noConsumptionRules: ncRules } : {}),
     };
 
     // Calculate version hash from content

@@ -1,4 +1,17 @@
-import { RulePriority, ComparisonOperator, AggregationType, MetricDomain } from './Rule';
+import { RulePriority, ComparisonOperator, AggregationType, MetricDomain, NoConsumptionConfig } from './Rule';
+
+/**
+ * RFC-0055 — No-consumption (data-absence) rule in the bundle. Additive section
+ * consumed by the Alarms Orchestrator (not Node-RED threshold eval). Carries the
+ * scope (devices/central/customer) and the detection config.
+ */
+export interface NoConsumptionBundleRule {
+  id: string;
+  name: string;
+  priority: RulePriority;
+  scope: { type: string; entityIds: string[] };
+  config: NoConsumptionConfig;
+}
 
 /**
  * Alarm Rule in compact format for the bundle
@@ -86,6 +99,11 @@ export interface AlarmRulesBundle {
    * Catalog of all rules (referenced by ID to avoid duplication)
    */
   rules: Record<string, BundleAlarmRule>;
+
+  /**
+   * RFC-0055 — no-consumption rules (present only when the customer has any).
+   */
+  noConsumptionRules?: NoConsumptionBundleRule[];
 }
 
 /**
@@ -185,4 +203,6 @@ export interface SimpleAlarmRulesBundle {
   meta: SimpleBundleMeta;
   deviceIndex: Record<string, SimpleDeviceMapping>;
   rules: Record<string, SimpleBundleAlarmRule>;
+  // RFC-0055 — no-consumption rules (present only when the customer has any).
+  noConsumptionRules?: NoConsumptionBundleRule[];
 }
