@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW' | 'DEVICE_OFFLINE';
+export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW' | 'DEVICE_OFFLINE' | 'NO_CONSUMPTION';
 export type RulePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComparisonOperator = 'GT' | 'GTE' | 'LT' | 'LTE' | 'EQ' | 'NEQ' | 'BETWEEN' | 'OUTSIDE' | 'UNCHANGED';
 export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';
@@ -145,6 +145,19 @@ export interface MaintenanceWindowConfig {
   affectedRules?: string[]; // Rule IDs to suppress, empty means all
 }
 
+// No-Consumption Configuration (RFC-0055) — data-absence detection.
+// A device in scope must produce a non-empty consumption slot every
+// `windowMinutes`. This is distinct from DEVICE_OFFLINE (connectivity): a device
+// can be ONLINE yet report empty consumption slots.
+export interface NoConsumptionConfig {
+  metric: MetricDomain;        // consumption metric that must be present (e.g. 'energy_consumption')
+  windowMinutes: number;       // slot size; v1 accepts only 60
+  minSamplesPerWindow: number; // a slot is "filled" with >= this many non-null samples (default 1)
+  graceWindows: number;        // consecutive empty windows tolerated before it counts (default 1)
+  timezone: string;            // bucket alignment + day categorization (required)
+  activeHours?: { start: string; end: string } | null; // HH:mm local; only evaluate inside these hours
+}
+
 // Alarm lifecycle actions (RFC-0024)
 export type AlarmAction = 'OPEN' | 'ACK' | 'ESCALATE' | 'SNOOZE' | 'CLOSE' | 'STATE_HISTORY';
 
@@ -247,6 +260,7 @@ export interface Rule extends BaseEntity {
   slaConfig?: SLAConfig;
   escalationConfig?: EscalationConfig;
   maintenanceConfig?: MaintenanceWindowConfig;
+  noConsumptionConfig?: NoConsumptionConfig;
 
   // Notification settings — delivery channels (webhook/SMS config)
   notificationChannels?: NotificationChannel[];
@@ -299,4 +313,8 @@ export function isEscalationRule(rule: Rule): rule is Rule & { escalationConfig:
 
 export function isMaintenanceRule(rule: Rule): rule is Rule & { maintenanceConfig: MaintenanceWindowConfig } {
   return rule.type === 'MAINTENANCE_WINDOW' && !!rule.maintenanceConfig;
+}
+
+export function isNoConsumptionRule(rule: Rule): rule is Rule & { noConsumptionConfig: NoConsumptionConfig } {
+  return rule.type === 'NO_CONSUMPTION' && !!rule.noConsumptionConfig;
 }

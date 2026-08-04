@@ -217,6 +217,7 @@ export class RuleService {
       ESCALATION: 0,
       MAINTENANCE_WINDOW: 0,
       DEVICE_OFFLINE: 0,
+      NO_CONSUMPTION: 0,
     };
 
     const byPriority: Record<string, number> = {

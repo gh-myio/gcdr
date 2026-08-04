@@ -53,7 +53,7 @@ export const connectivityStatusEnum = pgEnum('connectivity_status', ['ONLINE', '
 
 export const partnerStatusEnum = pgEnum('partner_status', ['PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED', 'REJECTED']);
 
-export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE']);
+export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION']);
 
 export const rulePriorityEnum = pgEnum('rule_priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
@@ -683,6 +683,7 @@ export const rules = pgTable('rules', {
   slaConfig: jsonb('sla_config'),
   escalationConfig: jsonb('escalation_config'),
   maintenanceConfig: jsonb('maintenance_config'),
+  noConsumptionConfig: jsonb('no_consumption_config'),  // RFC-0055
 
   // Notification settings
   notificationChannels: jsonb('notification_channels').notNull().default([]),
@@ -744,6 +745,10 @@ export const rules = pgTable('rules', {
   validMaintenanceConfig: check(
     'valid_maintenance_config',
     sql`${table.type} != 'MAINTENANCE_WINDOW' OR ${table.maintenanceConfig} IS NOT NULL`
+  ),
+  validNoConsumptionConfig: check(   // RFC-0055
+    'valid_no_consumption_config',
+    sql`${table.type} != 'NO_CONSUMPTION' OR ${table.noConsumptionConfig} IS NOT NULL`
   ),
   // valid_scope_entity constraint removed — DEVICE scope with empty entityIds is valid
   // (intermediate state when user clears devices before adding new ones). See migration 0015.
