@@ -115,6 +115,9 @@ export enum EventType {
   CENTRAL_COMMAND_ISSUED = 'CENTRAL_COMMAND_ISSUED',
   CENTRAL_COMMAND_COMPLETED = 'CENTRAL_COMMAND_COMPLETED',
   CENTRAL_COMMAND_FAILED = 'CENTRAL_COMMAND_FAILED',
+  // RFC-0005: gateway hardware replacement — the authoritative ledger event,
+  // written INSIDE the replace transaction (not via logEvent middleware).
+  GATEWAY_REPLACED = 'GATEWAY_REPLACED',
 
   // === Groups ===
   GROUP_CREATED = 'GROUP_CREATED',
