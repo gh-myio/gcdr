@@ -21,6 +21,8 @@ import {
   UpdateRestoreProgressSchema,
 } from '../dto/request/CentralRestoreDTO';
 import { centralEnrollmentService } from '../services/CentralEnrollmentService';
+import { centralReplacementService } from '../services/CentralReplacementService';
+import { ReplaceCentralSchema } from '../dto/request/CentralReplacementDTO';
 import { customerIntegrationService } from '../services/CustomerIntegrationService';
 import {
   SetMqttPasswordInputSchema,
@@ -235,6 +237,46 @@ router.post('/:id/enroll-token',
     }
   }
 );
+
+/**
+ * POST /centrals/:oldUuid/replace
+ * RFC-0005 — Gateway hardware replacement. ONE database transaction: locks the
+ * old central row, validates the new identity (UUID/IPv6 uniqueness), archives
+ * the old serial (`archived-<serial>-<epoch>`, status INACTIVE,
+ * metadata.replacedBy), creates the new central with the kept (or reissued)
+ * serial in the old one's exact place, repoints every device, and appends the
+ * authoritative GATEWAY_REPLACED ledger event.
+ *
+ * Idempotent on body.replacementId: a repeat call with the same id (and same
+ * old→new pair) returns the SAME stored result with 200, redoing no work.
+ *
+ * NOTE: deliberately NOT wrapped in logEvent() — the audit event must be
+ * durable atomically with the swap, so the repository writes it INSIDE the
+ * transaction; middleware logging here would double-log (and break the
+ * replacementId idempotency lookup, which keys on that single ledger row).
+ */
+router.post('/:oldUuid/replace', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const { oldUuid } = req.params;
+
+    if (!oldUuid) {
+      throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+    }
+
+    const data = ReplaceCentralSchema.parse(req.body);
+    const result = await centralReplacementService.replace(tenantId, oldUuid, data, {
+      userId,
+      userEmail: (req.context as { userEmail?: string }).userEmail,
+      requestId,
+    });
+
+    // 200 (not 201) so fresh and idempotent-replay responses are identical.
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * PATCH /centrals/:id/connection
