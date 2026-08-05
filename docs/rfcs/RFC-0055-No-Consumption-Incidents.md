@@ -321,17 +321,39 @@ with offset**.
 - **Internal rule definitions** (`NO_CONSUMPTION`) are **read-only metadata**
   visible only to admin/support — never customer-editable.
 
-### 7. Frontend transport decision
+### 7. Frontend transport decision — DECIDED (ED-1077): thin GCDR proxy
 
 The GCDR Frontend consumes an **Alarms-owned** incidents API while still needing
-GCDR master-data context. Decision:
+GCDR master-data context.
 
-- **If** auth, tenant headers and CORS are already standardized between the
-  frontend and Alarms → the frontend calls the Alarms `/incidents` API **directly**
-  and hydrates display fields from GCDR enrichment.
-- **Otherwise** → add a **thin GCDR-Backend proxy** for `/incidents*`. This is a
-  **transport/auth concern only** — it does **not** move incident *ownership* to
-  GCDR (Alarms remains the system of record).
+**Decision (ED-1077, 2026-08-04): Option B — a thin GCDR-Backend proxy for
+`/incidents*`.** The browser calls GCDR; GCDR forwards to the Alarms API and
+enriches the response in-process before returning it:
+
+```
+Browser (panel) ──► GCDR /incidents* ──► Alarms incidents API
+                         └─ enriches device/central/customer names in-process
+```
+
+This is a **transport/auth concern only** — it does **not** move incident
+*ownership* to GCDR (Alarms remains the system of record).
+
+Rationale (over calling Alarms directly):
+
+- **Auth / CORS / tenant scoping / asset-level RBAC already live in GCDR**
+  (`authMiddleware`, `contextMiddleware`, viewer-by-asset). The direct path would
+  force Alarms to re-implement all of it for the browser.
+- **Enrichment (ED-1080) runs in-process** — the proxy calls `EnrichmentService`
+  directly to inject `deviceName`/`centralName`/`customerName`, with no extra HTTP
+  round trip.
+- **The frontend stays GCDR-only** (single base URL, single auth model). The
+  `incidentService` is already transport-agnostic (`VITE_INCIDENTS_API_URL`).
+
+Cost accepted: one extra hop and four pass-through endpoints in GCDR
+(`GET /incidents`, `GET /incidents/:id`, `POST /incidents/:id/ack|resolve`).
+
+Implementation: **ED-1088** (GCDR proxy endpoints) + point `VITE_INCIDENTS_API_URL`
+at GCDR. Blocked only on the Alarms internal incidents API existing.
 
 ### 8. Compatibility / versioning
 
