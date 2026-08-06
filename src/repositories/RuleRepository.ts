@@ -33,6 +33,7 @@ export class RuleRepository implements IRuleRepository {
       slaConfig: data.slaConfig || null,
       escalationConfig: data.escalationConfig || null,
       maintenanceConfig: data.maintenanceConfig || null,
+      noConsumptionConfig: data.noConsumptionConfig || null,
       notificationChannels: data.notificationChannels || [],
       notifications: data.notifications || null,
       scopeProfiles: data.scope.scopeProfiles ?? null,
@@ -102,6 +103,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.slaConfig !== undefined) updateData.slaConfig = data.slaConfig;
     if (data.escalationConfig !== undefined) updateData.escalationConfig = data.escalationConfig;
     if (data.maintenanceConfig !== undefined) updateData.maintenanceConfig = data.maintenanceConfig;
+    if (data.noConsumptionConfig !== undefined) updateData.noConsumptionConfig = data.noConsumptionConfig;
 
     const [result] = await db
       .update(rules)
@@ -405,6 +407,7 @@ export class RuleRepository implements IRuleRepository {
       slaConfig: row.slaConfig as Rule['slaConfig'],
       escalationConfig: row.escalationConfig as Rule['escalationConfig'],
       maintenanceConfig: row.maintenanceConfig as Rule['maintenanceConfig'],
+      noConsumptionConfig: row.noConsumptionConfig as Rule['noConsumptionConfig'],
       notificationChannels: row.notificationChannels as Rule['notificationChannels'],
       notifications: row.notifications as RuleNotifications ?? undefined,
       scopeProfiles: (row.scopeProfiles && row.scopeProfiles.length > 0) ? row.scopeProfiles as string[] : undefined,

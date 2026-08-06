@@ -1,7 +1,21 @@
 import { z } from 'zod';
 
 // Enums
-const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE']);
+const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION']);
+
+// RFC-0055 — no-consumption (data-absence) rule config. v1 restricts windowMinutes
+// to 60 and metric to the consumption domains; timezone is required (never defaulted).
+const NoConsumptionConfigSchema = z.object({
+  metric: z.enum(['energy_consumption', 'water_flow']),
+  windowMinutes: z.literal(60).default(60),
+  minSamplesPerWindow: z.number().int().positive().default(1),
+  graceWindows: z.number().int().min(0).default(1),
+  timezone: z.string().min(1),
+  activeHours: z
+    .object({ start: z.string(), end: z.string() })
+    .nullable()
+    .optional(),
+});
 const RulePrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 const ComparisonOperatorSchema = z.enum(['GT', 'GTE', 'LT', 'LTE', 'EQ', 'NEQ', 'BETWEEN', 'OUTSIDE']);
 const ScopTypeSchema = z.enum(['GLOBAL', 'CUSTOMER', 'ASSET', 'DEVICE']);
@@ -204,6 +218,7 @@ export const CreateRuleSchema = z.object({
   slaConfig: SLAConfigSchema.optional(),
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
+  noConsumptionConfig: NoConsumptionConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
@@ -226,6 +241,8 @@ export const CreateRuleSchema = z.object({
         return !!data.maintenanceConfig;
       case 'DEVICE_OFFLINE':
         return !!data.alarmConfig; // alarmConfig carries schedule + centralId
+      case 'NO_CONSUMPTION':
+        return !!data.noConsumptionConfig;
       default:
         return false;
     }
@@ -245,6 +262,7 @@ export const UpdateRuleSchema = z.object({
   slaConfig: SLAConfigSchema.optional(),
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
+  noConsumptionConfig: NoConsumptionConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),

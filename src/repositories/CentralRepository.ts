@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Central, ConnectionStatus, createDefaultCentralConfig, createDefaultCentralStats } from '../domain/entities/Central';
 import { CreateCentralDTO, UpdateCentralDTO, ListCentralsDTO } from '../dto/request/CentralDTO';
@@ -53,6 +53,16 @@ export class CentralRepository implements ICentralRepository {
       .limit(1);
 
     return result ? this.mapToEntity(result) : null;
+  }
+
+  /** RFC-0055 — batch lookup for the enrichment endpoint. */
+  async findByIds(tenantId: string, ids: string[]): Promise<Central[]> {
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select()
+      .from(centrals)
+      .where(and(eq(centrals.tenantId, tenantId), inArray(centrals.id, ids)));
+    return rows.map((r) => this.mapToEntity(r));
   }
 
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Central | null> {
