@@ -118,15 +118,13 @@ export interface LogEventOptions {
 
 type AuditLogWriter = (log: CreateAuditLogInput) => Promise<void>;
 
-let auditLogWriter: AuditLogWriter = async (log) => {
-  // Default (dev only): log a NON-sensitive summary. Never dump the full entry —
-  // it can carry actor identifiers (userId/apiKeyId) and metadata, which would be
-  // clear-text logging of sensitive data (CodeQL js/clear-text-logging). The real
-  // writer (repository, set via setAuditLogWriter at boot) persists the full row.
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console -- dev-only audit summary (non-sensitive)
-    console.log('[AUDIT]', log.eventType, log.entityType ?? '', log.entityId ?? '');
-  }
+let auditLogWriter: AuditLogWriter = async () => {
+  // No-op placeholder. The real writer (the audit-log repository) is installed at
+  // boot via setAuditLogWriter (see infrastructure/audit). This default does NOT
+  // console.log the entry on purpose: audit rows carry actor identifiers and
+  // user-provided fields (customerId/entityId, event types), so dumping them to
+  // stdout would be clear-text logging / log injection (CodeQL js/clear-text-logging,
+  // js/log-injection). Persisted logging happens only through the repository writer.
 };
 
 /**
