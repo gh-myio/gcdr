@@ -16,6 +16,9 @@ import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware
 import { ValidationError } from '../shared/errors/AppError';
 import { EventType } from '../shared/types';
 
+const ERR_RULE_ID_REQUIRED = 'Rule ID is required';
+const ERR_CUSTOMER_ID_REQUIRED = 'Customer ID is required';
+
 const router = Router();
 
 /**
@@ -208,7 +211,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Rule ID is required');
+      throw new ValidationError(ERR_RULE_ID_REQUIRED);
     }
 
     if (!UUID_REGEX.test(id)) {
@@ -241,7 +244,7 @@ router.patch('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Rule ID is required');
+        throw new ValidationError(ERR_RULE_ID_REQUIRED);
       }
 
       if (!UUID_REGEX.test(id)) {
@@ -275,7 +278,7 @@ router.put('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Rule ID is required');
+        throw new ValidationError(ERR_RULE_ID_REQUIRED);
       }
 
       if (!UUID_REGEX.test(id)) {
@@ -361,7 +364,7 @@ router.delete('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Rule ID is required');
+        throw new ValidationError(ERR_RULE_ID_REQUIRED);
       }
 
       if (!UUID_REGEX.test(id)) {
@@ -393,7 +396,7 @@ router.post('/:id/toggle',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Rule ID is required');
+        throw new ValidationError(ERR_RULE_ID_REQUIRED);
       }
 
       const data = ToggleRuleSchema.parse(req.body);
@@ -422,7 +425,7 @@ router.post('/:id/trigger',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Rule ID is required');
+        throw new ValidationError(ERR_RULE_ID_REQUIRED);
       }
 
       const { count, triggeredAt } = TriggerRuleSchema.parse(req.body ?? {});
@@ -444,7 +447,7 @@ export const listByCustomerHandler = async (req: Request, res: Response, next: N
     const { customerId } = req.params;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     const params = ListRulesParamsSchema.parse({ ...req.query, customerId });
@@ -467,7 +470,7 @@ export const listInternalSupportRulesHandler = async (req: Request, res: Respons
     const { customerId } = req.params;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     const result = await ruleService.list(tenantId, {
@@ -512,7 +515,7 @@ export const getAlarmBundleHandler = async (req: Request, res: Response, next: N
     const { domain, deviceType, includeDisabled } = req.query;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     // Check for conditional request (If-None-Match header)
@@ -589,7 +592,7 @@ export const getSimplifiedAlarmBundleHandler = async (req: Request, res: Respons
     const clientVersionId = req.headers['x-version-id'] as string | undefined;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     // Validate X-Central-Id if provided
@@ -700,7 +703,7 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
     const centralId = req.headers['x-central-id'] as string | undefined;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     const bundle = await alarmBundleService.verifyBundle({
@@ -716,6 +719,12 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
       versionId: bundle.meta.version,
       deviceIndex: bundle.deviceIndex,
       rules: bundle.rules,
+      // RFC-0055: forward NO_CONSUMPTION rules to the Alarms Orchestrator (the
+      // consumer of to-verify-service). verifyBundle already builds them; the
+      // handler previously dropped them, so the no-consumption evaluator never
+      // received any rule. Included only when present → byte-identical bundle
+      // for customers without NC rules. NOT exposed on /simple (Node-RED).
+      ...(bundle.noConsumptionRules?.length ? { noConsumptionRules: bundle.noConsumptionRules } : {}),
     }, 200, requestId);
   } catch (err) {
     next(err);
@@ -733,7 +742,7 @@ export const invalidateAlarmBundleCacheHandler = async (req: Request, res: Respo
     const { customerId } = req.params;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     alarmBundleService.invalidateCache(tenantId, customerId, {
@@ -760,7 +769,7 @@ export const getAlarmBundleVersionsHandler = async (req: Request, res: Response,
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
 
     if (!customerId) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(ERR_CUSTOMER_ID_REQUIRED);
     }
 
     const versions = await alarmBundleService.getVersionHistory(tenantId, customerId, limit);
