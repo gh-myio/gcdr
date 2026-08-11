@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerService } from '../services/CustomerService';
+import { customerConfigService } from '../services/CustomerConfigService';
 import {
   CreateCustomerSchema,
   UpdateCustomerSchema,
@@ -133,6 +134,20 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const customer = await customerService.getById(tenantId, id);
+
+    // RFC-0057 DEC-11: opt-in inline consolidated config under a NEW field
+    // `configResolved` (masked secrets). The existing raw `config` field is left
+    // untouched for back-compat. Same authorization as GET /customers/:id.
+    const include = String(req.query.include ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (include.includes('config')) {
+      const configResolved = await customerConfigService.getConfig(tenantId, id);
+      sendSuccess(res, { ...customer, configResolved }, 200, requestId);
+      return;
+    }
+
     sendSuccess(res, customer, 200, requestId);
   } catch (err) {
     next(err);
