@@ -86,8 +86,9 @@ describe('leafPaths', () => {
   it('returns an empty array for a non-object', () => {
     expect(leafPaths(42)).toEqual([]);
   });
-  it('emits the section path for an empty nested object', () => {
-    expect(leafPaths({ a: {} })).toEqual(['a']);
+  it('contributes nothing for an empty nested object (no phantom path)', () => {
+    expect(leafPaths({ a: {} })).toEqual([]);
+    expect(leafPaths({ a: { b: {} } })).toEqual([]);
   });
 });
 
@@ -265,6 +266,48 @@ describe('patchConfig', () => {
     expect(doc.temperature.min).toBe(20);
     expect(doc.display.mapInstantaneousPower).toBe(true);
     expect(doc.ingestion.clientId).toBe('ci');
+  });
+
+  it('treats an empty featureButtons patch as a true no-op (P2.3)', async () => {
+    const { repo, svc } = makeService(makeCustomer());
+    await svc.patchConfig(TENANT_ID, CUSTOMER_ID, { featureButtons: {} });
+    const persisted = (repo.update as jest.Mock).mock.calls[0][2].config as CustomerConfig;
+    expect(persisted.featureButtons).toBeUndefined();
+    const meta = (logAuditEvent as jest.Mock).mock.calls[0][2].metadata;
+    expect(meta.changedPaths).toEqual([]);
+  });
+
+  it('treats featureButtons with only empty groups as a no-op (P2.3)', async () => {
+    const { repo, svc } = makeService(makeCustomer());
+    await svc.patchConfig(TENANT_ID, CUSTOMER_ID, { featureButtons: { demandPeak: {} } });
+    const persisted = (repo.update as jest.Mock).mock.calls[0][2].config as CustomerConfig;
+    expect(persisted.featureButtons).toBeUndefined();
+  });
+});
+
+describe('audit before/after (DEC-12 / P1.2)', () => {
+  it('CUSTOMER_CONFIG_UPDATED carries redacted before/after read models', async () => {
+    const { svc } = makeService(makeCustomer({ config: { ingestion: { clientSecret: 'enc(x)' } } }));
+    await svc.patchConfig(TENANT_ID, CUSTOMER_ID, { tickets: { enabled: true } });
+    const meta = (logAuditEvent as jest.Mock).mock.calls[0][2].metadata;
+    expect(meta.method).toBe('PATCH');
+    expect(meta.changedPaths).toEqual(['tickets.enabled']);
+    expect(meta.before.tickets.enabled).toBe(false);
+    expect(meta.after.tickets.enabled).toBe(true);
+    // secrets masked in BOTH snapshots — no plaintext/ciphertext ever in audit.
+    expect(meta.before.ingestion.clientSecret).toBe(MASKED_SECRET);
+    expect(meta.after.ingestion.clientSecret).toBe(MASKED_SECRET);
+    expect(JSON.stringify(meta)).not.toContain('enc(x)');
+  });
+
+  it('DELETE carries a before/after showing the reset to defaults', async () => {
+    const { svc } = makeService(
+      makeCustomer({ config: { tickets: { enabled: true, onlyToMyio: false } } }),
+    );
+    await svc.deleteConfig(TENANT_ID, CUSTOMER_ID);
+    const meta = (logAuditEvent as jest.Mock).mock.calls[0][2].metadata;
+    expect(meta.before.tickets).toEqual({ enabled: true, onlyToMyio: false });
+    expect(meta.after.tickets).toEqual({ enabled: false, onlyToMyio: true });
   });
 });
 

@@ -227,16 +227,28 @@ without permission, API key `SELF`/`SUBTREE`/`TENANT`, and cross-tenant.
 | Input | `PATCH` | `PUT` |
 |---|---|---|
 | section **omitted** | preserved | **reset to default** |
-| scalar field `null` | clear to default (or explicit `null` where the field allows) | same |
+| scalar field `null` (governed section) | **not accepted → `400`** (MVP) | **not accepted → `400`** (MVP) |
 | empty object `{}` | **no-op** (not a clear) | replaces that section with defaults |
-| `featureButtons` partial | per-group merge | full replace (all 6 required) |
+| `featureButtons` partial | per-group merge (`{}` = no-op) | full replace (all 6 required) |
 | secret field present | `400` (use secrets endpoint) | `400` |
 
+- **`null` on a governed section is NOT accepted in the MVP** (P1.1, decided
+  2026-08-10): the governed schemas (`alarms`, `tickets`, `temperature`,
+  `ingestion.clientId`) use optional-not-nullable fields, so a `null` returns
+  `400`. To clear a value, PATCH it to its default explicitly, or `DELETE` the
+  document to reset every section. (Explicitly-nullable fields — `defaultDashboard.id`,
+  the free `display.*` values, `classificationProfile` — still accept `null`.)
+  A future revision may introduce `null`=clear-to-default if a consumer needs it.
+- **Secrets** are the exception: on the dedicated `PUT /config/secrets`, `null`
+  **clears** the secret (DEC-7) — that path is not a governed config section.
 - **`metadata`** is writable via `/config` and persists to `customers.metadata`
-  (not `customers.config.metadata`).
+  (not `customers.config.metadata`); provided keys are merged (a PUT does not wipe
+  unrelated metadata keys).
 - **`DELETE`** returns the **full updated read-model document** (consistent with the
-  other writes), config reset to defaults; `settings`/`theme`/`bundle` untouched.
-- All writes emit the audit event (DEC-12).
+  other writes), config reset to defaults; `settings`/`theme`/`bundle` **and the
+  at-rest secrets** untouched.
+- All writes emit the audit event (DEC-12), which carries a **redacted
+  `before`/`after`** read-model snapshot (secrets always masked) plus `changedPaths`.
 
 ### DEC-10 — Three DTOs (P1.2, resolved)
 

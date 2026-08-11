@@ -3,5 +3,13 @@ export { authMiddleware, optionalAuthMiddleware, requireRoles, hybridAuthMiddlew
 export { errorHandler, notFoundHandler } from './errorHandler';
 export { requireGoalsAccess, PERM_GOALS_READ, PERM_GOALS_WRITE } from './requireGoalsAccess';
 export { requireTariffAccess, PERM_TARIFFS_READ, PERM_TARIFFS_WRITE } from './requireTariffAccess';
+export {
+  requireCustomerConfigAccess,
+  requireCustomerConfigSecretsAccess,
+  assertCustomerConfigAccess,
+  PERM_CUSTOMER_CONFIG_READ,
+  PERM_CUSTOMER_CONFIG_WRITE,
+  PERM_CUSTOMER_SECRETS,
+} from './requireCustomerConfigAccess';
 export { sendSuccess, sendCreated, sendNoContent, sendPaginated } from './response';
 export { logEvent, logAuditEvent, setAuditLogWriter, LogEventOptions } from './audit';

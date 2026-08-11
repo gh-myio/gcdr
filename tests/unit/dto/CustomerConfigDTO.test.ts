@@ -35,12 +35,10 @@ describe('FeatureButtonsSchema (full, PUT)', () => {
       instantTelemetry: { entrada: true, areacomum: true, lojas: false },
     });
     expect(r.success).toBe(false);
-    if (!r.success) {
-      const issue = r.error.issues[0];
-      expect(issue.path).toEqual(['demandPeak']);
-      expect(issue.code).toBe('unrecognized_keys');
-      expect((issue as z.ZodIssue & { keys: string[] }).keys).toContain('terraco');
-    }
+    const issue = r.success ? undefined : r.error.issues[0];
+    expect(issue?.path).toEqual(['demandPeak']);
+    expect(issue?.code).toBe('unrecognized_keys');
+    expect((issue as (z.ZodIssue & { keys: string[] }) | undefined)?.keys).toContain('terraco');
   });
 
   it('rejects an unknown feature key', () => {
@@ -67,7 +65,6 @@ describe('FeatureButtonsPatchSchema (partial, PATCH)', () => {
 
 describe('refineTemperature invariants', () => {
   function run(t: Record<string, number>) {
-    const schema = z.object({}).superRefine(() => {});
     const issues: z.ZodIssue[] = [];
     const ctx = { addIssue: (i: z.ZodIssue) => issues.push(i) } as unknown as z.RefinementCtx;
     refineTemperature(t, ctx);

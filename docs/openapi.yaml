@@ -3347,6 +3347,258 @@ components:
         config:
           type: object
 
+    # ---- RFC-0057: Customer Config Document -------------------------------
+    FeatureGroupFlags:
+      type: object
+      description: Three independent visibility toggles for one feature (2×3 matrix row).
+      required: [entrada, areacomum, lojas]
+      additionalProperties: false
+      properties:
+        entrada: { type: boolean }
+        areacomum: { type: boolean }
+        lojas: { type: boolean }
+    FeatureButtons:
+      type: object
+      description: RFC-0057 DEC-3 — 2×3 checkbox matrix (2 features × 3 groups).
+      required: [demandPeak, instantTelemetry]
+      additionalProperties: false
+      properties:
+        demandPeak: { $ref: '#/components/schemas/FeatureGroupFlags' }
+        instantTelemetry: { $ref: '#/components/schemas/FeatureGroupFlags' }
+    FeatureButtonsPatch:
+      type: object
+      description: Partial 2×3 matrix for PATCH — any subset of features/groups (per-group merge).
+      additionalProperties: false
+      properties:
+        demandPeak:
+          type: object
+          additionalProperties: false
+          properties:
+            entrada: { type: boolean }
+            areacomum: { type: boolean }
+            lojas: { type: boolean }
+        instantTelemetry:
+          type: object
+          additionalProperties: false
+          properties:
+            entrada: { type: boolean }
+            areacomum: { type: boolean }
+            lojas: { type: boolean }
+    CustomerConfigRead:
+      type: object
+      description: >-
+        Normalized read model — all keys present (defaults filled, DEC-5);
+        `ingestion.clientSecret` and `security.masterAdminPassword` are ALWAYS
+        masked as "***" here and can never be written via /config.
+      properties:
+        version: { type: integer, example: 1 }
+        featureButtons: { $ref: '#/components/schemas/FeatureButtons' }
+        alarms:
+          type: object
+          properties:
+            notificationsEnabled: { type: boolean }
+            showOffline: { type: boolean }
+            showInternalSupport: { type: boolean }
+        tickets:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            onlyToMyio: { type: boolean }
+        temperature:
+          type: object
+          properties:
+            min: { type: number }
+            max: { type: number }
+            clampMin: { type: number }
+            clampMax: { type: number }
+        display:
+          type: object
+          properties:
+            measurementDisplaySettings: { nullable: true }
+            mapInstantaneousPower: { nullable: true }
+        defaultDashboard:
+          type: object
+          properties:
+            id: { type: string, nullable: true }
+            cfg: { nullable: true }
+        classificationProfile: { nullable: true }
+        locale:
+          type: object
+          properties:
+            timezone: { type: string }
+            locale: { type: string }
+            currency: { type: string }
+        theme:
+          type: object
+          properties:
+            primaryColor: { type: string, nullable: true }
+            secondaryColor: { type: string, nullable: true }
+        ingestion:
+          type: object
+          properties:
+            clientId: { type: string, nullable: true }
+            clientSecret: { type: string, example: '***', description: Always masked. }
+        security:
+          type: object
+          properties:
+            masterAdminPassword: { type: string, example: '***', description: Always masked. }
+        metadata:
+          type: object
+          additionalProperties: true
+      example:
+        version: 1
+        featureButtons:
+          demandPeak: { entrada: true, areacomum: true, lojas: false }
+          instantTelemetry: { entrada: true, areacomum: true, lojas: false }
+        alarms: { notificationsEnabled: true, showOffline: false, showInternalSupport: false }
+        tickets: { enabled: false, onlyToMyio: true }
+        temperature: { min: 18, max: 27, clampMin: 15, clampMax: 40 }
+        display: { measurementDisplaySettings: null, mapInstantaneousPower: null }
+        defaultDashboard: { id: null, cfg: null }
+        classificationProfile: null
+        locale: { timezone: America/Sao_Paulo, locale: pt-BR, currency: BRL }
+        theme: { primaryColor: null, secondaryColor: null }
+        ingestion: { clientId: myio-prod, clientSecret: '***' }
+        security: { masterAdminPassword: '***' }
+        metadata: { inaugurationDate: null, obs: '' }
+    CustomerConfigWrite:
+      type: object
+      description: >-
+        Full replace of the writable sections (PUT). Governed sections are
+        strict — unknown keys 400. A scalar `null` is NOT accepted on governed
+        sections in the MVP (P1.1). Secret fields (`ingestion.clientSecret`, any
+        `security` section) are rejected here (use /config/secrets).
+      additionalProperties: false
+      properties:
+        featureButtons: { $ref: '#/components/schemas/FeatureButtons' }
+        alarms:
+          type: object
+          additionalProperties: false
+          properties:
+            notificationsEnabled: { type: boolean }
+            showOffline: { type: boolean }
+            showInternalSupport: { type: boolean }
+        tickets:
+          type: object
+          additionalProperties: false
+          properties:
+            enabled: { type: boolean }
+            onlyToMyio: { type: boolean }
+        temperature:
+          type: object
+          additionalProperties: false
+          properties:
+            min: { type: number }
+            max: { type: number }
+            clampMin: { type: number }
+            clampMax: { type: number }
+        display:
+          type: object
+          additionalProperties: false
+          properties:
+            measurementDisplaySettings: {}
+            mapInstantaneousPower: {}
+        defaultDashboard:
+          type: object
+          additionalProperties: false
+          properties:
+            id: { type: string, nullable: true }
+            cfg: {}
+        classificationProfile: {}
+        ingestion:
+          type: object
+          additionalProperties: false
+          properties:
+            clientId: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    CustomerConfigPatch:
+      type: object
+      description: >-
+        Deep-merge of a subset (PATCH). `featureButtons` merges per group key;
+        an empty `featureButtons` object is a no-op. Same strictness and
+        null/secret rules as CustomerConfigWrite.
+      additionalProperties: false
+      properties:
+        featureButtons: { $ref: '#/components/schemas/FeatureButtonsPatch' }
+        alarms:
+          type: object
+          additionalProperties: false
+          properties:
+            notificationsEnabled: { type: boolean }
+            showOffline: { type: boolean }
+            showInternalSupport: { type: boolean }
+        tickets:
+          type: object
+          additionalProperties: false
+          properties:
+            enabled: { type: boolean }
+            onlyToMyio: { type: boolean }
+        temperature:
+          type: object
+          additionalProperties: false
+          properties:
+            min: { type: number }
+            max: { type: number }
+            clampMin: { type: number }
+            clampMax: { type: number }
+        display:
+          type: object
+          additionalProperties: false
+          properties:
+            measurementDisplaySettings: {}
+            mapInstantaneousPower: {}
+        defaultDashboard:
+          type: object
+          additionalProperties: false
+          properties:
+            id: { type: string, nullable: true }
+            cfg: {}
+        classificationProfile: {}
+        ingestion:
+          type: object
+          additionalProperties: false
+          properties:
+            clientId: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    CustomerConfigSecretsWrite:
+      type: object
+      description: >-
+        Secrets write body (DEC-7). A string sets & encrypts at rest; `null`
+        clears; the masked sentinel "***" is rejected (400).
+      additionalProperties: false
+      properties:
+        ingestion:
+          type: object
+          additionalProperties: false
+          properties:
+            clientSecret: { type: string, nullable: true }
+        security:
+          type: object
+          additionalProperties: false
+          properties:
+            masterAdminPassword: { type: string, nullable: true }
+    CustomerConfigSecretsRevealed:
+      type: object
+      description: >-
+        Decrypted secret values (audited reveal). Both sections are always
+        present; each value is the plaintext or `null` when unset.
+      properties:
+        ingestion:
+          type: object
+          properties:
+            clientSecret: { type: string, nullable: true }
+        security:
+          type: object
+          properties:
+            masterAdminPassword: { type: string, nullable: true }
+      example:
+        ingestion: { clientSecret: s3cr3t }
+        security: { masterAdminPassword: null }
+
     CreateUser:
       type: object
       required:
@@ -6142,13 +6394,23 @@ paths:
     get:
       tags: [Customers]
       summary: Get customer by ID
+      description: >-
+        RFC-0057 DEC-11: pass `?include=config` to additionally return the
+        consolidated config read model under a NEW `configResolved` field (masked
+        secrets). The raw `config` field is unchanged. `include=config` requires
+        the same authorization as GET /customers/{id}/config.
       operationId: getCustomer
       parameters:
         - $ref: '#/components/parameters/TenantId'
         - $ref: '#/components/parameters/PathId'
+        - in: query
+          name: include
+          required: false
+          schema: { type: string, example: config }
+          description: Comma-separated extras. `config` adds `configResolved` (RFC-0057).
       responses:
         '200':
-          description: Customer details
+          description: Customer details (with `configResolved` when `include=config`)
           content:
             application/json:
               schema:
@@ -6156,7 +6418,12 @@ paths:
                   - $ref: '#/components/schemas/SuccessResponse'
                   - properties:
                       data:
-                        $ref: '#/components/schemas/Customer'
+                        allOf:
+                          - $ref: '#/components/schemas/Customer'
+                          - type: object
+                            properties:
+                              configResolved:
+                                $ref: '#/components/schemas/CustomerConfigRead'
         '404':
           description: Customer not found
           content:
@@ -12418,6 +12685,198 @@ paths:
       responses:
         '204':
           description: Deleted
+
+  # ===========================================================================
+  # Customer Config Document (RFC-0057)
+  # ===========================================================================
+
+  /customers/{customerId}/config:
+    get:
+      tags: [Customer Config]
+      summary: Read the consolidated customer config (masked secrets)
+      description: >-
+        Returns the normalized read model with defaults filled and secrets
+        masked. Auth: JWT (customers.hierarchy.read on customer:<id>) or a
+        customer API key with `customers:read` whose hierarchy reaches the
+        customer. Cross-tenant / out-of-reach → 404.
+      operationId: getCustomerConfig
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Config document
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigRead' }
+        '401': { description: Missing/invalid authentication }
+        '403': { description: Authenticated but lacking the required scope/permission }
+        '404': { description: Customer not found / outside the key's reach }
+    put:
+      tags: [Customer Config]
+      summary: Replace the writable config sections
+      description: >-
+        Full replace; an omitted section resets to its default. `featureButtons`,
+        when present, must be the complete 2×3 matrix. Secret fields are rejected
+        (400). Auth: customers:write / customers.hierarchy.update.
+      operationId: replaceCustomerConfig
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerConfigWrite' }
+      responses:
+        '200':
+          description: Updated config document
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigRead' }
+        '400': { description: Unknown key, secret field, temperature invariant, size cap, or null on a governed section }
+        '403': { description: Lacking the required scope/permission }
+        '404': { description: Customer not found / outside the key's reach }
+    patch:
+      tags: [Customer Config]
+      summary: Deep-merge a subset of the config
+      description: >-
+        Deep-merge; `featureButtons` merges per group key (an empty object is a
+        no-op). Secret fields rejected (400). Auth: customers:write /
+        customers.hierarchy.update.
+      operationId: patchCustomerConfig
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerConfigPatch' }
+            example:
+              featureButtons: { demandPeak: { lojas: true } }
+      responses:
+        '200':
+          description: Updated config document
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigRead' }
+        '400': { description: Unknown key, secret field, temperature invariant, size cap, or null on a governed section }
+        '403': { description: Lacking the required scope/permission }
+        '404': { description: Customer not found / outside the key's reach }
+    delete:
+      tags: [Customer Config]
+      summary: Reset the writable config sections to defaults
+      description: >-
+        Resets writable sections; preserves `settings`, `theme`, the alarm
+        `bundle` config, and the at-rest secrets. Returns the full read model.
+      operationId: resetCustomerConfig
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Config reset to defaults
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigRead' }
+        '403': { description: Lacking the required scope/permission }
+        '404': { description: Customer not found / outside the key's reach }
+
+  /customers/{customerId}/config/secrets:
+    get:
+      tags: [Customer Config]
+      summary: Reveal the real secret values (JWT-only, audited)
+      description: >-
+        Returns decrypted `ingestion.clientSecret` and
+        `security.masterAdminPassword` (each possibly null). JWT/master-key only
+        with `customers:secrets:read` (RBAC customers.secret.read on
+        customer:<id>). Customer API keys are DENIED (401). Every reveal is
+        audit-logged.
+      operationId: revealCustomerConfigSecrets
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Decrypted secrets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigSecretsRevealed' }
+        '401': { description: Customer API key (denied) or missing/invalid JWT }
+        '403': { description: JWT lacking customers:secrets:read }
+        '404': { description: Customer not found }
+    put:
+      tags: [Customer Config]
+      summary: Set or clear secrets (JWT-only, audited)
+      description: >-
+        A string sets & encrypts at rest; `null` clears; the masked sentinel
+        "***" is rejected (400). JWT/master-key only with `customers:secrets:read`;
+        customer API keys DENIED (401). Returns the masked read model.
+      operationId: writeCustomerConfigSecrets
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerConfigSecretsWrite' }
+            example:
+              ingestion: { clientSecret: s3cr3t }
+              security: { masterAdminPassword: null }
+      responses:
+        '200':
+          description: Secrets updated (masked read model returned)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CustomerConfigRead' }
+        '400': { description: Masked sentinel "***" or unknown key }
+        '401': { description: Customer API key (denied) or missing/invalid JWT }
+        '403': { description: JWT lacking customers:secrets:read }
+        '404': { description: Customer not found }
 
   # ===========================================================================
   # Wiki — Authenticated (RFC-0030 Phase 1+2)

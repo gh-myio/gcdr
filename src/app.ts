@@ -13,6 +13,8 @@ import {
   notFoundHandler,
   requireGoalsAccess,
   requireTariffAccess,
+  requireCustomerConfigAccess,
+  requireCustomerConfigSecretsAccess,
 } from './middleware';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { clientIp } from './middleware/rateLimit';
@@ -291,10 +293,12 @@ apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_C
 
 // RFC-0057: Customer config document (nested — must come before general /customers router).
 // The secrets sub-route is mounted FIRST and JWT/master-key only (authMiddleware) —
-// customer API keys are denied there (DEC-7). The general /config CRUD is hybridAuth:
-// GET requires customers:read; PUT/PATCH/DELETE require customers:write (non-secret only).
-apiV1Router.use('/customers/:customerId/config/secrets', authMiddleware, customerConfigSecretsController);
-apiV1Router.use('/customers/:customerId/config', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), customerConfigController);
+// customer API keys are denied there (DEC-7). requireCustomerConfigSecretsAccess enforces
+// the customers:secrets:read operator permission (P0.2). The general /config CRUD is
+// hybridAuth (GET customers:read / write customers:write) PLUS requireCustomerConfigAccess,
+// which enforces the API-key hierarchy (SELF/SUBTREE/TENANT) and RBAC customer:<id> (P0.1).
+apiV1Router.use('/customers/:customerId/config/secrets', authMiddleware, requireCustomerConfigSecretsAccess(), customerConfigSecretsController);
+apiV1Router.use('/customers/:customerId/config', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), requireCustomerConfigAccess(), customerConfigController);
 
 // RFC-0046: Customer consumption goals (nested — must come before general /customers router)
 // hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.

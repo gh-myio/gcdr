@@ -45,7 +45,12 @@ export interface CustomerConfigActor {
   requestId?: string;
 }
 
-/** Returns dotted leaf paths of a nested plain object (for audit changedPaths). */
+/**
+ * Returns dotted leaf paths of a nested plain object (for audit changedPaths).
+ * An empty nested object contributes NOTHING — so `leafPaths({ featureButtons: {} })`
+ * is `[]`, which lets callers treat a leaf-less patch section as a true no-op
+ * (P2.3) instead of reporting a phantom change.
+ */
 export function leafPaths(obj: unknown, prefix = ''): string[] {
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
     return prefix ? [prefix] : [];
@@ -54,8 +59,7 @@ export function leafPaths(obj: unknown, prefix = ''): string[] {
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      const nested = leafPaths(value, path);
-      out.push(...(nested.length > 0 ? nested : [path]));
+      out.push(...leafPaths(value, path));
     } else {
       out.push(path);
     }
@@ -99,6 +103,7 @@ export class CustomerConfigService {
   ): Promise<CustomerConfigReadModel> {
     const customer = await this.mustGet(tenantId, customerId);
     const existing = customer.config ?? {};
+    const before = this.buildReadModel(customer);
 
     // Start from a blank writable config; carry over only bundle + at-rest
     // secrets. Any section the caller omits stays absent → read model returns
@@ -117,8 +122,9 @@ export class CustomerConfigService {
     }
 
     const updated = await this.persist(tenantId, customerId, nextConfig, dto.metadata, actor);
-    await this.emitConfigUpdated(tenantId, customerId, 'PUT', leafPaths(dto), actor);
-    return this.buildReadModel(updated);
+    const after = this.buildReadModel(updated);
+    await this.emitConfigUpdated(tenantId, customerId, 'PUT', leafPaths(dto), before, after, actor);
+    return after;
   }
 
   // ---------------------------------------------------------------------------
@@ -133,9 +139,12 @@ export class CustomerConfigService {
   ): Promise<CustomerConfigReadModel> {
     const customer = await this.mustGet(tenantId, customerId);
     const existing = customer.config ?? {};
+    const before = this.buildReadModel(customer);
     const nextConfig: CustomerConfig = { ...existing };
 
-    if (dto.featureButtons !== undefined) {
+    // P2.3: `featureButtons: {}` (or `{ demandPeak: {} }`) has no leaves → true
+    // no-op. Do NOT write the default matrix and do NOT report a changed path.
+    if (dto.featureButtons !== undefined && leafPaths(dto.featureButtons).length > 0) {
       const base = existing.featureButtons ?? createDefaultFeatureButtons();
       nextConfig.featureButtons = mergeFeatureButtons(base, dto.featureButtons);
     }
@@ -152,8 +161,9 @@ export class CustomerConfigService {
     }
 
     const updated = await this.persist(tenantId, customerId, nextConfig, dto.metadata, actor);
-    await this.emitConfigUpdated(tenantId, customerId, 'PATCH', leafPaths(dto), actor);
-    return this.buildReadModel(updated);
+    const after = this.buildReadModel(updated);
+    await this.emitConfigUpdated(tenantId, customerId, 'PATCH', leafPaths(dto), before, after, actor);
+    return after;
   }
 
   // ---------------------------------------------------------------------------
@@ -168,14 +178,16 @@ export class CustomerConfigService {
   ): Promise<CustomerConfigReadModel> {
     const customer = await this.mustGet(tenantId, customerId);
     const existing = customer.config ?? {};
+    const before = this.buildReadModel(customer);
 
     // Only bundle + secrets survive; every non-secret writable section is
     // dropped so the read model returns defaults again.
     const nextConfig: CustomerConfig = this.preserveNonWritable(existing);
 
     const updated = await this.persist(tenantId, customerId, nextConfig, undefined, actor);
-    await this.emitConfigUpdated(tenantId, customerId, 'DELETE', ['*'], actor);
-    return this.buildReadModel(updated);
+    const after = this.buildReadModel(updated);
+    await this.emitConfigUpdated(tenantId, customerId, 'DELETE', ['*'], before, after, actor);
+    return after;
   }
 
   // ---------------------------------------------------------------------------
@@ -343,12 +355,18 @@ export class CustomerConfigService {
     customerId: string,
     method: 'PUT' | 'PATCH' | 'DELETE',
     changedPaths: string[],
+    before: CustomerConfigReadModel,
+    after: CustomerConfigReadModel,
     actor: CustomerConfigActor,
   ): Promise<void> {
+    // before/after come from the read model, whose secrets are ALWAYS masked as
+    // "***" (DEC-12) — so this audit payload can never carry secret material.
     await this.emit(tenantId, customerId, EventType.CUSTOMER_CONFIG_UPDATED, actor, {
       method,
       version: CONFIG_VERSION,
       changedPaths,
+      before,
+      after,
     });
   }
 
