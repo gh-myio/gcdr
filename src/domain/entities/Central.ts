@@ -113,6 +113,11 @@ export interface Central extends BaseEntity {
   // Stats (updated periodically)
   stats: CentralStats;
 
+  // Enriched on read (list/get): the owning customer's display name and a
+  // device-count summary for the "connected / total" column. Not persisted.
+  customerName?: string;
+  statistics?: { devicesTotal: number; devicesConnected: number };
+
   // Per-integration password presence (enriched on read from customer
   // integrations — RFC-0035). Plaintext available only via reveal endpoint.
   mqttPasswordsSet?: CentralMqttPasswordsSet;

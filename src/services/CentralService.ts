@@ -10,6 +10,8 @@ import { CentralRepository } from '../repositories/CentralRepository';
 import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
+import { customerRepository } from '../repositories/CustomerRepository';
+import { deviceRepository } from '../repositories/DeviceRepository';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
@@ -142,12 +144,14 @@ export class CentralService {
     }
     const result = await this.repository.list(tenantId, params);
     result.items = await this.enrichManyWithMqttPasswordsSet(tenantId, result.items);
+    result.items = await this.enrichManyWithCustomerAndDevices(tenantId, result.items);
     return result;
   }
 
   async listByCustomer(tenantId: string, customerId: string): Promise<Central[]> {
     const centrals = await this.repository.listByCustomer(tenantId, customerId);
-    return this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
+    const withMqtt = await this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
+    return this.enrichManyWithCustomerAndDevices(tenantId, withMqtt);
   }
 
   async listByAsset(tenantId: string, assetId: string): Promise<Central[]> {
@@ -156,7 +160,43 @@ export class CentralService {
       throw new NotFoundError(`Asset ${assetId} not found`);
     }
     const centrals = await this.repository.listByAsset(tenantId, assetId);
-    return this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
+    const withMqtt = await this.enrichManyWithMqttPasswordsSet(tenantId, centrals);
+    return this.enrichManyWithCustomerAndDevices(tenantId, withMqtt);
+  }
+
+  /**
+   * Enrich centrals with the owning customer's display name and a device-count
+   * summary (total + online) for the list "connected / total" column. Batched
+   * (one customer lookup, one grouped device count) and best-effort — any
+   * failure returns the centrals unchanged rather than failing the list.
+   */
+  private async enrichManyWithCustomerAndDevices(
+    tenantId: string,
+    centrals: Central[],
+  ): Promise<Central[]> {
+    if (centrals.length === 0) return centrals;
+    try {
+      const customerIds = [...new Set(centrals.map((c) => c.customerId).filter(Boolean))];
+      const centralIds = centrals.map((c) => c.id);
+      const [customers, deviceCounts] = await Promise.all([
+        customerRepository.findByIds(tenantId, customerIds),
+        deviceRepository.countByCentralIds(tenantId, centralIds),
+      ]);
+      const nameById = new Map(customers.map((c) => [c.id, c.displayName || c.name]));
+      return centrals.map((c) => {
+        const dc = deviceCounts.get(c.id);
+        return {
+          ...c,
+          customerName: nameById.get(c.customerId) ?? c.customerName,
+          statistics: {
+            devicesTotal: dc?.total ?? 0,
+            devicesConnected: dc?.connected ?? 0,
+          },
+        };
+      });
+    } catch {
+      return centrals;
+    }
   }
 
   // ---------------------------------------------------------------------------

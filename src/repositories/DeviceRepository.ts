@@ -572,6 +572,31 @@ export class DeviceRepository implements IDeviceRepository {
     return rows.map((r) => this.mapToEntity(r));
   }
 
+  /**
+   * Count devices grouped by central, with an online breakdown, for a set of
+   * centrals. Used to populate the /centrals list "connected / total" column.
+   */
+  async countByCentralIds(
+    tenantId: string,
+    centralIds: string[],
+  ): Promise<Map<string, { total: number; connected: number }>> {
+    const result = new Map<string, { total: number; connected: number }>();
+    if (centralIds.length === 0) return result;
+    const rows = await db
+      .select({
+        centralId: devices.centralId,
+        total: sql<number>`count(*)::int`,
+        connected: sql<number>`count(*) FILTER (WHERE ${devices.connectivityStatus} = 'ONLINE')::int`,
+      })
+      .from(devices)
+      .where(and(eq(devices.tenantId, tenantId), inArray(devices.centralId, centralIds)))
+      .groupBy(devices.centralId);
+    for (const r of rows) {
+      if (r.centralId) result.set(r.centralId, { total: r.total, connected: r.connected });
+    }
+    return result;
+  }
+
   // ===========================================================================
   // RFC-0008: New Query Methods
   // ===========================================================================
