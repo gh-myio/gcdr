@@ -1,6 +1,7 @@
 import http from 'http';
 import type { AddressInfo } from 'net';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 
 // RFC-0057 (P1.4) — exercise the REAL auth chain for /config and /config/secrets:
 //   contextMiddleware → hybridAuthByMethod/authMiddleware → requireCustomerConfig*
@@ -62,18 +63,24 @@ const OWN_CUSTOMER = '33333333-3333-3333-3333-333333333333';
 const OTHER_CUSTOMER = '44444444-4444-4444-4444-444444444444';
 const DESCENDANT = '55555555-5555-5555-5555-555555555555';
 
+// Mirror production: an express-rate-limiter fronts the authed mounts (also keeps
+// CodeQL js/missing-rate-limiting satisfied on this harness).
+const limiter = rateLimit({ windowMs: 60_000, limit: 10_000, validate: false });
+
 function buildApp() {
   const app = express();
   app.use(express.json());
   app.use(contextMiddleware);
   app.use(
     '/api/v1/customers/:customerId/config/secrets',
+    limiter,
     authMiddleware,
     requireCustomerConfigSecretsAccess(),
     configSecretsRouter,
   );
   app.use(
     '/api/v1/customers/:customerId/config',
+    limiter,
     hybridAuthByMethod('customers:read', 'customers:write'),
     requireCustomerConfigAccess(),
     configController,

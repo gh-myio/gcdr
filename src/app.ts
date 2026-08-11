@@ -297,8 +297,24 @@ apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_C
 // the customers:secrets:read operator permission (P0.2). The general /config CRUD is
 // hybridAuth (GET customers:read / write customers:write) PLUS requireCustomerConfigAccess,
 // which enforces the API-key hierarchy (SELF/SUBTREE/TENANT) and RBAC customer:<id> (P0.1).
-apiV1Router.use('/customers/:customerId/config/secrets', authMiddleware, requireCustomerConfigSecretsAccess(), customerConfigSecretsController);
-apiV1Router.use('/customers/:customerId/config', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), requireCustomerConfigAccess(), customerConfigController);
+// Rate-limited per IP+customer like goals/tariffs (auth'd DB route; satisfies
+// CodeQL js/missing-rate-limiting). Generous ceiling; blocks abusive floods.
+const customerConfigRateLimiter = expressRateLimit({
+  windowMs: 60_000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => `${clientIp(req)}:${req.params.customerId ?? ''}`,
+  handler: (req, res) =>
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many config requests; please slow down' },
+      meta: { requestId: req.context?.requestId, timestamp: new Date().toISOString() },
+    }),
+});
+apiV1Router.use('/customers/:customerId/config/secrets', customerConfigRateLimiter, authMiddleware, requireCustomerConfigSecretsAccess(), customerConfigSecretsController);
+apiV1Router.use('/customers/:customerId/config', customerConfigRateLimiter, hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), requireCustomerConfigAccess(), customerConfigController);
 
 // RFC-0046: Customer consumption goals (nested — must come before general /customers router)
 // hybridAuth: GET requires goals:read; PUT/PATCH/POST/DELETE require goals:write.

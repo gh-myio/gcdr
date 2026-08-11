@@ -23,7 +23,6 @@ import {
   inferEntityType,
   shouldLogEvent,
 } from '../shared/config/audit.config';
-import { JWTUser } from './context';
 
 // =============================================================================
 // Types
@@ -120,9 +119,13 @@ export interface LogEventOptions {
 type AuditLogWriter = (log: CreateAuditLogInput) => Promise<void>;
 
 let auditLogWriter: AuditLogWriter = async (log) => {
-  // Default: just log to console in development
+  // Default (dev only): log a NON-sensitive summary. Never dump the full entry —
+  // it can carry actor identifiers (userId/apiKeyId) and metadata, which would be
+  // clear-text logging of sensitive data (CodeQL js/clear-text-logging). The real
+  // writer (repository, set via setAuditLogWriter at boot) persists the full row.
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[AUDIT]', JSON.stringify(log, null, 2));
+    // eslint-disable-next-line no-console -- dev-only audit summary (non-sensitive)
+    console.log('[AUDIT]', log.eventType, log.entityType ?? '', log.entityId ?? '');
   }
 };
 
