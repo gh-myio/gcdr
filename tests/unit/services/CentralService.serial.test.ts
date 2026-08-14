@@ -1,5 +1,5 @@
 import { CentralService } from '../../../src/services/CentralService';
-import { ConflictError } from '../../../src/shared/errors/AppError';
+import { ConflictError, NotFoundError } from '../../../src/shared/errors/AppError';
 import type { ICentralRepository } from '../../../src/repositories/interfaces/ICentralRepository';
 
 function makeService(existsImpl?: (s: string) => boolean) {
@@ -51,6 +51,32 @@ describe('CentralService — central_id (serial) S1.S2.S3.S4', () => {
     it('returns false when valid but already taken', async () => {
       const { svc } = makeService(() => true);
       expect(await svc.isSerialAvailable('10.20.30.40')).toBe(false);
+    });
+  });
+
+  describe('update — serialNumber reconciliation guard', () => {
+    it('rejects changing serialNumber to one already taken by another central (409)', async () => {
+      const repo = {
+        getById: jest.fn(async () => ({ id: 'c-1', serialNumber: '1.1.1.1', customerId: 'cust-1' })),
+        getBySerialNumber: jest.fn(async () => ({ id: 'c-2', serialNumber: '2.2.2.2' })),
+      } as unknown as ICentralRepository;
+      const svc = new CentralService(repo, {} as never);
+      await expect(
+        svc.update('t-1', 'c-1', { serialNumber: '2.2.2.2' } as never, 'u-1'),
+      ).rejects.toThrow(ConflictError);
+      expect(repo.getBySerialNumber).toHaveBeenCalledWith('t-1', '2.2.2.2');
+    });
+
+    it('throws NotFoundError when the central does not exist', async () => {
+      const repo = {
+        getById: jest.fn(async () => null),
+        getBySerialNumber: jest.fn(),
+      } as unknown as ICentralRepository;
+      const svc = new CentralService(repo, {} as never);
+      await expect(
+        svc.update('t-1', 'missing', { serialNumber: '2.2.2.2' } as never, 'u-1'),
+      ).rejects.toThrow(NotFoundError);
+      expect(repo.getBySerialNumber).not.toHaveBeenCalled();
     });
   });
 

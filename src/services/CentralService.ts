@@ -1,5 +1,5 @@
 import { randomInt } from 'crypto';
-import { Central, CentralMqttPasswordsSet, ConnectionStatus } from '../domain/entities/Central';
+import { Central, CentralMqttPasswordsSet } from '../domain/entities/Central';
 import {
   CreateCentralDTO,
   UpdateCentralDTO,
@@ -116,6 +116,15 @@ export class CentralService {
     const existing = await this.repository.getById(tenantId, id);
     if (!existing) {
       throw new NotFoundError(`Central ${id} not found`);
+    }
+
+    // serialNumber is mutable (data reconciliation) but unique per tenant.
+    // Guard here for a clean 409 before hitting the DB unique constraint.
+    if (data.serialNumber && data.serialNumber !== existing.serialNumber) {
+      const clash = await this.repository.getBySerialNumber(tenantId, data.serialNumber);
+      if (clash && clash.id !== id) {
+        throw new ConflictError(`Central with serial number ${data.serialNumber} already exists`);
+      }
     }
 
     const updated = await this.repository.update(tenantId, id, data, userId);

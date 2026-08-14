@@ -81,6 +81,10 @@ export type CreateCentralDTO = z.infer<typeof CreateCentralSchema>;
 export const UpdateCentralSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   displayName: z.string().min(1).max(255).optional(),
+  // serialNumber = logical Central ID (RFC-0005). Mutable for data
+  // reconciliation (e.g. an ID mis-registered on import) — service enforces
+  // per-tenant uniqueness. Physical hardware swaps still use POST /replace.
+  serialNumber: z.string().min(1).max(100).optional(),
   type: z.enum(['NODEHUB', 'GATEWAY', 'EDGE_CONTROLLER', 'VIRTUAL']).optional(),
   firmwareVersion: z.string().max(50).optional(),
   softwareVersion: z.string().max(50).optional(),
