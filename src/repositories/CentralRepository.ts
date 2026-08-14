@@ -178,6 +178,7 @@ export class CentralRepository implements ICentralRepository {
     // Only update fields that are provided
     if (data.name !== undefined) updateData.name = data.name;
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.serialNumber !== undefined) updateData.serialNumber = data.serialNumber;
     if (data.firmwareVersion !== undefined) updateData.firmwareVersion = data.firmwareVersion;
     if (data.softwareVersion !== undefined) updateData.softwareVersion = data.softwareVersion;
     if (data.frequency !== undefined) updateData.frequency = data.frequency;
