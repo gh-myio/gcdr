@@ -98,7 +98,7 @@ export class CentralInitialKeyService {
       ?? 'awaiting_provisioning';
  
     if (provisioningState === 'provisioned') {
-      await this.audit(EventType.CENTRAL_INITIAL_API_KEY_BOOTSTRAP_FAILED, central, uuid, clientIp, {
+      await this.audit(EventType.CENTRAL_BOOTSTRAP_FAILED, central, uuid, clientIp, {
         reason: 'already_provisioned',
       });
       throw new ConflictError('Central already provisioned; bootstrap window closed');
@@ -108,7 +108,7 @@ export class CentralInitialKeyService {
  
     if (cachedKeyId) {
       const plaintextKey = await customerApiKeyService.revealApiKey(defaultTenantId(), cachedKeyId);
-      await this.audit(EventType.CENTRAL_INITIAL_API_KEY_ISSUED, central, uuid, clientIp, { cached: true });
+      await this.audit(EventType.CENTRAL_BOOTSTRAP_ISSUED, central, uuid, clientIp, { cached: true });
       return {
         apiKey: plaintextKey,
         scopes: INITIAL_KEY_SCOPES,
@@ -133,7 +133,7 @@ export class CentralInitialKeyService {
       centralInitialApiKeyId: apiKey.id,
     });
  
-    await this.audit(EventType.CENTRAL_INITIAL_API_KEY_ISSUED, central, uuid, clientIp, { cached: false });
+    await this.audit(EventType.CENTRAL_BOOTSTRAP_ISSUED, central, uuid, clientIp, { cached: false });
  
     return {
       apiKey: plaintextKey,
@@ -155,7 +155,7 @@ export class CentralInitialKeyService {
       entityType: 'central',
       entityId: central.centralId,
       actorType: ActorType.SYSTEM,
-      description: `Bootstrap ${eventType === EventType.CENTRAL_INITIAL_API_KEY_ISSUED ? 'succeeded' : 'failed'} for central ${uuid}`,
+      description: `Bootstrap ${eventType === EventType.CENTRAL_BOOTSTRAP_ISSUED ? 'succeeded' : 'failed'} for central ${uuid}`,
       metadata: { uuid, ip: clientIp, ...metadata },
     });
   }

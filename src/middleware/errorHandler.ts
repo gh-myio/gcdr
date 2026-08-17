@@ -43,9 +43,12 @@ export function errorHandler(
     const userId    = req.context?.userId    || '-';
     const ip        = req.context?.ip        || req.ip || '-';
     // err.message/req.path can carry attacker-controlled content; strip CR/LF
-    // so it can't forge extra log lines (log injection).
-    const logLine = `[${err.statusCode}] ${err.code}: ${err.message} | ${req.method} ${req.path} | ip=${ip} | userId=${userId} | requestId=${requestId}`
-      .replace(/[\r\n]+/g, ' ');
+    // from each SOURCE value before interpolation (not the composed string
+    // afterward) so static analysis can trace the sanitizer boundary and so
+    // it can't forge extra log lines (log injection).
+    const safeMessage = err.message.replace(/[\r\n]+/g, ' ');
+    const safePath = req.path.replace(/[\r\n]+/g, ' ');
+    const logLine = `[${err.statusCode}] ${err.code}: ${safeMessage} | ${req.method} ${safePath} | ip=${ip} | userId=${userId} | requestId=${requestId}`;
     console.warn(logLine);
   } else {
     console.error('Error:', err);
