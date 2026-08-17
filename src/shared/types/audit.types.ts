@@ -120,6 +120,12 @@ export enum EventType {
   CENTRAL_COMMAND_ISSUED = 'CENTRAL_COMMAND_ISSUED',
   CENTRAL_COMMAND_COMPLETED = 'CENTRAL_COMMAND_COMPLETED',
   CENTRAL_COMMAND_FAILED = 'CENTRAL_COMMAND_FAILED',
+  // RFC-0056: Central API Key Bootstrap. Naming includes "API_KEY_" so
+  // inferAuditLevel() classifies these MINIMAL (same tier as the customer
+  // API_KEY_* events) — never dropped regardless of AUDIT_LEVEL.
+  CENTRAL_INITIAL_API_KEY_ISSUED = 'CENTRAL_INITIAL_API_KEY_ISSUED',
+  CENTRAL_INITIAL_API_KEY_BOOTSTRAP_FAILED = 'CENTRAL_INITIAL_API_KEY_BOOTSTRAP_FAILED',
+  CENTRAL_PROVISIONING_RESET = 'CENTRAL_PROVISIONING_RESET',
   // RFC-0005: gateway hardware replacement — the authoritative ledger event,
   // written INSIDE the replace transaction (not via logEvent middleware).
   GATEWAY_REPLACED = 'GATEWAY_REPLACED',

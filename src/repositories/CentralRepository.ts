@@ -153,6 +153,33 @@ export class CentralRepository implements ICentralRepository {
     return row ?? null;
   }
 
+  /**
+   * RFC-0056 — shallow-merge a partial `config` jsonb patch onto the central
+   * row (e.g. `provisioningState`, `centralInitialApiKeyId`, `centralApiKeyId`).
+   * Tenant-scoped like the rest of the write methods; both call sites
+   * (bootstrap service, operator reset) already hold the resolved tenantId.
+   * Returns the updated config, or null if no such central in the tenant.
+   */
+  async patchConfig(
+    tenantId: string,
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<Record<string, unknown> | null> {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) return null;
+
+    const [result] = await db
+      .update(centrals)
+      .set({
+        config: { ...existing.config, ...patch },
+        updatedAt: new Date(),
+      })
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .returning({ config: centrals.config });
+
+    return (result?.config as Record<string, unknown>) ?? null;
+  }
+
   async existsBySerialNumberGlobal(serialNumber: string): Promise<boolean> {
     const [row] = await db
       .select({ id: centrals.id })

@@ -90,6 +90,36 @@ export function clientIp(req: Request): string {
 }
 
 /**
+ * Non-middleware fixed-window check: same bucket mechanics as `rateLimit()`
+ * below, but directly callable from application code that needs to gate on
+ * an OUTCOME rather than on request entry (e.g. RFC-0056's "successful
+ * reveal count per uuid" dimension, which must not consume budget on every
+ * call — only on ones the caller decides to count). Always increments on
+ * call; the caller decides when to call it.
+ */
+export function consumeIfAllowed(
+  name: string,
+  key: string,
+  config: { windowMs: number; max: number },
+): { allowed: boolean; retryAfterSeconds: number } {
+  const store = getStore(name);
+  const now = Date.now();
+  const entry = store.get(key);
+
+  if (!entry || entry.resetAt <= now) {
+    store.set(key, { count: 1, resetAt: now + config.windowMs });
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  entry.count += 1;
+  if (entry.count > config.max) {
+    return { allowed: false, retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000) };
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+/**
  * Build a rate limit middleware bound to a named bucket store. Each
  * named bucket is independent — `operator-pin` requests don't consume
  * the budget of `password-login` requests, etc.
@@ -189,4 +219,34 @@ export const centralPollIpRateLimiter = rateLimit('central-poll-ip', {
   max: 600,
   keyFn: (req) => clientIp(req),
   message: 'Too many central-agent requests from this source; slow down',
+});
+
+/**
+ * RFC-0056 bootstrap (`GET /public/central/initial-key`) — PUBLIC, secret-
+ * returning endpoint, so it needs its own dimensions rather than reusing
+ * central-enroll's. Two of the RFC's four dimensions (IP, uuid) are plain
+ * request-entry windows and fit the standard `rateLimit()` middleware; the
+ * other two (pre-key failure lockout, successful-reveal count) depend on the
+ * request OUTCOME and are implemented inside `centralPreKeyAuth` /
+ * `CentralInitialKeyService` via `consumeIfAllowed`.
+ *
+ * Numbers are proposed by analogy to centralEnrollRateLimiter (bootstrap is
+ * similarly rare — once per central, occasional firmware retries) — no
+ * threshold is specified in the RFC itself; adjust freely.
+ */
+export const centralBootstrapIpRateLimiter = rateLimit('central-bootstrap-ip', {
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  keyFn: (req) => clientIp(req),
+  message: 'Too many bootstrap attempts from this source; wait before retrying',
+});
+
+export const centralBootstrapUuidRateLimiter = rateLimit('central-bootstrap-uuid', {
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyFn: (req) => {
+    const u = req.headers['uuid'];
+    return typeof u === 'string' && u ? `central:${u}` : `ip:${clientIp(req)}`;
+  },
+  message: 'Too many bootstrap attempts for this central; wait before retrying',
 });

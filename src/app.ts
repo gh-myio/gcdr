@@ -60,6 +60,7 @@ import {
   centralsListByAssetHandler,
   centralSerialAvailableHandler,
   centralSerialNextHandler,
+  centralInitialKeyHandler,
   themesController,
   themesListByCustomerHandler,
   themesGetDefaultByCustomerHandler,
@@ -81,6 +82,9 @@ import {
   // RFC-0024: Alarm Dispatch Configuration
   customerChannelsController,
   customerIntegrationsController,
+  customerIntegrationSyncEventsHandler,
+  customerIntegrationDisableHandler,
+  customerIntegrationResetHandler,
   // RFC-0057: Customer Config Document
   customerConfigController,
   customerConfigSecretsController,
@@ -110,11 +114,14 @@ import { singleDashboardController } from './controllers/single-dashboard.contro
 import { userAdminController } from './controllers/admin/user-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
+import { centralPreKeyAuth, startLockoutJanitor } from './middleware/centralPreKeyAuth';
 import { requireSingleDashboardRead } from './middleware/requireDashboardPermission';
 import {
   centralEnrollRateLimiter,
   centralPollRateLimiter,
   centralPollIpRateLimiter,
+  centralBootstrapIpRateLimiter,
+  centralBootstrapUuidRateLimiter,
   startRateLimitJanitor,
 } from './middleware/rateLimit';
 import { validateSecretEncryptionKey } from './shared/utils/secretEnvelope';
@@ -290,6 +297,29 @@ const SCOPE_CUSTOMERS_WRITE = 'customers:write';
 // RFC-0024: Customer dispatch channels (nested — must come before general /customers router)
 // hybridAuth: supports JWT + API Key (alarm-orchestrator M2M)
 apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), customerChannelsController);
+
+// RFC-0056: sync-events/disable/reset re-gated to also accept the
+// central-sync:write scope (mounted BEFORE the general integrations router
+// below so express's ordering gives these full-path routes priority). The
+// rest of the integrations router (GET, PUT centrals/items) stays on
+// customers:read/write only — a central-sync:write-scoped CENTRAL_API_KEY
+// must not be able to touch PUT centrals/items (mqtt admin config).
+const SCOPE_CENTRAL_SYNC_WRITE = 'central-sync:write';
+apiV1Router.post(
+  '/customers/:customerId/integrations/:key/sync-events',
+  hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  customerIntegrationSyncEventsHandler,
+);
+apiV1Router.post(
+  '/customers/:customerId/integrations/:key/disable',
+  hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  customerIntegrationDisableHandler,
+);
+apiV1Router.post(
+  '/customers/:customerId/integrations/:key/reset',
+  hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  customerIntegrationResetHandler,
+);
 
 // RFC-0033: Customer integration sync state (nested — must come before general /customers router)
 // hybridAuth: GET requires customers:read; POST/PATCH/DELETE require customers:write.
@@ -525,6 +555,18 @@ apiV1Router.use('/dashboard', authMiddleware, dashboardController);
 // RFC-0023: Device Sync Jobs (hybridAuth — API Key with devices:write scope)
 apiV1Router.use('/device-sync/jobs', hybridAuthByMethod('devices:read', 'devices:write'), deviceSyncJobsController);
 
+// RFC-0056: Central API Key Bootstrap — PUBLIC (pre-key auth, not JWT/API-key).
+// Rate-limited per IP and per central uuid (request-entry windows); the
+// pre-key-failure lockout and successful-reveal-count dimensions are handled
+// inside centralPreKeyAuth / CentralInitialKeyService respectively (DEC-5).
+apiV1Router.get(
+  '/public/central/initial-key',
+  centralBootstrapIpRateLimiter,
+  centralBootstrapUuidRateLimiter,
+  centralPreKeyAuth,
+  centralInitialKeyHandler,
+);
+
 // RFC-0030: Public Wiki (anonymous, forces PUBLIC audience + PUBLISHED status).
 // Mounted BEFORE the authenticated /wiki router so express's ordering gives it
 // priority for /public/wiki/* paths.
@@ -663,6 +705,15 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to start the rate-limit janitor:', error);
+    }
+
+    // RFC-0056: periodically evict expired pre-key-failure lockout entries —
+    // same bounded-memory-under-churn rationale as the rate-limit janitor.
+    try {
+      startLockoutJanitor();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the central-bootstrap lockout janitor:', error);
     }
   });
 }

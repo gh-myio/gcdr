@@ -31,6 +31,8 @@ import {
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
 import { EventType, ActorType } from '../shared/types';
+import { customerApiKeyService } from '../services/CustomerApiKeyService';
+import { defaultTenantId } from '../services/CentralInitialKeyService';
 
 const ERR_CENTRAL_ID_REQUIRED = 'Central ID is required';
 
@@ -319,6 +321,60 @@ router.post('/:id/heartbeat', async (req: Request, res: Response, next: NextFunc
     next(err);
   }
 });
+
+/**
+ * POST /centrals/:id/reset-provisioning
+ * RFC-0056 (DEC-9) — operator action that reopens the bootstrap window: the
+ * RFC's DEC-4 mentions "an explicit operator reset" without specifying an
+ * endpoint; this fills that gap. Best-effort revokes both the INITIAL and
+ * full CENTRAL_API_KEY (if bound — they were minted under the fixed
+ * INITIAL-key tenant/customer, not this central's own tenant) and resets
+ * `provisioningState` back to `awaiting_provisioning`, fully reopening the
+ * ladder (a full key left bound while the state says "awaiting" would be
+ * inconsistent with DEC-4/DEC-6, which tie `provisioned` to a bound full key).
+ */
+router.post('/:id/reset-provisioning',
+  logEvent({
+    eventType: EventType.CENTRAL_PROVISIONING_RESET,
+    description: (req) => `Provisioning reset for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
+
+      if (!id) {
+        throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+      }
+
+      // Confirms the central exists in this tenant (throws NotFoundError otherwise).
+      const central = await centralService.getById(tenantId, id);
+      const config = central.config as unknown as Record<string, unknown>;
+      const keyIds = [config.centralInitialApiKeyId, config.centralApiKeyId]
+        .filter((v): v is string => typeof v === 'string' && v.length > 0);
+
+      for (const keyId of keyIds) {
+        try {
+          await customerApiKeyService.revokeApiKey(defaultTenantId(), keyId);
+        } catch (err) {
+          // Already gone (e.g. manually revoked) — reset should still proceed.
+          if (!(err instanceof NotFoundError)) throw err;
+        }
+      }
+
+      await centralRepository.patchConfig(tenantId, id, {
+        provisioningState: 'awaiting_provisioning',
+        centralInitialApiKeyId: null,
+        centralApiKeyId: null,
+      });
+
+      sendSuccess(res, { id, provisioningState: 'awaiting_provisioning' }, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * PUT /centrals/:id/mqtt-passwords/:integrationId
