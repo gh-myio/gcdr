@@ -1,8 +1,8 @@
 # RFC-0055 — No-Consumption Detection & Incidents Panel
 
-- **Status:** Draft v2 (feedback-v1 folded in)
+- **Status:** Draft v2 (feedback-v1 folded in) · aligned with Alarms RFC-0030/0031 (2026-08-13)
 - **Created:** 2026-08-03
-- **Updated:** 2026-08-03 (amended per feedback-v1)
+- **Updated:** 2026-08-13 (aligned with the Alarms-side implementation)
 - **Author:** GCDR Core Team
 - **Domain:** Rules Engine / Alarms Orchestrator / Incidents / Frontend
 - **Related RFCs:** RFC-0015 (Alarm Bundle Version History), RFC-0016 (ThingsBoard Entity Mapping), RFC-0035 (Plural MQTT on Centrals), `docs/RULE-ENTITY.md`, `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
@@ -17,6 +17,17 @@
 > to 60 and ships the rule **disabled by default** until Alarms confirms support;
 > added Authorization, Frontend transport decision, Testing, and Acceptance
 > Criteria sections; unique key now includes `customer_id`.
+
+> **Alignment update (2026-08-13)** — reconciled with the shipped Alarms-side
+> implementation (**RFC-0030**, No-Consumption; **RFC-0031**, Multi-Source
+> Ingestion): (1) §8 rewritten — `NO_CONSUMPTION` is delivered as a separate
+> additive `noConsumptionRules[]` section on `/bundle/to-verify-service` only
+> (never in `rules[]`, never in `/bundle/simple`); the real precondition is the
+> Alarms-side type guard (RFC-0030 §3.7, prod 2026-08-06), not "older builds
+> ignore unknown types". (2) §7/§4/Summary — the Incidents panel is owned by
+> `alarms-web`; GCDR `/incidents` is a **redirect**, not a proxy+panel. (3) the
+> `metric` enum is lowercase on the wire (`energy_consumption` \| `water_flow`).
+> (4) §4 — public candidate ingestion is superseded in part by RFC-0031.
 
 ---
 
@@ -41,8 +52,11 @@ Three moving parts:
    central**, grouping the affected devices, and within each device the **empty
    time-slot ranges**.
 
-3. **GCDR Frontend** renders the **Incidents panel**: day → central → device →
-   slot ranges, with drill-down, filters and status.
+3. The **Incidents panel** (day → central → device → slot ranges, drill-down,
+   filters, ack/resolve) is rendered by **`alarms-web`**, which owns the
+   incidents plane (Alarms RFC-0030 §3.8). **GCDR Frontend** only exposes a
+   `/incidents` **redirect** to it — see §7 (the earlier "GCDR renders the panel"
+   plan was superseded).
 
 This RFC defines the rule shape, the detection semantics, the incident data
 model, the API contracts, and — importantly — **who owns each piece**.
@@ -110,13 +124,13 @@ NO_CONSUMPTION rule    ── bundle ─▶ evaluate telemetry slots  ── API
   "status": "OPEN",
   "acknowledgedAt": null, "acknowledgedBy": null,
   "devices": [
-    { "deviceId": "…", "slaveId": 12, "name": "Medidor Loja 12", "metric": "ENERGY_CONSUMPTION",
+    { "deviceId": "…", "slaveId": 12, "name": "Medidor Loja 12", "metric": "energy_consumption",
       "emptySlots": [
         { "from": "2026-08-02T03:00:00-03:00", "to": "2026-08-02T05:00:00-03:00", "slotCount": 2 },
         { "from": "2026-08-02T21:00:00-03:00", "to": "2026-08-02T22:00:00-03:00", "slotCount": 1 }
       ],
       "slotCount": 3 },
-    { "deviceId": "…", "slaveId": 7,  "name": "Medidor Chiller", "metric": "ENERGY_CONSUMPTION",
+    { "deviceId": "…", "slaveId": 7,  "name": "Medidor Chiller", "metric": "energy_consumption",
       "emptySlots": [
         { "from": "2026-08-02T14:00:00-03:00", "to": "2026-08-02T15:00:00-03:00", "slotCount": 1 }
       ],
@@ -145,7 +159,7 @@ Config object (`noConsumptionConfig`, jsonb, mirrors how `alarmConfig` /
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `metric` | **enum** (consumption domain) | — | Which consumption metric must be present. Validated against a small enum (e.g. `ENERGY_CONSUMPTION`, `WATER_CONSUMPTION`), **not** an arbitrary string. |
+| `metric` | **enum** (consumption domain) | — | Which consumption metric must be present. Validated against a small enum — **`energy_consumption` \| `water_flow`** (lowercase, the actual `MetricDomain` values emitted on the wire), **not** an arbitrary string. |
 | `windowMinutes` | int | `60` | Slot size. **v1: only `60` accepted** — reject other values until Alarms supports variable windows. |
 | `minSamplesPerWindow` | int | `1` | A slot is "filled" when it has ≥ this many non-null samples. |
 | `graceWindows` | int | `1` | Consecutive empty windows tolerated before it counts (debounce). |
@@ -181,7 +195,7 @@ The rule appears in the existing bundle `rules[]` exactly as:
   "scopeEntityIds": ["central_uuid"],
   "priority": "HIGH",
   "noConsumptionConfig": {
-    "metric": "ENERGY_CONSUMPTION",
+    "metric": "energy_consumption",
     "windowMinutes": 60,
     "minSamplesPerWindow": 1,
     "graceWindows": 1,
@@ -276,6 +290,10 @@ API. (Alternative — GCDR hosts an incidents table — in §Alternatives.)
 - `POST /incidents/:id/resolve` — body `{ "reason": "…" }`; persists `actorId`,
   timestamp, tenant.
 - (internal) candidate ingestion is in-process; no public create endpoint.
+  **Superseded in part by Alarms RFC-0031** (Multi-Source Incident Ingestion),
+  which adds `POST /incidents/candidates` + an atomic `ON CONFLICT` upsert once a
+  second producer exists. Still a decision open there (`AUTHORITATIVE`/`PARTIAL`,
+  and whether GCDR itself becomes a producer).
 - The orchestrator **exposes support/version info** (which bundle version /
   rule types it can evaluate) so GCDR can flip the rule on safely (§Compatibility).
 
@@ -294,11 +312,13 @@ with offset**.
   alarms side to hydrate incidents. Reuse existing device/central reads where
   possible.
 
-**GCDR Frontend (new):**
-- **Incidents panel** consuming the alarms `/incidents` API: grouped
-  **day ▸ central ▸ device ▸ slot ranges**, with day/central/status filters,
-  severity chips, ack/resolve actions, and a drill-down. Lives as a top-level
-  page and/or a tab on the central/customer detail.
+**GCDR Frontend (updated — see §7):**
+- **No in-GCDR panel.** The Incidents panel lives in **`alarms-web`** (Alarms
+  RFC-0030 §3.8). GCDR's `/incidents` route is a **redirect**: a standard modal
+  explaining incidents are part of the Alarms project, with a button opening the
+  alarms-web panel in a new tab. The grouped **day ▸ central ▸ device ▸ slot
+  ranges** view, filters, severity chips and ack/resolve all live on the
+  alarms-web side.
 
 ### 5. Categorization / grouping (the panel)
 
@@ -321,48 +341,51 @@ with offset**.
 - **Internal rule definitions** (`NO_CONSUMPTION`) are **read-only metadata**
   visible only to admin/support — never customer-editable.
 
-### 7. Frontend transport decision — DECIDED (ED-1077): thin GCDR proxy
+### 7. Frontend transport decision — SUPERSEDED: the panel lives in `alarms-web`
 
-The GCDR Frontend consumes an **Alarms-owned** incidents API while still needing
-GCDR master-data context.
+> **Update (2026-08-13).** The earlier decision below (ED-1077: a thin GCDR
+> proxy fronting an in-GCDR panel) was **superseded**. The Incidents panel is
+> owned by **`alarms-web`** — see Alarms **RFC-0030 §3.8** — which already holds
+> the auth, the API client, and the alarm-shaped ack/resolve operations. GCDR's
+> `/incidents` route is a **redirect** to the alarms-web panel (a standard modal
+> explaining incidents live in the Alarms project, opening
+> `https://alarms-web.a.myio-bas.com/pt/incidents` in a new tab). No GCDR proxy,
+> no in-GCDR panel, no `incidentService`. Shipped in gcdr-frontend PR #24 → #29.
+>
+> Consequence: the GCDR-side items in §4 ("GCDR Frontend — Incidents panel") and
+> in the Summary reduce to the redirect; the proxy endpoints (ED-1088) are **not
+> built**. Alarms remains the system of record either way.
+
+*Historical (superseded) decision, kept for the record:*
 
 **Decision (ED-1077, 2026-08-04): Option B — a thin GCDR-Backend proxy for
 `/incidents*`.** The browser calls GCDR; GCDR forwards to the Alarms API and
-enriches the response in-process before returning it:
-
-```
-Browser (panel) ──► GCDR /incidents* ──► Alarms incidents API
-                         └─ enriches device/central/customer names in-process
-```
-
-This is a **transport/auth concern only** — it does **not** move incident
-*ownership* to GCDR (Alarms remains the system of record).
-
-Rationale (over calling Alarms directly):
-
-- **Auth / CORS / tenant scoping / asset-level RBAC already live in GCDR**
-  (`authMiddleware`, `contextMiddleware`, viewer-by-asset). The direct path would
-  force Alarms to re-implement all of it for the browser.
-- **Enrichment (ED-1080) runs in-process** — the proxy calls `EnrichmentService`
-  directly to inject `deviceName`/`centralName`/`customerName`, with no extra HTTP
-  round trip.
-- **The frontend stays GCDR-only** (single base URL, single auth model). The
-  `incidentService` is already transport-agnostic (`VITE_INCIDENTS_API_URL`).
-
-Cost accepted: one extra hop and four pass-through endpoints in GCDR
-(`GET /incidents`, `GET /incidents/:id`, `POST /incidents/:id/ack|resolve`).
-
-Implementation: **ED-1088** (GCDR proxy endpoints) + point `VITE_INCIDENTS_API_URL`
-at GCDR. Blocked only on the Alarms internal incidents API existing.
+enriches the response in-process before returning it. Rationale was auth/CORS/
+tenant scoping/RBAC already living in GCDR, in-process enrichment (ED-1080), and
+a GCDR-only frontend. That path added one hop and four pass-through endpoints and
+was **not** pursued once the panel moved to `alarms-web`.
 
 ### 8. Compatibility / versioning
 
 - The `NO_CONSUMPTION` rule ships **`enabled = false`** and is flipped on only
   after the Alarms Orchestrator reports it supports the bundle version carrying the
   new type (the orchestrator exposes support/version info; §4).
-- Adding the enum value is additive; older Alarms builds that don't recognize the
-  type must **ignore** unknown rule types in the bundle (confirm this is the
-  current behavior before enabling).
+- **How the rule reaches Alarms — and why it is not a threshold hazard.** GCDR
+  emits `NO_CONSUMPTION` rules in a **separate additive `noConsumptionRules[]`
+  section**, exposed **only on `GET /…/bundle/to-verify-service`** — never mixed
+  into `rules[]`, and **never in `/bundle/simple`** (the Node-RED bundle strips
+  it). A consumer that only iterates `rules[]` therefore never sees the rule and
+  cannot mis-evaluate it as a threshold; it simply ignores the unknown top-level
+  key. (An earlier draft claimed "older Alarms builds ignore unknown rule *types*
+  in the bundle" — that framing was imprecise: nothing about GCDR's output places
+  `NO_CONSUMPTION` inside `rules[]` in the first place.)
+- **The real precondition is on the Alarms side.** When the verify pipeline
+  begins *reading* the `noConsumptionRules[]` section, it must recognize the type
+  explicitly — a rule type it cannot evaluate must be **skipped and counted, never
+  reported as healthy**. Alarms **RFC-0030 §3.7** ships exactly this (a type guard
+  + a supported-types/version endpoint), **in production since 2026-08-06**. GCDR
+  only flips `enabled = true` **after** that guard is live, gated on the
+  supported-types endpoint. See Alarms **RFC-0030** (No-Consumption, Alarms side).
 
 ---
 
