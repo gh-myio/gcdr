@@ -76,6 +76,30 @@ export class RuleRepository implements IRuleRepository {
     return result ? this.mapToEntity(result) : null;
   }
 
+  /**
+   * Copies the scalar/simple-presence fields of an UpdateRuleDTO patch onto
+   * updateData — split out of update() purely to keep its cognitive
+   * complexity under the lint threshold; no behavior change.
+   */
+  private applyScalarUpdateFields(data: UpdateRuleDTO, updateData: Record<string, unknown>): void {
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.priority !== undefined) updateData.priority = data.priority;
+    if (data.enabled !== undefined) updateData.enabled = data.enabled;
+    if (data.internalRule !== undefined) updateData.internalRule = data.internalRule;
+    if (data.isInternalSupportRule !== undefined) updateData.isInternalSupportRule = data.isInternalSupportRule;
+    if (data.lookbackDays !== undefined) updateData.lookbackDays = data.lookbackDays ?? null;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
+    if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
+    if (data.scope?.scopeProfiles !== undefined) updateData.scopeProfiles = data.scope.scopeProfiles ?? null;
+    if (data.alarmConfig !== undefined) updateData.alarmConfig = data.alarmConfig;
+    if (data.slaConfig !== undefined) updateData.slaConfig = data.slaConfig;
+    if (data.escalationConfig !== undefined) updateData.escalationConfig = data.escalationConfig;
+    if (data.maintenanceConfig !== undefined) updateData.maintenanceConfig = data.maintenanceConfig;
+    if (data.noConsumptionConfig !== undefined) updateData.noConsumptionConfig = data.noConsumptionConfig;
+  }
+
   async update(tenantId: string, id: string, data: UpdateRuleDTO, updatedBy: string): Promise<Rule> {
     const existing = await this.getById(tenantId, id);
     if (!existing) {
@@ -88,18 +112,7 @@ export class RuleRepository implements IRuleRepository {
       version: existing.version + 1,
     };
 
-    // Only update fields that are provided
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.priority !== undefined) updateData.priority = data.priority;
-    if (data.enabled !== undefined) updateData.enabled = data.enabled;
-    if (data.internalRule !== undefined) updateData.internalRule = data.internalRule;
-    if (data.isInternalSupportRule !== undefined) updateData.isInternalSupportRule = data.isInternalSupportRule;
-    if (data.lookbackDays !== undefined) updateData.lookbackDays = data.lookbackDays ?? null;
-    if (data.tags !== undefined) updateData.tags = data.tags;
-    if (data.notificationChannels !== undefined) updateData.notificationChannels = data.notificationChannels;
-    if (data.notifications !== undefined) updateData.notifications = data.notifications ?? null;
-    if (data.scope?.scopeProfiles !== undefined) updateData.scopeProfiles = data.scope.scopeProfiles ?? null;
+    this.applyScalarUpdateFields(data, updateData);
 
     // Handle scope updates
     if (data.scope !== undefined) {
@@ -110,13 +123,6 @@ export class RuleRepository implements IRuleRepository {
 
     // Handle scope entity overrides
     if (data.scopeEntityOverrides !== undefined) updateData.scopeEntityOverrides = data.scopeEntityOverrides ?? null;
-
-    // Handle config updates
-    if (data.alarmConfig !== undefined) updateData.alarmConfig = data.alarmConfig;
-    if (data.slaConfig !== undefined) updateData.slaConfig = data.slaConfig;
-    if (data.escalationConfig !== undefined) updateData.escalationConfig = data.escalationConfig;
-    if (data.maintenanceConfig !== undefined) updateData.maintenanceConfig = data.maintenanceConfig;
-    if (data.noConsumptionConfig !== undefined) updateData.noConsumptionConfig = data.noConsumptionConfig;
 
     const [result] = await db
       .update(rules)
@@ -199,7 +205,8 @@ export class RuleRepository implements IRuleRepository {
     }
 
     if (params.search) {
-      conditions.push(sql`(${rules.name} ILIKE ${`%${params.search}%`})`);
+      const searchPattern = `%${params.search}%`;
+      conditions.push(sql`(${rules.name} ILIKE ${searchPattern})`);
     }
 
     if (params.internalRule !== undefined) {

@@ -11,6 +11,9 @@ import { countWhere } from './helpers/countQuery';
 
 const { customers } = schema;
 
+const ERR_CUSTOMER_NOT_FOUND_CODE = 'CUSTOMER_NOT_FOUND';
+const ERR_CUSTOMER_NOT_FOUND_MSG = 'Customer not found';
+
 export class CustomerRepository implements ICustomerRepository {
 
   async create(tenantId: string, data: CreateCustomerDTO, createdBy: string): Promise<Customer> {
@@ -105,7 +108,7 @@ export class CustomerRepository implements ICustomerRepository {
   async update(tenantId: string, id: string, data: UpdateCustomerDTO, updatedBy: string): Promise<Customer> {
     const existing = await this.getById(tenantId, id);
     if (!existing) {
-      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+      throw new AppError(ERR_CUSTOMER_NOT_FOUND_CODE, ERR_CUSTOMER_NOT_FOUND_MSG, 404);
     }
 
     const updateData: Record<string, unknown> = {
@@ -153,7 +156,7 @@ export class CustomerRepository implements ICustomerRepository {
       throw new AppError('HAS_CHILDREN', 'Cannot delete customer with children', 400);
     }
 
-    const result = await db
+    await db
       .delete(customers)
       .where(and(eq(customers.tenantId, tenantId), eq(customers.id, id)));
 
@@ -163,7 +166,7 @@ export class CustomerRepository implements ICustomerRepository {
   async forceDelete(tenantId: string, customerId: string, options: import('./interfaces/ICustomerRepository').ForceDeleteOptions = {}): Promise<ForceDeleteResult> {
     const customer = await this.getById(tenantId, customerId);
     if (!customer) {
-      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+      throw new AppError(ERR_CUSTOMER_NOT_FOUND_CODE, ERR_CUSTOMER_NOT_FOUND_MSG, 404);
     }
 
     const descendants = await this.getDescendants(tenantId, customerId);
@@ -430,7 +433,8 @@ export class CustomerRepository implements ICustomerRepository {
     }
 
     if (params.search) {
-      conditions.push(sql`(${customers.name} ILIKE ${`%${params.search}%`} OR ${customers.displayName} ILIKE ${`%${params.search}%`})`);
+      const searchPattern = `%${params.search}%`;
+      conditions.push(sql`(${customers.name} ILIKE ${searchPattern} OR ${customers.displayName} ILIKE ${searchPattern})`);
     }
 
     const [results, total] = await Promise.all([
@@ -486,7 +490,7 @@ export class CustomerRepository implements ICustomerRepository {
   async getDescendants(tenantId: string, customerId: string, maxDepth?: number): Promise<Customer[]> {
     const customer = await this.getById(tenantId, customerId);
     if (!customer) {
-      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+      throw new AppError(ERR_CUSTOMER_NOT_FOUND_CODE, ERR_CUSTOMER_NOT_FOUND_MSG, 404);
     }
 
     // Query by path prefix using LIKE
@@ -513,7 +517,7 @@ export class CustomerRepository implements ICustomerRepository {
   async getAncestors(tenantId: string, customerId: string): Promise<Customer[]> {
     const customer = await this.getById(tenantId, customerId);
     if (!customer) {
-      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+      throw new AppError(ERR_CUSTOMER_NOT_FOUND_CODE, ERR_CUSTOMER_NOT_FOUND_MSG, 404);
     }
 
     // Parse path to get ancestor IDs
@@ -559,7 +563,7 @@ export class CustomerRepository implements ICustomerRepository {
   async move(tenantId: string, customerId: string, newParentId: string | null, updatedBy: string): Promise<Customer> {
     const customer = await this.getById(tenantId, customerId);
     if (!customer) {
-      throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+      throw new AppError(ERR_CUSTOMER_NOT_FOUND_CODE, ERR_CUSTOMER_NOT_FOUND_MSG, 404);
     }
 
     // Validate new parent

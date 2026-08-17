@@ -78,7 +78,7 @@ export class EmailService {
   async send(options: SendEmailOptions): Promise<EmailResult> {
     // If email is disabled, log and return success
     if (!config.enabled) {
-      console.log(`[EMAIL-DISABLED] Would send to ${options.to}: ${options.subject}`);
+      console.info(`[EMAIL-DISABLED] Would send to ${options.to}: ${options.subject}`);
       return { success: true, messageId: 'disabled' };
     }
 
@@ -99,7 +99,7 @@ export class EmailService {
         text: options.text || stripHtmlTags(options.html),
       });
 
-      console.log(`[EMAIL] Sent to ${options.to}: ${options.subject} (${result.messageId})`);
+      console.info(`[EMAIL] Sent to ${options.to}: ${options.subject} (${result.messageId})`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -173,7 +173,7 @@ export class EmailService {
    */
   async verifyConnection(): Promise<boolean> {
     if (!config.enabled) {
-      console.log('[EMAIL] Email sending is disabled');
+      console.info('[EMAIL] Email sending is disabled');
       return true;
     }
 
@@ -185,7 +185,7 @@ export class EmailService {
     try {
       const transport = getTransporter();
       await transport.verify();
-      console.log('[EMAIL] SMTP connection verified successfully');
+      console.info('[EMAIL] SMTP connection verified successfully');
       return true;
     } catch (error) {
       console.error('[EMAIL] SMTP connection failed:', error);

@@ -28,6 +28,69 @@ function extractPostgresError(err: unknown): PostgresErrorShape | null {
 }
 
 /**
+ * Maps a Postgres constraint-violation error to its HTTP response and sends
+ * it. Returns true if it handled the error, false if the code isn't one of
+ * the mapped ones (caller falls through to the generic 500 path). Split out
+ * of errorHandler() purely to keep its cognitive complexity under the lint
+ * threshold — no behavior change from the inline version.
+ */
+function sendPostgresErrorResponse(
+  pgError: PostgresErrorShape,
+  res: Response,
+  requestId: string,
+  timestamp: string,
+): boolean {
+  if (pgError.code === '23505') {
+    // unique_violation
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.detail || 'A resource with the same unique value already exists',
+        code: 'CONFLICT',
+        ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
+      },
+      meta: { requestId, timestamp },
+    };
+    res.status(409).json(response);
+    return true;
+  }
+
+  if (pgError.code === '23503') {
+    // foreign_key_violation
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.detail || 'Referenced resource does not exist or is still in use',
+        code: 'FK_VIOLATION',
+        ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
+      },
+      meta: { requestId, timestamp },
+    };
+    res.status(409).json(response);
+    return true;
+  }
+
+  if (pgError.code === '23502') {
+    // not_null_violation
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.column_name
+          ? `Required column "${pgError.column_name}" is missing`
+          : 'A required field is missing',
+        code: 'VALIDATION_ERROR',
+        ...(pgError.column_name && { details: { column: pgError.column_name } }),
+      },
+      meta: { requestId, timestamp },
+    };
+    res.status(400).json(response);
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Global error handler middleware for Express
  */
 export function errorHandler(
@@ -133,53 +196,8 @@ export function errorHandler(
   // this, the wrapper's message is "Failed query: insert into ..." which
   // both leaks SQL/params to the client and is reported as 500.
   const pgError = extractPostgresError(err);
-  if (pgError) {
-    if (pgError.code === '23505') {
-      // unique_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.detail || 'A resource with the same unique value already exists',
-          code: 'CONFLICT',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(409).json(response);
-      return;
-    }
-
-    if (pgError.code === '23503') {
-      // foreign_key_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.detail || 'Referenced resource does not exist or is still in use',
-          code: 'FK_VIOLATION',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(409).json(response);
-      return;
-    }
-
-    if (pgError.code === '23502') {
-      // not_null_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.column_name
-            ? `Required column "${pgError.column_name}" is missing`
-            : 'A required field is missing',
-          code: 'VALIDATION_ERROR',
-          ...(pgError.column_name && { details: { column: pgError.column_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(400).json(response);
-      return;
-    }
+  if (pgError && sendPostgresErrorResponse(pgError, res, requestId, timestamp)) {
+    return;
   }
 
   // Unknown errors
