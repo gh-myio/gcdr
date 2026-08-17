@@ -40,6 +40,24 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
+/**
+ * Strip HTML tags for the plain-text fallback of an email. A single
+ * `replace(/<[^>]*>/g, '')` pass is unsound: a malformed/nested input like
+ * `<scr<script>ipt>` can leave a reassembled `<script>`-like fragment behind
+ * after just one pass. Looping to a fixed point (no more matches) closes
+ * that gap — the string only shrinks or stays put each iteration, so this
+ * always terminates.
+ */
+function stripHtmlTags(html: string): string {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = previous.replace(/<[^>]*>/g, '');
+  } while (current !== previous);
+  return current;
+}
+
 export interface SendEmailOptions {
   to: string;
   subject: string;
@@ -78,7 +96,7 @@ export class EmailService {
         to: options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replace(/<[^>]*>/g, ''),
+        text: options.text || stripHtmlTags(options.html),
       });
 
       console.log(`[EMAIL] Sent to ${options.to}: ${options.subject} (${result.messageId})`);

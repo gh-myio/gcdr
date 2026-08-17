@@ -42,7 +42,11 @@ export function errorHandler(
     const requestId = req.context?.requestId || '-';
     const userId    = req.context?.userId    || '-';
     const ip        = req.context?.ip        || req.ip || '-';
-    console.warn(`[${err.statusCode}] ${err.code}: ${err.message} | ${req.method} ${req.path} | ip=${ip} | userId=${userId} | requestId=${requestId}`);
+    // err.message/req.path can carry attacker-controlled content; strip CR/LF
+    // so it can't forge extra log lines (log injection).
+    const logLine = `[${err.statusCode}] ${err.code}: ${err.message} | ${req.method} ${req.path} | ip=${ip} | userId=${userId} | requestId=${requestId}`
+      .replace(/[\r\n]+/g, ' ');
+    console.warn(logLine);
   } else {
     console.error('Error:', err);
   }

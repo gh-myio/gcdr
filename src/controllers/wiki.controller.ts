@@ -482,11 +482,14 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
 router.get('/backlinks', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
-    const entity = req.query.entity as string | undefined;
-    if (!entity || !entity.includes(':')) {
+    // req.query.entity may be a string, an array (?entity=a&entity=b), or an
+    // object under qs's parsing — the `as string` cast doesn't check that at
+    // runtime. Validate the actual type before calling string methods on it.
+    const entityRaw = req.query.entity;
+    if (typeof entityRaw !== 'string' || !entityRaw.includes(':')) {
       throw new NotFoundError(`Invalid entity reference (expected 'type:id')`);
     }
-    const [entityType, entityId] = entity.split(':', 2);
+    const [entityType, entityId] = entityRaw.split(':', 2);
     const EntityTypeSchema = z.enum([
       'device','customer','rule','asset','central','group','user','rfc',
     ]);

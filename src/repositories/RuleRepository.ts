@@ -6,10 +6,23 @@ import { PaginatedResult } from '../shared/types';
 import { IRuleRepository, ListRulesParams } from './interfaces/IRuleRepository';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
-import { AppError } from '../shared/errors/AppError';
+import { AppError, ValidationError } from '../shared/errors/AppError';
 import { countWhere } from './helpers/countQuery';
 
 const { rules } = schema;
+
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// setDeviceOverride/removeDeviceOverride use deviceId as a jsonb object key
+// (`{ [deviceId]: override }`, `scopeEntityOverrides - deviceId`) built from a
+// caller-supplied value (ultimately req.params.deviceId) — reject anything
+// that isn't a well-formed device UUID before it can become an arbitrary key
+// in the stored document (CodeQL: remote property injection).
+function assertValidDeviceId(deviceId: string): void {
+  if (!UUID_RE.test(deviceId)) {
+    throw new ValidationError('deviceId must be a valid UUID');
+  }
+}
 
 export class RuleRepository implements IRuleRepository {
 
@@ -346,6 +359,7 @@ export class RuleRepository implements IRuleRepository {
   }
 
   async setDeviceOverride(tenantId: string, ruleId: string, deviceId: string, override: RuleValueOverride): Promise<Rule> {
+    assertValidDeviceId(deviceId);
     const existing = await this.getById(tenantId, ruleId);
     if (!existing) {
       throw new AppError('RULE_NOT_FOUND', 'Rule not found', 404);
@@ -365,6 +379,7 @@ export class RuleRepository implements IRuleRepository {
   }
 
   async removeDeviceOverride(tenantId: string, ruleId: string, deviceId: string): Promise<Rule> {
+    assertValidDeviceId(deviceId);
     const existing = await this.getById(tenantId, ruleId);
     if (!existing) {
       throw new AppError('RULE_NOT_FOUND', 'Rule not found', 404);

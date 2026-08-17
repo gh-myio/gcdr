@@ -301,8 +301,14 @@ export class CustomerRepository implements ICustomerRepository {
           ))
           .returning({ id: schema.devices.id, customerId: schema.devices.customerId, assetId: schema.devices.assetId });
         if (strayDevices.length > 0) {
+          // customerId is caller-provided: kept out of the format string itself
+          // (avoids the value being reinterpreted as %-specifiers) and stripped
+          // of CR/LF (avoids forging extra log lines).
+          const safeCustomerIdForLog = String(customerId).replace(/[\r\n]/g, '');
           console.warn(
-            `[forceDelete] DATA_INCONSISTENCY: ${strayDevices.length} device(s) had assetId pointing to customer ${customerId} but a different customerId. Deleted:`,
+            '[forceDelete] DATA_INCONSISTENCY: %d device(s) had assetId pointing to customer %s but a different customerId. Deleted:',
+            strayDevices.length,
+            safeCustomerIdForLog,
             strayDevices.map((d) => ({ deviceId: d.id, deviceCustomerId: d.customerId, assetId: d.assetId })),
           );
         }
