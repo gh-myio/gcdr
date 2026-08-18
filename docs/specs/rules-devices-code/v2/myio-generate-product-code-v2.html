@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MYIO · Padrão de numeração de dispositivos v2 (data)</title>
+<meta name="description" content="Gerador/parser do código de produto MYIO v2 — 4 bytes com data de fabricação (ano/mês/dia), sequencial e tipo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --purple:#673BB6; --purple-dark:#4A2A85; --purple-50:#F4F0FB;
+    --green:#00C57E; --green-dark:#00945F; --green-50:#E6FAF2;
+    --bg:#FAFAFB; --surface:#fff; --border:rgba(20,14,38,.08); --border-strong:rgba(20,14,38,.16);
+    --text:#140E26; --muted:#5A526C; --faint:#8B849B; --red:#D64545;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px;
+    background-image:radial-gradient(circle at 1px 1px,rgba(103,59,182,.06) 1px,transparent 0);background-size:32px 32px;min-height:100vh}
+  .header{background:rgba(255,255,255,.82);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+  .header-inner,.hero,main,.footer-inner{max-width:1080px;margin:0 auto}
+  .header-inner{padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--purple);display:flex;align-items:center;justify-content:center}
+  .logo-text{font-family:'Sora',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.025em}
+  .header-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);letter-spacing:.06em}
+  .hero{padding:64px 24px 24px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;
+    letter-spacing:.14em;color:var(--purple-dark);background:var(--purple-50);padding:6px 12px;border-radius:100px;margin-bottom:20px;text-transform:uppercase}
+  .eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(0,197,126,.18)}
+  h1{font-family:'Sora',sans-serif;font-size:clamp(30px,5vw,46px);font-weight:600;line-height:1.05;letter-spacing:-.03em;margin-bottom:16px}
+  h1 .accent{color:var(--purple);font-weight:700}
+  .sub{font-size:17px;color:var(--muted);max-width:640px}
+  .sub code{font-family:'JetBrains Mono',monospace;background:var(--purple-50);color:var(--purple-dark);padding:1px 8px;border-radius:4px;font-size:15px}
+  main{padding:0 24px 80px}
+  .section{margin-top:48px}
+  .section-label{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-bottom:8px}
+  .section-title{font-family:'Sora',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:20px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:0 1px 2px rgba(20,14,38,.04);padding:24px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+  input,select{width:100%;background:#fff;border:1px solid var(--border-strong);padding:10px 12px;border-radius:8px;
+    font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text)}
+  input:focus,select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-50)}
+  .out{margin-top:8px;background:linear-gradient(180deg,var(--purple-50),var(--surface));border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center}
+  .out .code{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:600;letter-spacing:-.01em}
+  .out .code.bad{color:var(--red)}
+  .bytes{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .byte{background:#fff;border:1px solid var(--border-strong);border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
+  .byte b{display:block;font-size:18px;color:var(--text)}
+  .byte.type b{color:var(--purple)}
+  .msg{margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:13px}
+  .msg.ok{color:var(--green-dark)}
+  .msg.err{color:var(--red)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:13px}
+  .kv .k{color:var(--faint)}
+  pre{background:#140E26;color:#E0DCEE;padding:22px;border-radius:14px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;overflow-x:auto}
+  .layout{font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.9;white-space:pre;overflow-x:auto}
+  footer{border-top:1px solid var(--border);background:var(--surface);margin-top:56px}
+  .footer-inner{padding:24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--faint)}
+  .footer-meta{font-family:'JetBrains Mono',monospace;font-size:11px}
+  @media(max-width:640px){.out .code{font-size:24px}}
+</style>
+</head>
+<body>
+<header class="header"><div class="header-inner">
+  <div class="logo"><div class="logo-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6L12 11L21 6V18L12 22L3 18V6Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M12 11V22" stroke="#fff" stroke-width="2"/><circle cx="12" cy="11" r="2" fill="#00C57E"/></svg></div><span class="logo-text">MYIO</span></div>
+  <span class="header-meta">DOC · v2.0 · 2026</span>
+</div></header>
+
+<section class="hero">
+  <div class="eyebrow">Especificação técnica · v2</div>
+  <h1>Código de produto <span class="accent">com data</span>.</h1>
+  <p class="sub">4 bytes <code>B1.B2.B3.B4</code>: o código agora carrega a <strong>data de fabricação</strong> (ano/mês/dia), um sequencial diário e o tipo. Válido de <code>2026</code> a <code>2041</code>.</p>
+</section>
+
+<main>
+  <!-- ENCODER -->
+  <section class="section">
+    <div class="section-label">01 · Gerar</div>
+    <h2 class="section-title">Campos → código</h2>
+    <div class="card">
+      <div class="grid">
+        <div><label>Ano (2026–2041)</label><input id="e-year" type="number" min="2026" max="2041" value="2027"></div>
+        <div><label>Mês (1–12)</label><input id="e-month" type="number" min="1" max="12" value="1"></div>
+        <div><label>Dia (1–31)</label><input id="e-day" type="number" min="1" max="31" value="2"></div>
+        <div><label>Seq3 (0–7)</label><input id="e-seq3" type="number" min="0" max="7" value="0"></div>
+        <div><label>Sequencial (1–254)</label><input id="e-seq" type="number" min="1" max="254" value="25"></div>
+        <div><label>Tipo</label><select id="e-type"><option value="12">12 · switch</option><option value="14">14 · remote</option><option value="15" selected>15 · 3f</option></select></div>
+      </div>
+      <div class="out">
+        <div class="code" id="e-code">17.2.25.15</div>
+        <div class="bytes" id="e-bytes"></div>
+        <div class="msg" id="e-msg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DECODER -->
+  <section class="section">
+    <div class="section-label">02 · Ler</div>
+    <h2 class="section-title">Código → campos</h2>
+    <div class="card">
+      <div class="grid" style="grid-template-columns:1fr auto">
+        <div><label>Código (B1.B2.B3.B4)</label><input id="d-code" value="17.2.25.15"></div>
+        <div style="align-self:end"><button id="d-btn" style="cursor:pointer;background:var(--purple);color:#fff;border:1px solid var(--purple);padding:10px 18px;border-radius:8px;font-family:'Manrope';font-weight:600">Decodificar</button></div>
+      </div>
+      <div class="out" style="text-align:left">
+        <div class="msg" id="d-msg"></div>
+        <div class="kv" id="d-kv"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LAYOUT -->
+  <section class="section">
+    <div class="section-label">03 · Layout de bits</div>
+    <h2 class="section-title">Estrutura dos 4 bytes</h2>
+    <div class="card">
+<div class="layout">Byte 1   YYYY MMMM   YYYY = ano-2026 (0..15)   MMMM = mês (1..12)
+Byte 2   SSS  DDDDD  SSS  = seq3 (0..7)      DDDDD = dia (1..31)
+Byte 3   NNNN NNNN   sequencial diário (1..254)
+Byte 4   TTTT TTTT   tipo (12=switch · 14=remote · 15=3f)</div>
+      <pre>const EPOCH_YEAR = 2026;
+// encode
+b1 = ((year - EPOCH_YEAR) &lt;&lt; 4) | month;
+b2 = (seq3 &lt;&lt; 5) | day;
+b3 = seq; b4 = type;
+// decode
+year  = EPOCH_YEAR + (b1 &gt;&gt; 4);   month = b1 &amp; 0x0F;
+seq3  = b2 &gt;&gt; 5;                   day   = b2 &amp; 0x1F;
+seq   = b3;                        type  = b4;</pre>
+    </div>
+  </section>
+</main>
+
+<footer><div class="footer-inner"><span>© 2026 MYIO · Especificação interna</span><span class="footer-meta">numeração-dispositivos · v2.0</span></div></footer>
+
+<script>
+  const EPOCH_YEAR = 2026;
+  const TYPES = { 12:'switch', 14:'remote', 15:'3f' };
+  const MONTHS = ['','jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+  const num = id => parseInt(document.getElementById(id).value, 10);
+
+  function validateFields(f){
+    const e = [];
+    if(!(f.year>=2026 && f.year<=2041)) e.push('ano fora de 2026..2041');
+    if(!(f.month>=1 && f.month<=12)) e.push('mês fora de 1..12');
+    if(!(f.day>=1 && f.day<=31)) e.push('dia fora de 1..31');
+    if(!(f.seq3>=0 && f.seq3<=7)) e.push('seq3 fora de 0..7');
+    if(!(f.seq>=1 && f.seq<=254)) e.push('sequencial fora de 1..254');
+    if(!(f.type in TYPES)) e.push('tipo desconhecido (use 12/14/15)');
+    return e;
+  }
+
+  function encode(){
+    const f = { year:num('e-year'), month:num('e-month'), day:num('e-day'), seq3:num('e-seq3'), seq:num('e-seq'), type:num('e-type') };
+    const errs = validateFields(f);
+    const codeEl = document.getElementById('e-code'), msgEl = document.getElementById('e-msg'), bytesEl = document.getElementById('e-bytes');
+    if(errs.length){ codeEl.textContent='—'; codeEl.className='code bad'; msgEl.className='msg err'; msgEl.textContent='✗ '+errs.join(' · '); bytesEl.innerHTML=''; return; }
+    const b1 = ((f.year-EPOCH_YEAR)<<4)|f.month, b2=(f.seq3<<5)|f.day, b3=f.seq, b4=f.type;
+    codeEl.textContent = `${b1}.${b2}.${b3}.${b4}`; codeEl.className='code';
+    bytesEl.innerHTML =
+      `<div class="byte">B1<b>${b1}</b>${f.year}·${MONTHS[f.month]}</div>`+
+      `<div class="byte">B2<b>${b2}</b>dia ${f.day}·s${f.seq3}</div>`+
+      `<div class="byte">B3<b>${b3}</b>nº ${f.seq}</div>`+
+      `<div class="byte type">B4<b>${b4}</b>${TYPES[f.type]}</div>`;
+    msgEl.className='msg ok'; msgEl.textContent = `✓ ${TYPES[f.type]} fabricado em ${String(f.day).padStart(2,'0')}/${String(f.month).padStart(2,'0')}/${f.year}, unidade #${f.seq}`+(f.seq3?` (bloco ${f.seq3})`:'');
+  }
+
+  function decode(){
+    const raw = document.getElementById('d-code').value.trim();
+    const msgEl = document.getElementById('d-msg'), kvEl = document.getElementById('d-kv');
+    const parts = raw.split('.').map(n=>parseInt(n,10));
+    if(parts.length!==4 || parts.some(n=>!Number.isInteger(n)||n<0||n>255)){
+      msgEl.className='msg err'; msgEl.textContent='✗ formato inválido — esperado B1.B2.B3.B4 (4 bytes 0..255)'; kvEl.innerHTML=''; return;
+    }
+    const [b1,b2,b3,b4]=parts;
+    const f = { year:EPOCH_YEAR+(b1>>4), month:b1&0x0F, seq3:b2>>5, day:b2&0x1F, seq:b3, type:b4 };
+    const errs = validateFields(f);
+    kvEl.innerHTML =
+      `<span class="k">ano</span><span>${f.year}${f.year>2041?' ⚠ fora do alcance':''}</span>`+
+      `<span class="k">mês</span><span>${f.month} ${MONTHS[f.month]||'⚠'}</span>`+
+      `<span class="k">dia</span><span>${f.day}</span>`+
+      `<span class="k">seq3 (bloco)</span><span>${f.seq3}</span>`+
+      `<span class="k">sequencial</span><span>#${f.seq}</span>`+
+      `<span class="k">tipo</span><span>${f.type} ${TYPES[f.type]||'⚠ desconhecido'}</span>`;
+    if(errs.length){ msgEl.className='msg err'; msgEl.textContent='✗ '+errs.join(' · '); }
+    else { msgEl.className='msg ok'; msgEl.textContent = `✓ ${TYPES[f.type]} · ${String(f.day).padStart(2,'0')}/${String(f.month).padStart(2,'0')}/${f.year} · unidade #${f.seq}`; }
+  }
+
+  ['e-year','e-month','e-day','e-seq3','e-seq','e-type'].forEach(id=>document.getElementById(id).addEventListener('input',encode));
+  document.getElementById('d-btn').addEventListener('click',decode);
+  document.getElementById('d-code').addEventListener('keydown',e=>{if(e.key==='Enter')decode();});
+  encode(); decode();
+</script>
+</body>
+</html>
