@@ -222,6 +222,7 @@ apiV1Router.use(
 // Frequently-reused permission scopes (sonarjs/no-duplicate-string).
 const PERM_BUNDLES_READ = 'bundles:read';
 const PERM_CUSTOMERS_READ = 'customers:read';
+const PERM_TEMPLATES_READ = 'templates:read';
 
 // -----------------------------------------------------------------------------
 // Authentication (public)
@@ -465,8 +466,18 @@ apiV1Router.use('/access-bundle', authMiddleware, accessBundleController);
 // RFC-0020: Public Single Apps (mixed auth — managed within controller)
 apiV1Router.use('/public-apps', authMiddleware, publicSingleAppsController);
 
-// RFC-0021: HTML Templates Engine
-apiV1Router.use('/templates', authMiddleware, templatesController);
+// RFC-0021: HTML Templates Engine.
+// The two /render endpoints are consumed by EMAIL_SENDER (M2M), so they also
+// accept a Customer API Key with the `templates:read` scope (hybrid auth). Every
+// other template route (list/get/create/update/delete/preview) stays JWT/master
+// only via authMiddleware.
+const templatesRenderAuth = hybridAuthMiddleware(PERM_TEMPLATES_READ);
+apiV1Router.use(
+  '/templates',
+  (req, res, next) =>
+    (req.path.endsWith('/render') ? templatesRenderAuth : authMiddleware)(req, res, next),
+  templatesController,
+);
 apiV1Router.use('/template-types', authMiddleware, templateTypesController);
 
 // Dashboard summary
