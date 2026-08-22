@@ -223,6 +223,8 @@ apiV1Router.use(
 const PERM_BUNDLES_READ = 'bundles:read';
 const PERM_CUSTOMERS_READ = 'customers:read';
 const PERM_TEMPLATES_READ = 'templates:read';
+const PERM_CENTRALS_READ = 'centrals:read';
+const PERM_CENTRALS_WRITE = 'centrals:write';
 
 // -----------------------------------------------------------------------------
 // Authentication (public)
@@ -267,7 +269,8 @@ apiV1Router.get('/customers/:customerId/internal-support-rules', hybridAuthMiddl
 apiV1Router.delete('/customers/:customerId/rules/devices', authMiddleware, clearCustomerRuleDevicesHandler);
 
 // Customer Centrals (nested route)
-apiV1Router.get('/customers/:customerId/centrals', authMiddleware, centralsListByCustomerHandler);
+// hybridAuth: supports JWT + API Key (alarms-backend M2M) — read-only list.
+apiV1Router.get('/customers/:customerId/centrals', hybridAuthMiddleware(PERM_CENTRALS_READ), centralsListByCustomerHandler);
 
 // Customer Themes (nested routes)
 apiV1Router.get('/customers/:customerId/themes/default', authMiddleware, themesGetDefaultByCustomerHandler);
@@ -388,7 +391,8 @@ apiV1Router.use('/entity-types', entitiesRateLimiter, hybridAuthByMethod('entiti
 apiV1Router.get('/assets/:assetId/devices', authMiddleware, devicesListByAssetHandler);
 
 // Asset Centrals (nested route)
-apiV1Router.get('/assets/:assetId/centrals', authMiddleware, centralsListByAssetHandler);
+// hybridAuth: supports JWT + API Key (alarms-backend M2M) — read-only list.
+apiV1Router.get('/assets/:assetId/centrals', hybridAuthMiddleware(PERM_CENTRALS_READ), centralsListByAssetHandler);
 
 // Central ID (serial) helpers — PUBLIC (no auth), must come before the
 // auth-gated /centrals router. Global collision check, format S1.S2.S3.S4.
@@ -396,7 +400,10 @@ apiV1Router.get('/centrals/serial/available', centralSerialAvailableHandler);
 apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 
 // Centrals
-apiV1Router.use('/centrals', authMiddleware, centralsController);
+// hybridAuth: GET* accept JWT + API Key (alarms-backend M2M) with centrals:read;
+// mutations (POST/PUT/PATCH/DELETE: commands, enroll, mqtt, backup/restore) require
+// centrals:write, which the alarms read-only key does not hold.
+apiV1Router.use('/centrals', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRALS_WRITE), centralsController);
 
 // Zero-touch enrollment (Slice 1.5). PUBLIC and mounted BEFORE the
 // centralAuthMiddleware /central-agent mount: a freshly-flashed central has no

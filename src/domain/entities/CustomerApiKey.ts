@@ -34,6 +34,8 @@ export type ApiKeyScope =
   | 'entities:write'    // Write generic entity registry — MYIO operator only (RFC-0047)
   | 'entities:admin'    // Create entity_types + mutate is_system rows (RFC-0047)
   | 'templates:read'    // Read/render HTML templates (RFC-0021) — used by EMAIL_SENDER (M2M)
+  | 'centrals:read'     // Read centrals/gateways — used by alarms-backend (M2M)
+  | 'centrals:write'    // Write centrals/gateways (commands, enroll, mqtt, backup/restore)
   | '*:read';           // Read all resources
 
 /**
