@@ -24,6 +24,7 @@ export interface TagDefinition {
   example: string;
 }
 
+/* eslint-disable sonarjs/no-duplicate-string -- data catalog: repeated labels/examples across template types are intentional */
 const TAG_CATALOG: Record<string, TagDefinition[]> = {
   EMAIL_ALARM: [
     { tag: '{{summary.rulesCount}}',     label: 'Qtd. de rules disparadas',        description: 'Número total de rules que dispararam no evento',              example: '3' },
@@ -202,6 +203,7 @@ const TAG_CATALOG: Record<string, TagDefinition[]> = {
     { tag: '{{/each}}',                  label: 'Loop — fecha bloco',              description: 'Fecha qualquer {{#each}}',                                   example: '' },
   ],
 };
+/* eslint-enable sonarjs/no-duplicate-string */
 
 // =============================================================================
 // Template Renderer
@@ -400,10 +402,6 @@ export function renderTemplate(htmlContent: string, data: Record<string, unknown
 // Theme Merge — inject customer colors/logo as CSS variables into HTML
 // =============================================================================
 
-function camelToKebab(str: string): string {
-  return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
-}
-
 export function buildThemeCssVars(theme: LookAndFeel): string {
   const lines: string[] = [];
 
@@ -453,6 +451,64 @@ export function buildThemeCssVars(theme: LookAndFeel): string {
   return `:root {\n${lines.join('\n')}\n}`;
 }
 
+/**
+ * Map of theme CSS var names (as emitted by buildThemeCssVars, kebab-case) to
+ * their literal values, for email-safe substitution.
+ */
+function buildThemeVarMap(theme: LookAndFeel): Record<string, string> {
+  const c = theme.colors;
+  const cv = c as unknown as Record<string, string>;
+  const map: Record<string, string> = {};
+  const put = (name: string, value?: string): void => {
+    if (value) map[`--color-${name}`] = value;
+  };
+  put('primary', c.primary);
+  put('primary-light', c.primaryLight);
+  put('primary-dark', c.primaryDark);
+  put('secondary', c.secondary);
+  put('secondary-light', c.secondaryLight);
+  put('secondary-dark', c.secondaryDark);
+  put('accent', c.accent);
+  put('background', c.background);
+  put('surface', c.surface);
+  put('surface-variant', cv['surfaceVariant']);
+  put('error', c.error);
+  put('warning', c.warning);
+  put('success', c.success);
+  put('info', c.info);
+  put('text-primary', c.textPrimary);
+  put('text-secondary', c.textSecondary);
+  put('text-disabled', c.textDisabled);
+  put('divider', c.divider);
+  if (theme.typography.fontFamily) map['--font-family'] = theme.typography.fontFamily;
+  if (theme.typography.fontFamilySecondary) map['--font-family-secondary'] = theme.typography.fontFamilySecondary;
+  if (theme.logo.primaryUrl) map['--logo-url'] = `url('${theme.logo.primaryUrl}')`;
+  if (theme.logo.iconUrl) map['--logo-icon-url'] = `url('${theme.logo.iconUrl}')`;
+  return map;
+}
+
+/**
+ * Replace `var(--x, fallback)` references with the theme's literal value.
+ *
+ * Email clients (Gmail, Outlook) do not support CSS custom properties: an
+ * unresolved var() drops the whole declaration, so a white-on-colored element
+ * loses its background and turns unreadable (white-on-white in light mode).
+ * Substituting the literal at render time keeps per-customer theming working in
+ * email. When a var is not in the theme map, the declared fallback is used
+ * (still literal, still email-safe); a bare var() with no fallback is left as-is.
+ */
+export function resolveThemeVars(html: string, theme: LookAndFeel): string {
+  const map = buildThemeVarMap(theme);
+  return html.replace(
+    /var\(\s*(--[a-zA-Z0-9-]+)\s*(?:,\s*([^)]*))?\)/g,
+    (match: string, name: string, fallback?: string): string => {
+      const literal = map[name];
+      if (literal) return literal;
+      return fallback !== undefined ? fallback.trim() : match;
+    },
+  );
+}
+
 const NUNITO_FONT_LINK = [
   '<link rel="preconnect" href="https://fonts.googleapis.com">',
   '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
@@ -460,6 +516,11 @@ const NUNITO_FONT_LINK = [
 ].join('\n');
 
 function injectThemeIntoHtml(html: string, theme: LookAndFeel): string {
+  // Email-safe theming: resolve the template's var(--color-x, fallback) into the
+  // theme's literal colors, since email clients do not support CSS custom
+  // properties. The :root vars are still injected below for web/backward-compat.
+  const themed = resolveThemeVars(html, theme);
+
   const cssVars = buildThemeCssVars(theme);
   const styleBlock = [
     NUNITO_FONT_LINK,
@@ -470,10 +531,10 @@ function injectThemeIntoHtml(html: string, theme: LookAndFeel): string {
   ].join('\n');
 
   // Inject before </head> if present, otherwise prepend
-  if (html.includes('</head>')) {
-    return html.replace('</head>', `${styleBlock}\n</head>`);
+  if (themed.includes('</head>')) {
+    return themed.replace('</head>', `${styleBlock}\n</head>`);
   }
-  return styleBlock + '\n' + html;
+  return styleBlock + '\n' + themed;
 }
 
 // =============================================================================
@@ -575,6 +636,7 @@ export class TemplateService {
    *   3. parent customer generic default (walks parentCustomerId chain)
    *   4. MYIO platform customer default (always exists)
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing template+theme resolution chain; unchanged by this PR
   async renderForEmailSender(
     tenantId: string,
     type: TemplateType,
