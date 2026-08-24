@@ -55,7 +55,7 @@ BEGIN
         'role:customer-admin',
         'Customer Administrator',
         'Full administrative access within assigned customer scope including users, devices, alarms, and reports',
-        '["policy:user-management", "policy:device-management", "policy:alarm-management", "policy:reports", "policy:customer-management", "policy:admin-approval"]',
+        '["policy:user-management", "policy:device-management", "policy:alarm-management", "policy:reports", "policy:customer-management", "policy:admin-approval", "policy:customer-secrets"]',
         '["admin", "customer"]',
         'high',
         false,

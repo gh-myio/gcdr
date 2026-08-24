@@ -20,9 +20,15 @@
 //
 //   /config/secrets (requireCustomerConfigSecretsAccess), DEC-7/DEC-8:
 //     Customer API keys are ALWAYS denied (authMiddleware already rejects them;
-//     defense-in-depth here too). JWT operators need the named
-//     `customers:secrets:read` permission (RBAC dotted form
-//     `customers.secret.read`) for BOTH GET (reveal) and PUT (write).
+//     defense-in-depth here too). JWT operators need a named, high-risk
+//     permission — SPLIT by verb so neither is reachable by the read-only
+//     policy (its allow list is `*.*.read` / `*.*.list`, which would otherwise
+//     match a `.read` action and leak real secrets to any viewer):
+//       GET/HEAD/OPTIONS (reveal real values)   → customers.secret.reveal
+//       PUT (set / rotate / clear a secret)      → customers.secret.manage
+//     Neither `reveal` nor `manage` is in the read-only allow OR deny list, so
+//     a viewer is implicitly denied; grant via the `policy:customer-secrets`
+//     high-risk policy (seed 04-policies.sql).
 //
 //   Master key / DISABLE_AUTH carry the '*' role and bypass (operator path).
 // =============================================================================
@@ -35,8 +41,12 @@ import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } fro
 // `*.*.read` read-only policies match unchanged).
 export const PERM_CUSTOMER_CONFIG_READ = 'customers.hierarchy.read';
 export const PERM_CUSTOMER_CONFIG_WRITE = 'customers.hierarchy.update';
-// DEC-8 `customers:secrets:read` — a single permission gates BOTH secrets verbs.
-export const PERM_CUSTOMER_SECRETS = 'customers.secret.read';
+// DEC-8 (revised, feedback-pre-merge P0.3) — secrets verbs are SPLIT so that
+// the read-only policy (`*.*.read` / `*.*.list`) matches neither:
+//   GET  (reveal real secret values) → customers.secret.reveal
+//   PUT  (set / rotate / clear)      → customers.secret.manage
+export const PERM_CUSTOMER_SECRETS_REVEAL = 'customers.secret.reveal';
+export const PERM_CUSTOMER_SECRETS_MANAGE = 'customers.secret.manage';
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -106,11 +116,15 @@ export function requireCustomerConfigAccess() {
 
 /**
  * Core guard for the secrets sub-resource. Customer API keys are always denied;
- * JWT operators need `customers:secrets:read` on `customer:<id>` for GET and PUT.
+ * JWT operators need a verb-specific permission on `customer:<id>`:
+ *   GET/HEAD/OPTIONS → customers.secret.reveal
+ *   PUT (and any other write) → customers.secret.manage
+ * The split keeps the read-only policy (`*.*.read` / `*.*.list`) from matching.
  */
 export async function assertCustomerConfigSecretsAccess(
   req: Request,
   customerId: string,
+  method: string,
 ): Promise<void> {
   const roles = req.user?.roles ?? [];
   if (roles.includes('*')) return; // master key / DISABLE_AUTH
@@ -130,20 +144,23 @@ export async function assertCustomerConfigSecretsAccess(
     throw new UnauthorizedError('Autenticação necessária');
   }
 
+  const isReveal = READ_METHODS.has(method);
+  const permission = isReveal ? PERM_CUSTOMER_SECRETS_REVEAL : PERM_CUSTOMER_SECRETS_MANAGE;
   const result = await authorizationService.evaluatePermission(tenantId, {
     userId,
-    permission: PERM_CUSTOMER_SECRETS,
+    permission,
     resourceScope: `customer:${customerId}`,
   });
   if (result.allowed) return;
 
-  throw new ForbiddenError('Sem permissão para os secrets deste cliente (customers:secrets:read)');
+  const scopeLabel = isReveal ? 'customers:secrets:reveal' : 'customers:secrets:manage';
+  throw new ForbiddenError(`Sem permissão para os secrets deste cliente (${scopeLabel})`);
 }
 
 export function requireCustomerConfigSecretsAccess() {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      await assertCustomerConfigSecretsAccess(req, req.params.customerId);
+      await assertCustomerConfigSecretsAccess(req, req.params.customerId, req.method);
       next();
     } catch (err) {
       next(err);

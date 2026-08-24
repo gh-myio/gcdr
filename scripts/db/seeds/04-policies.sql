@@ -43,6 +43,25 @@ BEGIN
         1
     );
 
+    -- Customer Secrets Policy (System, high-risk) - RFC-0057 DEC-8 (revised).
+    -- Reveal/rotate real customer config secrets. Uses the `reveal`/`manage`
+    -- actions ON PURPOSE: neither is in policy:read-only's allow (*.*.read /
+    -- *.*.list), so a viewer can NEVER reach secrets. Grant this policy only to
+    -- trusted operator roles (see 05-roles.sql → role:customer-admin).
+    INSERT INTO policies (id, tenant_id, key, display_name, description, allow, deny, risk_level, is_system, version)
+    VALUES (
+        'cccc5757-5757-5757-5757-575757575757',
+        v_tenant_id,
+        'policy:customer-secrets',
+        'Customer Secrets Access',
+        'Reveal (GET) and manage (PUT) customer config secrets — high-risk, not covered by read-only',
+        '["customers.secret.reveal", "customers.secret.manage"]',
+        '[]',
+        'critical',
+        true,
+        1
+    );
+
     -- =========================================================================
     -- DOMAIN POLICIES (is_system = false)
     -- =========================================================================

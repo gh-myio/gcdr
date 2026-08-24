@@ -294,7 +294,9 @@ apiV1Router.use('/customers/:customerId/integrations', hybridAuthByMethod(PERM_C
 // RFC-0057: Customer config document (nested — must come before general /customers router).
 // The secrets sub-route is mounted FIRST and JWT/master-key only (authMiddleware) —
 // customer API keys are denied there (DEC-7). requireCustomerConfigSecretsAccess enforces
-// the customers:secrets:read operator permission (P0.2). The general /config CRUD is
+// verb-split high-risk permissions (GET customers.secret.reveal / PUT
+// customers.secret.manage) so the read-only *.*.read policy can't reach secrets (P0.2/P0.3).
+// The general /config CRUD is
 // hybridAuth (GET customers:read / write customers:write) PLUS requireCustomerConfigAccess,
 // which enforces the API-key hierarchy (SELF/SUBTREE/TENANT) and RBAC customer:<id> (P0.1).
 // Rate-limited per IP+customer like goals/tariffs (auth'd DB route; satisfies

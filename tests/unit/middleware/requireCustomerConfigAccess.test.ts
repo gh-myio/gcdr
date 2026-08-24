@@ -71,25 +71,42 @@ describe('assertCustomerConfigAccess', () => {
 
 describe('assertCustomerConfigSecretsAccess', () => {
   it('bypasses for the master/DISABLE_AUTH * role', async () => {
-    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: ['*'] } }), OWN)).resolves.toBeUndefined();
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: ['*'] } }), OWN, 'GET')).resolves.toBeUndefined();
   });
 
   it('rejects a malformed customerId with 400', async () => {
-    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] } }), 'bad')).rejects.toBeInstanceOf(ValidationError);
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] } }), 'bad', 'GET')).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('always denies an API key (403)', async () => {
-    await expect(assertCustomerConfigSecretsAccess(req({ context: { apiKeyId: 'k', customerId: OWN } }), OWN)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(assertCustomerConfigSecretsAccess(req({ context: { apiKeyId: 'k', customerId: OWN } }), OWN, 'GET')).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('JWT without userId → 401', async () => {
-    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: {} }), OWN)).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: {} }), OWN, 'GET')).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
-  it('JWT with the secret permission → allowed; without → 403', async () => {
+  it('GET evaluates customers.secret.reveal (not a *.*.read action)', async () => {
     (authorizationService.evaluatePermission as jest.Mock).mockResolvedValueOnce({ allowed: true });
-    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN)).resolves.toBeUndefined();
-    (authorizationService.evaluatePermission as jest.Mock).mockResolvedValueOnce({ allowed: false });
-    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN, 'GET')).resolves.toBeUndefined();
+    expect(authorizationService.evaluatePermission).toHaveBeenCalledWith(
+      TENANT,
+      expect.objectContaining({ permission: 'customers.secret.reveal', resourceScope: `customer:${OWN}` }),
+    );
+  });
+
+  it('PUT evaluates customers.secret.manage', async () => {
+    (authorizationService.evaluatePermission as jest.Mock).mockResolvedValueOnce({ allowed: true });
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN, 'PUT')).resolves.toBeUndefined();
+    expect(authorizationService.evaluatePermission).toHaveBeenCalledWith(
+      TENANT,
+      expect.objectContaining({ permission: 'customers.secret.manage', resourceScope: `customer:${OWN}` }),
+    );
+  });
+
+  it('denies (403) when the RBAC engine rejects, for both verbs', async () => {
+    (authorizationService.evaluatePermission as jest.Mock).mockResolvedValue({ allowed: false });
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN, 'GET')).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(assertCustomerConfigSecretsAccess(req({ user: { roles: [] }, context: { userId: 'u' } }), OWN, 'PUT')).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

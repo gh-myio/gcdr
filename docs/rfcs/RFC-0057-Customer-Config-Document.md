@@ -4,7 +4,7 @@
 - Start Date: 2026-08-10
 - RFC PR: (leave this empty)
 - Tracking Issue: (leave this empty)
-- Status: **Draft v3 — feedback-v1 folded in (P0s resolved). For review, future implementation.**
+- Status: **v3.1 — implemented on branch `feat/rfc-0057-customer-config` (PR #29). Pre-merge review P0.3 (secrets read-only escalation) fixed. Awaiting formal review + merge.**
 - Related package: `packages/backend` (GCDR)
 - Primary files (new/changed): `src/domain/entities/Customer.ts` (extend `CustomerConfig`), `src/dto/request/CustomerConfigDTO.ts` (new — read/write/patch schemas), `src/services/CustomerConfigService.ts` (new — normalize/defaults/mask), `src/controllers/customer-config.controller.ts` (new), `src/controllers/customers.controller.ts` (`?include=config`), `src/app.ts`, `src/shared/utils/secretEnvelope.ts` (reuse), OpenAPI spec
 - **No schema migration** — config lives in `customers.config` jsonb (DEC-6). *(A data backfill from TB is separate — DEC-14.)*
@@ -18,6 +18,14 @@
 > (P1.4); inline config made opt-in without clobbering the existing raw `config`
 > field (P1.5); size/temperature/unknown-key validation (P2.1–2.3); MVP split (P2.5);
 > explicit acceptance criteria.
+>
+> **Changelog v3.1 (pre-merge review, P0.3):** the secrets guard originally evaluated
+> `customers.secret.read` — an action matched by `policy:read-only`'s `*.*.read` allow,
+> so any read-only/viewer scoped on the customer could reveal real secrets. Fixed by
+> splitting the verbs into `customers.secret.reveal` (GET) / `customers.secret.manage`
+> (PUT) — neither reachable by read-only — and granting them via a new high-risk
+> `policy:customer-secrets` (seed) attached to `role:customer-admin`. Regression test
+> asserts read-only is denied both verbs. See DEC-7/DEC-8.
 
 ---
 
@@ -201,7 +209,8 @@ Secrets are **out of the general config document write path** entirely:
   values. Rules: a string ⇒ new secret, encrypted at rest via `secretEnvelope`; `null`
   ⇒ clear; **`"***"` ⇒ rejected `400`** (never persisted). Stored as ciphertext.
 - **Reveal:** `GET /api/v1/customers/:id/config/secrets` — **JWT only** (no API key),
-  gated by a named scope **`customers:secrets:read`**, **mandatory audit** (actor,
+  gated by the high-risk permission **`customers.secret.reveal`** (write uses
+  **`customers.secret.manage`**; see DEC-8), **mandatory audit** (actor,
   credential, customer, tenant, fields revealed, requestId, timestamp).
 - PUT/PATCH `/config` **ignore/reject** any `ingestion.clientSecret` /
   `security.masterAdminPassword` in the body (`400`).
@@ -212,8 +221,8 @@ Secrets are **out of the general config document write path** entirely:
 |---|---|---|---|---|
 | `GET` | `/customers/:id/config` | reader role | `customers:read` | masked secrets |
 | `PUT`/`PATCH`/`DELETE` | `/customers/:id/config` | operator role | `customers:write` | non-secret only |
-| `GET` | `/customers/:id/config/secrets` | operator + `customers:secrets:read` | **denied** | audited reveal |
-| `PUT` | `/customers/:id/config/secrets` | operator + `customers:secrets:read` | **denied** | audited write |
+| `GET` | `/customers/:id/config/secrets` | operator + `customers.secret.reveal` | **denied** | audited reveal |
+| `PUT` | `/customers/:id/config/secrets` | operator + `customers.secret.manage` | **denied** | audited write |
 | `GET` | `/customers/:id?include=config` | same as customer read | `customers:read` | masked; opt-in (DEC-11) |
 
 **Hierarchy (API key):** `SELF` → only its own customer; `SUBTREE` → customer +
@@ -311,7 +320,7 @@ This is a **data** migration (not schema). Plan:
 - `PATCH /customers/:id/config` — e.g. `{ "featureButtons": { "demandPeak": { "lojas": true } } }` → `200` updated doc. `400` unknown group/type or secret field present.
 - `PUT /customers/:id/config` → `200` full doc (writable sections replaced). `400` as above.
 - `DELETE /customers/:id/config` → `200` full doc reset to defaults.
-- `GET|PUT /customers/:id/config/secrets` → JWT + `customers:secrets:read`, audited.
+- `GET /customers/:id/config/secrets` → JWT + `customers.secret.reveal`; `PUT` → `customers.secret.manage`. Both audited. Split so the read-only policy (`*.*.read`) can never reach secrets; granted via `policy:customer-secrets`.
 
 ## Acceptance criteria
 

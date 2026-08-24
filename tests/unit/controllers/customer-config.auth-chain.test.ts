@@ -228,7 +228,7 @@ describe('/config/secrets — gating (DEC-7/DEC-8)', () => {
     }
   });
 
-  it('denies a JWT lacking customers:secrets:read (403)', async () => {
+  it('denies a JWT lacking customers:secrets:reveal (403)', async () => {
     (decodeJWT as jest.Mock).mockReturnValue({ sub: 'u', email: 'o@x', tenant_id: TENANT_A, roles: ['role:operator'], type: 'USER' });
     (authorizationService.evaluatePermission as jest.Mock).mockResolvedValue({ allowed: false });
     const srv = await listen(buildApp());
@@ -240,7 +240,7 @@ describe('/config/secrets — gating (DEC-7/DEC-8)', () => {
     }
   });
 
-  it('grants a JWT with customers:secrets:read (200) using the secret permission', async () => {
+  it('grants a JWT with customers:secrets:reveal (200) — GET evaluates the reveal permission', async () => {
     (decodeJWT as jest.Mock).mockReturnValue({ sub: 'u', email: 'o@x', tenant_id: TENANT_A, roles: ['role:operator'], type: 'USER' });
     (authorizationService.evaluatePermission as jest.Mock).mockResolvedValue({ allowed: true });
     const srv = await listen(buildApp());
@@ -249,7 +249,7 @@ describe('/config/secrets — gating (DEC-7/DEC-8)', () => {
       expect(res.status).toBe(200);
       expect(authorizationService.evaluatePermission).toHaveBeenCalledWith(
         TENANT_A,
-        expect.objectContaining({ permission: 'customers.secret.read', resourceScope: `customer:${OWN_CUSTOMER}` }),
+        expect.objectContaining({ permission: 'customers.secret.reveal', resourceScope: `customer:${OWN_CUSTOMER}` }),
       );
     } finally {
       await srv.close();

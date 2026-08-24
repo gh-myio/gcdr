@@ -12818,9 +12818,10 @@ paths:
       description: >-
         Returns decrypted `ingestion.clientSecret` and
         `security.masterAdminPassword` (each possibly null). JWT/master-key only
-        with `customers:secrets:read` (RBAC customers.secret.read on
-        customer:<id>). Customer API keys are DENIED (401). Every reveal is
-        audit-logged.
+        with the high-risk `customers.secret.reveal` permission on
+        customer:<id> (granted via policy:customer-secrets; NOT reachable by the
+        read-only *.*.read policy). Customer API keys are DENIED (401). Every
+        reveal is audit-logged.
       operationId: revealCustomerConfigSecrets
       security: [{ bearerAuth: [] }]
       parameters:
@@ -12839,15 +12840,16 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/CustomerConfigSecretsRevealed' }
         '401': { description: Customer API key (denied) or missing/invalid JWT }
-        '403': { description: JWT lacking customers:secrets:read }
+        '403': { description: JWT lacking customers.secret.reveal }
         '404': { description: Customer not found }
     put:
       tags: [Customer Config]
       summary: Set or clear secrets (JWT-only, audited)
       description: >-
         A string sets & encrypts at rest; `null` clears; the masked sentinel
-        "***" is rejected (400). JWT/master-key only with `customers:secrets:read`;
-        customer API keys DENIED (401). Returns the masked read model.
+        "***" is rejected (400). JWT/master-key only with the high-risk
+        `customers.secret.manage` permission; customer API keys DENIED (401).
+        Returns the masked read model.
       operationId: writeCustomerConfigSecrets
       security: [{ bearerAuth: [] }]
       parameters:
@@ -12875,7 +12877,7 @@ paths:
                       data: { $ref: '#/components/schemas/CustomerConfigRead' }
         '400': { description: Masked sentinel "***" or unknown key }
         '401': { description: Customer API key (denied) or missing/invalid JWT }
-        '403': { description: JWT lacking customers:secrets:read }
+        '403': { description: JWT lacking customers.secret.manage }
         '404': { description: Customer not found }
 
   # ===========================================================================

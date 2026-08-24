@@ -50,9 +50,10 @@
   reach) or `403` (no RBAC grant). Same enforcement applies to the inline
   `?include=config`.
 - **Secrets** (`/customers/:id/config/secrets`): **JWT / master key only** —
-  customer API keys are **denied** (DEC-7). JWT operators need the named
-  `customers:secrets:read` permission (RBAC `customers.secret.read` on
-  `customer:<id>`) for **both** GET and PUT. Every read/write is **audit-logged**
+  customer API keys are **denied** (DEC-7). JWT operators need a verb-split,
+  high-risk permission on `customer:<id>`: **GET → `customers.secret.reveal`**,
+  **PUT → `customers.secret.manage`** (granted via `policy:customer-secrets`;
+  neither is reachable by the read-only `*.*.read` policy). Every read/write is **audit-logged**
   (`CUSTOMER_CONFIG_SECRET_REVEALED` / `…_UPDATED`), values never logged.
 - **Size caps** (DEC-13): each free section ≤ **16 KB**, whole writable document
   ≤ **64 KB** (measured on the JSON serialization).

@@ -26,9 +26,11 @@ import { ActorType } from '../shared/types/audit.types';
 //     GET     /   — audited reveal of real secret values
 //     PUT     /   — set/clear secrets (secretEnvelope at rest); "***" -> 400
 //
-// TODO(RFC-0057 DEC-7): gate the secrets routes with a named RBAC permission
-// `customers:secrets:read` once the RBAC catalog is extended. Until then
-// authMiddleware (JWT/master key, no customer API key) is the guard.
+// RFC-0057 DEC-8 (revised): requireCustomerConfigSecretsAccess gates these with
+// verb-split, high-risk RBAC permissions on customer:<id> —
+//   GET → customers.secret.reveal, PUT → customers.secret.manage — neither of
+// which the read-only policy (*.*.read / *.*.list) can match. Granted via
+// policy:customer-secrets (seed 04-policies.sql → role:customer-admin).
 // =============================================================================
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
