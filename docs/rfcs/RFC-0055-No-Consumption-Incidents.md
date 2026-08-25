@@ -1,12 +1,12 @@
 # RFC-0055 — No-Consumption Detection & Incidents Panel
 
-- **Status:** Draft v2 (feedback-v1 folded in) · aligned with Alarms RFC-0030/0031 (2026-08-13)
+- **Status:** Draft v3 — aligned with Alarms RFC-0030/0031 and internally consistent (2026-08-25)
 - **Created:** 2026-08-03
-- **Updated:** 2026-08-13 (aligned with the Alarms-side implementation)
+- **Updated:** 2026-08-25 (consistency pass — see changelog)
 - **Author:** GCDR Core Team
 - **Domain:** Rules Engine / Alarms Orchestrator / Incidents / Frontend
 - **Related RFCs:** RFC-0015 (Alarm Bundle Version History), RFC-0016 (ThingsBoard Entity Mapping), RFC-0035 (Plural MQTT on Centrals), `docs/RULE-ENTITY.md`, `docs/EMAIL-SENDER-PAYLOAD-CONTRACT.md`
-- **Owners (split):** GCDR Backend · GCDR Frontend · Alarms Orchestrator · Central Agent (read-only)
+- **Owners (split):** GCDR Backend · Alarms Orchestrator · `alarms-web` (Incidents panel) · GCDR Frontend (`/incidents` redirect only) · Central Agent (read-only)
 
 > **Changelog v2 (feedback-v1):** added a normative bundle payload; pinned the
 > definition of "empty slot" (zero is present, null/absent is empty); decided the
@@ -28,6 +28,16 @@
 > `alarms-web`; GCDR `/incidents` is a **redirect**, not a proxy+panel. (3) the
 > `metric` enum is lowercase on the wire (`energy_consumption` \| `water_flow`).
 > (4) §4 — public candidate ingestion is superseded in part by RFC-0031.
+>
+> **Consistency pass (2026-08-25)** — reconciled the sections the alignment update
+> had missed, so the RFC no longer contradicts itself: the bundle-delivery section
+> (was "appears in `rules[]` … exposed via `/bundle/*`") now matches §8
+> (`noConsumptionRules[]` on `/bundle/to-verify-service` only); the responsibility
+> matrix, the Owners line, the data-flow diagram, the testing section and the
+> Phase-3 rollout now show `alarms-web` owning the panel and GCDR Frontend doing
+> only the `/incidents` redirect; and the config-storage "open question" is closed
+> — the dedicated `no_consumption_config jsonb` column + `valid_no_consumption_config`
+> CHECK already shipped in `desenv`.
 
 ---
 
@@ -89,13 +99,13 @@ We need:
 ### The concept
 
 ```
-GCDR (master data)                 Alarms Orchestrator                 GCDR Frontend
-──────────────────                 ───────────────────                 ─────────────
+GCDR (master data)                 Alarms Orchestrator                 alarms-web
+──────────────────                 ───────────────────                 ──────────
 NO_CONSUMPTION rule    ── bundle ─▶ evaluate telemetry slots  ── API ─▶ Incidents panel
 (internal, per scope)               detect empty hourly slots            day ▸ central ▸
                                     build Incident candidate             device ▸ slots
-   device/central       ◀─ enrich ─ (names, slaveId, central)
-   registry lookups
+   device/central       ◀─ enrich ─ (names, slaveId, central)      (GCDR Frontend
+   registry lookups                                                 only redirects here)
 ```
 
 - A slot is **"empty"** for an hour bucket `[H, H+1)` when the device produced
@@ -182,7 +192,9 @@ see the resulting incidents, scoped to their customer — §Authorization).
 
 #### Normative alarm-bundle payload (GCDR → Alarms)
 
-The rule appears in the existing bundle `rules[]` exactly as:
+The rule is delivered in the additive **`noConsumptionRules[]`** section of
+`GET /…/bundle/to-verify-service` (see §8) — **never** inside `rules[]` and
+**never** in `/bundle/simple`. Its shape is:
 
 ```json
 {
@@ -205,10 +217,11 @@ The rule appears in the existing bundle `rules[]` exactly as:
 }
 ```
 
-> **Config storage (open confirmation):** confirm whether the `rules` table has a
-> generic JSONB config column that can safely carry `noConsumptionConfig`
-> alongside `alarmConfig`/`slaConfig`/etc. If not, add a `no_consumption_config
-> jsonb` column in the migration (§Migrations).
+> **Config storage (resolved — shipped):** the `rules` table carries a dedicated
+> **`no_consumption_config jsonb`** column (`schema.ts`), guarded by a
+> `valid_no_consumption_config` CHECK (`type != 'NO_CONSUMPTION' OR
+> no_consumption_config IS NOT NULL`). Entity, Zod DTO, repository and bundle
+> serialization are all in `desenv`. No generic-slot reuse.
 
 > **Why a new type and not `ALARM_THRESHOLD` with `COUNT == 0`?** Data-absence has
 > different evaluation semantics (you alarm on the *lack* of events, which a
@@ -217,9 +230,12 @@ The rule appears in the existing bundle `rules[]` exactly as:
 > incident, not a per-sample alarm). Modeling it as a threshold would overload
 > `alarmConfig` and hide the "no data" nature. Alternative kept in §Alternatives.
 
-The rule is exposed to the alarms side **through the existing alarm bundle**
-(`GET /customers/:id/alarm-rules/bundle/*`, versioned per RFC-0015). No new
-transport — `NO_CONSUMPTION` rules just appear in `rules[]` with their config.
+The rule is exposed to the alarms side **only on the verify bundle**
+(`GET /customers/:id/alarm-rules/bundle/to-verify-service`, versioned per
+RFC-0015), in a **separate additive `noConsumptionRules[]` section** — **never**
+mixed into `rules[]`, and **never** carried by `/bundle/simple` (the Node-RED
+bundle strips it). A consumer that only iterates `rules[]` never sees it and so
+cannot mis-evaluate it as a threshold. See §8 for the full delivery contract.
 
 ### 2. Detection & incident construction (Alarms Orchestrator)
 
@@ -401,8 +417,8 @@ was **not** pursued once the panel moved to `alarms-web`.
 | 6 | Incident candidate build (group by device, merge slot ranges) | — | — | **Owns** | — |
 | 7 | Incident persistence + lifecycle (OPEN/ACK/RESOLVED, auto-resolve) | — | — | **Owns** | — |
 | 8 | Incident enrichment (device/central/customer names, slaveId) | **Owns** (lookup API) | — | consumes lookup | — |
-| 9 | `GET /incidents*` + ack/resolve API | — | consumes | **Owns** | — |
-| 10 | Incidents panel (day▸central▸device▸slots, filters, drill-down) | — | **Owns** | — | — |
+| 9 | `GET /incidents*` + ack/resolve API | — | — (alarms-web consumes) | **Owns** | — |
+| 10 | Incidents panel (day▸central▸device▸slots, filters, drill-down) | — | `/incidents` **redirect only** | **Owns** (via `alarms-web`, RFC-0030 §3.8) | — |
 | 11 | Optional notification of incidents (reuse channels/EMAIL_RELAY) | provides channel config | — | **Owns** dispatch | — |
 | 12 | Docs / contract (this RFC, bundle field, incident payload) | co-owns | co-owns | co-owns | — |
 
@@ -465,9 +481,10 @@ avoiding a row-per-slot explosion and matching the panel's grouping.
 
 ## Migrations
 
-- **GCDR:** `00XX_rule_type_no_consumption.sql` — `ALTER TYPE rule_type ADD VALUE
-  'NO_CONSUMPTION'` (additive, safe). No new column needed if `noConsumptionConfig`
-  reuses an existing config jsonb slot; otherwise add `no_consumption_config jsonb`.
+- **GCDR (shipped):** `ALTER TYPE rule_type ADD VALUE 'NO_CONSUMPTION'` (additive,
+  safe) **plus** a dedicated `no_consumption_config jsonb` column on `rules` with a
+  `valid_no_consumption_config` CHECK — both present in `desenv` (`schema.ts`). The
+  generic-slot-reuse option was **not** taken.
   > **Migration number:** pick the next free number **at implementation time** —
   > prod is baselined through `0063` (see the migration governance runbook). Do
   > **not** hardcode a number in this RFC.
@@ -486,9 +503,11 @@ avoiding a row-per-slot explosion and matching the panel's grouping.
   contiguous slot merge; non-contiguous ranges stay separate; day boundary in the
   configured timezone; late-telemetry shrink/remove while OPEN; dedup by incident
   key (idempotent update); ack/resolve audit fields persisted.
-- **Frontend:** grouping day▸central▸device; device expansion; slot-range
-  rendering; empty/loading/error/permission-denied states; ack/resolve flows;
-  permission-gated controls.
+- **`alarms-web`** (owns the panel, RFC-0030 §3.8): grouping day▸central▸device;
+  device expansion; slot-range rendering; empty/loading/error/permission-denied
+  states; ack/resolve flows; permission-gated controls.
+- **GCDR Frontend:** only the `/incidents` **redirect** — the modal renders and
+  the button opens the `alarms-web` panel in a new tab.
 
 ## Acceptance criteria
 
@@ -538,16 +557,18 @@ Implementation-ready when:
 - ~~Status model~~ → `OPEN | RESOLVED` + ack metadata (§2, Data model).
 - ~~`activeHours` per device vs rule~~ → v1 rule-level; per-device override deferred.
 - ~~Slot storage format~~ → full ISO timestamps; UI renders `HH:mm`.
+- ~~Config storage~~ → **shipped** as a dedicated `no_consumption_config jsonb`
+  column + `valid_no_consumption_config` CHECK on `rules` (§1, §Migrations).
+- ~~Incidents panel transport~~ → **superseded**: panel owned by `alarms-web`;
+  GCDR `/incidents` is a redirect (§7).
 
 **Still open:**
 1. **Exact metric source:** which hourly-consumption aggregation table/feed does
    Alarms read (goals/tariffs aggregation vs normalized telemetry)? Named source
    before build (§2 v1 decision narrows this but doesn't pin the table).
-2. **Config storage:** reuse a generic `rules` JSONB config column for
-   `noConsumptionConfig`, or add `no_consumption_config` (§1, §Migrations)?
-3. **Notification default:** panel-only (proposed) vs dispatch via
+2. **Notification default:** panel-only (proposed) vs dispatch via
    channel/EMAIL_RELAY, per customer/central opt-in?
-4. **Incident ↔ alarm linkage:** should an incident also reference DEVICE_OFFLINE
+3. **Incident ↔ alarm linkage:** should an incident also reference DEVICE_OFFLINE
    alarms in the same window for context, or stay a pure no-consumption roll-up?
 
 ## Rollout / phases
@@ -557,8 +578,9 @@ Implementation-ready when:
    WestPlaza). No behavior change until the alarms side consumes it.
 2. **Phase 2 — Alarms:** evaluator (bucketing, debounce, merge), `incidents`
    tables, candidate build + lifecycle, `/incidents` read API + ack/resolve.
-3. **Phase 3 — Frontend:** Incidents panel (day▸central▸device▸slots) against the
-   alarms API + GCDR enrichment.
+3. **Phase 3 — `alarms-web`:** Incidents panel (day▸central▸device▸slots) against
+   the alarms API + GCDR enrichment (RFC-0030 §3.8). **GCDR Frontend** ships only
+   the `/incidents` redirect (gcdr-frontend PR #24 → #29) — no in-GCDR panel.
 4. **Phase 4 — Optional dispatch** of incidents via existing channels.
 
 Each phase is independently shippable; Phase 1 is inert until Phase 2 lands.
