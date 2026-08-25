@@ -198,14 +198,16 @@ code = `${(year-2026)&lt;&lt;4 | month}.${seq3&lt;&lt;5 | day}.${seq}.${B4}`</pr
   function build(){
     const r = fieldsToParts({ year:num('e-year'), month:num('e-month'), day:num('e-day'), unit:num('e-unit'), prefix:document.getElementById('e-type').value });
     const nameEl=document.getElementById('e-name'), codeEl=document.getElementById('e-code'), bytesEl=document.getElementById('e-bytes'), msgEl=document.getElementById('e-msg');
-    if(r.errs.length){ nameEl.textContent='—'; nameEl.className='name bad'; codeEl.innerHTML=''; bytesEl.innerHTML=''; msgEl.className='msg err'; msgEl.textContent='✗ '+r.errs.join(' · '); return; }
+    if(r.errs.length){ nameEl.textContent='—'; nameEl.className='name bad'; codeEl.textContent=''; bytesEl.textContent=''; msgEl.className='msg err'; msgEl.textContent='✗ '+r.errs.join(' · '); return; }
     nameEl.textContent=r.name; nameEl.className='name';
-    codeEl.innerHTML=`código: <b>${r.code}</b>`;
-    bytesEl.innerHTML=
-      `<div class="byte">B1<b>${r.b1}</b>${r.year}·${p2(r.month)}</div>`+
-      `<div class="byte">B2<b>${r.b2}</b>dia ${r.day}·s${r.seq3}</div>`+
-      `<div class="byte">B3<b>${r.b3}</b>seq ${r.seq}</div>`+
-      `<div class="byte type">B4<b>${r.b4}</b>${r.prefix}</div>`;
+    codeEl.textContent='';
+    const codeB=document.createElement('b'); codeB.textContent=r.code; codeEl.append('código: ', codeB);
+    bytesEl.textContent='';
+    const byteDiv=(cls,label,val,extra)=>{ const d=document.createElement('div'); d.className=cls; const b=document.createElement('b'); b.textContent=String(val); d.append(label,b,extra); bytesEl.appendChild(d); };
+    byteDiv('byte','B1',r.b1,`${r.year}·${p2(r.month)}`);
+    byteDiv('byte','B2',r.b2,`dia ${r.day}·s${r.seq3}`);
+    byteDiv('byte','B3',r.b3,`seq ${r.seq}`);
+    byteDiv('byte type','B4',r.b4,r.prefix);
     msgEl.className='msg ok'; msgEl.textContent=`✓ ${LABEL[r.b4]} · ${p2(r.day)}/${p2(r.month)}/${r.year} · unidade #${r.unit} (bloco ${r.seq3}, seq ${r.seq})`;
   }
 
@@ -215,13 +217,14 @@ code = `${(year-2026)&lt;&lt;4 | month}.${seq3&lt;&lt;5 | day}.${seq}.${B4}`</pr
     const isCode=/^\d{1,3}(\.\d{1,3}){3}$/.test(raw);
     const r = isCode ? codeToFields(raw) : nameToFields(raw);
     const msgEl=document.getElementById('c-msg'), kvEl=document.getElementById('c-kv');
-    if(r.errs && r.errs.length){ msgEl.className='msg err'; msgEl.textContent='✗ '+r.errs.join(' · '); kvEl.innerHTML=''; return; }
-    kvEl.innerHTML=
-      `<span class="k">nome</span><span>${r.name}</span>`+
-      `<span class="k">código</span><span>${r.code}</span>`+
-      `<span class="k">tipo</span><span>${r.b4} · ${r.prefix} (${LABEL[r.b4]||'desconhecido'})</span>`+
-      `<span class="k">data</span><span>${p2(r.day)}/${p2(r.month)}/${r.year}</span>`+
-      `<span class="k">unidade</span><span>#${r.unit} (bloco ${r.seq3}, seq ${r.seq})</span>`;
+    if(r.errs && r.errs.length){ msgEl.className='msg err'; msgEl.textContent='✗ '+r.errs.join(' · '); kvEl.textContent=''; return; }
+    kvEl.textContent='';
+    const kv=(k,v)=>{ const ks=document.createElement('span'); ks.className='k'; ks.textContent=k; const vs=document.createElement('span'); vs.textContent=v; kvEl.append(ks,vs); };
+    kv('nome', r.name);
+    kv('código', r.code);
+    kv('tipo', `${r.b4} · ${r.prefix} (${LABEL[r.b4]||'desconhecido'})`);
+    kv('data', `${p2(r.day)}/${p2(r.month)}/${r.year}`);
+    kv('unidade', `#${r.unit} (bloco ${r.seq3}, seq ${r.seq})`);
     msgEl.className='msg ok'; msgEl.textContent = isCode ? '✓ código → nome' : '✓ nome → código';
   }
 
