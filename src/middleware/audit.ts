@@ -23,7 +23,6 @@ import {
   inferEntityType,
   shouldLogEvent,
 } from '../shared/config/audit.config';
-import { JWTUser } from './context';
 
 // =============================================================================
 // Types
@@ -119,11 +118,13 @@ export interface LogEventOptions {
 
 type AuditLogWriter = (log: CreateAuditLogInput) => Promise<void>;
 
-let auditLogWriter: AuditLogWriter = async (log) => {
-  // Default: just log to console in development
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[AUDIT]', JSON.stringify(log, null, 2));
-  }
+let auditLogWriter: AuditLogWriter = async () => {
+  // No-op placeholder. The real writer (the audit-log repository) is installed at
+  // boot via setAuditLogWriter (see infrastructure/audit). This default does NOT
+  // console.log the entry on purpose: audit rows carry actor identifiers and
+  // user-provided fields (customerId/entityId, event types), so dumping them to
+  // stdout would be clear-text logging / log injection (CodeQL js/clear-text-logging,
+  // js/log-injection). Persisted logging happens only through the repository writer.
 };
 
 /**

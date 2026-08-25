@@ -1,5 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerService } from '../services/CustomerService';
+import { customerConfigService } from '../services/CustomerConfigService';
+import { assertCustomerConfigAccess } from '../middleware/requireCustomerConfigAccess';
 import {
   CreateCustomerSchema,
   UpdateCustomerSchema,
@@ -11,6 +13,8 @@ import { ValidationError } from '../shared/errors/AppError';
 import { CustomerType, EventType } from '../shared/types';
 
 const router = Router();
+
+const CUSTOMER_ID_REQUIRED = 'Customer ID is required';
 
 /**
  * POST /customers
@@ -129,10 +133,28 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(CUSTOMER_ID_REQUIRED);
     }
 
     const customer = await customerService.getById(tenantId, id);
+
+    // RFC-0057 DEC-11: opt-in inline consolidated config under a NEW field
+    // `configResolved` (masked secrets). The existing raw `config` field is left
+    // untouched for back-compat. Same authorization as GET /customers/:id.
+    const include = String(req.query.include ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (include.includes('config')) {
+      // Same authorization as GET /customers/:id/config (P0.1): the general
+      // /customers router only runs hybridAuthByMethod, so enforce the API-key
+      // hierarchy + RBAC customer:<id> here before exposing configResolved.
+      await assertCustomerConfigAccess(req, id, 'GET');
+      const configResolved = await customerConfigService.getConfig(tenantId, id);
+      sendSuccess(res, { ...customer, configResolved }, 200, requestId);
+      return;
+    }
+
     sendSuccess(res, customer, 200, requestId);
   } catch (err) {
     next(err);
@@ -158,7 +180,7 @@ router.put('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Customer ID is required');
+        throw new ValidationError(CUSTOMER_ID_REQUIRED);
       }
 
       // Get previous value for audit
@@ -193,7 +215,7 @@ router.delete('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Customer ID is required');
+        throw new ValidationError(CUSTOMER_ID_REQUIRED);
       }
 
       // Get previous value for audit
@@ -228,7 +250,7 @@ router.delete('/:id/force',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Customer ID is required');
+        throw new ValidationError(CUSTOMER_ID_REQUIRED);
       }
 
       const previous = await customerService.getById(tenantId, id);
@@ -259,7 +281,7 @@ router.get('/:id/children', async (req: Request, res: Response, next: NextFuncti
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(CUSTOMER_ID_REQUIRED);
     }
 
     const children = await customerService.getChildren(tenantId, id);
@@ -280,7 +302,7 @@ router.get('/:id/descendants', async (req: Request, res: Response, next: NextFun
     const { maxDepth } = req.query;
 
     if (!id) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(CUSTOMER_ID_REQUIRED);
     }
 
     const params = {
@@ -304,7 +326,7 @@ router.get('/:id/ancestors', async (req: Request, res: Response, next: NextFunct
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(CUSTOMER_ID_REQUIRED);
     }
 
     const ancestors = await customerService.getAncestors(tenantId, id);
@@ -329,7 +351,7 @@ router.get('/:id/tree', async (req: Request, res: Response, next: NextFunction) 
     const deep = req.query.deep === '1';
 
     if (!id) {
-      throw new ValidationError('Customer ID is required');
+      throw new ValidationError(CUSTOMER_ID_REQUIRED);
     }
 
     const tree = deep
@@ -362,7 +384,7 @@ router.post('/:id/move',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Customer ID is required');
+        throw new ValidationError(CUSTOMER_ID_REQUIRED);
       }
 
       // Get previous value for audit
