@@ -115,6 +115,9 @@ export const CreateDeviceSchema = z.object({
   // RFC-0054 (DEC-2): explicit tariff category — the join key between a device's
   // consumption and the hourly tariff. Never inferred; NULL = unclassified.
   tariffCategory: z.enum(['COMMON_AREA', 'SPECIFIC']).nullable().optional(),
+  // RFC-0058: BOX membership — the enclosure (deviceProfile='BOX') this device
+  // belongs to. Profile/tenant/self-reference invariants enforced in DeviceService.
+  boxId: z.string().uuid().nullable().optional(),
 });
 
 export type CreateDeviceDTO = z.infer<typeof CreateDeviceSchema>;
@@ -158,6 +161,9 @@ export const UpdateDeviceSchema = z.object({
   // RFC-0054 (DEC-2): explicit tariff category — the join key between a device's
   // consumption and the hourly tariff. Never inferred; NULL = unclassified.
   tariffCategory: z.enum(['COMMON_AREA', 'SPECIFIC']).nullable().optional(),
+  // RFC-0058: BOX membership. Set a UUID to assign/move into a box, `null` to
+  // detach. Profile/tenant/self-reference invariants enforced in DeviceService.
+  boxId: z.string().uuid().nullable().optional(),
 });
 
 export type UpdateDeviceDTO = z.infer<typeof UpdateDeviceSchema>;
@@ -192,6 +198,8 @@ export interface ListDevicesParams extends PaginationParams {
   // RFC-0008: New filter options
   centralId?: string;
   slaveId?: number;
+  // RFC-0058: members of a given BOX (device_profile='BOX') enclosure.
+  boxId?: string;
   identifier?: string;
   deviceProfile?: string;
   deviceType?: string;
