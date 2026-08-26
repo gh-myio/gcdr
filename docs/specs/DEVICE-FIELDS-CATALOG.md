@@ -9,6 +9,12 @@
 > disagree, the schema wins — update this doc.
 >
 > **Last synced:** 2026-08-17 (against `desenv`).
+>
+> **Scope — current schema only.** This catalog lists fields that **exist today**
+> in `schema.ts`. Fields that are only *proposed* in an RFC are **not** listed
+> here until the migration lands. In particular, `box_id` (self-referential BOX
+> membership) is proposed in **RFC-0058** and is **not yet in the schema** — do
+> not treat it as a current device field.
 
 ---
 

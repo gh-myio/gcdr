@@ -3,8 +3,13 @@
 > **Purpose.** A human-readable device **name** that mirrors the v2 product code
 > ([DEVICE-PRODUCT-CODE-NUMBERING.md](./DEVICE-PRODUCT-CODE-NUMBERING.md)): same
 > manufacturing date + daily unit, but with a **category prefix** instead of the
-> numeric type byte. The name is self-documenting, sortable, and **losslessly
-> convertible** to/from the numeric code.
+> numeric type byte. The name is self-documenting, sortable, and — **for hardware
+> prefixes** (`3F`, `HIDR`, `REM`, `TANK`…) — **losslessly convertible** to/from
+> the numeric code. For **functional prefixes** (MOTR, COMPRESSOR, ELEV…) the name
+> carries the *installed role* only; the hardware byte (usually `3F`) is not
+> recoverable from the code alone — the authoritative source of "what a MOTR
+> really is" is the device's **`deviceType`/`deviceProfile`**, not the name.
+> See §3b.
 >
 > **Status:** definition draft (2026-08-17). Ties to the v2 date-stamped code.
 
@@ -116,9 +121,19 @@ underlying hardware byte usually defaults to `3F` (15). So the numeric code can
 **always** be derived from name+build-info **only when the prefix is a hardware
 prefix**; for functional prefixes, `B4` must be carried separately (or defaulted).
 
+> **Consequence for reverse conversion (code → identity):** many functional
+> roles (MOTOR, COMPRESSOR, ELEVADOR, VENTILADOR, ENTRADA…) all collapse onto the
+> same hardware byte `3F` (15) — see the `handleDeviceType()` default
+> (`return '3F_MEDIDOR'`). Given only the code you therefore **cannot** tell a
+> MOTR from a COMPRESSOR; both read back as `3F`. To recover the installed role
+> you must read the device's **`deviceType`/`deviceProfile`** (the value
+> `handleDeviceType()` derived from the *name* and synced to ThingsBoard), never
+> the numeric code. This is why the round-trip is lossless **only** for the
+> hardware-prefix subset.
+
 ---
 
-## 4. Conversion (lossless, both directions)
+## 4. Conversion (lossless for hardware prefixes; see §3b for functional ones)
 
 ```js
 const EPOCH_YEAR = 2026;
