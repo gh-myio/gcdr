@@ -21,6 +21,7 @@ import {
   uniqueIndex,
   check,
   primaryKey,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -451,6 +452,13 @@ export const devices = pgTable('devices', {
   deviceProfile: varchar('device_profile', { length: 100 }),  // Device profile (e.g., HIDROMETRO_AREA_COMUM)
   deviceType: varchar('device_type', { length: 100 }),  // Specific device type (e.g., 3F_MEDIDOR)
 
+  // RFC-0058: BOX device profile — self-referential membership. A member
+  // device points at its enclosure (deviceProfile='BOX') via box_id. A BOX
+  // has box_id NULL (BOX_GROUP nesting is deferred). ON DELETE SET NULL:
+  // deleting a BOX detaches its members, never deletes them. Profile/tenant/
+  // self-reference invariants are enforced in DeviceService (see migration 0066).
+  boxId: uuid('box_id').references((): AnyPgColumn => devices.id, { onDelete: 'set null' }),
+
   // Ingestion Integration
   ingestionId: uuid('ingestion_id'),  // ID in ingestion system
   ingestionGatewayId: uuid('ingestion_gateway_id'),  // Gateway ID in ingestion system
@@ -482,6 +490,8 @@ export const devices = pgTable('devices', {
   deviceTypeIdx: index('devices_device_type_idx').on(table.tenantId, table.deviceType),
   ingestionIdIdx: index('devices_ingestion_id_idx').on(table.tenantId, table.ingestionId),
   ingestionGatewayIdIdx: index('devices_ingestion_gateway_id_idx').on(table.tenantId, table.ingestionGatewayId),
+  // RFC-0058: BOX membership lookup (members of a box).
+  boxIdIdx: index('devices_box_id_idx').on(table.tenantId, table.boxId),
   lastActivityTimeIdx: index('devices_last_activity_time_idx').on(table.tenantId, table.lastActivityTime),
   lastAlarmTimeIdx: index('devices_last_alarm_time_idx').on(table.tenantId, table.lastAlarmTime),
 

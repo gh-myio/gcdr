@@ -1433,6 +1433,14 @@ components:
           type: string
           maxLength: 100
           description: Optional channel sub-type (e.g. "lamp", "presence_sensor").
+        boxId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            RFC-0058: on a member device, the UUID of the containing BOX
+            (a device with deviceProfile='BOX'). Null on a BOX and on
+            standalone devices.
         updatedAt:
           type: string
           format: date-time
@@ -1592,6 +1600,16 @@ components:
         ingestionGatewayId:
           type: string
           format: uuid
+        boxId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            RFC-0058: assign this device to a BOX enclosure (a device with
+            deviceProfile='BOX') by its UUID, or send null to detach. The
+            referenced box must exist in the same tenant and be a BOX; a BOX
+            device may not itself have a boxId; a device may not reference
+            itself.
       example:
         assetId: 455accf5-4aad-49e6-934f-97ae691b6c45
         name: SW QGBT_01_LEN2C37 - Lamp 0
@@ -8072,6 +8090,14 @@ paths:
             type: integer
             minimum: 1
             maximum: 247
+        - name: boxId
+          in: query
+          description: >-
+            RFC-0058: filter to the members of a given BOX enclosure (devices
+            whose box_id equals this UUID).
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: List of devices
@@ -8079,6 +8105,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedResponse'
+
+  /devices/{id}/contents:
+    get:
+      tags: [Devices]
+      summary: Get BOX contents summary
+      operationId: getDeviceContents
+      description: >-
+        RFC-0058: returns the member devices of a BOX summarized by
+        deviceProfile, plus a total — e.g. `{ "3F": 3, "HIDR": 2, "total": 5 }`.
+        The device must exist; a device with no members returns `{ "total": 0 }`.
+        Members with a null deviceProfile are grouped under `UNKNOWN`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: id
+          in: path
+          required: true
+          description: UUID of the BOX device (or any device) whose contents to summarize.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Contents summary keyed by deviceProfile, with a total.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - properties:
+                      data:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: >-
+                          Map of deviceProfile -> member count, plus a `total`
+                          key with the sum.
+                        example:
+                          '3F': 3
+                          HIDR: 2
+                          total: 5
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /devices/external/{externalId}:
     get:

@@ -44,6 +44,8 @@ const UPDATE_COPY_FIELDS = [
   'meterDomain',
   // RFC-0054 (DEC-2): explicit tariff category.
   'tariffCategory',
+  // RFC-0058: BOX membership (validated upstream in DeviceService).
+  'boxId',
 ] as const;
 
 /**
@@ -82,6 +84,9 @@ function applyCommonFilters(conditions: ReturnType<typeof sql>[], params: ListDe
   }
   if (params.slaveId !== undefined) {
     conditions.push(eq(devices.slaveId, params.slaveId));
+  }
+  if (params.boxId) {
+    conditions.push(eq(devices.boxId, params.boxId));
   }
   if (params.deviceProfile) {
     conditions.push(eq(devices.deviceProfile, params.deviceProfile));
@@ -157,6 +162,8 @@ export class DeviceRepository implements IDeviceRepository {
       meterDomain: data.meterDomain ?? null,
       // RFC-0054 (DEC-2)
       tariffCategory: data.tariffCategory ?? null,
+      // RFC-0058: BOX membership (validated upstream in DeviceService)
+      boxId: data.boxId ?? null,
     }).returning();
 
     return this.mapToEntity(result);
@@ -458,6 +465,35 @@ export class DeviceRepository implements IDeviceRepository {
     return result[0]?.count || 0;
   }
 
+  /**
+   * RFC-0058: contents summary of a BOX — count of member devices grouped by
+   * device_profile, shaped as `{ <profile>: count, ..., total }`. Members with a
+   * NULL device_profile are grouped under 'UNKNOWN'.
+   */
+  async getContentsSummary(tenantId: string, boxId: string): Promise<Record<string, number>> {
+    const rows = await db
+      .select({
+        deviceProfile: devices.deviceProfile,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(devices)
+      .where(and(
+        eq(devices.tenantId, tenantId),
+        eq(devices.boxId, boxId),
+      ))
+      .groupBy(devices.deviceProfile);
+
+    const summary: Record<string, number> = {};
+    let total = 0;
+    for (const row of rows) {
+      const key = row.deviceProfile ?? 'UNKNOWN';
+      summary[key] = row.count;
+      total += row.count;
+    }
+    summary.total = total;
+    return summary;
+  }
+
   async countByConnectivityStatus(
     tenantId: string,
   ): Promise<{ total: number; byConnectivity: Record<string, number> }> {
@@ -524,6 +560,7 @@ export class DeviceRepository implements IDeviceRepository {
       meterRole: (row.meterRole as Device['meterRole']) || undefined,
       meterDomain: (row.meterDomain as Device['meterDomain']) || undefined,
       tariffCategory: (row.tariffCategory as Device['tariffCategory']) || undefined,
+      boxId: row.boxId || undefined,
       ingestionId: row.ingestionId || undefined,
       ingestionGatewayId: row.ingestionGatewayId || undefined,
       lastActivityTime: row.lastActivityTime?.toISOString(),

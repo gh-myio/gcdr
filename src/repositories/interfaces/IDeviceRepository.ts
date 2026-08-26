@@ -47,4 +47,8 @@ export interface IDeviceRepository {
   // Count
   countByAsset(tenantId: string, assetId: string): Promise<number>;
   countByCustomer(tenantId: string, customerId: string): Promise<number>;
+
+  // RFC-0058: BOX contents summary — member counts grouped by device_profile,
+  // shaped as `{ <profile>: count, ..., total }`.
+  getContentsSummary(tenantId: string, boxId: string): Promise<Record<string, number>>;
 }

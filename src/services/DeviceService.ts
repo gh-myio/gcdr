@@ -61,8 +61,52 @@ export class DeviceService {
     }
   }
 
+  /**
+   * RFC-0058: validates a BOX membership assignment. Only runs when `boxId` is a
+   * non-null UUID (setting/moving into a box). Detach (`null`) and untouched
+   * (`undefined`) are no-ops. These invariants cannot be SQL CHECKs (a CHECK
+   * cannot read the referenced row's profile), so they live here and are tested.
+   */
+  private async assertBoxAssignment(
+    tenantId: string,
+    opts: { deviceId?: string; effectiveProfile?: string; boxId: string | null | undefined },
+  ): Promise<void> {
+    const { boxId, deviceId, effectiveProfile } = opts;
+    if (boxId === undefined || boxId === null) {
+      return;
+    }
+
+    // A device that is itself a BOX may not be a member of another box
+    // (BOX_GROUP nesting is deferred — see RFC-0058 Future possibilities).
+    if (effectiveProfile === 'BOX') {
+      throw new ValidationError("A BOX device cannot be a member of another box (boxId must be null)");
+    }
+
+    // A device may not reference itself as its box.
+    if (deviceId && boxId === deviceId) {
+      throw new ValidationError('A device cannot reference itself as its box');
+    }
+
+    // The referenced box must exist in the same tenant.
+    const box = await this.repository.getById(tenantId, boxId);
+    if (!box) {
+      throw new NotFoundError(`Box ${boxId} not found`);
+    }
+
+    // The referenced device must actually be a BOX.
+    if (box.deviceProfile !== 'BOX') {
+      throw new ValidationError(`Device ${boxId} is not a BOX (deviceProfile must be 'BOX')`);
+    }
+  }
+
   async create(tenantId: string, data: CreateDeviceDTO, userId: string): Promise<Device> {
     this.assertMeterPair(data);
+    // RFC-0058: a new device gets its id in the repo, so self-reference is not
+    // possible here; validate profile/target-box invariants only.
+    await this.assertBoxAssignment(tenantId, {
+      effectiveProfile: data.deviceProfile,
+      boxId: data.boxId,
+    });
 
     // Validate asset exists
     const asset = await this.assetRepository.getById(tenantId, data.assetId);
@@ -125,6 +169,16 @@ export class DeviceService {
     return device;
   }
 
+  /**
+   * RFC-0058: contents summary of a device's box members, grouped by
+   * deviceProfile — e.g. `{ '3F': 3, 'HIDR': 2, total: 5 }`. The device must
+   * exist (404 otherwise). A device with no members returns `{ total: 0 }`.
+   */
+  async getContents(tenantId: string, id: string): Promise<Record<string, number>> {
+    await this.getById(tenantId, id); // 404 if the box/device does not exist
+    return this.repository.getContentsSummary(tenantId, id);
+  }
+
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Device> {
     const device = await this.repository.getBySerialNumber(tenantId, serialNumber);
     if (!device) {
@@ -156,6 +210,17 @@ export class DeviceService {
   async update(tenantId: string, id: string, data: UpdateDeviceDTO, userId: string): Promise<Device> {
     this.assertMeterPair(data);
     const existing = await this.getById(tenantId, id);
+
+    // RFC-0058: validate BOX membership on assign/move. The effective profile is
+    // the incoming one if the update changes it, otherwise the existing profile.
+    const effectiveProfile = data.deviceProfile !== undefined
+      ? data.deviceProfile
+      : existing.deviceProfile;
+    await this.assertBoxAssignment(tenantId, {
+      deviceId: id,
+      effectiveProfile,
+      boxId: data.boxId,
+    });
 
     // Check for duplicate external ID if updating
     if (data.externalId && data.externalId !== existing.externalId) {

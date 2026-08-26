@@ -15,6 +15,8 @@ import { EventType } from '../shared/types';
 
 const router = Router();
 
+const DEVICE_ID_REQUIRED = 'Device ID is required';
+
 // Apply deep customer resolution to all list endpoints
 router.use('/', resolveDeepCustomers);
 
@@ -55,7 +57,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const { tenantId, requestId } = req.context;
     const {
       assetId, customerId, type, status, connectivityStatus,
-      centralId, slaveId,
+      centralId, slaveId, boxId,
       search, name,
       deviceProfile, identifier, ingestionId, ingestionGatewayId,
       label, externalId,
@@ -85,6 +87,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       connectivityStatus: connectivityStatus as string | undefined,
       centralId: centralId as string | undefined,
       slaveId: slaveId ? parseInt(slaveId as string, 10) : undefined,
+      boxId: boxId as string | undefined,
       search: (search || name) as string | undefined,
       deviceProfile: deviceProfile as string | undefined,
       identifier: identifier as string | undefined,
@@ -241,6 +244,27 @@ router.get('/:id/rules', async (req: Request, res: Response, next: NextFunction)
 });
 
 /**
+ * GET /devices/:id/contents
+ * RFC-0058: contents summary of a BOX — member counts grouped by deviceProfile,
+ * e.g. { "3F": 3, "HIDR": 2, "total": 5 }.
+ */
+router.get('/:id/contents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ValidationError(DEVICE_ID_REQUIRED);
+    }
+
+    const contents = await deviceService.getContents(tenantId, id);
+    sendSuccess(res, contents, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /devices/:id
  * Get device by ID
  */
@@ -250,7 +274,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     if (!id) {
-      throw new ValidationError('Device ID is required');
+      throw new ValidationError(DEVICE_ID_REQUIRED);
     }
 
     const device = await deviceService.getById(tenantId, id);
@@ -278,7 +302,7 @@ const updateDeviceHandler = [
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Device ID is required');
+        throw new ValidationError(DEVICE_ID_REQUIRED);
       }
 
       const data = UpdateDeviceSchema.parse(req.body);
@@ -309,7 +333,7 @@ router.delete('/:id',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Device ID is required');
+        throw new ValidationError(DEVICE_ID_REQUIRED);
       }
 
       await deviceService.delete(tenantId, id, userId);
@@ -338,7 +362,7 @@ router.post('/:id/move',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Device ID is required');
+        throw new ValidationError(DEVICE_ID_REQUIRED);
       }
 
       const data = MoveDeviceSchema.parse(req.body);
@@ -367,7 +391,7 @@ router.patch('/:id/connectivity',
       const { id } = req.params;
 
       if (!id) {
-        throw new ValidationError('Device ID is required');
+        throw new ValidationError(DEVICE_ID_REQUIRED);
       }
 
       const data = UpdateConnectivitySchema.parse(req.body);

@@ -172,6 +172,11 @@ export interface Device extends BaseEntity {
   meterDomain?: MeterDomain;     // 'ENERGY' | 'WATER'
   tariffCategory?: TariffCategory; // RFC-0054: 'COMMON_AREA' | 'SPECIFIC'
 
+  // RFC-0058: BOX device profile — self-referential membership. On a member
+  // device, boxId points at its enclosure (a device with deviceProfile='BOX').
+  // On a BOX, boxId is undefined (BOX_GROUP nesting is deferred).
+  boxId?: string;                // UUID of the containing BOX device
+
   // Ingestion Integration
   ingestionId?: string;          // UUID in ingestion system
   ingestionGatewayId?: string;   // UUID of ingestion gateway
