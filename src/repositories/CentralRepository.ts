@@ -11,7 +11,36 @@ import { countWhere } from './helpers/countQuery';
 
 const { centrals } = schema;
 
+/** The Drizzle transaction client passed to `db.transaction(async (tx) => …)`. */
+export type CentralTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type CentralDbClient = typeof db | CentralTx;
+
 export class CentralRepository implements ICentralRepository {
+
+  /**
+   * RFC-0056 (P1 fix) — run a callback inside a Postgres transaction on the
+   * `centrals` table, e.g. `lockByIdQuery` + `patchConfig` to make a
+   * read-check-mint-write sequence atomic (mirrors
+   * CentralReplacementRepository.replace()'s transaction shape).
+   */
+  async withTransaction<T>(fn: (tx: CentralTx) => Promise<T>): Promise<T> {
+    return db.transaction(fn);
+  }
+
+  /**
+   * RFC-0056 (P1 fix) — lock the central row for the duration of the caller's
+   * transaction (mirrors CentralReplacementRepository.lockOldCentralQuery).
+   * Must be awaited inside a `withTransaction` callback with `client` set to
+   * the `tx` it received; otherwise the lock is released immediately.
+   */
+  lockByIdQuery(tenantId: string, id: string, client: CentralDbClient = db) {
+    return client
+      .select()
+      .from(centrals)
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .limit(1)
+      .for('update');
+  }
 
   async create(tenantId: string, data: CreateCentralDTO, createdBy: string): Promise<Central> {
     const id = data.id || generateId();
@@ -159,19 +188,30 @@ export class CentralRepository implements ICentralRepository {
    * Tenant-scoped like the rest of the write methods; both call sites
    * (bootstrap service, operator reset) already hold the resolved tenantId.
    * Returns the updated config, or null if no such central in the tenant.
+   *
+   * RFC-0056 (P1 fix) — accepts an optional tx client so the bootstrap
+   * service can run this INSIDE the same transaction/lock as
+   * `lockByIdQuery`, making read-check-mint-write atomic. Defaults to the
+   * module-level `db` for existing callers (e.g. the operator reset flow)
+   * that don't need the extra guarantee.
    */
   async patchConfig(
     tenantId: string,
     id: string,
     patch: Record<string, unknown>,
+    client: CentralDbClient = db,
   ): Promise<Record<string, unknown> | null> {
-    const existing = await this.getById(tenantId, id);
+    const [existing] = await client
+      .select({ config: centrals.config })
+      .from(centrals)
+      .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))
+      .limit(1);
     if (!existing) return null;
 
-    const [result] = await db
+    const [result] = await client
       .update(centrals)
       .set({
-        config: { ...existing.config, ...patch },
+        config: { ...(existing.config as Record<string, unknown>), ...patch },
         updatedAt: new Date(),
       })
       .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)))

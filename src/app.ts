@@ -13,6 +13,7 @@ import {
   notFoundHandler,
   requireGoalsAccess,
   requireTariffAccess,
+  requireCentralSyncAccess,
   requireCustomerConfigAccess,
   requireCustomerConfigSecretsAccess,
 } from './middleware';
@@ -304,20 +305,27 @@ apiV1Router.use('/customers/:customerId/channels', hybridAuthByMethod(PERM_CUSTO
 // rest of the integrations router (GET, PUT centrals/items) stays on
 // customers:read/write only — a central-sync:write-scoped CENTRAL_API_KEY
 // must not be able to touch PUT centrals/items (mqtt admin config).
+// RFC-0056 feedback (P0): hybridAuthMiddleware only authenticates + scope-checks —
+// it does not bind the URL's :customerId to the key's own customer. requireCentralSyncAccess
+// enforces the API-key hierarchy (SELF/SUBTREE/TENANT) and centrals.sync.write RBAC,
+// same pattern as requireGoalsAccess/requireCustomerConfigAccess.
 const SCOPE_CENTRAL_SYNC_WRITE = 'central-sync:write';
 apiV1Router.post(
   '/customers/:customerId/integrations/:key/sync-events',
   hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  requireCentralSyncAccess(),
   customerIntegrationSyncEventsHandler,
 );
 apiV1Router.post(
   '/customers/:customerId/integrations/:key/disable',
   hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  requireCentralSyncAccess(),
   customerIntegrationDisableHandler,
 );
 apiV1Router.post(
   '/customers/:customerId/integrations/:key/reset',
   hybridAuthMiddleware([SCOPE_CUSTOMERS_WRITE, SCOPE_CENTRAL_SYNC_WRITE]),
+  requireCentralSyncAccess(),
   customerIntegrationResetHandler,
 );
 

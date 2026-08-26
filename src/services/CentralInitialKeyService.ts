@@ -3,7 +3,7 @@ import { centralRepository } from '../repositories/CentralRepository';
 import { consumeIfAllowed } from '../middleware/rateLimit';
 import { logAuditEvent } from '../middleware/audit';
 import { EventType, ActorType } from '../shared/types/audit.types';
-import { AppError, ConflictError } from '../shared/errors/AppError';
+import { AppError, ConflictError, NotFoundError } from '../shared/errors/AppError';
 import { ApiKeyScope } from '../domain/entities/CustomerApiKey';
 import { CreateCustomerApiKeyDTO } from '../dto/request/CustomerApiKeyDTO';
 import { CentralBootstrapIdentity } from '../middleware/centralPreKeyAuth';
@@ -70,12 +70,26 @@ export interface BootstrapResult {
   customerId: string;
   cached: boolean;
 }
- 
+
+// RFC-0056 feedback (P1) — outcome of the locked transaction body in
+// getOrCreateInitialKey, before audit logging (which happens post-commit).
+type MintOutcome =
+  | { kind: 'already_provisioned' }
+  | { kind: 'cached'; plaintextKey: string }
+  | { kind: 'created'; plaintextKey: string };
+
 export class CentralInitialKeyService {
   /**
    * Mint (first call) or idempotently reveal (subsequent calls) the
    * per-central INITIAL key, while the central is `awaiting_provisioning`.
-   * `central` is the identity already resolved by `centralPreKeyAuth`.
+   * `central` is the identity already resolved by `centralPreKeyAuth` — but
+   * `central.config` is a snapshot read BEFORE this method runs, so it is
+   * NOT used to decide whether to mint. Instead, the whole
+   * read-check-mint-write sequence runs inside a single transaction that
+   * locks the central row first (RFC-0056 feedback P1 — closes a race where
+   * two concurrent first-time calls for the same uuid could each mint a key,
+   * orphaning one, and closes the same TOCTOU on the 409 "already
+   * provisioned" check).
    */
   async getOrCreateInitialKey(
     uuid: string,
@@ -93,53 +107,70 @@ export class CentralInitialKeyService {
         429,
       );
     }
- 
-    const provisioningState = (central.config.provisioningState as string | undefined)
-      ?? 'awaiting_provisioning';
- 
-    if (provisioningState === 'provisioned') {
+
+    const outcome: MintOutcome = await centralRepository.withTransaction(async (tx) => {
+      const [row] = await centralRepository.lockByIdQuery(central.tenantId, central.centralId, tx);
+      if (!row) {
+        // Defensive: centralPreKeyAuth already resolved this central; only a
+        // delete racing the whole request could hit this.
+        throw new NotFoundError(`Central ${central.centralId} not found`);
+      }
+
+      const config = (row.config as Record<string, unknown>) ?? {};
+      const provisioningState = (config.provisioningState as string | undefined)
+        ?? 'awaiting_provisioning';
+
+      // Re-checked UNDER the lock, not from the pre-captured `central.config`
+      // snapshot passed into this method — closes the TOCTOU on this path too.
+      if (provisioningState === 'provisioned') {
+        return { kind: 'already_provisioned' as const };
+      }
+
+      const cachedKeyId = config.centralInitialApiKeyId as string | undefined;
+      if (cachedKeyId) {
+        const plaintextKey = await customerApiKeyService.revealApiKey(defaultTenantId(), cachedKeyId);
+        return { kind: 'cached' as const, plaintextKey };
+      }
+
+      // Mint INSIDE the transaction/lock: create + patch commit together, or
+      // neither does. No concurrent racer can observe a half-done state.
+      const { plaintextKey, apiKey } = await customerApiKeyService.createApiKey(
+        defaultTenantId(),
+        initialKeyCustomerId(),
+        {
+          name: `Central Initial Key — ${uuid}`,
+          scopes: INITIAL_KEY_SCOPES,
+          hierarchyAccess: 'SELF',
+        },
+        SYSTEM_ACTOR_ID,
+        tx,
+      );
+
+      await centralRepository.patchConfig(
+        central.tenantId,
+        central.centralId,
+        { provisioningState: 'awaiting_provisioning', centralInitialApiKeyId: apiKey.id },
+        tx,
+      );
+
+      return { kind: 'created' as const, plaintextKey };
+    });
+
+    if (outcome.kind === 'already_provisioned') {
       await this.audit(EventType.CENTRAL_BOOTSTRAP_FAILED, central, uuid, clientIp, {
         reason: 'already_provisioned',
       });
       throw new ConflictError('Central already provisioned; bootstrap window closed');
     }
- 
-    const cachedKeyId = central.config.centralInitialApiKeyId as string | undefined;
- 
-    if (cachedKeyId) {
-      const plaintextKey = await customerApiKeyService.revealApiKey(defaultTenantId(), cachedKeyId);
-      await this.audit(EventType.CENTRAL_BOOTSTRAP_ISSUED, central, uuid, clientIp, { cached: true });
-      return {
-        apiKey: plaintextKey,
-        scopes: INITIAL_KEY_SCOPES,
-        customerId: initialKeyCustomerId(),
-        cached: true,
-      };
-    }
- 
-    const { plaintextKey, apiKey } = await customerApiKeyService.createApiKey(
-      defaultTenantId(),
-      initialKeyCustomerId(),
-      {
-        name: `Central Initial Key — ${uuid}`,
-        scopes: INITIAL_KEY_SCOPES,
-        hierarchyAccess: 'SELF',
-      },
-      SYSTEM_ACTOR_ID,
-    );
- 
-    await centralRepository.patchConfig(central.tenantId, central.centralId, {
-      provisioningState: 'awaiting_provisioning',
-      centralInitialApiKeyId: apiKey.id,
-    });
- 
-    await this.audit(EventType.CENTRAL_BOOTSTRAP_ISSUED, central, uuid, clientIp, { cached: false });
- 
+
+    const cached = outcome.kind === 'cached';
+    await this.audit(EventType.CENTRAL_BOOTSTRAP_ISSUED, central, uuid, clientIp, { cached });
+
     return {
-      apiKey: plaintextKey,
+      apiKey: outcome.plaintextKey,
       scopes: INITIAL_KEY_SCOPES,
       customerId: initialKeyCustomerId(),
-      cached: false,
+      cached,
     };
   }
  

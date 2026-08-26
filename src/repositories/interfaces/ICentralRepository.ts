@@ -11,11 +11,14 @@ export interface ICentralRepository {
   // RFC-0056 — shallow-merge a partial `config` jsonb patch onto the central row.
   // Both bootstrap and the operator reset flow already hold the resolved
   // `tenantId` by the time they call this. Returns the updated config, or null
-  // if no such central in the tenant.
+  // if no such central in the tenant. `client` (RFC-0056 P1 fix) lets a caller
+  // run this inside its own transaction (e.g. under a row lock) — defaults to
+  // the repository's own connection.
   patchConfig(
     tenantId: string,
     id: string,
-    patch: Record<string, unknown>
+    patch: Record<string, unknown>,
+    client?: unknown
   ): Promise<Record<string, unknown> | null>;
   getBySerialNumber(tenantId: string, serialNumber: string): Promise<Central | null>;
   // Global (cross-tenant) existence check — used by the public central_id generator.
