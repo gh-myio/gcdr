@@ -6,7 +6,6 @@ import {
   ApiKeyContext,
   ApiKeyScope,
   hasScope,
-  formatKeyPrefix,
 } from '../domain/entities/CustomerApiKey';
 import { CustomerApiKeyRepository, CustomerApiKeyDbClient } from '../repositories/CustomerApiKeyRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
