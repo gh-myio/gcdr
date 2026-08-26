@@ -27,6 +27,66 @@ function extractPostgresError(err: unknown): PostgresErrorShape | null {
   return null;
 }
 
+// Map a known PostgreSQL constraint error to an HTTP response. Extracted from
+// errorHandler to keep that function's cognitive complexity in bounds.
+function mapPostgresError(
+  pgError: PostgresErrorShape,
+  requestId: string,
+  timestamp: string,
+): { status: number; body: ApiResponse } | null {
+  if (pgError.code === '23505') {
+    // unique_violation
+    return {
+      status: 409,
+      body: {
+        success: false,
+        error: {
+          message: pgError.detail || 'A resource with the same unique value already exists',
+          code: 'CONFLICT',
+          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
+        },
+        meta: { requestId, timestamp },
+      },
+    };
+  }
+
+  if (pgError.code === '23503') {
+    // foreign_key_violation
+    return {
+      status: 409,
+      body: {
+        success: false,
+        error: {
+          message: pgError.detail || 'Referenced resource does not exist or is still in use',
+          code: 'FK_VIOLATION',
+          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
+        },
+        meta: { requestId, timestamp },
+      },
+    };
+  }
+
+  if (pgError.code === '23502') {
+    // not_null_violation
+    return {
+      status: 400,
+      body: {
+        success: false,
+        error: {
+          message: pgError.column_name
+            ? `Required column "${pgError.column_name}" is missing`
+            : 'A required field is missing',
+          code: 'VALIDATION_ERROR',
+          ...(pgError.column_name && { details: { column: pgError.column_name } }),
+        },
+        meta: { requestId, timestamp },
+      },
+    };
+  }
+
+  return null;
+}
+
 /**
  * Global error handler middleware for Express
  */
@@ -91,13 +151,17 @@ export function errorHandler(
     return;
   }
 
-  // Custom AppError
+  // Custom AppError. Some subclasses (e.g. RFC-0061 InventoryError) carry a
+  // structured `details` payload with machine-readable params (Appendix D) —
+  // surface it when present so the frontend can render from code + params.
   if (err instanceof AppError) {
+    const details = (err as { details?: Record<string, unknown> }).details;
     const response: ApiResponse = {
       success: false,
       error: {
         message: err.message,
         code: err.code,
+        ...(details ? { details } : {}),
       },
       meta: { requestId, timestamp },
     };
@@ -126,53 +190,10 @@ export function errorHandler(
   // this, the wrapper's message is "Failed query: insert into ..." which
   // both leaks SQL/params to the client and is reported as 500.
   const pgError = extractPostgresError(err);
-  if (pgError) {
-    if (pgError.code === '23505') {
-      // unique_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.detail || 'A resource with the same unique value already exists',
-          code: 'CONFLICT',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(409).json(response);
-      return;
-    }
-
-    if (pgError.code === '23503') {
-      // foreign_key_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.detail || 'Referenced resource does not exist or is still in use',
-          code: 'FK_VIOLATION',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(409).json(response);
-      return;
-    }
-
-    if (pgError.code === '23502') {
-      // not_null_violation
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          message: pgError.column_name
-            ? `Required column "${pgError.column_name}" is missing`
-            : 'A required field is missing',
-          code: 'VALIDATION_ERROR',
-          ...(pgError.column_name && { details: { column: pgError.column_name } }),
-        },
-        meta: { requestId, timestamp },
-      };
-      res.status(400).json(response);
-      return;
-    }
+  const pgMapped = pgError ? mapPostgresError(pgError, requestId, timestamp) : null;
+  if (pgMapped) {
+    res.status(pgMapped.status).json(pgMapped.body);
+    return;
   }
 
   // Unknown errors

@@ -88,3 +88,6 @@ export { default as enrichmentController } from './enrichment.controller';
 
 // RFC-0047: Generic Entity Registry
 export { default as entitiesController, entityTypesRouter as entityTypesController } from './entities.controller';
+
+// RFC-0061: Inventory & Warehouse Management ("Menu de Estoque")
+export { default as inventoryController } from './inventory.controller';

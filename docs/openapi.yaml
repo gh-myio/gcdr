@@ -99,6 +99,26 @@ tags:
       read. Optimistic concurrency via `expectedVersion` (409 on mismatch).
       Nested under `/customers/{customerId}/goals`; scopes `goals:read` /
       `goals:write`. Full wire contract: docs/rfcs/RFC-0046-Goals-API.md.
+  - name: Inventory
+    description: |
+      RFC-0061 — Inventory & Warehouse Management ("Menu de Estoque"). Unified
+      catalog + event-sourced stock ledger, purchases, production/assembly,
+      homologation & QR traceability, expedition, field tracking and the
+      external product-tracking sync. Mounted at `/api/v1/inventory`; scopes
+      `inventory:read` / `inventory:write`. **Contract-first kickoff:** routes,
+      auth and request DTOs are live; endpoints whose service ships in a later
+      phase return `501` with error code `INV_NOT_IMPLEMENTED` and a
+      `{ module, phase }` detail. Error contract (Appendix D) — machine-readable
+      `error.code`, rendered pt-BR client-side, never parsed:
+      `INV_ILLEGAL_TRANSITION` (409), `INV_ALREADY_IN_STATE` (409),
+      `INV_INSUFFICIENT_STOCK` (409), `INV_QR_ALREADY_USED` (409),
+      `INV_QR_DUPLICATE` (409), `INV_QR_NOT_IN_REGISTRY` (422),
+      `INV_QR_WRONG_ITEM` (422), `INV_BOX_FULL`/`INV_BOX_EMPTY`/`INV_BOX_TOO_BIG`
+      (422), `INV_EDIT_LOCKED_STATE` (409), `INV_CONFIRMATION_REQUIRED` (428),
+      `INV_IDEMPOTENCY_KEY_MISSING` (400), `INV_NOT_IMPLEMENTED` (501). Mutations
+      that create movements/deliveries/entries require an `Idempotency-Key`
+      header (S1); destructive verbs (DELETE, `/stock/reset`) require a
+      server-side confirmation token (S3).
 
 security:
   - bearerAuth: []
@@ -218,6 +238,158 @@ components:
           type: string
       required:
         - success
+
+    # RFC-0061: Inventory request bodies
+    InvCreateItem:
+      type: object
+      required: [name, domain]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        domain: { type: string, enum: [COMPONENT, PRODUCT, THIRD_PARTY, TOOL] }
+        link: { type: string, maxLength: 2048, nullable: true }
+        description: { type: string, maxLength: 4096, nullable: true }
+        isManufactured: { type: boolean, default: false, description: 'requires domain=PRODUCT (W4)' }
+        lossPercent: { type: number, minimum: 0, maximum: 100, default: 0 }
+        lotQuantity: { type: integer, minimum: 1, nullable: true }
+        purchaseType: { type: string, enum: [NACIONAL, IMPORTACAO], nullable: true }
+        photoFileId: { type: string, format: uuid, nullable: true }
+        active: { type: boolean, default: true }
+    InvUpdateItem:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        link: { type: string, maxLength: 2048, nullable: true }
+        description: { type: string, maxLength: 4096, nullable: true }
+        isManufactured: { type: boolean }
+        lossPercent: { type: number, minimum: 0, maximum: 100 }
+        lotQuantity: { type: integer, minimum: 1, nullable: true }
+        purchaseType: { type: string, enum: [NACIONAL, IMPORTACAO], nullable: true }
+        photoFileId: { type: string, format: uuid, nullable: true }
+        active: { type: boolean }
+    InvPutBom:
+      type: object
+      required: [components]
+      additionalProperties: false
+      properties:
+        components:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [componentItemId, quantity]
+            additionalProperties: false
+            properties:
+              componentItemId: { type: string, format: uuid }
+              quantity: { type: number, exclusiveMinimum: 0, description: 'up to 3 decimals' }
+    InvCreateMovement:
+      type: object
+      required: [itemId, location, quantity, type]
+      additionalProperties: false
+      properties:
+        itemId: { type: string, format: uuid }
+        location: { type: string, enum: [FABRICA, ALMOXARIFADO, ALMOXARIFADO_GERAL] }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        type: { type: string, enum: [ENTRADA, SAIDA, AJUSTE], description: 'transfers use /stock/transfers' }
+        reason: { type: string, maxLength: 1024 }
+        responsible: { type: string, maxLength: 255 }
+        photoFileId: { type: string, format: uuid }
+        purchaseOrderId: { type: string, format: uuid }
+        qrs:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              qrValue: { type: string, maxLength: 512 }
+              boxQr: { type: string, maxLength: 512 }
+              homologationUnitId: { type: string, format: uuid }
+    InvCreateTransfer:
+      type: object
+      required: [itemId, fromLocation, toLocation, quantity]
+      additionalProperties: false
+      properties:
+        itemId: { type: string, format: uuid }
+        fromLocation: { type: string, enum: [FABRICA, ALMOXARIFADO, ALMOXARIFADO_GERAL] }
+        toLocation: { type: string, enum: [FABRICA, ALMOXARIFADO, ALMOXARIFADO_GERAL] }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        reason: { type: string, maxLength: 1024 }
+    InvStockReset:
+      type: object
+      required: [confirmationToken]
+      additionalProperties: false
+      properties:
+        confirmationToken: { type: string, minLength: 1 }
+        location: { type: string, enum: [FABRICA, ALMOXARIFADO, ALMOXARIFADO_GERAL] }
+    InvCreatePurchaseOrder:
+      type: object
+      required: [projectId, itemId, quantity, deadlineType]
+      additionalProperties: false
+      properties:
+        projectId: { type: string, format: uuid }
+        itemId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 100000 }
+        recipient: { type: string, maxLength: 255 }
+        deliveryPoint: { type: string, maxLength: 255 }
+        deadlineType: { type: string, enum: [URGENTE, ESTA_SEMANA, ESTE_MES, CUSTOMIZADO] }
+        deadlineDate: { type: string, format: date-time, description: 'required when deadlineType=CUSTOMIZADO' }
+        requesterNotes: { type: string, maxLength: 4096 }
+        fileIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+    InvUpdatePurchaseOrder:
+      type: object
+      additionalProperties: false
+      properties:
+        quantity: { type: integer, minimum: 1, maximum: 100000 }
+        recipient: { type: string, maxLength: 255 }
+        deliveryPoint: { type: string, maxLength: 255 }
+        deadlineType: { type: string, enum: [URGENTE, ESTA_SEMANA, ESTE_MES, CUSTOMIZADO] }
+        deadlineDate: { type: string, format: date-time, nullable: true }
+        requesterNotes: { type: string, maxLength: 4096 }
+        buyerNotes: { type: string, maxLength: 4096 }
+        passphrase: { type: string, maxLength: 255 }
+        deliveryForecast: { type: string, format: date-time, nullable: true }
+    InvPurchaseOrderStatus:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [COMPRADO_AGUARDANDO, ENTREGUE, RECEBIDO_OK, RECEBIDO_PROBLEMA, CANCELADO] }
+        note: { type: string, maxLength: 4096 }
+    InvPurchaseOrderFiles:
+      type: object
+      required: [fileIds]
+      additionalProperties: false
+      properties:
+        fileIds: { type: array, minItems: 1, maxItems: 20, items: { type: string, format: uuid } }
+    InvQrValidate:
+      type: object
+      required: [codes]
+      additionalProperties: false
+      properties:
+        codes: { type: array, minItems: 1, maxItems: 200, items: { type: string, minLength: 1, maxLength: 512 } }
+        expectedItemId: { type: string, format: uuid }
+        orderItemId: { type: string, format: uuid }
+    InvCreateProject:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 4096, nullable: true }
+        customerId: { type: string, format: uuid, nullable: true }
+        legacyClientName: { type: string, maxLength: 255, nullable: true }
+        legacyClientCnpj: { type: string, maxLength: 32, nullable: true }
+    InvUpdateProject:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 4096, nullable: true }
+        customerId: { type: string, format: uuid, nullable: true }
+        legacyClientName: { type: string, maxLength: 255, nullable: true }
+        legacyClientCnpj: { type: string, maxLength: 32, nullable: true }
 
     # RFC-0023: Device Sync Jobs schemas
     DeviceSyncLogEntry:
@@ -14705,3 +14877,752 @@ paths:
         - { in: path, name: attId, required: true, schema: { type: string, format: uuid } }
       responses:
         '204': { description: Detached }
+
+  # ===========================================================================
+  # RFC-0061 — Inventory & Warehouse Management ("Menu de Estoque")
+  # /api/v1/inventory/*  — scopes inventory:read / inventory:write.
+  # Endpoints whose service ships later return 501 INV_NOT_IMPLEMENTED (see the
+  # Inventory tag for the full Appendix D error contract).
+  # ===========================================================================
+  /api/v1/inventory/meta:
+    get:
+      tags: [Inventory]
+      summary: Contract metadata (concrete) — enums + state machines + error codes
+      description: Static contract aid so the frontend never re-implements the enums, the purchase-order / expedition state machines (allowedTransitions), or the error-code list (S3).
+      operationId: inventoryMeta
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: Contract metadata, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '401': { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/items:
+    get:
+      tags: [Inventory]
+      summary: List catalog items (paginated)
+      operationId: invListItems
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+        - { in: query, name: domain, schema: { type: string, enum: [COMPONENT, PRODUCT, THIRD_PARTY, TOOL] } }
+        - { in: query, name: active, schema: { type: boolean } }
+        - { in: query, name: q, schema: { type: string } }
+      responses:
+        '200': { description: Paginated items, content: { application/json: { schema: { $ref: '#/components/schemas/PaginatedResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a catalog item
+      operationId: invCreateItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvCreateItem' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/items/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Inventory]
+      summary: Get a catalog item
+      operationId: invGetItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    patch:
+      tags: [Inventory]
+      summary: Update a catalog item
+      operationId: invUpdateItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvUpdateItem' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      tags: [Inventory]
+      summary: Delete a catalog item (admin; requires confirmation token)
+      description: Destructive. Requires header `X-Confirmation-Token` or body `confirmationToken` (else 428 INV_CONFIRMATION_REQUIRED).
+      operationId: invDeleteItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/items/{id}/stock:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Per-location balances for one item
+      operationId: invItemStock
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/items/{id}/bom:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Get a product BOM
+      operationId: invGetBom
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    put:
+      tags: [Inventory]
+      summary: Replace a product BOM
+      operationId: invPutBom
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvPutBom' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M1/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/balances:
+    get:
+      tags: [Inventory]
+      summary: Per-location stock balances (derived from the ledger)
+      operationId: invStockBalances
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters:
+        - { in: query, name: location, schema: { type: string, enum: [FABRICA, ALMOXARIFADO, ALMOXARIFADO_GERAL] } }
+        - { in: query, name: domain, schema: { type: string, enum: [COMPONENT, PRODUCT, THIRD_PARTY, TOOL] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/consistency:
+    get:
+      tags: [Inventory]
+      summary: Ledger-vs-QR-registry drift report (W1)
+      operationId: invStockConsistency
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/movements:
+    get:
+      tags: [Inventory]
+      summary: Paginated movement history
+      operationId: invListMovements
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PaginatedResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a stock movement (ENTRADA/SAIDA/AJUSTE)
+      description: Requires an `Idempotency-Key` header (S1). Exit rules enforced by domain (W4). Negative-stock guard → 409 INV_INSUFFICIENT_STOCK.
+      operationId: invCreateMovement
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters:
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvCreateMovement' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error / INV_IDEMPOTENCY_KEY_MISSING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: INV_INSUFFICIENT_STOCK / INV_QR_ALREADY_USED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/movements/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Get a movement
+      operationId: invGetMovement
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/transfers:
+    post:
+      tags: [Inventory]
+      summary: Transfer stock between locations (paired legs, one transaction)
+      description: Requires an `Idempotency-Key` header. Negative guard on the OUT leg (409 INV_INSUFFICIENT_STOCK).
+      operationId: invCreateTransfer
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters: [ { in: header, name: Idempotency-Key, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvCreateTransfer' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error / INV_IDEMPOTENCY_KEY_MISSING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: INV_INSUFFICIENT_STOCK, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/stock/reset:
+    post:
+      tags: [Inventory]
+      summary: Reset stock (admin; requires confirmation token)
+      operationId: invStockReset
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvStockReset' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M2/P0), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/purchase-orders:
+    get:
+      tags: [Inventory]
+      summary: List purchase orders / buyer queue (paginated)
+      operationId: invListPurchaseOrders
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [PENDENTE, COMPRADO_AGUARDANDO, ENTREGUE, RECEBIDO_OK, RECEBIDO_PROBLEMA, CANCELADO] } }
+        - { in: query, name: projectId, schema: { type: string, format: uuid } }
+        - { in: query, name: purchaseType, schema: { type: string, enum: [NACIONAL, IMPORTACAO] } }
+        - { in: query, name: groupByProject, schema: { type: boolean } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PaginatedResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a purchase request
+      operationId: invCreatePurchaseOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvCreatePurchaseOrder' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/purchase-orders/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Get a purchase order (includes allowedTransitions)
+      operationId: invGetPurchaseOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    patch:
+      tags: [Inventory]
+      summary: Update a purchase order (requester edits only while PENDENTE)
+      description: Edits outside PENDENTE → 409 INV_EDIT_LOCKED_STATE.
+      operationId: invUpdatePurchaseOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvUpdatePurchaseOrder' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: INV_EDIT_LOCKED_STATE, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      tags: [Inventory]
+      summary: Delete a purchase order (admin; requires confirmation token)
+      operationId: invDeletePurchaseOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/purchase-orders/{id}/status:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Transition a purchase order (server-side state machine)
+      description: RECEBIDO_OK creates exactly one idempotent ENTRADA. Illegal transition → 409 INV_ILLEGAL_TRANSITION; transition to the current state → 409 INV_ALREADY_IN_STATE.
+      operationId: invPurchaseOrderStatus
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvPurchaseOrderStatus' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '409': { description: INV_ILLEGAL_TRANSITION / INV_ALREADY_IN_STATE, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/purchase-orders/{id}/events:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Purchase-order event timeline (WO-style)
+      operationId: invPurchaseOrderEvents
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/purchase-orders/{id}/files:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Attach files (file_assets ids) to a purchase order
+      operationId: invPurchaseOrderAddFiles
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvPurchaseOrderFiles' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      tags: [Inventory]
+      summary: Detach a file from a purchase order
+      operationId: invPurchaseOrderRemoveFile
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M3/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/production/demands:
+    get:
+      tags: [Inventory]
+      summary: Production demand queue (M4)
+      operationId: invProductionDemands
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/production/resolve-demand:
+    post:
+      tags: [Inventory]
+      summary: Resolve demand for expedition-order items lacking stock (P3)
+      operationId: invResolveDemand
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/production/capacity:
+    get:
+      tags: [Inventory]
+      summary: Production capacity (min over BOM components)
+      operationId: invProductionCapacity
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/production/simulator/preview:
+    post:
+      tags: [Inventory]
+      summary: Simulate production (preview-only — DEC-13)
+      operationId: invSimulatorPreview
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/assembly-releases:
+    get:
+      tags: [Inventory]
+      summary: List assembly releases (M4)
+      operationId: invListAssemblyReleases
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create an assembly release (consumes BOM FIFO; requires Idempotency-Key)
+      operationId: invCreateAssemblyRelease
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters: [ { in: header, name: Idempotency-Key, required: true, schema: { type: string } } ]
+      responses:
+        '400': { description: INV_IDEMPOTENCY_KEY_MISSING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/assembly-releases/{id}/correct:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Correct released quantities (delta movements)
+      operationId: invCorrectAssemblyRelease
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/assembly-releases/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    delete:
+      tags: [Inventory]
+      summary: Delete an assembly release (admin; requires confirmation token)
+      operationId: invDeleteAssemblyRelease
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/assembly-releases/{id}/issues:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: List assembly-release divergence issues
+      operationId: invListAssemblyIssues
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Report an assembly-release divergence
+      operationId: invCreateAssemblyIssue
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/issues/{id}/resolve:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Resolve a divergence issue
+      operationId: invResolveIssue
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M4/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/homologations:
+    get:
+      tags: [Inventory]
+      summary: List homologations (M5)
+      operationId: invListHomologations
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a homologation (requires Idempotency-Key)
+      operationId: invCreateHomologation
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters: [ { in: header, name: Idempotency-Key, required: true, schema: { type: string } } ]
+      responses:
+        '400': { description: INV_IDEMPOTENCY_KEY_MISSING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/homologations/boxes:
+    get:
+      tags: [Inventory]
+      summary: List homologation boxes
+      operationId: invListBoxes
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/homologations/boxes/{id}/add-unit:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Add a unit to a box (INV_BOX_FULL / INV_BOX_TOO_BIG on violation)
+      operationId: invBoxAddUnit
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '422': { description: INV_BOX_FULL / INV_BOX_TOO_BIG, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/homologations/units/{id}/remove-from-box:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Remove a unit from its box (becomes a box_size=1 homologation)
+      operationId: invBoxRemoveUnit
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '422': { description: INV_BOX_EMPTY, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/qr/generate:
+    post:
+      tags: [Inventory]
+      summary: Generate a QR via the external platform (M5/M8)
+      operationId: invQrGenerate
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/qr/trace/{code}:
+    parameters: [ { in: path, name: code, required: true, schema: { type: string }, description: 'Bare code or full https://produto.myio.com.br/<code> URL' } ]
+    get:
+      tags: [Inventory]
+      summary: Full QR trace — current-state header + normalized timeline (S5)
+      description: 'Limbo semantics: unknown QR -> 404; box QR expands its units (flagged). p95 < 1s.'
+      operationId: invQrTrace
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '404': { description: INV_QR_NOT_IN_REGISTRY (unknown QR), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/qr/validate:
+    post:
+      tags: [Inventory]
+      summary: Batch per-code QR validation for handheld scanners (S2, p95 < 300ms)
+      operationId: invQrValidate
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvQrValidate' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M5/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/expedition-orders:
+    get:
+      tags: [Inventory]
+      summary: List expedition orders (paginated, M6)
+      operationId: invListExpeditionOrders
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create an expedition order
+      operationId: invCreateExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Get an expedition order (includes allowedTransitions)
+      operationId: invGetExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    patch:
+      tags: [Inventory]
+      summary: Update an expedition order
+      operationId: invUpdateExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      tags: [Inventory]
+      summary: Delete an expedition order (admin; requires confirmation token)
+      operationId: invDeleteExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/status:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Transition an expedition order (server-side state machine)
+      operationId: invExpeditionOrderStatus
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '409': { description: INV_ILLEGAL_TRANSITION / INV_ALREADY_IN_STATE, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/items/{itemId}/deliver:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: itemId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Inventory]
+      summary: Baixa/separacao — deliver an order item (requires Idempotency-Key)
+      operationId: invDeliverItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      parameters: [ { in: header, name: Idempotency-Key, required: true, schema: { type: string } } ]
+      responses:
+        '400': { description: INV_IDEMPOTENCY_KEY_MISSING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: INV_INSUFFICIENT_STOCK / INV_QR_ALREADY_USED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '422': { description: INV_QR_NOT_IN_REGISTRY / INV_QR_WRONG_ITEM, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/ship:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Expedir — create a shipment (-> EM_TRANSITO)
+      operationId: invShipExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/return:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Return to expedition
+      operationId: invReturnExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/lost:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Mark lost (PERDIDO)
+      operationId: invLostExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/found:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Mark found (returns to a chosen sector)
+      operationId: invFoundExpeditionOrder
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/expedition-orders/{id}/transit-progress:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Inventory]
+      summary: Live transit progress by QR (badge "X de Y em transporte")
+      operationId: invTransitProgress
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M6/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/unit-products:
+    get:
+      tags: [Inventory]
+      summary: List field unit-products (paginated, M7)
+      operationId: invListUnitProducts
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a field unit-product
+      operationId: invCreateUnitProduct
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/unit-products/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Inventory]
+      summary: Toggle install/stop (pushes to external platform)
+      operationId: invUpdateUnitProduct
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/unit-products/{id}/move:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Move a unit (TECNICO/ALMOXARIFADO/PERDIDO/AVARIADO)
+      operationId: invMoveUnitProduct
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/technician-items:
+    get:
+      tags: [Inventory]
+      summary: Technician custody items
+      operationId: invTechnicianItems
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/technician-moves:
+    post:
+      tags: [Inventory]
+      summary: Dispatch to a technician (custody control)
+      operationId: invTechnicianMove
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/damaged-items:
+    get:
+      tags: [Inventory]
+      summary: List damaged items (paginated)
+      operationId: invListDamagedItems
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Report a damaged item
+      operationId: invCreateDamagedItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/damaged-items/{id}/recover:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Inventory]
+      summary: Recover a damaged item (compensating movements + re-link QR)
+      operationId: invRecoverDamagedItem
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M7/P3), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/external/states:
+    get:
+      tags: [Inventory]
+      summary: External platform state mirror (M8)
+      operationId: invExternalStates
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M8/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/external/sync/status:
+    get:
+      tags: [Inventory]
+      summary: External sync run report (ok|parcial|erro)
+      operationId: invExternalSyncStatus
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M8/P2), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/external/sync/run:
+    post:
+      tags: [Inventory]
+      summary: Trigger the external sync (admin JWT or gcdr_cust_* M2M key — no anon endpoint, DEC-7)
+      operationId: invExternalSyncRun
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '501': { description: INV_NOT_IMPLEMENTED (M8/P4), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/v1/inventory/projects:
+    get:
+      tags: [Inventory]
+      summary: List projects (paginated, M9)
+      operationId: invListProjects
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PaginatedResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M9/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Inventory]
+      summary: Create a project
+      operationId: invCreateProject
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvCreateProject' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M9/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /api/v1/inventory/projects/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Inventory]
+      summary: Update a project
+      operationId: invUpdateProject
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InvUpdateProject' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M9/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    delete:
+      tags: [Inventory]
+      summary: Delete a project (admin; requires confirmation token)
+      operationId: invDeleteProject
+      security: [ { bearerAuth: [] }, { apiKeyAuth: [] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '428': { description: INV_CONFIRMATION_REQUIRED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { description: INV_NOT_IMPLEMENTED (M9/P1), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }

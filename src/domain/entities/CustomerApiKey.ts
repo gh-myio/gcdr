@@ -36,6 +36,8 @@ export type ApiKeyScope =
   | 'templates:read'    // Read/render HTML templates (RFC-0021) — used by EMAIL_SENDER (M2M)
   | 'centrals:read'     // Read centrals/gateways — used by alarms-backend (M2M)
   | 'centrals:write'    // Write centrals/gateways (commands, enroll, mqtt, backup/restore)
+  | 'inventory:read'    // Read inventory domain (RFC-0061)
+  | 'inventory:write'   // Write inventory domain incl. external sync run (RFC-0061)
   | '*:read';           // Read all resources
 
 /**

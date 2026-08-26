@@ -103,6 +103,8 @@ import {
   enrichmentController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
+  // RFC-0061: Inventory & Warehouse Management ("Menu de Estoque")
+  inventoryController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -580,6 +582,13 @@ apiV1Router.use('/assistant', authMiddleware, assistantController);
 // RFC-0055 (ED-1080): batch entity enrichment for the Alarms Orchestrator.
 // M2M consumer — same auth as the bundle to-verify-service (master key + JWT).
 apiV1Router.use('/enrichment', authMiddleware, enrichmentController);
+
+// RFC-0061: Inventory & Warehouse Management ("Menu de Estoque").
+// hybridAuth: GET → inventory:read; write verbs → inventory:write (JWT or
+// customer API key gcdr_cust_* for M2M — external sync run). Finer RBAC
+// (requester/buyer/factory/admin per §RBAC) is enforced in the services;
+// destructive verbs additionally require a server-side confirmation token.
+apiV1Router.use('/inventory', hybridAuthByMethod('inventory:read', 'inventory:write'), inventoryController);
 
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
