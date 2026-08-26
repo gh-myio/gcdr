@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MYIO · Padrão de numeração de dispositivos</title>
+<meta name="description" content="Especificação técnica do padrão de identificação de 4 bytes A.B.C.D para dispositivos IoT MYIO.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --myio-purple: #673BB6;
+    --myio-purple-dark: #4A2A85;
+    --myio-purple-light: #8A5CD9;
+    --myio-purple-50: #F4F0FB;
+    --myio-purple-100: #E5DBF5;
+    --myio-green: #00C57E;
+    --myio-green-dark: #00945F;
+    --myio-green-50: #E6FAF2;
+    --bg: #FAFAFB;
+    --surface: #FFFFFF;
+    --border: rgba(20, 14, 38, 0.08);
+    --border-strong: rgba(20, 14, 38, 0.16);
+    --text: #140E26;
+    --text-muted: #5A526C;
+    --text-faint: #8B849B;
+    --shadow-sm: 0 1px 2px rgba(20, 14, 38, 0.04);
+    --shadow-md: 0 4px 16px rgba(20, 14, 38, 0.06);
+    --shadow-lg: 0 12px 40px rgba(20, 14, 38, 0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Manrope', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(circle at 1px 1px, rgba(103, 59, 182, 0.06) 1px, transparent 0);
+    background-size: 32px 32px;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .site-header {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .header-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--myio-purple);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-text {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.025em;
+    color: var(--text);
+  }
+  .header-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+  }
+
+  /* Hero */
+  .hero {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 72px 24px 32px;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    color: var(--myio-purple-dark);
+    background: var(--myio-purple-50);
+    padding: 6px 12px;
+    border-radius: 100px;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--myio-green);
+    box-shadow: 0 0 0 4px rgba(0, 197, 126, 0.18);
+  }
+  .hero-title {
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(34px, 5vw, 54px);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin-bottom: 18px;
+    max-width: 760px;
+  }
+  .hero-title .accent {
+    color: var(--myio-purple);
+    font-weight: 700;
+  }
+  .hero-sub {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .hero-sub strong {
+    color: var(--text);
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--myio-purple-50);
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  /* Sections */
+  main { max-width: 1080px; margin: 0 auto; padding: 0 24px 80px; }
+  .section { margin-top: 56px; }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  /* Product tabs */
+  .product-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .product-tab {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .product-tab:hover { background: var(--myio-purple-50); border-color: var(--myio-purple-light); }
+  .product-tab.active {
+    background: var(--myio-purple);
+    border-color: var(--myio-purple);
+    color: white;
+  }
+
+  /* ID stage */
+  .id-stage {
+    padding: 56px 24px;
+    background: linear-gradient(180deg, var(--myio-purple-50) 0%, var(--surface) 100%);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .byte-labels {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .byte-label {
+    width: 92px;
+    text-align: center;
+  }
+  .byte-spacer { width: 16px; }
+  .id-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    flex-wrap: nowrap;
+  }
+  .id-byte {
+    background: white;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 16px 12px;
+    width: 92px;
+    text-align: center;
+    font-size: 32px;
+    color: var(--text);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: var(--shadow-sm);
+  }
+  .id-byte.product {
+    background: var(--myio-purple);
+    color: white;
+    border-color: var(--myio-purple);
+  }
+  .id-byte.flash {
+    background: var(--myio-green);
+    color: white;
+    border-color: var(--myio-green);
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 8px 24px rgba(0, 197, 126, 0.3);
+  }
+  .id-dot {
+    color: var(--text-faint);
+    font-size: 28px;
+    padding: 0 6px;
+    user-select: none;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 8px;
+    padding: 18px 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctrl-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .ctrl-btn:hover {
+    background: var(--myio-purple-50);
+    border-color: var(--myio-purple-light);
+    color: var(--myio-purple-dark);
+    transform: translateY(-1px);
+  }
+  .ctrl-btn:active { transform: translateY(0); }
+  .ctrl-btn.primary {
+    background: var(--myio-purple);
+    color: white;
+    border-color: var(--myio-purple);
+  }
+  .ctrl-btn.primary:hover {
+    background: var(--myio-purple-dark);
+    color: white;
+    border-color: var(--myio-purple-dark);
+  }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--border);
+  }
+  .stat {
+    background: var(--surface);
+    padding: 20px 24px;
+  }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'Sora', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Converter */
+  .converter {
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface) 0%, #FAFAFB 100%);
+  }
+  .conv-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+  .conv-row {
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+  .conv-row label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .conv-input-group {
+    display: flex;
+    gap: 8px;
+  }
+  .conv-input {
+    flex: 1;
+    background: white;
+    border: 1px solid var(--border-strong);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--text);
+    transition: all 0.15s ease;
+    width: 100%;
+    min-width: 0;
+  }
+  .conv-input:focus {
+    outline: none;
+    border-color: var(--myio-purple);
+    box-shadow: 0 0 0 3px var(--myio-purple-50);
+  }
+
+  /* Rules */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .rule-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .rule-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .rule-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--myio-purple);
+  }
+  .rule-card.green::before { background: var(--myio-green); }
+  .rule-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    color: var(--myio-purple);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .rule-card.green .rule-num { color: var(--myio-green-dark); }
+  .rule-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin-bottom: 8px;
+  }
+  .rule-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .rule-desc code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--myio-purple-50);
+    color: var(--myio-purple-dark);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .rule-card.green .rule-desc code {
+    background: var(--myio-green-50);
+    color: var(--myio-green-dark);
+  }
+
+  /* Code */
+  pre {
+    background: #140E26;
+    color: #E0DCEE;
+    padding: 28px;
+    border-radius: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+  }
+  pre .kw { color: #C29CFF; font-weight: 500; }
+  pre .num { color: #00C57E; }
+  pre .var { color: #FFB85C; }
+  pre .cmt { color: #6E6886; font-style: italic; }
+  pre .str { color: #FFB85C; }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    margin-top: 64px;
+  }
+  .footer-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+  .footer-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  @media (max-width: 640px) {
+    .conv-row { grid-template-columns: 1fr; }
+    .id-byte { width: 64px; font-size: 22px; padding: 12px 6px; }
+    .byte-label { width: 64px; font-size: 9px; }
+    .byte-spacer { width: 6px; }
+    .id-dot { padding: 0 2px; font-size: 22px; }
+    .stat { padding: 16px 18px; }
+    .stat-value { font-size: 19px; }
+    .hero { padding: 48px 24px 16px; }
+    .section { margin-top: 40px; }
+    pre { padding: 18px; font-size: 12px; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero, .section { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .section:nth-child(1) { animation-delay: 0.1s; }
+  .section:nth-child(2) { animation-delay: 0.2s; }
+  .section:nth-child(3) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#" class="logo">
+      <!--
+        ============================================================
+        ✏️  TROCAR PELO LOGO REAL DA MYIO
+        ============================================================
+        Coloque o arquivo myio-logo.svg (ou .png) na mesma pasta
+        deste HTML e substitua o bloco abaixo por:
+
+            <img src="myio-logo.svg" alt="MYIO" style="height: 32px;">
+
+        Você pode remover o <span class="logo-text">MYIO</span>
+        depois disso, se o logo já contiver o texto da marca.
+        ============================================================
+      -->
+      <div class="logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M3 6L12 11L21 6V18L12 22L3 18V6Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M12 11V22" stroke="white" stroke-width="2"/>
+          <circle cx="12" cy="11" r="2" fill="#00C57E"/>
+        </svg>
+      </div>
+      <span class="logo-text">MYIO</span>
+    </a>
+    <span class="header-meta">DOC · v1.0 · 2026</span>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-eyebrow">Especificação técnica</div>
+  <h1 class="hero-title">
+    Padrão de numeração de <span class="accent">dispositivos IoT</span>.
+  </h1>
+  <p class="hero-sub">
+    Esquema de identificação compacto de 4 bytes no formato <strong>A.B.C.D</strong>, onde os três primeiros bytes formam um contador base-253 com offset 1, e o quarto byte discrimina o tipo do produto.
+  </p>
+</section>
+
+<main>
+
+  <section class="section">
+    <div class="section-label">01 · Visualizador interativo</div>
+    <h2 class="section-title">Explore o padrão</h2>
+
+    <div class="card">
+      <div class="product-tabs" role="tablist">
+        <button class="product-tab active" data-product="12">12 · switch</button>
+        <button class="product-tab" data-product="14">14 · remote</button>
+        <button class="product-tab" data-product="15">15 · 3f</button>
+      </div>
+
+      <div class="id-stage">
+        <div class="byte-labels">
+          <span class="byte-label">A · 1–253</span>
+          <span class="byte-spacer"></span>
+          <span class="byte-label">B · 1–253</span>
+          <span class="byte-spacer"></span>
+          <span class="byte-label">C · 1–253</span>
+          <span class="byte-spacer"></span>
+          <span class="byte-label">tipo</span>
+        </div>
+        <div class="id-display">
+          <div class="id-byte" id="byte-a">1</div>
+          <span class="id-dot">.</span>
+          <div class="id-byte" id="byte-b">1</div>
+          <span class="id-dot">.</span>
+          <div class="id-byte" id="byte-c">1</div>
+          <span class="id-dot">.</span>
+          <div class="id-byte product" id="byte-d">12</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" id="btn-reset">Reset</button>
+        <button class="ctrl-btn" id="btn-prev">−1</button>
+        <button class="ctrl-btn primary" id="btn-next">+1</button>
+        <button class="ctrl-btn" id="btn-jump-b">+253 (vira B)</button>
+        <button class="ctrl-btn" id="btn-jump-a">+64.009 (vira A)</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Índice atual (N)</div>
+          <div class="stat-value" id="stat-index">1</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Capacidade total</div>
+          <div class="stat-value">16.194.277</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Restantes</div>
+          <div class="stat-value" id="stat-remaining">16.194.276</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Utilizado</div>
+          <div class="stat-value" id="stat-pct">0,000%</div>
+        </div>
+      </div>
+
+      <div class="converter">
+        <div class="conv-title">Conversor índice ↔ A.B.C</div>
+        <div class="conv-row">
+          <label>Índice N:</label>
+          <div class="conv-input-group">
+            <input class="conv-input" type="number" id="conv-index" min="1" max="16194277" value="1">
+          </div>
+          <button class="ctrl-btn" id="btn-conv-from-index">N → A.B.C</button>
+        </div>
+        <div class="conv-row">
+          <label>A . B . C:</label>
+          <div class="conv-input-group">
+            <input class="conv-input" type="number" id="conv-a" min="1" max="253" value="1">
+            <input class="conv-input" type="number" id="conv-b" min="1" max="253" value="1">
+            <input class="conv-input" type="number" id="conv-c" min="1" max="253" value="1">
+          </div>
+          <button class="ctrl-btn" id="btn-conv-from-abc">A.B.C → N</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-label">02 · Regras formais</div>
+    <h2 class="section-title">Como o contador funciona</h2>
+
+    <div class="rules-grid">
+      <div class="rule-card">
+        <div class="rule-num">Regra 01</div>
+        <div class="rule-title">Faixa de cada byte</div>
+        <div class="rule-desc">
+          Os bytes <code>A</code>, <code>B</code> e <code>C</code> aceitam valores de <code>1</code> a <code>253</code> — o zero não é usado e os valores 254/255 ficam reservados para uso futuro.
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-num">Regra 02</div>
+        <div class="rule-title">Propagação de carry</div>
+        <div class="rule-desc">
+          Quando <code>C</code> ultrapassa 253, volta a 1 e <code>B</code> incrementa. Idem entre <code>B</code> e <code>A</code>. Comportamento idêntico ao de um odômetro em base-253.
+        </div>
+      </div>
+      <div class="rule-card green">
+        <div class="rule-num">Regra 03</div>
+        <div class="rule-title">Discriminador de tipo</div>
+        <div class="rule-desc">
+          O quarto byte <code>D</code> identifica a categoria: <code>12</code> = switch (hidrômetro), <code>14</code> = remote, <code>15</code> = 3f.
+        </div>
+      </div>
+      <div class="rule-card green">
+        <div class="rule-num">Regra 04</div>
+        <div class="rule-title">Capacidade por tipo</div>
+        <div class="rule-desc">
+          Cada tipo de produto comporta <code>253³ = 16.194.277</code> dispositivos únicos antes de esgotar a numeração.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-label">03 · Fórmulas</div>
+    <h2 class="section-title">Conversão sequencial</h2>
+
+    <pre><span class="cmt">// Constantes</span>
+<span class="kw">const</span> <span class="var">STEP_A</span>   = <span class="num">253</span> * <span class="num">253</span>;     <span class="cmt">// 64.009</span>
+<span class="kw">const</span> <span class="var">STEP_B</span>   = <span class="num">253</span>;
+<span class="kw">const</span> <span class="var">CAPACITY</span> = <span class="num">253</span> ** <span class="num">3</span>;      <span class="cmt">// 16.194.277</span>
+
+<span class="cmt">// Encode: índice sequencial → A.B.C</span>
+<span class="kw">function</span> <span class="var">indexToABC</span>(n) {
+  <span class="kw">const</span> i = n - <span class="num">1</span>;
+  <span class="kw">return</span> {
+    a: <span class="var">Math</span>.floor(i / <span class="var">STEP_A</span>) + <span class="num">1</span>,
+    b: (<span class="var">Math</span>.floor(i / <span class="var">STEP_B</span>) % <span class="num">253</span>) + <span class="num">1</span>,
+    c: (i % <span class="num">253</span>) + <span class="num">1</span>
+  };
+}
+
+<span class="cmt">// Decode: A.B.C → índice sequencial</span>
+<span class="kw">function</span> <span class="var">abcToIndex</span>(a, b, c) {
+  <span class="kw">return</span> (a - <span class="num">1</span>) * <span class="var">STEP_A</span> + (b - <span class="num">1</span>) * <span class="var">STEP_B</span> + c;
+}
+
+<span class="cmt">// ID completo do dispositivo (string canônica)</span>
+<span class="kw">function</span> <span class="var">deviceId</span>(n, productType) {
+  <span class="kw">const</span> { a, b, c } = <span class="var">indexToABC</span>(n);
+  <span class="kw">return</span> <span class="str">`${a}.${b}.${c}.${productType}`</span>;
+}</pre>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>© 2026 MYIO · Especificação interna</span>
+    <span class="footer-meta">numeração-dispositivos · v1.0</span>
+  </div>
+</footer>
+
+<script>
+  const state = { index: 1, productType: 12 };
+  const MAX_INDEX = 253 * 253 * 253;
+  const STEP_B = 253;
+  const STEP_A = 253 * 253;
+
+  function indexToABC(n) {
+    const i = n - 1;
+    return {
+      a: Math.floor(i / STEP_A) + 1,
+      b: (Math.floor(i / STEP_B) % 253) + 1,
+      c: (i % 253) + 1
+    };
+  }
+  function abcToIndex(a, b, c) {
+    return (a - 1) * STEP_A + (b - 1) * STEP_B + c;
+  }
+  function fmt(n) { return n.toLocaleString('pt-BR'); }
+  function flashByte(id) {
+    const el = document.getElementById(id);
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 400);
+  }
+  function render(prev) {
+    const { a, b, c } = indexToABC(state.index);
+    document.getElementById('byte-a').textContent = a;
+    document.getElementById('byte-b').textContent = b;
+    document.getElementById('byte-c').textContent = c;
+    document.getElementById('byte-d').textContent = state.productType;
+    document.getElementById('stat-index').textContent = fmt(state.index);
+    document.getElementById('stat-remaining').textContent = fmt(MAX_INDEX - state.index);
+    const pct = (state.index / MAX_INDEX) * 100;
+    document.getElementById('stat-pct').textContent = pct.toFixed(3).replace('.', ',') + '%';
+    if (prev) {
+      if (prev.a !== a) flashByte('byte-a');
+      if (prev.b !== b) flashByte('byte-b');
+      if (prev.c !== c) flashByte('byte-c');
+    }
+  }
+  function step(delta) {
+    const prev = indexToABC(state.index);
+    state.index = Math.max(1, Math.min(MAX_INDEX, state.index + delta));
+    render(prev);
+  }
+
+  document.getElementById('btn-next').addEventListener('click', () => step(1));
+  document.getElementById('btn-prev').addEventListener('click', () => step(-1));
+  document.getElementById('btn-jump-b').addEventListener('click', () => step(STEP_B));
+  document.getElementById('btn-jump-a').addEventListener('click', () => step(STEP_A));
+  document.getElementById('btn-reset').addEventListener('click', () => { state.index = 1; render(); });
+
+  document.querySelectorAll('.product-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.product-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      state.productType = parseInt(tab.dataset.product);
+      render();
+    });
+  });
+
+  document.getElementById('btn-conv-from-index').addEventListener('click', () => {
+    const n = parseInt(document.getElementById('conv-index').value);
+    if (Number.isFinite(n) && n >= 1 && n <= MAX_INDEX) {
+      const prev = indexToABC(state.index);
+      state.index = n;
+      render(prev);
+      const { a, b, c } = indexToABC(n);
+      document.getElementById('conv-a').value = a;
+      document.getElementById('conv-b').value = b;
+      document.getElementById('conv-c').value = c;
+    }
+  });
+  document.getElementById('btn-conv-from-abc').addEventListener('click', () => {
+    const a = parseInt(document.getElementById('conv-a').value);
+    const b = parseInt(document.getElementById('conv-b').value);
+    const c = parseInt(document.getElementById('conv-c').value);
+    if ([a,b,c].every(v => Number.isFinite(v) && v >= 1 && v <= 253)) {
+      const prev = indexToABC(state.index);
+      state.index = abcToIndex(a, b, c);
+      document.getElementById('conv-index').value = state.index;
+      render(prev);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); step(-1); }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); step(STEP_B); }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); step(-STEP_B); }
+  });
+
+  render();
+</script>
+
+</body>
+</html>
