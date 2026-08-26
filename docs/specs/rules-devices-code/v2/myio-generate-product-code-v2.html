@@ -87,7 +87,7 @@
         <div><label>Dia (1–31)</label><input id="e-day" type="number" min="1" max="31" value="2"></div>
         <div><label>Seq3 (0–7)</label><input id="e-seq3" type="number" min="0" max="7" value="0"></div>
         <div><label>Sequencial (1–254)</label><input id="e-seq" type="number" min="1" max="254" value="25"></div>
-        <div><label>Tipo</label><select id="e-type"><option value="12">12 · switch</option><option value="14">14 · remote</option><option value="15" selected>15 · 3f</option></select></div>
+        <div><label>Tipo</label><select id="e-type"><option value="12">12 · switch</option><option value="14">14 · remote</option><option value="15" selected>15 · 3f</option><option value="18">18 · box</option></select></div>
       </div>
       <div class="out">
         <div class="code" id="e-code">17.2.25.15</div>
@@ -121,7 +121,7 @@
 <div class="layout">Byte 1   YYYY MMMM   YYYY = ano-2026 (0..15)   MMMM = mês (1..12)
 Byte 2   SSS  DDDDD  SSS  = seq3 (0..7)      DDDDD = dia (1..31)
 Byte 3   NNNN NNNN   sequencial diário (1..254)
-Byte 4   TTTT TTTT   tipo (12=switch · 14=remote · 15=3f)</div>
+Byte 4   TTTT TTTT   tipo (12=switch · 14=remote · 15=3f · 18=box)</div>
       <pre>const EPOCH_YEAR = 2026;
 // encode
 b1 = ((year - EPOCH_YEAR) &lt;&lt; 4) | month;
@@ -139,7 +139,7 @@ seq   = b3;                        type  = b4;</pre>
 
 <script>
   const EPOCH_YEAR = 2026;
-  const TYPES = { 12:'switch', 14:'remote', 15:'3f' };
+  const TYPES = { 12:'switch', 14:'remote', 15:'3f', 18:'box' };
   const MONTHS = ['','jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
   const num = id => parseInt(document.getElementById(id).value, 10);
@@ -151,7 +151,7 @@ seq   = b3;                        type  = b4;</pre>
     if(!(f.day>=1 && f.day<=31)) e.push('dia fora de 1..31');
     if(!(f.seq3>=0 && f.seq3<=7)) e.push('seq3 fora de 0..7');
     if(!(f.seq>=1 && f.seq<=254)) e.push('sequencial fora de 1..254');
-    if(!(f.type in TYPES)) e.push('tipo desconhecido (use 12/14/15)');
+    if(!(f.type in TYPES)) e.push('tipo desconhecido (use 12/14/15/18)');
     return e;
   }
 

@@ -137,6 +137,7 @@
           <tr><td><code>15</code></td><td><code>3F</code></td><td>medidor trifásico</td><td>existente</td></tr>
           <tr><td><code>16</code></td><td><code>TEMP</code></td><td>sensor de temperatura</td><td>proposto *</td></tr>
           <tr><td><code>17</code></td><td><code>TANK</code></td><td>nível de tanque</td><td>proposto *</td></tr>
+          <tr><td><code>18</code></td><td><code>BOX</code></td><td>agrupador de dispositivos (RFC-0058)</td><td>novo</td></tr>
         </tbody>
       </table>
       <pre>unit = seq3*254 + seq            // 1..2032  (seq3 0..7, seq 1..254)
@@ -151,9 +152,9 @@ code = `${(year-2026)&lt;&lt;4 | month}.${seq3&lt;&lt;5 | day}.${seq}.${B4}`</pr
 
 <script>
   const EPOCH_YEAR = 2026, SEQ_MAX = 254, UNIT_MAX = 8 * SEQ_MAX; // 2032
-  const BYTE_BY_PREFIX = { HIDR:12, REM:14, '3F':15, TEMP:16, TANK:17 };
+  const BYTE_BY_PREFIX = { HIDR:12, REM:14, '3F':15, TEMP:16, TANK:17, BOX:18 };
   const PREFIX_BY_BYTE = Object.fromEntries(Object.entries(BYTE_BY_PREFIX).map(([p,b]) => [b, p]));
-  const LABEL = { 12:'hidrômetro', 14:'remote', 15:'3f', 16:'temperatura', 17:'tanque' };
+  const LABEL = { 12:'hidrômetro', 14:'remote', 15:'3f', 16:'temperatura', 17:'tanque', 18:'box' };
   const p2 = n => String(n).padStart(2,'0');
   const p4 = n => String(n).padStart(4,'0');
   const num = id => parseInt(document.getElementById(id).value, 10);

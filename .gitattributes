@@ -1,0 +1,13 @@
+# Treat binary asset types as binary: no EOL normalization, no diff/merge as text.
+# Prevents CRLF corruption and spurious whitespace warnings on committed assets.
+*.pdf  binary
+*.mp4  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.zip  binary
+*.woff  binary
+*.woff2 binary

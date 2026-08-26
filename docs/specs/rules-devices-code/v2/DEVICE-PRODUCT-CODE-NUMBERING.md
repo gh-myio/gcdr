@@ -22,7 +22,7 @@ Byte 1   Byte 2   Byte 3   Byte 4
 ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
 │YYYYMMMM│SSSDDDDD│NNNNNNNN│TTTTTTTT│
 └──────┘ └──────┘ └──────┘ └──────┘
-   │        │        │        └── product type (12=switch, 14=remote, 15=3f)
+   │        │        │        └── product type (12=switch, 14=remote, 15=3f, 18=box)
    │        │        └── daily sequential, 1..254
    │        └── SSS = extra sequential 0..7 (high 3 bits) · DDDDD = day-of-month 1..31 (low 5 bits)
    └── YYYY = year offset from 2026, 0..15 (high nibble) · MMMM = month 1..12 (low nibble)
@@ -35,7 +35,7 @@ Byte 1   Byte 2   Byte 3   Byte 4
 | **2** | high 3 | `seq3` | 0..7 | secondary/block sequential (extends the daily count) |
 | **2** | low 5 | `day` | 1..31 | day of month |
 | **3** | all 8 | `seq` | 1..254 | daily sequential (0 and 255 reserved) |
-| **4** | all 8 | `type` | 12/14/15 | product type |
+| **4** | all 8 | `type` | 12/14/15/18 | product type |
 
 > **Lifespan:** the 4-bit year offset covers **2026 → 2041** (16 years). After
 > 2041 the scheme must be revised (v3).
@@ -114,7 +114,7 @@ A string is a valid **v2** product code iff, after `split('.')` into `[b1,b2,b3,
 | day | `b2 & 0x1F` ∈ **1..31** (reject 0) |
 | seq3 | `b2 >> 5` ∈ `0..7` — always true |
 | seq | `b3` ∈ **1..254** (reject 0 and 255 — reserved) |
-| type | `b4` ∈ **{12, 14, 15}** (or flag unknown for future types) |
+| type | `b4` ∈ **{12, 14, 15, 18}** (18 = BOX, RFC-0058; flag unknown for other future types) |
 
 Optional calendar check: reject impossible dates (e.g. day 31 in a 30-day month,
 Feb 30). The bit-field allows day up to 31 regardless of month.
@@ -143,7 +143,7 @@ Feb 30). The bit-field allows day up to 31 regardless of month.
 |---|---|---|
 | Meaning of `A.B.C` / B1-B2 | global base-253 counter (offset 1) | **manufacturing date** (year/month/day) + `seq3` |
 | Byte 3 | part of the counter | **daily sequential** 1..254 |
-| Byte 4 | product type | product type (unchanged: 12/14/15) |
+| Byte 4 | product type | product type (12/14/15/18) |
 | Byte range | A,B,C ∈ 1..253 (254/255 reserved) | packed bit-fields; per-field ranges above |
 | Carry | base-253 odometer | none — date-stamped |
 | Capacity | 253³ = 16,194,277 per type (lifetime) | 2,032 per day per type |
@@ -173,7 +173,7 @@ Inferences to verify:
    addr bytes carry B1/B2 (date) and B3 (seq), with `type` = B4? Confirm the QR
    layout and the `POST /wo/install` handler for v2.
 3. **`type` (B4) → GCDR `deviceType`/`deviceProfile`** mapping (12=switch,
-   14=remote, 15=3f, + future).
+   14=remote, 15=3f, 18=box (RFC-0058), + future).
 4. **Version discrimination.** v1 and v2 share the dotted 4-byte form but mean
    different things. How does a reader know which scheme a given code uses?
    (e.g. a manufacture-date cutover, a version registry, or a marker byte.)
