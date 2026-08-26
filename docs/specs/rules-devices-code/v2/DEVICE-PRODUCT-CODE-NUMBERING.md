@@ -22,7 +22,7 @@ Byte 1   Byte 2   Byte 3   Byte 4
 ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
 │YYYYMMMM│SSSDDDDD│NNNNNNNN│TTTTTTTT│
 └──────┘ └──────┘ └──────┘ └──────┘
-   │        │        │        └── product type (12=switch, 14=remote, 15=3f, 18=box)
+   │        │        │        └── product type (12=switch/HIDR, 14=remote, 15=3f, 18=box)
    │        │        └── daily sequential, 1..254
    │        └── SSS = extra sequential 0..7 (high 3 bits) · DDDDD = day-of-month 1..31 (low 5 bits)
    └── YYYY = year offset from 2026, 0..15 (high nibble) · MMMM = month 1..12 (low nibble)
@@ -172,8 +172,9 @@ Inferences to verify:
 2. **QR payload ↔ `woAddrLow`/`woAddrHigh` (RFC-0032).** Do the two `smallint`
    addr bytes carry B1/B2 (date) and B3 (seq), with `type` = B4? Confirm the QR
    layout and the `POST /wo/install` handler for v2.
-3. **`type` (B4) → GCDR `deviceType`/`deviceProfile`** mapping (12=switch,
-   14=remote, 15=3f, 18=box (RFC-0058), + future).
+3. **`type` (B4) → GCDR `deviceType`/`deviceProfile`** mapping (12=switch/HIDR —
+   byte 12 was originally `switch`, now the hidrômetro (HIDR) family; see
+   DEVICE-NAME-SPEC — 14=remote, 15=3f, 18=box (RFC-0058), + future).
 4. **Version discrimination.** v1 and v2 share the dotted 4-byte form but mean
    different things. How does a reader know which scheme a given code uses?
    (e.g. a manufacture-date cutover, a version registry, or a marker byte.)
