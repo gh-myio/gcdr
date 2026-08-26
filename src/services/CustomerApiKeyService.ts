@@ -6,9 +6,8 @@ import {
   ApiKeyContext,
   ApiKeyScope,
   hasScope,
-  formatKeyPrefix,
 } from '../domain/entities/CustomerApiKey';
-import { CustomerApiKeyRepository } from '../repositories/CustomerApiKeyRepository';
+import { CustomerApiKeyRepository, CustomerApiKeyDbClient } from '../repositories/CustomerApiKeyRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerApiKeyRepository } from '../repositories/interfaces/ICustomerApiKeyRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
@@ -42,7 +41,8 @@ export class CustomerApiKeyService {
     tenantId: string,
     customerId: string,
     data: CreateCustomerApiKeyDTO,
-    createdBy: string
+    createdBy: string,
+    exec?: CustomerApiKeyDbClient
   ): Promise<CreateApiKeyResult> {
     // Validate customer exists
     const customer = await this.customerRepository.getById(tenantId, customerId);
@@ -81,7 +81,7 @@ export class CustomerApiKeyService {
       version: 1,
     };
 
-    await this.apiKeyRepository.create(apiKey);
+    await this.apiKeyRepository.create(apiKey, exec);
 
     return {
       apiKey,

@@ -30,6 +30,8 @@ export { default as centralsController, listByCustomerHandler as centralsListByC
 // enrollHandler is the device-facing zero-touch enroll endpoint (Slice 1.5) and is
 // deliberately mounted OUTSIDE centralAuthMiddleware (the enroll token is the credential).
 export { default as centralAgentController, enrollHandler as centralAgentEnrollHandler } from './central-agent.controller';
+// RFC-0056: Central API Key Bootstrap — PUBLIC, gated by centralPreKeyAuth (not agent_secret).
+export { getInitialKeyHandler as centralInitialKeyHandler } from './central-initial-key.controller';
 export { default as themesController, listByCustomerHandler as themesListByCustomerHandler, getDefaultByCustomerHandler as themesGetDefaultByCustomerHandler } from './themes.controller';
 
 // RFC-0013: User Access Profile Bundle
@@ -76,7 +78,12 @@ export { default as groupChannelsController } from './group-channels.controller'
 export { default as userContactsController } from './user-contacts.controller';
 
 // RFC-0033: Customer Integration Sync State
-export { default as customerIntegrationsController } from './customer-integrations.controller';
+export {
+  default as customerIntegrationsController,
+  syncEventsHandler as customerIntegrationSyncEventsHandler,
+  disableHandler as customerIntegrationDisableHandler,
+  resetHandler as customerIntegrationResetHandler,
+} from './customer-integrations.controller';
 
 // RFC-0057: Customer Config Document
 export { default as customerConfigController, configSecretsRouter as customerConfigSecretsController } from './customer-config.controller';

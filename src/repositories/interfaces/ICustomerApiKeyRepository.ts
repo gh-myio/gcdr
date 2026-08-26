@@ -3,9 +3,10 @@ import { PaginatedResult, PaginationParams } from '../../shared/types';
 
 export interface ICustomerApiKeyRepository {
   /**
-   * Create a new API key
+   * Create a new API key. `exec` (RFC-0056 P1 fix) lets a caller run this
+   * inside its own transaction — defaults to the repository's own connection.
    */
-  create(apiKey: CustomerApiKey): Promise<CustomerApiKey>;
+  create(apiKey: CustomerApiKey, exec?: unknown): Promise<CustomerApiKey>;
 
   /**
    * Get API key by ID

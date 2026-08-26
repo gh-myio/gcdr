@@ -21,17 +21,24 @@ import { ActorType } from '../shared/types/audit.types';
 // constructed with mergeParams so :customerId from the parent route is
 // available in req.params here.
 //
-// Routes:
+// Routes on THIS router:
 //   GET    /                         — full integrations map
 //   GET    /:key                     — one integration's state
-//   POST   /:key/sync-events         — append a sync event (M2M ingress)
-//   POST   /:key/disable             — admin-mark DISABLED
-//   POST   /:key/reset               — admin-clear (back to IDLE)
+//   PUT    /centrals/items           — admin replacement of centrals.items[]
+//
+// RFC-0056: sync-events/disable/reset moved OUT of this router — they're
+// mounted directly on apiV1Router in app.ts, BEFORE this router, as exported
+// handlers (syncEventsHandler/disableHandler/resetHandler below), so they can
+// accept EITHER customers:write OR the new central-sync:write scope without
+// loosening the scope required by the other routes here (notably PUT
+// centrals/items, which must stay customers:write-only).
 //
 // Auth is applied at mount time in app.ts (hybridAuthByMethod with
-// customers:read on GET / customers:write on POST). Read paths apply
-// mqttPassword masking before serialising; the audit-emission layer
-// already strips credentials before they hit audit_logs.
+// customers:read on GET / customers:write on POST/PUT here; the three
+// extracted routes use their own hybridAuthMiddleware([customers:write,
+// central-sync:write])). Read paths apply mqttPassword masking before
+// serialising; the audit-emission layer already strips credentials before
+// they hit audit_logs.
 
 const router = Router({ mergeParams: true });
 
@@ -101,8 +108,11 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
  * POST /customers/:customerId/integrations/:key/sync-events
  * M2M ingress for sync events. Updates live state and emits one
  * CUSTOMER_INTEGRATION_SYNC audit row.
+ *
+ * RFC-0056: mounted directly on apiV1Router in app.ts (not on `router` below)
+ * so it can accept central-sync:write in addition to customers:write.
  */
-router.post('/:key/sync-events', async (req: Request, res: Response, next: NextFunction) => {
+export async function syncEventsHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
@@ -115,14 +125,15 @@ router.post('/:key/sync-events', async (req: Request, res: Response, next: NextF
   } catch (err) {
     next(err);
   }
-});
+}
 
 /**
  * POST /customers/:customerId/integrations/:key/disable
- * Mark an integration DISABLED. Admin-only by virtue of the
- * customers:write scope check at mount time.
+ * Mark an integration DISABLED.
+ *
+ * RFC-0056: mounted directly on apiV1Router in app.ts — see syncEventsHandler.
  */
-router.post('/:key/disable', async (req: Request, res: Response, next: NextFunction) => {
+export async function disableHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
@@ -140,13 +151,15 @@ router.post('/:key/disable', async (req: Request, res: Response, next: NextFunct
   } catch (err) {
     next(err);
   }
-});
+}
 
 /**
  * POST /customers/:customerId/integrations/:key/reset
  * Clear the integration state entirely.
+ *
+ * RFC-0056: mounted directly on apiV1Router in app.ts — see syncEventsHandler.
  */
-router.post('/:key/reset', async (req: Request, res: Response, next: NextFunction) => {
+export async function resetHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const { tenantId, requestId } = req.context;
     const { customerId } = req.params;
@@ -163,7 +176,7 @@ router.post('/:key/reset', async (req: Request, res: Response, next: NextFunctio
   } catch (err) {
     next(err);
   }
-});
+}
 
 /**
  * PUT /customers/:customerId/integrations/centrals/items

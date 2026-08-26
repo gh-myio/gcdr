@@ -36,6 +36,11 @@ export type ApiKeyScope =
   | 'templates:read'    // Read/render HTML templates (RFC-0021) — used by EMAIL_SENDER (M2M)
   | 'centrals:read'     // Read centrals/gateways — used by alarms-backend (M2M)
   | 'centrals:write'    // Write centrals/gateways (commands, enroll, mqtt, backup/restore)
+  | 'central-state:read'        // Read a central's runtime state (RFC-0056) — enforced by the central
+  | 'central-environment:read'  // Read a central's local environment (RFC-0056) — enforced by the central
+  | 'central-environment:write' // Provision a central's local environment (RFC-0056) — enforced by the central
+  | 'central-data:write'        // Central data-clear operations (RFC-0056) — enforced by the central
+  | 'central-sync:write'        // Central mqtt sync-status operations (RFC-0056)
   | '*:read';           // Read all resources
 
 /**
