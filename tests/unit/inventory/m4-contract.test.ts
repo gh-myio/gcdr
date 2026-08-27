@@ -127,7 +127,10 @@ describe('M4 production routes — real contract', () => {
     }
   });
 
-  it('POST /production/resolve-demand → STILL 501 (P3 with M6 — A4)', async () => {
+  // Was "STILL 501 (P3 with M6 — A4)": demand resolution shipped with M6 —
+  // the route is real now. The full route contract lives in m6-contract; here
+  // we keep the DTO gate (empty body → 400) so the M4 router stays covered.
+  it('POST /production/resolve-demand → 400 without expeditionOrderId (real route — was 501)', async () => {
     const srv = await listen(buildApp());
     try {
       const res = await fetch(U(srv.url, '/production/resolve-demand'), {
@@ -135,10 +138,7 @@ describe('M4 production routes — real contract', () => {
         headers: { 'x-api-key': 'gcdr_cust_x', 'content-type': 'application/json' },
         body: JSON.stringify({}),
       });
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as ErrBody;
-      expect(body.error.code).toBe('INV_NOT_IMPLEMENTED');
-      expect(body.error.details).toMatchObject({ module: 'M4', phase: 'P3' });
+      expect(res.status).toBe(400);
     } finally {
       await srv.close();
     }

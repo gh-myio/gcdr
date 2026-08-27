@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { defer, requireUuid, requireIdempotencyKey, requireConfirmation } from './shared';
+import { requireUuid, requireIdempotencyKey, requireConfirmation } from './shared';
 import { PaginationQuerySchema } from '../../dto/request/InventoryDTO';
 import {
   inventoryProductionService,
@@ -9,6 +9,10 @@ import {
   CorrectAssemblyReleaseSchema,
   SimulatorPreviewSchema,
 } from '../../services/inventory/InventoryProductionService';
+import {
+  inventoryExpeditionService,
+  ResolveDemandSchema,
+} from '../../services/inventory/InventoryExpeditionService';
 import { sendSuccess, sendCreated } from '../../middleware/response';
 
 // M4 — Produção (P2). Real routes (RFC-0061 §M4):
@@ -17,7 +21,7 @@ import { sendSuccess, sendCreated } from '../../middleware/response';
 //   BOM explosion into component SAIDAs — one service transaction.
 // - Divergências (issues) + correction with the homologated floor.
 // - Capacity and the preview-only simulator (DEC-13).
-// Demand resolution stays deferred to P3 with M6 (A4).
+// Demand resolution ships with M6 (P3, A4) — served by the expedition service.
 const router = Router();
 
 // GET /production/demands — pending demands grouped by product (paginated).
@@ -32,8 +36,20 @@ router.get('/production/demands', async (req: Request, res: Response, next: Next
   }
 });
 
-// POST /production/resolve-demand — P3 (depends on expedition orders, A4).
-router.post('/production/resolve-demand', defer('M4', 'P3'));
+// POST /production/resolve-demand — §M4 demand resolution (P3, with M6/A4):
+// expedition items short on ALMOXARIFADO stock → production demand
+// (manufactured) or automatic purchase order + purchase demand (purchasable);
+// idempotent per expedition_order_item_id (UNIQUE).
+router.post('/production/resolve-demand', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, userId, requestId } = req.context;
+    const dto = ResolveDemandSchema.parse(req.body ?? {});
+    const data = await inventoryExpeditionService.resolveDemand({ tenantId, userId }, dto);
+    sendSuccess(res, data, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /production/capacity — min over BOM components; limiting flagged.
 router.get('/production/capacity', async (req: Request, res: Response, next: NextFunction) => {
