@@ -117,15 +117,15 @@ describe('GET /meta (concrete)', () => {
 });
 
 describe('deferred modules return the 501 contract', () => {
-  it('GET /purchase-orders → 501 INV_NOT_IMPLEMENTED with { module, phase }', async () => {
+  it('GET /expedition-orders → 501 INV_NOT_IMPLEMENTED with { module, phase }', async () => {
     const srv = await listen(buildApp());
     try {
-      const res = await fetch(U(srv.url, '/purchase-orders'), { headers: { 'x-api-key': 'gcdr_cust_x' } });
+      const res = await fetch(U(srv.url, '/expedition-orders'), { headers: { 'x-api-key': 'gcdr_cust_x' } });
       expect(res.status).toBe(501);
       const body = (await res.json()) as ErrBody;
       expect(body.success).toBe(false);
       expect(body.error.code).toBe('INV_NOT_IMPLEMENTED');
-      expect(body.error.details).toEqual({ module: 'M3', phase: 'P1' });
+      expect(body.error.details).toEqual({ module: 'M6', phase: 'P3' });
     } finally {
       await srv.close();
     }
