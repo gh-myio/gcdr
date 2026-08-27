@@ -1,0 +1,61 @@
+name: Terraform (Auth0 tenants)
+
+# RFC-0059 / RFC-0060 Fase 0.4. `plan` needs Auth0 Management API + AWS
+# (state backend) credentials that don't exist as repo secrets yet — that
+# step is skipped gracefully until AUTH0_MANAGEMENT_CLIENT_ID is set
+# (RFC-0060 Fase 0, "Fora do GCDR": Auth0 Dashboard M2M app + GitHub secrets).
+# fmt/validate run unconditionally and don't need any credentials.
+
+on:
+  pull_request:
+    branches: [main, desenv]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform-auth0.yml'
+
+concurrency:
+  group: terraform-auth0-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: infra/terraform/auth0
+
+jobs:
+  fmt-validate-plan:
+    name: fmt / validate / plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.5'
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend — credentials/state bucket not provisioned yet)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        if: ${{ secrets.AUTH0_MANAGEMENT_CLIENT_ID != '' }}
+        run: |
+          terraform plan \
+            -var="auth0_domain=${{ secrets.AUTH0_DOMAIN }}" \
+            -var="auth0_management_client_id=${{ secrets.AUTH0_MANAGEMENT_CLIENT_ID }}" \
+            -var="auth0_management_client_secret=${{ secrets.AUTH0_MANAGEMENT_CLIENT_SECRET }}" \
+            -var="environment=dev" \
+            -var="tenant_model=single"
+
+      - name: plan skipped — secrets not configured yet
+        if: ${{ secrets.AUTH0_MANAGEMENT_CLIENT_ID == '' }}
+        run: |
+          echo "::notice::terraform plan skipped — AUTH0_MANAGEMENT_CLIENT_ID repo secret not set yet (RFC-0060 Fase 0, pre-requisito externo). fmt/validate still ran above."

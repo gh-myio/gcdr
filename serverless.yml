@@ -2076,6 +2076,40 @@ resources:
       Properties:
         Name: ${self:custom.eventBusName}
 
+    # ---------------------------------------------------------------------
+    # RFC-0059 / RFC-0060 Fase 0.3 — Grant Service KMS signing key. PROPOSED,
+    # NOT ACTIVE. Left commented until (a) it's confirmed this serverless.yml
+    # /Lambda path is still the live deployment target (production actually
+    # runs as a Docker container via Dokploy today — see dokploy.yml) and
+    # (b) AWS account/region are confirmed (RFC-0060 Fase 0, "Fora do GCDR").
+    # The equivalent Terraform resource lives in infra/terraform/kms/ as the
+    # other candidate — apply exactly ONE of the two, never both.
+    #
+    # GrantSigningKey:
+    #   Type: AWS::KMS::Key
+    #   Properties:
+    #     Description: !Sub "GCDR Grant Service central-grant signing key (${self:provider.stage})"
+    #     KeySpec: ECC_NIST_P256
+    #     KeyUsage: SIGN_VERIFY
+    #     KeyPolicy:
+    #       Version: '2012-10-17'
+    #       Statement:
+    #         - Sid: AllowAccountRootAdmin
+    #           Effect: Allow
+    #           Principal:
+    #             AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+    #           Action: "kms:*"
+    #           Resource: "*"
+    #         # TODO: replace with a scoped statement granting kms:Sign +
+    #         # kms:GetPublicKey to the specific IAM user/role the Dokploy
+    #         # container authenticates as (not a Lambda execution role —
+    #         # Dokploy is not native AWS runtime).
+    # GrantSigningKeyAlias:
+    #   Type: AWS::KMS::Alias
+    #   Properties:
+    #     AliasName: !Sub "alias/gcdr-grant-${self:provider.stage}"
+    #     TargetKeyId: !Ref GrantSigningKey
+
   Outputs:
     CustomersTableArn:
       Value: !GetAtt CustomersTable.Arn

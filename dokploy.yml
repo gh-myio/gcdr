@@ -64,6 +64,16 @@ env:
   - name: JWT_REFRESH_EXPIRES_IN
     value: "7d"
 
+  # Grant Service — KMS central-grant signing key (RFC-0059 / RFC-0060 Fase 0.3)
+  # NOT YET PROVISIONED. Uncomment once the KMS key exists and the
+  # "grant-kms-key-id" secret is created in the Dokploy dashboard — do not
+  # uncomment with a placeholder value, Dokploy will fail to resolve the
+  # secret reference.
+  # - name: GRANT_KMS_KEY_ID
+  #   fromSecret: grant-kms-key-id
+  # - name: GRANT_KMS_REGION
+  #   value: "sa-east-1"
+
   # CORS
   - name: CORS_ORIGIN
     value: "https://gcdr.myio.com.br"

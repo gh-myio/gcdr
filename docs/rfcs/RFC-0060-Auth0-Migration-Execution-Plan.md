@@ -87,30 +87,38 @@ Auth0 tenants."* O §1 bloqueia o Terraform: GCDR garante unicidade de email só
 `src/infrastructure/database/drizzle/schema.ts:254`), mas o Auth0 exige email único dentro de
 uma Database Connection.
 
+**Status (2026-08-24):** todo o código de scaffolding desta fase está escrito na branch
+`ED-1134-fase-0-auth0-prep`. Nada foi executado contra dados/infra reais — cada item abaixo
+está marcado ✅ (escrito) ou ⏳ (aguardando execução/decisão fora deste sandbox).
+
 **Dentro do GCDR:**
 
-- Criar `scripts/db/ops/audit-tenant-email-collisions.sql` (segue a convenção já existente em
-  `scripts/db/ops/*.sql`): agrupar por `LOWER(email)`, contar `tenant_id` distintos, listar
-  `COUNT(DISTINCT tenant_id) > 1` (id do usuário, tenant, status, `created_at`).
-- Rodar contra réplica de leitura ou snapshot; classificar cada colisão (legítima vs.
-  acidental/teste) — resultado alimenta a decisão do §1.
+- ✅ `scripts/db/ops/audit-tenant-email-collisions.sql` — criado, segue a convenção de
+  `scripts/db/ops/*.sql`. Agrupa por `LOWER(email)`, conta `tenant_id` distintos, lista
+  `COUNT(DISTINCT tenant_id) > 1`.
+- ⏳ Rodar contra réplica de leitura/snapshot e classificar cada colisão — template do
+  relatório criado em `docs/audits/tenant-email-collisions.md`, ainda sem dados reais (o
+  runner `npm run db:ops` só fala com um container Docker local; produção precisa de alguém
+  com acesso direto ao Postgres real).
 - Achado relacionado, ticket à parte: `UserRepository.findByEmail()`
   (`src/repositories/UserRepository.ts:333`) busca por email **sem filtrar por tenant**,
   usado por `AuthService.login()` (`AuthService.ts:167`, comentário "tenant-independent" no
   código) — se já existe colisão real, o login hoje já escolhe uma linha arbitrária.
-- Atualizar a seção "Unresolved questions" do RFC-0059 com a decisão do §1 (opção a ou b) e a
-  justificativa — desbloqueia o Terraform.
-- Adicionar `GRANT_KMS_KEY_ID`/`GRANT_KMS_REGION` a `.env.example` e a `dokploy.yml`
-  (referenciando `fromSecret:`, sem valor real commitado).
-- Se o caminho `serverless.yml` estiver confirmado ativo (ver "Fora do GCDR"): adicionar a
-  chave como recurso `AWS::KMS::Key` no bloco `resources:` (mesmo padrão do `GcdrEventBus`,
-  `serverless.yml:2074`).
-- Criar `infra/terraform/auth0/` (novo diretório — hoje não existe `.tf` no repo):
-  `provider.tf`, `backend.tf`, `variables.tf`, e recursos `auth0_connection` (1 ou N conforme
-  a decisão do §1), `auth0_client` (app humano PKCE), `auth0_action` (injeta `tid` de
-  `app_metadata`), `auth0_resource_server` (audience RS256 da Fase 4), `auth0_client` M2M para
-  o `Auth0ProvisioningService` (usado só na Fase 4, mas criado aqui).
-- Adicionar workflow de CI (`fmt`/`validate`/`plan` em PR) para o Terraform.
+- ⏳ Atualizar "Unresolved questions" do RFC-0059 com a decisão do §1 — depende do resultado
+  real da auditoria.
+- ✅ `GRANT_KMS_KEY_ID`/`GRANT_KMS_REGION` adicionados a `.env.example` (vazios) e a
+  `dokploy.yml` (bloco `fromSecret:` comentado até o secret existir no Dokploy).
+- ✅ Chave KMS proposta nas duas vias candidatas, nenhuma aplicada: bloco `AWS::KMS::Key`
+  comentado em `serverless.yml` (logo após `GcdrEventBus`, `serverless.yml:2074`) **e** módulo
+  Terraform equivalente em `infra/terraform/kms/`. Aplicar só uma das duas, depois que
+  confirmado se `serverless.yml` segue ativo (ver "Fora do GCDR").
+- ✅ `infra/terraform/auth0/` criado (`provider.tf`, `backend.tf` comentado, `variables.tf`
+  com `tenant_model` modelando a decisão do §1, `connections.tf`, `clients.tf`, `actions.tf`,
+  `resource_server.tf`, `README.md`) — escrito, não validado (`terraform` não estava
+  disponível no ambiente em que foi escrito; conferir contra a doc atual do provider
+  `auth0/auth0` antes do primeiro `apply`).
+- ✅ Workflow de CI `.github/workflows/terraform-auth0.yml` — roda `fmt`/`validate` sempre;
+  `plan` só quando os secrets do Auth0 existirem no repositório (senão, pula com aviso).
 
 **Fora do GCDR:**
 
