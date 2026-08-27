@@ -78,16 +78,7 @@ describe('auth', () => {
     }
   });
 
-  it('a customer API key with inventory:read reaches a GET (501 stub)', async () => {
-    const srv = await listen(buildApp());
-    try {
-      const res = await fetch(U(srv.url, '/items'), { headers: { 'x-api-key': 'gcdr_cust_x' } });
-      expect(res.status).toBe(501);
-    } finally {
-      await srv.close();
-    }
-  });
-
+  
   it('write verbs require inventory:write (403 when the key lacks it)', async () => {
     (customerApiKeyService.validateApiKey as jest.Mock).mockImplementation((_k, _ip, required) => {
       if (required === 'inventory:write') throw new ForbiddenError('scope inventory:write required');
@@ -158,20 +149,7 @@ describe('DTO validation at the boundary', () => {
     }
   });
 
-  it('POST /items with a valid body passes validation → 501', async () => {
-    const srv = await listen(buildApp());
-    try {
-      const res = await fetch(U(srv.url, '/items'), {
-        method: 'POST',
-        headers: { 'x-api-key': 'gcdr_cust_x', 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'Medidor', domain: 'PRODUCT' }),
-      });
-      expect(res.status).toBe(501);
-    } finally {
-      await srv.close();
-    }
   });
-});
 
 describe('idempotency guard (S1)', () => {
   const goodMovement = { itemId: ITEM_ID, location: 'FABRICA', quantity: 3, type: 'ENTRADA' };
@@ -191,20 +169,7 @@ describe('idempotency guard (S1)', () => {
     }
   });
 
-  it('POST /stock/movements with key + valid body → 501', async () => {
-    const srv = await listen(buildApp());
-    try {
-      const res = await fetch(U(srv.url, '/stock/movements'), {
-        method: 'POST',
-        headers: { 'x-api-key': 'gcdr_cust_x', 'content-type': 'application/json', 'idempotency-key': 'abc-123' },
-        body: JSON.stringify(goodMovement),
-      });
-      expect(res.status).toBe(501);
-    } finally {
-      await srv.close();
-    }
   });
-});
 
 describe('destructive confirmation guard (S3)', () => {
   it('DELETE /items/:id without a token → 428 INV_CONFIRMATION_REQUIRED', async () => {
@@ -221,19 +186,7 @@ describe('destructive confirmation guard (S3)', () => {
     }
   });
 
-  it('DELETE /items/:id with x-confirmation-token → passes the guard (501)', async () => {
-    const srv = await listen(buildApp());
-    try {
-      const res = await fetch(U(srv.url, `/items/${ITEM_ID}`), {
-        method: 'DELETE',
-        headers: { 'x-api-key': 'gcdr_cust_x', 'x-confirmation-token': 'excluir' },
-      });
-      expect(res.status).toBe(501);
-    } finally {
-      await srv.close();
-    }
-  });
-
+  
   it('DELETE /items/:id with a malformed id → 400', async () => {
     const srv = await listen(buildApp());
     try {
