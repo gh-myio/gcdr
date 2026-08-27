@@ -124,6 +124,7 @@ import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
 import { startRestoreSweep } from './services/CentralRestoreSweep';
+import { startInventoryExternalWorkers } from './services/inventory/InventoryExternalWorkers';
 
 const app: Express = express();
 
@@ -663,6 +664,15 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to start the restore-sweep:', error);
+    }
+
+    // RFC-0061 M8: external-tracking pull (shadow by default) + outbox drain.
+    // No-op unless MYIO_PRODUCTS_API_KEY is set; live writes need INV_SYNC_LIVE.
+    try {
+      startInventoryExternalWorkers();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the inventory external-sync workers:', error);
     }
 
     // round-3 #6: periodically evict expired rate-limit buckets so rotated keys
