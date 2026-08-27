@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { defer, requireUuid, requireIdempotencyKey } from './shared';
+import { requireUuid, requireIdempotencyKey } from './shared';
 import { QrValidateSchema } from '../../dto/request/InventoryDTO';
 import {
   inventoryHomologationService,
@@ -8,6 +8,10 @@ import {
   HomologationListQuerySchema,
 } from '../../services/inventory/InventoryHomologationService';
 import { inventoryQrService } from '../../services/inventory/InventoryQrService';
+import {
+  inventoryExternalSyncService,
+  GenerateQrSchema,
+} from '../../services/inventory/InventoryExternalSyncService';
 import { sendSuccess, sendCreated } from '../../middleware/response';
 
 // M5 — Homologação & QR (P2). Real routes (RFC-0061 §M5):
@@ -15,9 +19,9 @@ import { sendSuccess, sendCreated } from '../../middleware/response';
 // box×unit uniqueness) and finish with an ENTRADA into ALMOXARIFADO; box ops
 // re-shuffle units between boxes; /qr/validate (S2) gives per-code verdicts
 // for handheld scanners; /qr/trace/:code (S5) returns the current-state
-// header + normalized timeline. POST /qr/generate stays deferred: it
-// delegates QR generation to the external platform, whose client ships with
-// M8 (P4) — v1 keeps external-only generation (source parity).
+// header + normalized timeline; /qr/generate delegates QR generation to the
+// external platform through the M8 client — v1 keeps external-only
+// generation (source parity).
 const router = Router();
 
 // GET /homologations — paginated listing (optional itemId/releaseId filters).
@@ -85,9 +89,20 @@ router.post('/homologations/units/:id/remove-from-box', async (req: Request, res
   }
 });
 
-// POST /qr/generate — delegates to the external platform (M8 client, P4).
-// v1 keeps generation external-only (source parity — RFC Unresolved q. 3).
-router.post('/qr/generate', defer('M5 /qr/generate (external platform client — M8)', 'P4'));
+// POST /qr/generate — delegates to the external platform (M8 client): POST
+// /api/public/products {product_type, location:'estoque', status:'parado'} →
+// {code, qrUrl}. v1 keeps generation external-only (source parity — RFC
+// Unresolved q. 3); 503 INV_EXTERNAL_NOT_CONFIGURED without the client env.
+router.post('/qr/generate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { requestId } = req.context;
+    const dto = GenerateQrSchema.parse(req.body ?? {});
+    const data = await inventoryExternalSyncService.generateQr(dto);
+    sendCreated(res, data, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /qr/trace/:code — S5 traceability. `:code` accepts the bare code or the
 // URL-encoded full https://produto.myio.com.br/<code> URL.

@@ -305,7 +305,9 @@ describe('M5 QR routes — real contract', () => {
     }
   });
 
-  it('POST /qr/generate stays deferred → 501 INV_NOT_IMPLEMENTED (external platform client is M8)', async () => {
+  it('POST /qr/generate is real since M8 (was 501): DTO gate → 400 on an empty body', async () => {
+    // Full route coverage (201/503) lives in m8-contract.test.ts — here only
+    // the M5-visible contract: the route validates before touching anything.
     const srv = await listen(buildApp());
     try {
       const res = await fetch(U(srv.url, '/qr/generate'), {
@@ -313,9 +315,9 @@ describe('M5 QR routes — real contract', () => {
         headers: { 'X-API-Key': 'gcdr_cust_test', 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      expect(res.status).toBe(501);
+      expect(res.status).toBe(400);
       const body = (await res.json()) as ErrBody;
-      expect(body.error.code).toBe('INV_NOT_IMPLEMENTED');
+      expect(body.error.code).toBe('VALIDATION_ERROR');
     } finally {
       await srv.close();
     }
