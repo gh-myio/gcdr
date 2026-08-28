@@ -27,6 +27,8 @@ function extractPostgresError(err: unknown): PostgresErrorShape | null {
   return null;
 }
 
+// Map a known PostgreSQL constraint error to an HTTP response. Extracted from
+// errorHandler to keep that function's cognitive complexity in bounds.
 /**
  * Maps a Postgres constraint-violation error to its HTTP response and sends
  * it. Returns true if it handled the error, false if the code isn't one of
@@ -161,13 +163,17 @@ export function errorHandler(
     return;
   }
 
-  // Custom AppError
+  // Custom AppError. Some subclasses (e.g. RFC-0061 InventoryError) carry a
+  // structured `details` payload with machine-readable params (Appendix D) —
+  // surface it when present so the frontend can render from code + params.
   if (err instanceof AppError) {
+    const details = (err as { details?: Record<string, unknown> }).details;
     const response: ApiResponse = {
       success: false,
       error: {
         message: err.message,
         code: err.code,
+        ...(details ? { details } : {}),
       },
       meta: { requestId, timestamp },
     };

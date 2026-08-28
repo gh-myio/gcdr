@@ -2481,3 +2481,476 @@ export const customerTariffHistory = pgTable('customer_tariff_history', {
     sql`${table.actionLevel} IN ('YEAR','MONTH','DAY','HOUR')`
   ),
 }));
+
+// ===========================================================================
+// RFC-0061 — Inventory & Warehouse Management ("Menu de Estoque"), migration
+// 0067. Tables prefixed `inv_`. Conventions (RFC §Data model): id uuid pk
+// default gen_random_uuid(); tenant_id not null; created_at/updated_at tz;
+// created_by uuid (GCDR user); enums as text + CHECK; balance ALWAYS derived
+// from inv_stock_movements (DEC-2, never stored). `customer_id` only where the
+// record faces a customer (DEC-12). Advanced index shapes (covering INCLUDE,
+// partial UNIQUE) are authoritative in the SQL migration; the ORM mirror below
+// stays within Drizzle's expressible subset.
+// ===========================================================================
+
+// M1 — unified catalog (replaces 3 source families via `domain`, DEC-1).
+export const invItems = pgTable('inv_items', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull(),
+  name:           text('name').notNull(),
+  // generated: lower(btrim(name)) — the uniqueness key (never write it).
+  normalizedName: text('normalized_name').generatedAlwaysAs(sql`lower(btrim(name))`),
+  domain:         text('domain').notNull(),              // COMPONENT | PRODUCT | THIRD_PARTY | TOOL
+  link:           text('link'),
+  description:    text('description'),
+  isManufactured: boolean('is_manufactured').notNull().default(false),
+  lossPercent:    numeric('loss_percent', { precision: 6, scale: 2 }).notNull().default('0'),
+  lotQuantity:    integer('lot_quantity'),
+  purchaseType:   text('purchase_type'),                 // NACIONAL | IMPORTACAO | null
+  photoFileId:    uuid('photo_file_id').references(() => fileAssets.id, { onDelete: 'set null' }),
+  active:         boolean('active').notNull().default(true),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:      uuid('created_by'),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:      uuid('updated_by'),
+}, (table) => ({
+  uq:          uniqueIndex('inv_items_uq').on(table.tenantId, table.domain, table.normalizedName),
+  tenantIdx:   index('inv_items_tenant_idx').on(table.tenantId, table.domain),
+  domainCheck: check('inv_items_domain_check', sql`${table.domain} IN ('COMPONENT','PRODUCT','THIRD_PARTY','TOOL')`),
+  purchaseTypeCheck: check('inv_items_purchase_type_check', sql`${table.purchaseType} IS NULL OR ${table.purchaseType} IN ('NACIONAL','IMPORTACAO')`),
+  // W4 invariant: only manufactured PRODUCTs may be is_manufactured.
+  manufacturedCheck: check('inv_items_manufactured_check', sql`NOT ${table.isManufactured} OR ${table.domain} = 'PRODUCT'`),
+}));
+
+// M5 — single QR identity source (A2). Cross box×unit uniqueness by constraint.
+export const invQrRegistry = pgTable('inv_qr_registry', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  qrValue:   text('qr_value').notNull(),
+  kind:      text('kind').notNull(),                     // UNIT | BOX
+  itemId:    uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  uq:        uniqueIndex('inv_qr_registry_uq').on(table.tenantId, table.qrValue),
+  kindCheck: check('inv_qr_registry_kind_check', sql`${table.kind} IN ('UNIT','BOX')`),
+}));
+
+// M1 — BOM: product → component, loss factor applied at consumption time.
+export const invBoms = pgTable('inv_boms', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull(),
+  productItemId:   uuid('product_item_id').notNull().references(() => invItems.id, { onDelete: 'cascade' }),
+  componentItemId: uuid('component_item_id').notNull().references(() => invItems.id, { onDelete: 'cascade' }),
+  quantity:        numeric('quantity', { precision: 12, scale: 3 }).notNull(),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:       uuid('created_by'),
+}, (table) => ({
+  uq:          uniqueIndex('inv_boms_uq').on(table.productItemId, table.componentItemId),
+  productIdx:  index('inv_boms_product_idx').on(table.tenantId, table.productItemId),
+  qtyCheck:    check('inv_boms_quantity_check', sql`${table.quantity} > 0`),
+}));
+
+// M9 — projects; clients map onto GCDR customers (no new clients table).
+export const invProjects = pgTable('inv_projects', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  name:             text('name').notNull(),
+  description:      text('description'),
+  customerId:       uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  legacyClientName: text('legacy_client_name'),
+  legacyClientCnpj: text('legacy_client_cnpj'),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:        uuid('created_by'),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:        uuid('updated_by'),
+}, (table) => ({
+  tenantIdx: index('inv_projects_tenant_idx').on(table.tenantId),
+}));
+
+// M3 — purchase orders (requests + buyer queue), server-side state machine.
+export const invPurchaseOrders = pgTable('inv_purchase_orders', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  projectId:        uuid('project_id').notNull().references(() => invProjects.id, { onDelete: 'restrict' }),
+  requesterId:      uuid('requester_id'),
+  itemId:           uuid('item_id').notNull().references(() => invItems.id, { onDelete: 'restrict' }),
+  itemNameSnapshot: text('item_name_snapshot'),
+  itemLink:         text('item_link'),
+  quantity:         integer('quantity').notNull(),
+  recipient:        text('recipient'),
+  deliveryPoint:    text('delivery_point'),
+  status:           text('status').notNull().default('PENDENTE'),
+  deadlineType:     text('deadline_type'),               // URGENTE | ESTA_SEMANA | ESTE_MES | CUSTOMIZADO
+  deadlineDate:     timestamp('deadline_date', { withTimezone: true }),
+  deliveryForecast: timestamp('delivery_forecast', { withTimezone: true }),
+  requesterNotes:   text('requester_notes'),
+  buyerNotes:       text('buyer_notes'),
+  passphrase:       text('passphrase'),                  // spoken delivery word (DEC-10, plaintext)
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:        uuid('created_by'),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:        uuid('updated_by'),
+}, (table) => ({
+  tenantStatusIdx: index('inv_purchase_orders_status_idx').on(table.tenantId, table.status),
+  projectIdx:      index('inv_purchase_orders_project_idx').on(table.tenantId, table.projectId),
+  statusCheck: check('inv_purchase_orders_status_check', sql`${table.status} IN ('PENDENTE','COMPRADO_AGUARDANDO','ENTREGUE','RECEBIDO_OK','RECEBIDO_PROBLEMA','CANCELADO')`),
+  deadlineTypeCheck: check('inv_purchase_orders_deadline_type_check', sql`${table.deadlineType} IS NULL OR ${table.deadlineType} IN ('URGENTE','ESTA_SEMANA','ESTE_MES','CUSTOMIZADO')`),
+  quantityCheck: check('inv_purchase_orders_quantity_check', sql`${table.quantity} BETWEEN 1 AND 100000`),
+}));
+
+export const invPurchaseOrderFiles = pgTable('inv_purchase_order_files', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  orderId:   uuid('order_id').notNull().references(() => invPurchaseOrders.id, { onDelete: 'cascade' }),
+  fileId:    uuid('file_id').notNull().references(() => fileAssets.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+}, (table) => ({
+  orderIdx: index('inv_purchase_order_files_order_idx').on(table.orderId),
+}));
+
+// WO-style event model (RFC-0037) for the PO timeline (DEC-9).
+export const invPurchaseOrderEvents = pgTable('inv_purchase_order_events', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  orderId:   uuid('order_id').notNull().references(() => invPurchaseOrders.id, { onDelete: 'cascade' }),
+  actorId:   uuid('actor_id'),
+  eventType: text('event_type').notNull(),               // CRIADO | STATUS_ALTERADO | OBSERVACAO_ATUALIZADA
+  details:   jsonb('details').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orderChronoIdx: index('inv_purchase_order_events_chrono_idx').on(table.orderId, table.createdAt),
+  eventTypeCheck: check('inv_purchase_order_events_type_check', sql`${table.eventType} IN ('CRIADO','STATUS_ALTERADO','OBSERVACAO_ATUALIZADA')`),
+}));
+
+// M2 — event-sourced stock ledger (DEC-2/DEC-3). Balance derived, never stored.
+export const invStockMovements = pgTable('inv_stock_movements', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull(),
+  itemId:          uuid('item_id').notNull().references(() => invItems.id, { onDelete: 'restrict' }),
+  location:        text('location').notNull(),           // FABRICA | ALMOXARIFADO | ALMOXARIFADO_GERAL
+  quantity:        numeric('quantity', { precision: 12, scale: 3 }).notNull(),
+  type:            text('type').notNull(),               // ENTRADA | SAIDA | AJUSTE | TRANSFERENCIA_IN | TRANSFERENCIA_OUT
+  reason:          text('reason'),
+  responsible:     text('responsible'),                  // technician name (free text)
+  photoFileId:     uuid('photo_file_id').references(() => fileAssets.id, { onDelete: 'set null' }),
+  purchaseOrderId: uuid('purchase_order_id').references(() => invPurchaseOrders.id, { onDelete: 'set null' }),
+  transferGroupId: uuid('transfer_group_id'),            // pairs the two TRANSFERENCIA legs
+  imported:        boolean('imported').notNull().default(false), // A5 --raw-ledger
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:       uuid('created_by'),
+}, (table) => ({
+  // Covering index (W2) — INCLUDE(quantity) is applied in the SQL migration.
+  balanceIdx:  index('inv_stock_movements_balance_idx').on(table.tenantId, table.itemId, table.location, table.type),
+  typeCheck:     check('inv_stock_movements_type_check', sql`${table.type} IN ('ENTRADA','SAIDA','AJUSTE','TRANSFERENCIA_IN','TRANSFERENCIA_OUT')`),
+  locationCheck: check('inv_stock_movements_location_check', sql`${table.location} IN ('FABRICA','ALMOXARIFADO','ALMOXARIFADO_GERAL')`),
+  quantityCheck: check('inv_stock_movements_quantity_check', sql`${table.quantity} > 0`),
+}));
+
+// M4 — production & assembly.
+export const invAssemblyReleases = pgTable('inv_assembly_releases', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  tenantId:     uuid('tenant_id').notNull(),
+  photoFileId:  uuid('photo_file_id').notNull().references(() => fileAssets.id, { onDelete: 'restrict' }),
+  responsibles: uuid('responsibles').array().notNull().default(sql`'{}'::uuid[]`),
+  notes:        text('notes'),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:    uuid('created_by'),
+}, (table) => ({
+  tenantIdx: index('inv_assembly_releases_tenant_idx').on(table.tenantId),
+}));
+
+export const invAssemblyReleaseItems = pgTable('inv_assembly_release_items', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull(),
+  releaseId: uuid('release_id').notNull().references(() => invAssemblyReleases.id, { onDelete: 'cascade' }),
+  itemId:    uuid('item_id').notNull().references(() => invItems.id, { onDelete: 'restrict' }),
+  quantity:  integer('quantity').notNull(),
+}, (table) => ({
+  releaseIdx:    index('inv_assembly_release_items_release_idx').on(table.releaseId),
+  quantityCheck: check('inv_assembly_release_items_quantity_check', sql`${table.quantity} > 0`),
+}));
+
+export const invAssemblyReleaseIssues = pgTable('inv_assembly_release_issues', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull(),
+  releaseId:        uuid('release_id').notNull().references(() => invAssemblyReleases.id, { onDelete: 'cascade' }),
+  releaseItemId:    uuid('release_item_id').references(() => invAssemblyReleaseItems.id, { onDelete: 'cascade' }),
+  itemId:           uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  reportedQuantity: integer('reported_quantity'),
+  message:          text('message'),
+  status:           text('status').notNull().default('ABERTA'),
+  resolutionNote:   text('resolution_note'),
+  reportedBy:       uuid('reported_by'),
+  resolvedBy:       uuid('resolved_by'),
+  resolvedAt:       timestamp('resolved_at', { withTimezone: true }),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  releaseIdx:  index('inv_assembly_release_issues_release_idx').on(table.releaseId),
+  statusCheck: check('inv_assembly_release_issues_status_check', sql`${table.status} IN ('ABERTA','RESOLVIDA')`),
+}));
+
+// M5 — homologation (boxes + units).
+export const invHomologations = pgTable('inv_homologations', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tenantId:      uuid('tenant_id').notNull(),
+  releaseId:     uuid('release_id').references(() => invAssemblyReleases.id, { onDelete: 'cascade' }),
+  itemId:        uuid('item_id').notNull().references(() => invItems.id, { onDelete: 'cascade' }),
+  boxSize:       integer('box_size').notNull(),          // 1 | 10 | 50 | 100 | 224
+  boxQr:         text('box_qr'),
+  responsibleId: uuid('responsible_id'),
+  notes:         text('notes'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:     uuid('created_by'),
+}, (table) => ({
+  itemIdx:      index('inv_homologations_item_idx').on(table.tenantId, table.itemId),
+  boxQrUq:      uniqueIndex('inv_homologations_box_qr_uq').on(table.tenantId, table.boxQr).where(sql`box_qr IS NOT NULL`),
+  boxSizeCheck: check('inv_homologations_box_size_check', sql`${table.boxSize} IN (1,10,50,100,224)`),
+}));
+
+export const invHomologationUnits = pgTable('inv_homologation_units', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull(),
+  homologationId: uuid('homologation_id').notNull().references(() => invHomologations.id, { onDelete: 'cascade' }),
+  position:       integer('position'),
+  qrValue:        text('qr_value').notNull(),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  qrUq:          uniqueIndex('inv_homologation_units_qr_uq').on(table.tenantId, table.qrValue),
+  homologIdx:    index('inv_homologation_units_homolog_idx').on(table.homologationId),
+}));
+
+// M2 — QR links per movement (anti-double-exit ledger). Declared after
+// invHomologationUnits so its FK is a backward reference.
+export const invMovementQrs = pgTable('inv_movement_qrs', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  movementId:         uuid('movement_id').notNull().references(() => invStockMovements.id, { onDelete: 'cascade' }),
+  qrValue:            text('qr_value'),
+  boxQr:              text('box_qr'),
+  homologationUnitId: uuid('homologation_unit_id').references(() => invHomologationUnits.id, { onDelete: 'set null' }),
+}, (table) => ({
+  qrValueIdx:  index('inv_movement_qrs_qr_value_idx').on(table.qrValue),
+  movementIdx: index('inv_movement_qrs_movement_idx').on(table.movementId),
+}));
+
+// M6 — expedition (Pedidos Myio), server-side state machine.
+export const invExpeditionOrders = pgTable('inv_expedition_orders', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tenantId:      uuid('tenant_id').notNull(),
+  title:         text('title'),
+  projectId:     uuid('project_id').references(() => invProjects.id, { onDelete: 'restrict' }),
+  customerId:    uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  deliveryDate:  timestamp('delivery_date', { withTimezone: true }).notNull(),
+  status:        text('status').notNull().default('PENDENTE'),
+  isReplacement: boolean('is_replacement').notNull().default(false),
+  notes:         text('notes'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:     uuid('created_by'),
+  updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:     uuid('updated_by'),
+}, (table) => ({
+  tenantStatusIdx: index('inv_expedition_orders_status_idx').on(table.tenantId, table.status),
+  statusCheck: check('inv_expedition_orders_status_check', sql`${table.status} IN ('PENDENTE','PRODUZINDO','PRONTO_ENTREGA','EM_TRANSITO','ENTREGUE_CLIENTE','PERDIDO')`),
+}));
+
+export const invExpeditionOrderItems = pgTable('inv_expedition_order_items', {
+  id:       uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  orderId:  uuid('order_id').notNull().references(() => invExpeditionOrders.id, { onDelete: 'cascade' }),
+  itemId:   uuid('item_id').notNull().references(() => invItems.id, { onDelete: 'restrict' }),
+  quantity: integer('quantity').notNull(),
+}, (table) => ({
+  orderIdx:      index('inv_expedition_order_items_order_idx').on(table.orderId),
+  quantityCheck: check('inv_expedition_order_items_quantity_check', sql`${table.quantity} > 0`),
+}));
+
+// M4 — demand resolution (delivered P3; schema in P0, A4).
+export const invProductionDemands = pgTable('inv_production_demands', {
+  id:                    uuid('id').primaryKey().defaultRandom(),
+  tenantId:              uuid('tenant_id').notNull(),
+  expeditionOrderItemId: uuid('expedition_order_item_id').notNull(),
+  expeditionOrderId:     uuid('expedition_order_id').references(() => invExpeditionOrders.id, { onDelete: 'cascade' }),
+  itemId:                uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  quantity:              integer('quantity').notNull(),
+  status:                text('status').notNull().default('PENDENTE'),
+  createdAt:             timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orderItemUq: uniqueIndex('inv_production_demands_order_item_uq').on(table.expeditionOrderItemId),
+  statusCheck: check('inv_production_demands_status_check', sql`${table.status} IN ('PENDENTE','CONCLUIDO')`),
+}));
+
+export const invPurchaseDemands = pgTable('inv_purchase_demands', {
+  id:                    uuid('id').primaryKey().defaultRandom(),
+  tenantId:              uuid('tenant_id').notNull(),
+  expeditionOrderItemId: uuid('expedition_order_item_id').notNull(),
+  expeditionOrderId:     uuid('expedition_order_id').references(() => invExpeditionOrders.id, { onDelete: 'cascade' }),
+  purchaseOrderId:       uuid('purchase_order_id').references(() => invPurchaseOrders.id, { onDelete: 'set null' }),
+  itemId:                uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  quantity:              integer('quantity').notNull(),
+  createdAt:             timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orderItemUq: uniqueIndex('inv_purchase_demands_order_item_uq').on(table.expeditionOrderItemId),
+}));
+
+export const invItemDeliveries = pgTable('inv_item_deliveries', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  orderId:     uuid('order_id').notNull().references(() => invExpeditionOrders.id, { onDelete: 'cascade' }),
+  orderItemId: uuid('order_item_id').notNull().references(() => invExpeditionOrderItems.id, { onDelete: 'cascade' }),
+  quantity:    integer('quantity').notNull(),
+  photoFileId: uuid('photo_file_id').notNull().references(() => fileAssets.id, { onDelete: 'restrict' }),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:   uuid('created_by'),
+}, (table) => ({
+  orderIdx: index('inv_item_deliveries_order_idx').on(table.orderId),
+}));
+
+export const invDeliveryQrs = pgTable('inv_delivery_qrs', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  deliveryId:         uuid('delivery_id').notNull().references(() => invItemDeliveries.id, { onDelete: 'cascade' }),
+  orderItemId:        uuid('order_item_id').notNull().references(() => invExpeditionOrderItems.id, { onDelete: 'cascade' }),
+  qrValue:            text('qr_value'),
+  boxQr:              text('box_qr'),
+  homologationUnitId: uuid('homologation_unit_id').references((): AnyPgColumn => invHomologationUnits.id, { onDelete: 'set null' }),
+}, (table) => ({
+  qrValueIdx:  index('inv_delivery_qrs_qr_value_idx').on(table.qrValue),   // S5 — trace
+  deliveryIdx: index('inv_delivery_qrs_delivery_idx').on(table.deliveryId),
+}));
+
+export const invShipments = pgTable('inv_shipments', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull(),
+  orderId:        uuid('order_id').notNull().references(() => invExpeditionOrders.id, { onDelete: 'cascade' }),
+  address:        text('address'),
+  shippingMethod: text('shipping_method').notNull(),     // AZUL_CARGO | CORREIOS | CARRO_MYIO | UBER
+  responsible:    text('responsible'),
+  trackingCode:   text('tracking_code'),
+  proofFileId:    uuid('proof_file_id').notNull().references(() => fileAssets.id, { onDelete: 'restrict' }),
+  notes:          text('notes'),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:      uuid('created_by'),
+}, (table) => ({
+  orderIdx:      index('inv_shipments_order_idx').on(table.orderId),
+  methodCheck:   check('inv_shipments_method_check', sql`${table.shippingMethod} IN ('AZUL_CARGO','CORREIOS','CARRO_MYIO','UBER')`),
+}));
+
+// M7 — field (client / technician / damaged).
+export const invUnitProducts = pgTable('inv_unit_products', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  itemId:             uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  label:              text('label'),                     // QR, unique per tenant when set
+  status:             text('status').notNull().default('PARADO'),
+  installedAt:        timestamp('installed_at', { withTimezone: true }),
+  projectId:          uuid('project_id').references(() => invProjects.id, { onDelete: 'set null' }),
+  customerId:         uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  clientNameSnapshot: text('client_name_snapshot'),
+  expeditionOrderId:  uuid('expedition_order_id').references(() => invExpeditionOrders.id, { onDelete: 'set null' }),
+  movedTo:            text('moved_to'),                  // TECNICO | ALMOXARIFADO | PERDIDO | AVARIADO
+  movedTechnician:    text('moved_technician'),
+  movePhotoFileId:    uuid('move_photo_file_id').references(() => fileAssets.id, { onDelete: 'set null' }),
+  movedAt:            timestamp('moved_at', { withTimezone: true }),
+  moveNotes:          text('move_notes'),
+  notes:              text('notes'),
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:          uuid('created_by'),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  labelUq:      uniqueIndex('inv_unit_products_label_uq').on(table.tenantId, table.label).where(sql`label IS NOT NULL`),
+  statusCheck:  check('inv_unit_products_status_check', sql`${table.status} IN ('PARADO','INSTALADO')`),
+  movedToCheck: check('inv_unit_products_moved_to_check', sql`${table.movedTo} IS NULL OR ${table.movedTo} IN ('TECNICO','ALMOXARIFADO','PERDIDO','AVARIADO')`),
+}));
+
+export const invTechnicianMoves = pgTable('inv_technician_moves', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  movementId:  uuid('movement_id').references(() => invStockMovements.id, { onDelete: 'cascade' }),
+  itemId:      uuid('item_id').references(() => invItems.id, { onDelete: 'cascade' }),
+  technician:  text('technician'),
+  destination: text('destination').notNull(),            // UNIDADE | PERDIDO | ALMOXARIFADO | AVARIADO
+  projectId:   uuid('project_id').references(() => invProjects.id, { onDelete: 'set null' }),
+  quantity:    integer('quantity').notNull(),
+  notes:       text('notes'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:   uuid('created_by'),
+}, (table) => ({
+  itemIdx:          index('inv_technician_moves_item_idx').on(table.tenantId, table.itemId),
+  destinationCheck: check('inv_technician_moves_destination_check', sql`${table.destination} IN ('UNIDADE','PERDIDO','ALMOXARIFADO','AVARIADO')`),
+  quantityCheck:    check('inv_technician_moves_quantity_check', sql`${table.quantity} > 0`),
+}));
+
+export const invDamagedItems = pgTable('inv_damaged_items', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  itemId:             uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  productNameSnapshot: text('product_name_snapshot'),
+  quantity:           integer('quantity').notNull(),
+  source:             text('source'),
+  sourceDetail:       text('source_detail'),
+  reason:             text('reason'),
+  photoFileId:        uuid('photo_file_id').references(() => fileAssets.id, { onDelete: 'set null' }),
+  status:             text('status').notNull().default('AVARIADO'),
+  recoveredTo:        text('recovered_to'),
+  recoveryNotes:      text('recovery_notes'),
+  recoveredBy:        uuid('recovered_by'),
+  recoveredAt:        timestamp('recovered_at', { withTimezone: true }),
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy:          uuid('created_by'),
+}, (table) => ({
+  tenantIdx:     index('inv_damaged_items_tenant_idx').on(table.tenantId, table.status),
+  quantityCheck: check('inv_damaged_items_quantity_check', sql`${table.quantity} > 0`),
+  statusCheck:   check('inv_damaged_items_status_check', sql`${table.status} IN ('AVARIADO','RECUPERADO')`),
+}));
+
+// M8 — external platform mirror + sync + push outbox.
+export const invExternalStates = pgTable('inv_external_states', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  tenantId:           uuid('tenant_id').notNull(),
+  code:               text('code').notNull(),
+  productType:        text('product_type'),
+  location:           text('location'),
+  status:             text('status'),
+  technician:         text('technician'),
+  clientName:         text('client_name'),
+  qrValue:            text('qr_value'),
+  itemId:             uuid('item_id').references(() => invItems.id, { onDelete: 'set null' }),
+  homologationUnitId: uuid('homologation_unit_id').references((): AnyPgColumn => invHomologationUnits.id, { onDelete: 'set null' }),
+  lastChangeAt:       timestamp('last_change_at', { withTimezone: true }),
+  payload:            jsonb('payload'),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  codeUq:     uniqueIndex('inv_external_states_code_uq').on(table.tenantId, table.code),
+  qrValueIdx: index('inv_external_states_qr_value_idx').on(table.qrValue),
+}));
+
+export const invExternalSyncState = pgTable('inv_external_sync_state', {
+  tenantId:   uuid('tenant_id').primaryKey(),
+  leaseUntil: timestamp('lease_until', { withTimezone: true }),
+  lastRunAt:  timestamp('last_run_at', { withTimezone: true }),
+  lastStatus: text('last_status'),                       // OK | PARCIAL | ERRO
+  lastMessage: text('last_message'),
+  totalItems: integer('total_items'),
+}, (table) => ({
+  statusCheck: check('inv_external_sync_state_status_check', sql`${table.lastStatus} IS NULL OR ${table.lastStatus} IN ('OK','PARCIAL','ERRO')`),
+}));
+
+export const invExternalPushOutbox = pgTable('inv_external_push_outbox', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tenantId:      uuid('tenant_id').notNull(),
+  qrCodes:       text('qr_codes').array().notNull().default(sql`'{}'::text[]`),
+  location:      text('location'),
+  status:        text('status').notNull().default('PENDING'),
+  technician:    text('technician'),
+  clientName:    text('client_name'),
+  attempts:      integer('attempts').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+  lastError:     text('last_error'),
+  dispatchedAt:  timestamp('dispatched_at', { withTimezone: true }),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  drainIdx:    index('inv_external_push_outbox_drain_idx').on(table.tenantId, table.status, table.nextAttemptAt),
+  statusCheck: check('inv_external_push_outbox_status_check', sql`${table.status} IN ('PENDING','FAILED','DONE')`),
+}));

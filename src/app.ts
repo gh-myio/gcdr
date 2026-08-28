@@ -108,6 +108,8 @@ import {
   enrichmentController,
   // RFC-0036: Device/Work-Order Annotations (polymorphic)
   annotationsController,
+  // RFC-0061: Inventory & Warehouse Management ("Menu de Estoque")
+  inventoryController,
 } from './controllers';
 
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
@@ -130,6 +132,7 @@ import { requestMonitorMiddleware } from './middleware/requestMonitor';
 import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
 import { startRestoreSweep } from './services/CentralRestoreSweep';
+import { startInventoryExternalWorkers } from './services/inventory/InventoryExternalWorkers';
 
 const app: Express = express();
 
@@ -631,6 +634,13 @@ apiV1Router.use('/assistant', authMiddleware, assistantController);
 // M2M consumer — same auth as the bundle to-verify-service (master key + JWT).
 apiV1Router.use('/enrichment', authMiddleware, enrichmentController);
 
+// RFC-0061: Inventory & Warehouse Management ("Menu de Estoque").
+// hybridAuth: GET → inventory:read; write verbs → inventory:write (JWT or
+// customer API key gcdr_cust_* for M2M — external sync run). Finer RBAC
+// (requester/buyer/factory/admin per §RBAC) is enforced in the services;
+// destructive verbs additionally require a server-side confirmation token.
+apiV1Router.use('/inventory', hybridAuthByMethod('inventory:read', 'inventory:write'), inventoryController);
+
 // Mount API v1 router
 app.use('/api/v1', apiV1Router);
 
@@ -704,6 +714,15 @@ if (require.main === module) {
     } catch (error) {
       // eslint-disable-next-line no-console -- startup diagnostics
       console.error('Failed to start the restore-sweep:', error);
+    }
+
+    // RFC-0061 M8: external-tracking pull (shadow by default) + outbox drain.
+    // No-op unless MYIO_PRODUCTS_API_KEY is set; live writes need INV_SYNC_LIVE.
+    try {
+      startInventoryExternalWorkers();
+    } catch (error) {
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.error('Failed to start the inventory external-sync workers:', error);
     }
 
     // round-3 #6: periodically evict expired rate-limit buckets so rotated keys
