@@ -15,7 +15,19 @@ if (!connectionString) {
 
 // Create postgres client
 // For query purposes (used by Drizzle)
-const queryClient = postgres(connectionString);
+const queryClient = postgres(connectionString, {
+  onnotice: (notice) => {
+    // executeRawScript() always ends with a defensive ROLLBACK so the reserved
+    // socket returns to the pool clean; when no transaction is open Postgres
+    // answers with WARNING 25P01 ("there is no transaction in progress").
+    // That is expected on every DB-admin statement — swallow it so prod logs
+    // only carry notices that mean something. Everything else still surfaces
+    // (e.g. RAISE NOTICE from seeds/migrations).
+    if (notice.code === '25P01') return;
+    // eslint-disable-next-line no-console -- server-side notices are operational signal
+    console.log(notice);
+  },
+});
 
 // Create Drizzle instance with schema
 export const db = drizzle(queryClient, { schema });
