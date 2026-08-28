@@ -163,3 +163,35 @@ export type NewWorkOrderEventRow = typeof schema.workOrdersEvents.$inferInsert;
 
 export type WorkOrderFileRow = typeof schema.workOrderFiles.$inferSelect;
 export type NewWorkOrderFileRow = typeof schema.workOrderFiles.$inferInsert;
+
+// =============================================================================
+// Boot-time DB readiness gate.
+//
+// On Dokploy, the app container can come up before Docker DNS has registered
+// the postgres service alias on the shared network — the first queries then die
+// with ENOTFOUND (2026-08-28 prod incident: simulator init failed at boot and
+// never retried). postgres.js connects lazily, so we probe with SELECT 1 and
+// back off until the database answers; startup subsystems run only after this
+// resolves. Never throws — after the attempts are exhausted the server still
+// starts (requests will surface their own errors) but the wait is logged.
+// =============================================================================
+export async function waitForDatabaseReady(maxAttempts = 12, delayMs = 5000): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await queryClient`select 1`;
+      if (attempt > 1) {
+        // eslint-disable-next-line no-console -- startup diagnostics
+        console.log(`[db] Database reachable after ${attempt} attempt(s)`);
+      }
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console -- startup diagnostics
+      console.warn(`[db] Not reachable yet (attempt ${attempt}/${maxAttempts}): ${msg.slice(0, 200)}`);
+      if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  // eslint-disable-next-line no-console -- startup diagnostics
+  console.error(`[db] Still unreachable after ${maxAttempts} attempts — starting anyway (subsystems degraded)`);
+  return false;
+}

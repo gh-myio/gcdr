@@ -133,6 +133,7 @@ import { initializeAuditLogging } from './infrastructure/audit';
 import { initializeSimulator, registerShutdownHandlers } from './services/SimulatorStartup';
 import { startRestoreSweep } from './services/CentralRestoreSweep';
 import { startInventoryExternalWorkers } from './services/inventory/InventoryExternalWorkers';
+import { waitForDatabaseReady } from './infrastructure/database/drizzle/db';
 
 const app: Express = express();
 
@@ -698,6 +699,10 @@ if (require.main === module) {
 ║  Monitor:     ${(baseUrl + '/admin/monitor').padEnd(42)}║` : ''}
 ╚════════════════════════════════════════════════════════════╝
     `);
+
+    // Boot gate: wait for the database before any subsystem touches it (the
+    // Dokploy postgres alias may register on the network after we come up).
+    await waitForDatabaseReady();
 
     // Initialize simulator subsystem (RFC-0010)
     try {
