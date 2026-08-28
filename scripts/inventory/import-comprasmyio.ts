@@ -31,7 +31,7 @@
  */
 
 import { createHash, randomUUID } from 'crypto';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import postgres from 'postgres';
 import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -283,7 +283,9 @@ function makeFileResolver(ctx: Omit<PlanContext, 'fileId' | 'userId' | 'ensureFa
       const localPath = path.join(opts.filesDir, parsed.bucket, parsed.path);
       if (existsSync(localPath)) {
         const id = randomUUID();
-        const bytes = statSync(localPath).size;
+        // Single read: size and hash from the same buffer (no stat/read race).
+        const fileBuf = readFileSync(localPath);
+        const bytes = fileBuf.length;
         plan.fileAssets.push({
           id,
           tenantId: opts.tenantId,
@@ -292,7 +294,7 @@ function makeFileResolver(ctx: Omit<PlanContext, 'fileId' | 'userId' | 'ensureFa
           filename: path.basename(parsed.path),
           contentType: guessContentType(parsed.path),
           byteSize: bytes,
-          sha256: createHash('sha256').update(readFileSync(localPath)).digest('hex'),
+          sha256: createHash('sha256').update(fileBuf).digest('hex'),
           storageProvider: 'LOCAL',
           storageBucket: parsed.bucket,
           storageKey: parsed.path,

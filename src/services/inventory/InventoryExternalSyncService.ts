@@ -1133,12 +1133,17 @@ export class InventoryExternalSyncService {
       corrections: report.corrections.slice(0, REPORT_CORRECTIONS_CAP),
       correctionsTotal: report.corrections.length,
     };
-    // Shadow log: every would-be correction also goes to stdout for diffing.
+    // Shadow trail: stdout carries only counts + a sanitized tenant id; the
+    // full corrections payload lives in inv_external_sync_state.last_message
+    // (CodeQL: no user-influenced format strings / payloads on stdout).
     if (!report.live && report.corrections.length > 0) {
+      const safeTenant = /^[0-9a-f-]{36}$/i.test(tenantId) ? tenantId : 'invalid-tenant-id';
       // eslint-disable-next-line no-console -- J4 shadow-mode diff trail
-      console.info(`[inv-external-sync] SHADOW ${tenantId}: ${report.corrections.length} correção(ões) NÃO aplicadas`, {
-        corrections: persisted.corrections,
-      });
+      console.info(
+        '[inv-external-sync] SHADOW: %d correction(s) NOT applied (tenant %s) — full report persisted in inv_external_sync_state.last_message',
+        report.corrections.length,
+        safeTenant,
+      );
     }
     try {
       await this.repository.releaseLease(tenantId, {
