@@ -40,6 +40,24 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
+/**
+ * Strip HTML tags for the plain-text fallback of an email. A single
+ * `replace(/<[^>]*>/g, '')` pass is unsound: a malformed/nested input like
+ * `<scr<script>ipt>` can leave a reassembled `<script>`-like fragment behind
+ * after just one pass. Looping to a fixed point (no more matches) closes
+ * that gap — the string only shrinks or stays put each iteration, so this
+ * always terminates.
+ */
+function stripHtmlTags(html: string): string {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = previous.replace(/<[^>]*>/g, '');
+  } while (current !== previous);
+  return current;
+}
+
 export interface SendEmailOptions {
   to: string;
   subject: string;
@@ -60,7 +78,7 @@ export class EmailService {
   async send(options: SendEmailOptions): Promise<EmailResult> {
     // If email is disabled, log and return success
     if (!config.enabled) {
-      console.log(`[EMAIL-DISABLED] Would send to ${options.to}: ${options.subject}`);
+      console.info(`[EMAIL-DISABLED] Would send to ${options.to}: ${options.subject}`);
       return { success: true, messageId: 'disabled' };
     }
 
@@ -78,10 +96,10 @@ export class EmailService {
         to: options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replace(/<[^>]*>/g, ''),
+        text: options.text || stripHtmlTags(options.html),
       });
 
-      console.log(`[EMAIL] Sent to ${options.to}: ${options.subject} (${result.messageId})`);
+      console.info(`[EMAIL] Sent to ${options.to}: ${options.subject} (${result.messageId})`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -155,7 +173,7 @@ export class EmailService {
    */
   async verifyConnection(): Promise<boolean> {
     if (!config.enabled) {
-      console.log('[EMAIL] Email sending is disabled');
+      console.info('[EMAIL] Email sending is disabled');
       return true;
     }
 
@@ -167,7 +185,7 @@ export class EmailService {
     try {
       const transport = getTransporter();
       await transport.verify();
-      console.log('[EMAIL] SMTP connection verified successfully');
+      console.info('[EMAIL] SMTP connection verified successfully');
       return true;
     } catch (error) {
       console.error('[EMAIL] SMTP connection failed:', error);

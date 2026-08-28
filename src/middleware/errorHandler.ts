@@ -29,62 +29,67 @@ function extractPostgresError(err: unknown): PostgresErrorShape | null {
 
 // Map a known PostgreSQL constraint error to an HTTP response. Extracted from
 // errorHandler to keep that function's cognitive complexity in bounds.
-function mapPostgresError(
+/**
+ * Maps a Postgres constraint-violation error to its HTTP response and sends
+ * it. Returns true if it handled the error, false if the code isn't one of
+ * the mapped ones (caller falls through to the generic 500 path). Split out
+ * of errorHandler() purely to keep its cognitive complexity under the lint
+ * threshold — no behavior change from the inline version.
+ */
+function sendPostgresErrorResponse(
   pgError: PostgresErrorShape,
+  res: Response,
   requestId: string,
   timestamp: string,
-): { status: number; body: ApiResponse } | null {
+): boolean {
   if (pgError.code === '23505') {
     // unique_violation
-    return {
-      status: 409,
-      body: {
-        success: false,
-        error: {
-          message: pgError.detail || 'A resource with the same unique value already exists',
-          code: 'CONFLICT',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.detail || 'A resource with the same unique value already exists',
+        code: 'CONFLICT',
+        ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
       },
+      meta: { requestId, timestamp },
     };
+    res.status(409).json(response);
+    return true;
   }
 
   if (pgError.code === '23503') {
     // foreign_key_violation
-    return {
-      status: 409,
-      body: {
-        success: false,
-        error: {
-          message: pgError.detail || 'Referenced resource does not exist or is still in use',
-          code: 'FK_VIOLATION',
-          ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
-        },
-        meta: { requestId, timestamp },
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.detail || 'Referenced resource does not exist or is still in use',
+        code: 'FK_VIOLATION',
+        ...(pgError.constraint_name && { details: { constraint: pgError.constraint_name } }),
       },
+      meta: { requestId, timestamp },
     };
+    res.status(409).json(response);
+    return true;
   }
 
   if (pgError.code === '23502') {
     // not_null_violation
-    return {
-      status: 400,
-      body: {
-        success: false,
-        error: {
-          message: pgError.column_name
-            ? `Required column "${pgError.column_name}" is missing`
-            : 'A required field is missing',
-          code: 'VALIDATION_ERROR',
-          ...(pgError.column_name && { details: { column: pgError.column_name } }),
-        },
-        meta: { requestId, timestamp },
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        message: pgError.column_name
+          ? `Required column "${pgError.column_name}" is missing`
+          : 'A required field is missing',
+        code: 'VALIDATION_ERROR',
+        ...(pgError.column_name && { details: { column: pgError.column_name } }),
       },
+      meta: { requestId, timestamp },
     };
+    res.status(400).json(response);
+    return true;
   }
 
-  return null;
+  return false;
 }
 
 /**
@@ -102,7 +107,14 @@ export function errorHandler(
     const requestId = req.context?.requestId || '-';
     const userId    = req.context?.userId    || '-';
     const ip        = req.context?.ip        || req.ip || '-';
-    console.warn(`[${err.statusCode}] ${err.code}: ${err.message} | ${req.method} ${req.path} | ip=${ip} | userId=${userId} | requestId=${requestId}`);
+    // err.message/req.path can carry attacker-controlled content; strip CR/LF
+    // from each SOURCE value before interpolation (not the composed string
+    // afterward) so static analysis can trace the sanitizer boundary and so
+    // it can't forge extra log lines (log injection).
+    const safeMessage = err.message.replace(/[\r\n]+/g, ' ');
+    const safePath = req.path.replace(/[\r\n]+/g, ' ');
+    const logLine = `[${err.statusCode}] ${err.code}: ${safeMessage} | ${req.method} ${safePath} | ip=${ip} | userId=${userId} | requestId=${requestId}`;
+    console.warn(logLine);
   } else {
     console.error('Error:', err);
   }
@@ -190,9 +202,7 @@ export function errorHandler(
   // this, the wrapper's message is "Failed query: insert into ..." which
   // both leaks SQL/params to the client and is reported as 500.
   const pgError = extractPostgresError(err);
-  const pgMapped = pgError ? mapPostgresError(pgError, requestId, timestamp) : null;
-  if (pgMapped) {
-    res.status(pgMapped.status).json(pgMapped.body);
+  if (pgError && sendPostgresErrorResponse(pgError, res, requestId, timestamp)) {
     return;
   }
 

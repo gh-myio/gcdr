@@ -1,4 +1,4 @@
-import { eq, and, ilike, or, sql, inArray } from 'drizzle-orm';
+import { eq, and, ilike, or, sql, inArray, desc } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import {
   User,
@@ -427,7 +427,9 @@ export class UserRepository implements IUserRepository {
       db.select()
         .from(users)
         .where(and(...conditions))
-        .orderBy(users.createdAt)
+        // Newest first: a user created just now must show up on page 1 of the
+        // Users screen (the UI only fetches the first page of 20).
+        .orderBy(desc(users.createdAt))
         .limit(limit + 1)
         .offset(offset),
       countWhere(users, conditions),

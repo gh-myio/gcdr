@@ -38,6 +38,11 @@ export type ApiKeyScope =
   | 'centrals:write'    // Write centrals/gateways (commands, enroll, mqtt, backup/restore)
   | 'inventory:read'    // Read inventory domain (RFC-0061)
   | 'inventory:write'   // Write inventory domain incl. external sync run (RFC-0061)
+  | 'central-state:read'        // Read a central's runtime state (RFC-0056) — enforced by the central
+  | 'central-environment:read'  // Read a central's local environment (RFC-0056) — enforced by the central
+  | 'central-environment:write' // Provision a central's local environment (RFC-0056) — enforced by the central
+  | 'central-data:write'        // Central data-clear operations (RFC-0056) — enforced by the central
+  | 'central-sync:write'        // Central mqtt sync-status operations (RFC-0056)
   | '*:read';           // Read all resources
 
 /**

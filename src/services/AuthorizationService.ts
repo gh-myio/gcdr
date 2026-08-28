@@ -13,6 +13,7 @@ import { RoleRepository } from '../repositories/RoleRepository';
 import { PolicyRepository } from '../repositories/PolicyRepository';
 import { RoleAssignmentRepository } from '../repositories/RoleAssignmentRepository';
 import { UserRepository } from '../repositories/UserRepository';
+import { CustomerRepository } from '../repositories/CustomerRepository';
 import { IRoleRepository, ListRolesParams } from '../repositories/interfaces/IRoleRepository';
 import { IPolicyRepository, ListPoliciesParams, UpdatePolicyDTO } from '../repositories/interfaces/IPolicyRepository';
 import { IRoleAssignmentRepository, UpdateRoleAssignmentDTO } from '../repositories/interfaces/IRoleAssignmentRepository';
@@ -101,6 +102,7 @@ export class AuthorizationService {
   private policyRepository: IPolicyRepository;
   private roleAssignmentRepository: IRoleAssignmentRepository;
   private userRepository: UserRepository;
+  private customerRepository: CustomerRepository;
 
   constructor(
     roleRepository?: IRoleRepository,
@@ -111,6 +113,7 @@ export class AuthorizationService {
     this.policyRepository = policyRepository || new PolicyRepository();
     this.roleAssignmentRepository = roleAssignmentRepository || new RoleAssignmentRepository();
     this.userRepository = new UserRepository();
+    this.customerRepository = new CustomerRepository();
   }
 
   // ==================== Role Management ====================
@@ -307,7 +310,42 @@ export class AuthorizationService {
   }
 
   async getUserAssignments(tenantId: string, userId: string): Promise<RoleAssignment[]> {
-    return this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
+    const assignments = await this.roleAssignmentRepository.getActiveByUserId(tenantId, userId);
+    return this.withScopeNames(tenantId, assignments);
+  }
+
+  /**
+   * Resolve human-readable names for `customer:<uuid>` scopes so UIs can show
+   * "Myio" instead of the raw uuid (UserDetail/RoleDetail already prefer
+   * `scopeName` and fall back to the raw scope). Other scope forms (global,
+   * partner:, ...) are returned untouched. Read-only enrichment — never persisted.
+   */
+  private async withScopeNames(tenantId: string, assignments: RoleAssignment[]): Promise<RoleAssignment[]> {
+    const customerIds = [...new Set(
+      assignments
+        .map((a) => a.scope)
+        .filter((s): s is string => !!s && s.startsWith('customer:'))
+        .map((s) => s.slice('customer:'.length)),
+    )];
+    if (customerIds.length === 0) return assignments;
+
+    const entries = await Promise.all(
+      customerIds.map(async (id) => {
+        try {
+          const customer = await this.customerRepository.getById(tenantId, id);
+          return [id, customer?.name] as const;
+        } catch {
+          return [id, undefined] as const; // enrichment must never break the listing
+        }
+      }),
+    );
+    const nameById = new Map(entries.filter(([, name]) => !!name));
+
+    return assignments.map((a) => {
+      if (!a.scope?.startsWith('customer:')) return a;
+      const name = nameById.get(a.scope.slice('customer:'.length));
+      return name ? { ...a, scopeName: name } : a;
+    });
   }
 
   /**

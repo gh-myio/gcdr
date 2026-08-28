@@ -22,6 +22,11 @@ export const ApiKeyScopeSchema = z.enum([
   'entities:read',     // RFC-0047 generic entity registry (read/resolve)
   'entities:write',    // RFC-0047 generic entity registry (write)
   'entities:admin',    // RFC-0047 entity_types + is_system mutation
+  'central-state:read',         // RFC-0056 — enforced by the central
+  'central-environment:read',   // RFC-0056 — enforced by the central
+  'central-environment:write',  // RFC-0056 — enforced by the central
+  'central-data:write',         // RFC-0056 — enforced by the central
+  'central-sync:write',         // RFC-0056 — enforced by GCDR (mqtt sync-status)
   '*:read',
 ]);
 

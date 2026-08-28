@@ -134,7 +134,10 @@ export function inferAuditLevel(eventType: EventType): AuditLevel {
   if (eventType.includes('_DELETED') || eventType.includes('_REVOKED') ||
       eventType === EventType.AUTH_LOGIN_FAILED ||
       eventType.includes('AUTH_PASSWORD') ||
-      eventType.includes('API_KEY_')) {
+      eventType.includes('API_KEY_') ||
+      // RFC-0056 bootstrap events — see the naming note on their EventType
+      // declaration for why they can't just match on 'API_KEY_' above.
+      eventType.startsWith('CENTRAL_BOOTSTRAP_')) {
     return AuditLevel.MINIMAL;
   }
 

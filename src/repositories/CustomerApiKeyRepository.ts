@@ -7,10 +7,20 @@ import { countWhere } from './helpers/countQuery';
 
 const { customerApiKeys } = schema;
 
+/** The Drizzle transaction client passed to `db.transaction(async (tx) => …)`. */
+export type CustomerApiKeyTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type CustomerApiKeyDbClient = typeof db | CustomerApiKeyTx;
+
 export class CustomerApiKeyRepository implements ICustomerApiKeyRepository {
 
-  async create(apiKey: CustomerApiKey): Promise<CustomerApiKey> {
-    const [result] = await db.insert(customerApiKeys).values({
+  /**
+   * RFC-0056 (P1 fix) — accepts an optional tx client so a caller (e.g. the
+   * central bootstrap service) can mint a key inside the SAME transaction
+   * that holds a row lock elsewhere, making the whole read-check-mint-write
+   * sequence atomic. Defaults to the module-level `db` for existing callers.
+   */
+  async create(apiKey: CustomerApiKey, exec: CustomerApiKeyDbClient = db): Promise<CustomerApiKey> {
+    const [result] = await exec.insert(customerApiKeys).values({
       id: apiKey.id,
       tenantId: apiKey.tenantId,
       customerId: apiKey.customerId,

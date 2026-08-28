@@ -101,6 +101,13 @@ jobs:
             src/**/*.ts
             tests/**/*.ts
             scripts/**/*.ts
+          # Keep in sync with .eslintrc.json's ignorePatterns — otherwise a
+          # changed *.config.ts file passes eslint's own "should skip this"
+          # check as a *warning* on the CLI, which --max-warnings 0 then
+          # fails on for a file nobody meant to lint in the first place.
+          files_ignore: |
+            **/*.config.ts
+            **/*.config.js
 
       - name: ESLint changed files (block on errors)
         if: steps.changed.outputs.any_changed == 'true'

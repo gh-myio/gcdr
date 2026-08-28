@@ -280,7 +280,22 @@ export const s3Storage = new S3Storage(loadConfigFromEnv());
  * endpoint. Used purely as audit metadata — does not affect runtime routing.
  */
 export function detectStorageProvider(endpoint: string): 'S3' | 'MINIO' | 'LOCAL' {
-  if (endpoint.includes('amazonaws.com')) return 'S3';
-  if (endpoint.includes('minio') || endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) return 'MINIO';
+  let host = endpoint.trim().toLowerCase();
+
+  try {
+    host = new URL(endpoint).hostname.toLowerCase();
+  } catch {
+    // Keep fallback host-like input handling for non-URL endpoint formats.
+  }
+
+  if (host === 'amazonaws.com' || host.endsWith('.amazonaws.com')) return 'S3';
+  if (
+    host.includes('minio') ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '127.0.0.1'
+  ) {
+    return 'MINIO';
+  }
   return 'LOCAL';
 }
