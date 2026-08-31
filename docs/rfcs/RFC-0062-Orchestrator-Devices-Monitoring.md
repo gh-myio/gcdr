@@ -160,7 +160,7 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 |---|---|
 | energy / consumption | `GET /consumption/slave/{slaveId}/minute/{start}/{end}` |
 | temperature | `GET /temperature_history/slave/{slaveId}/{start}/{end}` |
-| water / pulses | consumption/pulses variant (per firmware — TBD) |
+| water / flow (pulses) | `GET /flow/slave/{slaveId}/{channel}/{start}/{end}` |
 
 `start`/`end` are URL-encoded (`%20` for the space). The consumption response is a `{ slaveId, type, values: [{ timestamp, value }] }` envelope (newest first), e.g.:
 
@@ -175,7 +175,19 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 
 - **Persist per device:** `last_timestamp_telemetry` (newest `timestamp` in the window) and `last_value_telemetry` (its `value`) — **updated only when the window actually returned data**. An **empty** window does **not** overwrite them, so a gap never clobbers the last real reading.
 - **Windowed & cursor-based.** The tick runs **after a window closes** — e.g. at ~**01:30** it fetches the **00:00–01:00** window — advancing a per-slave cursor `last_fetch_energy_telemetry`. Concretely: if the cursor is `2026-08-31 17:00:00` and there is **no data** for the slave in `16:00–17:00`, the cursor advances but `last_timestamp_telemetry`/`last_value_telemetry` are **left untouched**.
-- **Offline by freshness (default 24 h, per-slave override).** A slave with **no new data for `TELEMETRY_OFFLINE_AFTER`** (default **24 h**) ⇒ `connectivity_status = OFFLINE`, even if `/v2/slaves` still said `online`. This is a **default policy**; each slave may override it via a **freshness policy book** — `orchestrator_freshness_policies (name, offline_after, window, granularity, …)` referenced by a nullable `devices.freshness_policy` column (the same "book + per-entity override + env default" pattern as the retry policies, §2a).
+- **Offline by freshness (default 24 h, per-slave override).** A slave with **no new data for `TELEMETRY_OFFLINE_AFTER`** (default **24 h**) ⇒ `connectivity_status = OFFLINE`, even if `/v2/slaves` still said `online`. This is a **default policy**; each slave may override it via a **freshness policy book** — `orchestrator_freshness_policies (name, mode, offline_after, window, granularity, …)` referenced by a nullable `devices.freshness_policy` column (the same "book + per-entity override + env default" pattern as the retry policies, §2a).
+
+**Water is different — cumulative + change-based.** A water meter reports a **running counter**, so "freshness" is about the counter **changing**, not data merely arriving (a meter can keep reporting the same reading). `/flow` returns second-by-second raw pulses with both the **accumulated `reading`** and the per-second **`value`** (delta):
+
+```jsonc
+// GET /flow/slave/106/1/2026-08-30%2022:00:00/2026-08-31%2022:00:00   ({channel}=1)
+{ "values": [ { "timestamp": "2026-08-31T21:59:59.000Z", "reading": 9537, "value": 1 }, … ] }
+```
+
+- **Window = the whole current day** (00:00 → now), not energy's completed-previous-hour window.
+- **`{channel}`** comes from the slave's `channelConfig` in `/v2/slaves` (the pulse channel — e.g. channel `1`, `PULSE_ON_POWER`, on a HIDR).
+- **Persist:** `last_value_telemetry` = the accumulated `reading`; `last_timestamp_telemetry` = the timestamp of the **last change** in `reading` (last non-zero delta), not merely the last row received.
+- **Alert/offline rule (default 72 h without change):** if `reading` has **not changed for `WATER_STALE_AFTER` (default 72 h)** the meter is flagged **stuck-or-offline** — either a genuine no-consumption or a jammed/dead meter (feeds RFC-0055's NO_CONSUMPTION incidents). This is *change-based* (`mode: change`), distinct from energy/temperature's *arrival-based* rule (`mode: arrival`); the freshness policy book carries the `mode` per policy.
 
 **Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — computed from connectivity, the gateway `status` (`bad` ⇒ `DEGRADED`), telemetry staleness (`last_timestamp_telemetry` age), alarm state (orchestrator), and no-consumption incidents (RFC-0055). `DashboardService.devices.health` stops being a mock and reads this column.
 
@@ -206,9 +218,10 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 | `DEVICES_SCAN_INTERVAL_MS` / `OS_SCAN_INTERVAL_MS` | 60s / 300s | scan cadence for the other two monitors |
 | `TELEMETRY_WINDOW` / `TELEMETRY_GRANULARITY` | 1h / `minute` | per-slave telemetry pull window + granularity |
 | `TELEMETRY_FETCH_LAG_MINUTES` | 30 | run the pull **after** the window closes (e.g. 01:30 fetches 00:00–01:00) |
-| `TELEMETRY_OFFLINE_AFTER` | **24h** | no data for this long ⇒ device `OFFLINE`; **overridable per slave** via `devices.freshness_policy` |
-| `DEFAULT_FRESHNESS_POLICY` | `default` | policy from the `orchestrator_freshness_policies` book |
-| `TELEMETRY_ENDPOINT_ENERGY` / `_TEMPERATURE` | `/consumption/slave/{id}/minute/{s}/{e}`, `/temperature_history/slave/{id}/{s}/{e}` | per-domain pull endpoints |
+| `TELEMETRY_OFFLINE_AFTER` (arrival) | **24h** | energy/temperature: no data for this long ⇒ `OFFLINE`; **per-slave override** via `devices.freshness_policy` |
+| `WATER_STALE_AFTER` (change) | **72h** | water: no **change** in `reading` for this long ⇒ stuck-or-offline alert |
+| `DEFAULT_FRESHNESS_POLICY` | `default` | policy from the `orchestrator_freshness_policies` book (carries `mode: arrival \| change`) |
+| `TELEMETRY_ENDPOINT_ENERGY` / `_TEMPERATURE` / `_WATER` | `/consumption/slave/{id}/minute/{s}/{e}`, `/temperature_history/slave/{id}/{s}/{e}`, `/flow/slave/{id}/{channel}/{s}/{e}` | per-domain pull endpoints |
 | `OS_SLA_*` / `OS_STALE_AFTER` | per type | work-order SLA windows |
 | `SCAN_BATCH_SIZE`, `SCAN_LEADER_LOCK` | 500, on | batching + advisory-lock HA guard |
 
