@@ -142,8 +142,14 @@ export class CentralAgentService {
    * throws into the poll — a failed write just retries next tick.
    */
   async recordPlatform(ctx: CentralAgentContext, deviceType?: string): Promise<void> {
-    if (!deviceType) return;
-    await this.centrals.recordPlatform(ctx.tenantId, ctx.centralId, deviceType);
+    // Bounded before it is stored: this is a header, so its length is the
+    // caller's choice, and it lands in a jsonb column that the operator UI
+    // renders. A board name is short (`raspberrypi-cm4-64`); anything longer is
+    // not one, and truncating keeps a malformed poll from writing a large value
+    // on every tick.
+    const platform = deviceType?.trim().slice(0, 64);
+    if (!platform) return;
+    await this.centrals.recordPlatform(ctx.tenantId, ctx.centralId, platform);
   }
 
   /**
