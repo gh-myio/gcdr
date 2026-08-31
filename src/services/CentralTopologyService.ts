@@ -10,13 +10,19 @@ import { NotFoundError } from '../shared/errors/AppError';
 // whole topology response until undici's multi-minute default timeout.
 const CLOUD_FETCH_TIMEOUT_MS = 3000;
 
-// centralId flows into a server-to-server URL path; constrain it to a UUID so a
-// caller-supplied value cannot alter the request target (CodeQL SSRF).
+// The id that reaches the server-to-server URL is read back from the database
+// (see getTopology), and the route rejects a non-UUID before the service is even
+// reached. This is the third barrier, kept so the guarantee is local to the code
+// that builds the URL and cannot be lost by a future caller (CodeQL SSRF).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Page the device registry at the API's max page size (100). A NodeHub with
 // 20-30+ slaves, each exposing several channel-rows, can exceed one page.
 const DEVICE_PAGE_LIMIT = 100;
+
+// Soft-deleted devices keep their row for history. The topology, the device list
+// and the centrals-list connected/total column all count the same set: ACTIVE.
+const DEVICE_ACTIVE_STATUS = 'ACTIVE';
 type TopologyDeviceRow = Awaited<
   ReturnType<typeof deviceRepository.findByCentralId>
 >['items'][number];
@@ -57,19 +63,23 @@ export interface CentralTopology {
  *
  * SIDE EFFECT: getTopology also reconciles the central's connection_status and
  * each device's connectivity_status off the same cloud link (best-effort, only on
- * change). It is a read that mutates — documented here so it isn't a surprise.
+ * change). It is a read that mutates -- documented here so it isn't a surprise,
+ * and tracked for migration off the read path in gh-myio/gcdr#26.
  */
 export class CentralTopologyService {
   async getTopology(tenantId: string, centralId: string): Promise<CentralTopology> {
     const central = await centralRepository.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
-    const { linkBySlave, connected } = await this.fetchLinkQuality(centralId);
-    await this.reconcileCentralStatus(tenantId, centralId, central.connectionStatus, connected);
+    // Deliberately `central.id`, not the request parameter: the id that reaches
+    // the server-to-server URL is the primary key of a row this tenant owns,
+    // read back from the database, never a caller-supplied string.
+    const { linkBySlave, connected } = await this.fetchLinkQuality(central.id);
+    await this.reconcileCentralStatus(tenantId, central.id, central.connectionStatus, connected);
 
     // One node per physical device (grouped by slaveId), carrying its live link.
     const bySlave = await this.loadDevicesBySlave(tenantId, centralId);
-    const nodes = [...bySlave.values()].map((d) => this.toNode(d, linkBySlave));
+    const nodes = [...bySlave.values()].map((rows) => this.toNode(rows[0], linkBySlave));
     await this.reconcileDeviceStatus(tenantId, bySlave, linkBySlave);
 
     return { central: { id: central.id, name: central.name }, nodes };
@@ -94,22 +104,36 @@ export class CentralTopologyService {
     }
   }
 
-  // One row per slaveId (a board can expose several channel-rows; first wins),
-  // paged through the registry at the API's max page size.
+  // Every registry row, grouped by the slaveId it belongs to, paged through at
+  // the API's max page size.
+  //
+  // ALL rows of a slave, not just the first: a board exposes one row per channel
+  // (the unique index is tenant+central+slave+channel+type), the topology draws
+  // one node per BOARD -- so rows[0] -- but the reconcile has to write every row
+  // of that board. Keeping only the first is what let a NodeHub's channel rows
+  // stay ONLINE forever after it went offline, since the centrals-list column
+  // counts rows and only one of them was ever updated.
+  //
+  // ACTIVE only: a device removed from the central is soft-deleted, and drawing
+  // uninstalled hardware on the topology (permanently offline, since the radio
+  // no longer answers for it) is both wrong and alarming to the operator.
   private async loadDevicesBySlave(
     tenantId: string,
     centralId: string,
-  ): Promise<Map<number, TopologyDeviceRow>> {
-    const bySlave = new Map<number, TopologyDeviceRow>();
+  ): Promise<Map<number, TopologyDeviceRow[]>> {
+    const bySlave = new Map<number, TopologyDeviceRow[]>();
     let cursor: string | undefined;
     do {
       const page = await deviceRepository.findByCentralId(tenantId, centralId, {
         limit: DEVICE_PAGE_LIMIT,
+        status: DEVICE_ACTIVE_STATUS,
         cursor,
       });
       for (const d of page.items) {
         if (d.slaveId === null || d.slaveId === undefined) continue;
-        if (!bySlave.has(d.slaveId)) bySlave.set(d.slaveId, d);
+        const rows = bySlave.get(d.slaveId);
+        if (rows) rows.push(d);
+        else bySlave.set(d.slaveId, [d]);
       }
       cursor = page.pagination.hasMore ? page.pagination.nextCursor : undefined;
     } while (cursor);
@@ -149,19 +173,26 @@ export class CentralTopologyService {
   // ONLINE, offline -> OFFLINE; unknown/null left as-is). Best-effort + only on
   // change; the desired status is binary, so the writes batch into at most two
   // UPDATEs. The topology response still renders if it fails.
+  //
+  // The link is per BOARD and the status column is per ROW, so one verdict fans
+  // out over every channel row of that slave. Rows already holding the desired
+  // value are skipped individually, which is what keeps the steady state at zero
+  // writes.
   private async reconcileDeviceStatus(
     tenantId: string,
-    bySlave: Map<number, TopologyDeviceRow>,
+    bySlave: Map<number, TopologyDeviceRow[]>,
     linkBySlave: Map<number, CloudDeviceStatus>,
   ): Promise<void> {
     const toOnline: string[] = [];
     const toOffline: string[] = [];
-    for (const d of bySlave.values()) {
-      const link = linkBySlave.get(d.slaveId as number);
+    for (const rows of bySlave.values()) {
+      const link = linkBySlave.get(rows[0].slaveId as number);
       if (!link?.status) continue;
       const desired = link.status === 'offline' ? 'OFFLINE' : 'ONLINE';
-      if (d.connectivityStatus === desired) continue;
-      (desired === 'ONLINE' ? toOnline : toOffline).push(d.id);
+      for (const d of rows) {
+        if (d.connectivityStatus === desired) continue;
+        (desired === 'ONLINE' ? toOnline : toOffline).push(d.id);
+      }
     }
     try {
       await Promise.all([

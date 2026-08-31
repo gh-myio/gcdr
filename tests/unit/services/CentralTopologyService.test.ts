@@ -163,6 +163,52 @@ describe('CentralTopologyService', () => {
     expect(updateConnectionStatus).not.toHaveBeenCalled();
   });
 
+  it('loads only ACTIVE devices, so a removed device leaves the topology', async () => {
+    findByCentralId.mockResolvedValue(onePage([device({ id: 'a', slaveId: 1 })]));
+    await svc.getTopology(TENANT, CID);
+    expect(findByCentralId).toHaveBeenCalledWith(
+      TENANT,
+      CID,
+      expect.objectContaining({ status: 'ACTIVE' }),
+    );
+  });
+
+  it('keeps the ACTIVE filter on every page, not just the first', async () => {
+    findByCentralId
+      .mockResolvedValueOnce({
+        items: [device({ id: 'a', slaveId: 1 })],
+        pagination: { total: 2, totalPages: 2, hasMore: true, nextCursor: '100' },
+      })
+      .mockResolvedValueOnce(onePage([device({ id: 'b', slaveId: 2 })]));
+    await svc.getTopology(TENANT, CID);
+    for (const call of findByCentralId.mock.calls) {
+      expect(call[2]).toEqual(expect.objectContaining({ status: 'ACTIVE' }));
+    }
+  });
+
+  it('builds the cloud URL from the stored central id, not the caller string', async () => {
+    // The row the repository returns is the only source of the id that reaches
+    // the server-to-server URL; a caller-supplied string never gets there.
+    getById.mockResolvedValue({
+      id: '22222222-2222-2222-2222-222222222222',
+      name: 'C1',
+      connectionStatus: 'ONLINE',
+    });
+    await svc.getTopology(TENANT, CID);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud.test/centrals/22222222-2222-2222-2222-222222222222/device-status',
+      expect.anything(),
+    );
+  });
+
+  it('does not call the cloud-server at all when the id is not a UUID', async () => {
+    getById.mockResolvedValue({ id: '../../admin', name: 'C1', connectionStatus: 'ONLINE' });
+    findByCentralId.mockResolvedValue(onePage([device({ id: 'a', slaveId: 1 })]));
+    const topo = await svc.getTopology(TENANT, CID);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(topo.nodes[0].signalPct).toBeNull();
+  });
+
   it('pages through the device registry until hasMore is false', async () => {
     findByCentralId
       .mockResolvedValueOnce({
@@ -176,5 +222,98 @@ describe('CentralTopologyService', () => {
     const topo = await svc.getTopology(TENANT, CID);
     expect(findByCentralId).toHaveBeenCalledTimes(2);
     expect(topo.nodes).toHaveLength(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Boards with several channel rows
+  //
+  // A board is one row per channel in the registry (the unique index is
+  // tenant+central+slave+channel+type), but the radio link is per BOARD. The
+  // topology draws one node per board; the centrals-list connected/total column
+  // counts ROWS. So a reconcile that writes only the row it happened to draw
+  // leaves the sibling rows on their old value, and a NodeHub that went offline
+  // keeps most of its rows ONLINE for good.
+  // -----------------------------------------------------------------------
+
+  it('draws one node per board, however many channel rows the board has', async () => {
+    findByCentralId.mockResolvedValue(
+      onePage([
+        device({ id: 'ch1', slaveId: 7, name: 'Hub' }),
+        device({ id: 'ch2', slaveId: 7, name: 'Hub' }),
+        device({ id: 'ch3', slaveId: 7, name: 'Hub' }),
+      ]),
+    );
+    fetchMock.mockResolvedValue(
+      cloud([{ id: 7, status: 'online', average_retries: 0, updated_at: 10 }]),
+    );
+
+    const topo = await svc.getTopology(TENANT, CID);
+    expect(topo.nodes).toHaveLength(1);
+    expect(topo.nodes[0].slaveId).toBe(7);
+    expect(topo.nodes[0].signalPct).toBe(100);
+  });
+
+  it('reconciles EVERY channel row of a board, not just the one it drew', async () => {
+    findByCentralId.mockResolvedValue(
+      onePage([
+        device({ id: 'ch1', slaveId: 7, connectivityStatus: 'ONLINE' }),
+        device({ id: 'ch2', slaveId: 7, connectivityStatus: 'ONLINE' }),
+        device({ id: 'ch3', slaveId: 7, connectivityStatus: 'ONLINE' }),
+      ]),
+    );
+    fetchMock.mockResolvedValue(
+      cloud([{ id: 7, status: 'offline', average_retries: 10, updated_at: 10 }]),
+    );
+
+    await svc.getTopology(TENANT, CID);
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, ['ch1', 'ch2', 'ch3'], 'OFFLINE');
+  });
+
+  it('writes only the rows that actually differ, so a settled board costs no writes', async () => {
+    findByCentralId.mockResolvedValue(
+      onePage([
+        device({ id: 'ch1', slaveId: 7, connectivityStatus: 'OFFLINE' }),
+        device({ id: 'ch2', slaveId: 7, connectivityStatus: 'ONLINE' }),
+      ]),
+    );
+    fetchMock.mockResolvedValue(
+      cloud([{ id: 7, status: 'offline', average_retries: 10, updated_at: 10 }]),
+    );
+
+    await svc.getTopology(TENANT, CID);
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, ['ch2'], 'OFFLINE');
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, [], 'ONLINE');
+  });
+
+  it('groups the rows of one board even when they land on different pages', async () => {
+    findByCentralId
+      .mockResolvedValueOnce({
+        items: [device({ id: 'ch1', slaveId: 7, connectivityStatus: 'OFFLINE' })],
+        pagination: { total: 2, totalPages: 2, hasMore: true, nextCursor: '100' },
+      })
+      .mockResolvedValueOnce(
+        onePage([device({ id: 'ch2', slaveId: 7, connectivityStatus: 'OFFLINE' })]),
+      );
+    fetchMock.mockResolvedValue(
+      cloud([{ id: 7, status: 'online', average_retries: 2, updated_at: 10 }]),
+    );
+
+    const topo = await svc.getTopology(TENANT, CID);
+    expect(topo.nodes).toHaveLength(1);
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, ['ch1', 'ch2'], 'ONLINE');
+  });
+
+  it('leaves a board alone when the cloud has no status for it', async () => {
+    findByCentralId.mockResolvedValue(
+      onePage([
+        device({ id: 'ch1', slaveId: 7, connectivityStatus: 'ONLINE' }),
+        device({ id: 'ch2', slaveId: 7, connectivityStatus: 'ONLINE' }),
+      ]),
+    );
+    fetchMock.mockResolvedValue(cloud([]));
+
+    await svc.getTopology(TENANT, CID);
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, [], 'ONLINE');
+    expect(setConnectivityStatusBatch).toHaveBeenCalledWith(TENANT, [], 'OFFLINE');
   });
 });

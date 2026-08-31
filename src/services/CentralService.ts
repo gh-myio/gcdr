@@ -12,7 +12,6 @@ import { deviceRepository } from '../repositories/DeviceRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
-import { deviceRepository } from '../repositories/DeviceRepository';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';

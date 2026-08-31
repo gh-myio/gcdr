@@ -38,6 +38,17 @@ import { defaultTenantId } from '../services/CentralInitialKeyService';
 
 const ERR_CENTRAL_ID_REQUIRED = 'Central ID is required';
 
+// Route-level shape check for :id. The topology route forwards the central id
+// into a server-to-server URL, so the value is constrained to a UUID before any
+// handler runs -- the sanitization sits above the service rather than inside it.
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requireCentralId(value: string | undefined): string {
+  if (!value) throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+  if (!UUID_REGEX.test(value)) throw new ValidationError(`Invalid central id: "${value}"`);
+  return value;
+}
+
 const router = Router();
 
 /**
@@ -134,8 +145,12 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
     // devicesConnected counts REACHABLE devices: the cloud-server's online AND
     // bad radio states both map to ONLINE, only offline is excluded. See the
     // `statistics` field on the Central entity.
-    const counts = await deviceRepository.countsByCentralIds(tenantId, [id]);
-    const deviceCounts = counts.get(id) ?? { devicesTotal: 0, devicesConnected: 0 };
+    const counts = await deviceRepository.countByCentralIds(tenantId, [id]);
+    const row = counts.get(id);
+    const deviceCounts = {
+      devicesTotal: row?.total ?? 0,
+      devicesConnected: row?.connected ?? 0,
+    };
 
     sendSuccess(res, { ...central.stats, ...deviceCounts }, 200, requestId);
   } catch (err) {
@@ -149,15 +164,17 @@ router.get('/:id/statistics', async (req: Request, res: Response, next: NextFunc
  * (status + average_retries, joined from the cloud-server) for the CentralDetail
  * topology view. One node per physical device (grouped by slaveId).
  *
- * NOTE: this GET has side effects — it reconciles the central's connection_status
+ * NOTE: this GET has side effects -- it reconciles the central's connection_status
  * and each device's connectivity_status from the live cloud link (best-effort).
  * As a result the centrals-list connected/total counts are only fresh after a
- * central's topology has been viewed, until a background reconciler exists.
+ * central's topology has been viewed, and a cache/retry/prefetch turns a read
+ * into a write. Tracked for migration to a scheduled reconciler in gh-myio/gcdr#26.
  */
 router.get('/:id/device-topology', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const result = await centralTopologyService.getTopology(tenantId, req.params.id);
+    const centralId = requireCentralId(req.params.id);
+    const result = await centralTopologyService.getTopology(tenantId, centralId);
     sendSuccess(res, result, 200, requestId);
   } catch (err) {
     next(err);
