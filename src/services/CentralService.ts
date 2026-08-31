@@ -8,10 +8,10 @@ import {
 } from '../dto/request/CentralDTO';
 import { CentralRepository } from '../repositories/CentralRepository';
 import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
+import { deviceRepository } from '../repositories/DeviceRepository';
 import { AssetRepository } from '../repositories/AssetRepository';
 import { IAssetRepository } from '../repositories/interfaces/IAssetRepository';
 import { customerRepository } from '../repositories/CustomerRepository';
-import { deviceRepository } from '../repositories/DeviceRepository';
 import { PaginatedResult, EntityStatus } from '../shared/types';
 import { NotFoundError, ConflictError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';

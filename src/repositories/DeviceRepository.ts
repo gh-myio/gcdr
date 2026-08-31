@@ -206,6 +206,26 @@ export class DeviceRepository implements IDeviceRepository {
     return row?.count ?? 0;
   }
 
+  /**
+   * Set the same connectivity_status on many devices in one UPDATE (reconciled
+   * from the cloud-server link). No-op for an empty id list.
+   *
+   * Deliberately does NOT bump `version`: connectivity_status is a derived,
+   * reconciled field, so it must not invalidate the optimistic-locking version
+   * that guards operator edits.
+   */
+  async setConnectivityStatusBatch(
+    tenantId: string,
+    ids: string[],
+    status: ConnectivityStatus,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await db
+      .update(devices)
+      .set({ connectivityStatus: status, updatedAt: new Date(now()) })
+      .where(and(eq(devices.tenantId, tenantId), inArray(devices.id, ids)));
+  }
+
   async getBySerialNumber(tenantId: string, serialNumber: string): Promise<Device | null> {
     const [result] = await db
       .select()
@@ -612,6 +632,12 @@ export class DeviceRepository implements IDeviceRepository {
   /**
    * Count devices grouped by central, with an online breakdown, for a set of
    * centrals. Used to populate the /centrals list "connected / total" column.
+   *
+   * ACTIVE only. A device that was removed from the central is soft-deleted
+   * (status INACTIVE/DELETED, the row stays for history); counting those
+   * inflates `total` with hardware that is no longer installed, and the count
+   * then disagrees with the device list and the topology view, which are both
+   * active-only.
    */
   async countByCentralIds(
     tenantId: string,
@@ -626,7 +652,13 @@ export class DeviceRepository implements IDeviceRepository {
         connected: sql<number>`count(*) FILTER (WHERE ${devices.connectivityStatus} = 'ONLINE')::int`,
       })
       .from(devices)
-      .where(and(eq(devices.tenantId, tenantId), inArray(devices.centralId, centralIds)))
+      .where(
+        and(
+          eq(devices.tenantId, tenantId),
+          inArray(devices.centralId, centralIds),
+          eq(devices.status, 'ACTIVE'),
+        ),
+      )
       .groupBy(devices.centralId);
     for (const r of rows) {
       if (r.centralId) result.set(r.centralId, { total: r.total, connected: r.connected });
@@ -638,26 +670,56 @@ export class DeviceRepository implements IDeviceRepository {
   // RFC-0008: New Query Methods
   // ===========================================================================
 
-  async findByCentralId(tenantId: string, centralId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
-    const limit = params?.limit || 20;
-    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
-
+  /**
+   * Conditions for one central's device page. Shared by the page query and by
+   * its count, so the two can never disagree about what they are looking at.
+   */
+  private findByCentralIdConditions(tenantId: string, centralId: string, params?: ListDevicesParams) {
     const conditions = [
       eq(devices.tenantId, tenantId),
       eq(devices.centralId, centralId),
     ];
-
     if (params?.status) {
       conditions.push(eq(devices.status, params.status as 'ACTIVE' | 'INACTIVE' | 'DELETED'));
     }
+    return conditions;
+  }
+
+  /**
+   * One page of a central's devices, as a builder.
+   *
+   * Exposed rather than inlined so the ORDER BY can be asserted without a
+   * database -- same technique as CentralRepository.lockByIdQuery. The ordering
+   * is the point: `name` alone is NOT a total order, since two devices on the
+   * same central can share a name, and under LIMIT/OFFSET the database is free
+   * to return tied rows in a different order on each page. A row that changes
+   * sides of a page boundary between two requests is silently skipped, and the
+   * device disappears from anything that walks the pages -- which is exactly
+   * what the topology view now does. `id` is the primary key, so ordering by it
+   * as well makes the order total and the paging exact.
+   *
+   * The sibling listings in this repository page the same way and share the
+   * weakness; they are left alone here because nothing walks their pages yet.
+   */
+  findByCentralIdQuery(tenantId: string, centralId: string, params?: ListDevicesParams) {
+    const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+    return db.select()
+      .from(devices)
+      .where(and(...this.findByCentralIdConditions(tenantId, centralId, params)))
+      .orderBy(devices.name, devices.id)
+      .limit(limit + 1)
+      .offset(offset);
+  }
+
+  async findByCentralId(tenantId: string, centralId: string, params?: ListDevicesParams): Promise<PaginatedResult<Device>> {
+    const limit = params?.limit || 20;
+    const offset = params?.cursor ? parseInt(params.cursor, 10) : 0;
+
+    const conditions = this.findByCentralIdConditions(tenantId, centralId, params);
 
     const [results, total] = await Promise.all([
-      db.select()
-        .from(devices)
-        .where(and(...conditions))
-        .orderBy(devices.name)
-        .limit(limit + 1)
-        .offset(offset),
+      this.findByCentralIdQuery(tenantId, centralId, params),
       countWhere(devices, conditions),
     ]);
 

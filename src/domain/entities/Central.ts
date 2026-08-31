@@ -115,6 +115,12 @@ export interface Central extends BaseEntity {
 
   // Enriched on read (list/get): the owning customer's display name and a
   // device-count summary for the "connected / total" column. Not persisted.
+  //
+  // API consumers: "connected" means REACHABLE, not "good link". The cloud-server
+  // reports three radio states (online | bad | offline) and both online and bad
+  // map to ONLINE here -- a device answering over a poor link still counts as
+  // connected. Only offline is excluded. Use the per-device signalPct from
+  // GET /centrals/:id/device-topology to tell a healthy link from a degraded one.
   customerName?: string;
   statistics?: { devicesTotal: number; devicesConnected: number };
 
