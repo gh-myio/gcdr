@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db, schema } from '../infrastructure/database/drizzle/db';
 import { Central, ConnectionStatus, createDefaultCentralConfig, createDefaultCentralStats } from '../domain/entities/Central';
 import { CreateCentralDTO, UpdateCentralDTO, ListCentralsDTO } from '../dto/request/CentralDTO';
@@ -445,6 +445,42 @@ export class CentralRepository implements ICentralRepository {
         updatedAt: new Date(timestamp),
       })
       .where(and(eq(centrals.tenantId, tenantId), eq(centrals.id, id)));
+  }
+
+  /**
+   * Persist the central's hardware board (reported by its agent on poll via the
+   * x-device-type header) into metadata.platform. Heartbeat-style: no version
+   * bump / optimistic lock (like recordHeartbeat), so it never fights the
+   * operator's update().
+   *
+   * One conditional UPDATE rather than read-then-write, for two reasons. This
+   * runs on EVERY agent poll of every central, and the board changes about once
+   * in a central's life -- a read that exists only to decide not to write is a
+   * SELECT per poll per central for nothing. And jsonb_set edits the one key in
+   * place, so a metadata field an operator changed between the read and the
+   * write is no longer overwritten by a stale copy of the whole object.
+   *
+   * `IS DISTINCT FROM` (not `<>`) so the first write, when the key is absent and
+   * the comparison would be NULL, still happens.
+   */
+  recordPlatformQuery(tenantId: string, id: string, platform: string) {
+    return db
+      .update(centrals)
+      .set({
+        metadata: sql`jsonb_set(${centrals.metadata}, '{platform}', to_jsonb(${platform}::text), true)`,
+        updatedAt: new Date(now()),
+      })
+      .where(
+        and(
+          eq(centrals.tenantId, tenantId),
+          eq(centrals.id, id),
+          sql`${centrals.metadata}->>'platform' is distinct from ${platform}`,
+        ),
+      );
+  }
+
+  async recordPlatform(tenantId: string, id: string, platform: string): Promise<void> {
+    await this.recordPlatformQuery(tenantId, id, platform);
   }
 
   // SECURITY (CR-B2): this is the operator-facing allowlist. The credential

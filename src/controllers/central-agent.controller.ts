@@ -82,6 +82,15 @@ router.patch('/restore/:jobId', async (req: Request, res: Response, next: NextFu
 router.get('/commands/next', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ctx = requireCentral(req);
+    // The agent stamps its board (raspberrypi-cm4-64 / orangepi-zero2) on every
+    // poll via x-device-type; capture it best-effort (never fail the poll) so the
+    // operator UI + SET_WIFI gate can tell CM4 from Orange Pi.
+    const deviceType =
+      typeof req.headers['x-device-type'] === 'string' ? req.headers['x-device-type'] : undefined;
+    await centralAgentService.recordPlatform(ctx, deviceType).catch(() => {
+      /* best-effort; the next poll retries */
+    });
+
     const cmd = await centralAgentService.nextCommand(ctx);
     if (!cmd) {
       sendNoContent(res);
@@ -121,7 +130,11 @@ router.patch('/commands/:commandId', async (req: Request, res: Response, next: N
         {
           entityId: result.id,
           actorType: ActorType.SYSTEM,
-          userId: `central:${ctx.centralId}`,
+          // Actor is the central (SYSTEM), not a user: leave user_id null. Passing
+          // `central:<uuid>` here is not a valid uuid and made the audit_logs insert
+          // throw (user_id is a uuid column), so EVERY command result PATCH returned
+          // 500 even though the command already committed. The central id is kept
+          // below in metadata.centralId.
           description: `Command ${result.type} on central ${ctx.centralId} ${result.status.toLowerCase()}`,
           metadata: {
             centralId: ctx.centralId,

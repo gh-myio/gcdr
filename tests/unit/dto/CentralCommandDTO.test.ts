@@ -18,6 +18,60 @@ describe('CentralCommandDTO', () => {
     it('requires type', () => {
       expect(() => CreateCommandSchema.parse({})).toThrow();
     });
+
+    it('accepts SET_WIFI with a valid payload', () => {
+      const r = CreateCommandSchema.parse({
+        type: 'SET_WIFI',
+        payload: { ssid: 'test-ssid', password: 'test-password-123', country: 'BR' },
+      });
+      expect(r.type).toBe('SET_WIFI');
+      expect(r.payload?.ssid).toBe('test-ssid');
+    });
+
+    it('rejects SET_WIFI without a payload', () => {
+      expect(() => CreateCommandSchema.parse({ type: 'SET_WIFI' })).toThrow();
+    });
+
+    it('rejects SET_WIFI with a too-short password', () => {
+      expect(() =>
+        CreateCommandSchema.parse({ type: 'SET_WIFI', payload: { ssid: 'net', password: 'short' } }),
+      ).toThrow();
+    });
+
+    // `length(2)` accepted '12' and '  '. The country reaches myio-wifi-set and
+    // ends up in the regulatory domain, so two arbitrary characters are not the
+    // same thing as two letters.
+    it('rejects a two-character country that is not two letters', () => {
+      for (const country of ['12', '  ', 'B1']) {
+        expect(() =>
+          CreateCommandSchema.parse({
+            type: 'SET_WIFI',
+            payload: { ssid: 'test-ssid', password: 'test-password-123', country },
+          }),
+        ).toThrow();
+      }
+    });
+
+    // A reboot never reads a payload, so storing one would retain a secret in a
+    // row that has no use for it. Accepting and ignoring is the worse of the two.
+    it('rejects a payload on a command that takes none', () => {
+      for (const type of ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI']) {
+        expect(() =>
+          CreateCommandSchema.parse({
+            type,
+            payload: { ssid: 'test-ssid', password: 'test-password-123' },
+          }),
+        ).toThrow();
+      }
+    });
+
+    it('normalizes the country code to upper case', () => {
+      const r = CreateCommandSchema.parse({
+        type: 'SET_WIFI',
+        payload: { ssid: 'test-ssid', password: 'test-password-123', country: 'br' },
+      });
+      expect(r.payload?.country).toBe('BR');
+    });
   });
 
   describe('UpdateCommandResultSchema', () => {

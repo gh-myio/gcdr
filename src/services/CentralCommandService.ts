@@ -10,6 +10,21 @@ import { CentralCommand } from '../infrastructure/database/drizzle/db';
 
 const TERMINAL_STATUSES = new Set(['DONE', 'FAILED']);
 
+// The SET_WIFI payload carries the WiFi password; it is written for the central
+// to consume and must never be echoed back to an operator. Strip it from every
+// operator-facing return (the central-agent path returns the payload separately).
+function stripPayload<T extends { payload?: unknown }>(cmd: T): Omit<T, 'payload'> {
+  const { payload: _payload, ...rest } = cmd;
+  return rest;
+}
+
+// Defensive redaction: remove a known secret substring from captured command
+// output before persisting it, so a tool that echoes its argument can't leak the
+// SET_WIFI password through stdout/stderr (which are not stripped from responses).
+function redactSecret(text: string, secret: string | undefined): string {
+  return secret ? text.split(secret).join('[redacted]') : text;
+}
+
 // Status may advance QUEUED -> RUNNING -> DONE/FAILED. FAILED is reachable from
 // any non-terminal state; DONE only from RUNNING (the central always claims a
 // command — QUEUED -> RUNNING — before it can report a result, so a direct
@@ -51,6 +66,19 @@ export class CentralCommandService {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
+    // CM4-only: SET_WIFI configures wpa_supplicant, which only the CM4 image
+    // ships (the OPi fleet has no myio-wifi-set). Gate on the board the central
+    // reports via its agent poll (metadata.platform). The UI hides the button
+    // too; this is the server-side backstop.
+    if (dto.type === 'SET_WIFI') {
+      const platform = String(
+        (central.metadata as Record<string, unknown> | undefined)?.platform ?? '',
+      );
+      if (!/cm4/i.test(platform)) {
+        throw new ValidationError('SET_WIFI is only supported on CM4 centrals');
+      }
+    }
+
     // Dedup guard: reject a second command while one is still in flight. Without
     // this a double-submit (or two operators) could enqueue several REBOOTs the
     // central would run back-to-back — reboot, come back, reboot again.
@@ -62,19 +90,21 @@ export class CentralCommandService {
       );
     }
 
-    return this.commands.create({
+    const created = await this.commands.create({
       tenantId,
       centralId,
       type: dto.type,
+      payload: dto.payload,
       createdBy: userId ?? null,
     });
+    return stripPayload(created);
   }
 
   async listCommands(
     tenantId: string,
     centralId: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult<CentralCommand>> {
+  ): Promise<PaginatedResult<Omit<CentralCommand, 'payload'>>> {
     const central = await this.centrals.getById(tenantId, centralId);
     if (!central) throw new NotFoundError(`Central ${centralId} not found`);
 
@@ -87,7 +117,7 @@ export class CentralCommandService {
       offset,
     });
     return {
-      items,
+      items: items.map(stripPayload),
       pagination: {
         total,
         totalPages: Math.ceil(total / limit),
@@ -99,7 +129,7 @@ export class CentralCommandService {
   async getCommand(tenantId: string, centralId: string, commandId: string) {
     const cmd = await this.commands.getById(tenantId, centralId, commandId);
     if (!cmd) throw new NotFoundError(`Command ${commandId} not found for central ${centralId}`);
-    return cmd;
+    return stripPayload(cmd);
   }
 
   /**
@@ -125,12 +155,21 @@ export class CentralCommandService {
     const patch: UpdateCommandPatch = {};
     if (dto.status) {
       patch.status = dto.status;
-      if (TERMINAL_STATUSES.has(dto.status)) patch.completedAt = new Date();
+      if (TERMINAL_STATUSES.has(dto.status)) {
+        patch.completedAt = new Date();
+        // The agent has already consumed the command; drop the SET_WIFI payload
+        // so the WiFi password is not retained in central_commands afterwards.
+        patch.payload = null;
+      }
     }
+    // Defense in depth: myio-wifi-set does not echo the password, but stdout/
+    // stderr are not stripped from operator-facing responses, so redact the
+    // SET_WIFI secret from any captured output before persisting it.
+    const secret = (cmd.payload as { password?: string } | null)?.password;
     if (dto.exitCode !== undefined) patch.exitCode = dto.exitCode;
-    if (dto.stdout !== undefined) patch.stdout = dto.stdout;
-    if (dto.stderr !== undefined) patch.stderr = dto.stderr;
-    if (dto.errorMessage !== undefined) patch.errorMessage = dto.errorMessage;
+    if (dto.stdout !== undefined) patch.stdout = redactSecret(dto.stdout, secret);
+    if (dto.stderr !== undefined) patch.stderr = redactSecret(dto.stderr, secret);
+    if (dto.errorMessage !== undefined) patch.errorMessage = redactSecret(dto.errorMessage, secret);
 
     // Compare-and-swap on the status we validated against: if the reaper (or any
     // concurrent terminal transition) changed the command between the read above
@@ -142,7 +181,11 @@ export class CentralCommandService {
         `Command ${commandId} changed concurrently (no longer ${cmd.status}); result report rejected`,
       );
     }
-    return updated;
+    // Stripped like every other return here. The caller is the central, which
+    // already holds this payload -- but a non-terminal report (QUEUED -> RUNNING)
+    // does not purge it, so without this the row's password would be echoed back
+    // out of the one path that skipped the strip.
+    return stripPayload(updated);
   }
 }
 

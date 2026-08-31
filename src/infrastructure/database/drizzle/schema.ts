@@ -894,7 +894,7 @@ export const centralRestoreJobs = pgTable('central_restore_jobs', {
 // service). The CENTRAL runs the command via its myio-gcdr-agent poll loop;
 // gcdr tracks this state machine, driven by the central's result report
 // (exit_code + stdout + stderr). See migration 0053_central_commands.sql.
-export const centralCommandTypeEnum = pgEnum('central_command_type', ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI']);
+export const centralCommandTypeEnum = pgEnum('central_command_type', ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI', 'SET_WIFI']);
 export const centralCommandStatusEnum = pgEnum('central_command_status', ['QUEUED', 'RUNNING', 'DONE', 'FAILED']);
 
 export const centralCommands = pgTable('central_commands', {
@@ -907,6 +907,10 @@ export const centralCommands = pgTable('central_commands', {
   stdout: text('stdout'),
   stderr: text('stderr'),
   errorMessage: text('error_message'),
+  // SET_WIFI carries { ssid, password, country } for the central to apply via
+  // myio-wifi-set; null for the payload-less commands. Written for the agent to
+  // consume — stripped from operator responses (never echoed back).
+  payload: jsonb('payload'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   claimedAt: timestamp('claimed_at', { withTimezone: true }),

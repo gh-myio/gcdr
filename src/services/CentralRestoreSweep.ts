@@ -20,7 +20,9 @@ const RESTORE_STALL_TIMEOUT_MS = Number(
   process.env.RESTORE_STALL_TIMEOUT_MS ?? String(20 * 60 * 1000),
 ); // 20 min — RESTORE_DB legitimately runs long and reports infrequently.
 // A reboot/restart reports (or the box comes back) within a couple of minutes;
-// a command still RUNNING after this window means the central never came back.
+// a command still RUNNING — or still QUEUED (an offline central never claimed it)
+// — after this window means the central never came back, so we fail it. Failing
+// the QUEUED orphan also unblocks the findActiveByCentral dedup guard.
 const COMMAND_STALL_TIMEOUT_MS = Number(
   process.env.COMMAND_STALL_TIMEOUT_MS ?? String(5 * 60 * 1000),
 ); // 5 min
@@ -42,9 +44,10 @@ export async function sweepStalledRestoreJobsOnce(): Promise<number> {
 }
 
 /**
- * Run a single sweep: fail RUNNING operational commands that stopped reporting
- * (the central died mid-REBOOT / restart and never PATCHed a result). Returns
- * the reaped count.
+ * Run a single sweep: fail stalled operational commands — RUNNING whose central
+ * died mid-command and never PATCHed a result, and QUEUED an offline central
+ * never claimed (which would otherwise deadlock the central's command queue).
+ * Returns the reaped count.
  */
 export async function sweepStalledCommandsOnce(): Promise<number> {
   const reaped = await centralCommandRepository.reapStalledJobs(COMMAND_STALL_TIMEOUT_MS);
