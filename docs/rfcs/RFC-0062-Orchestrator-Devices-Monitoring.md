@@ -66,10 +66,24 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 - **Liveness:** a minimal `/healthz` endpoint (or a heartbeat row) so Dokploy can health-check the worker.
 - **Graceful shutdown & backpressure:** bounded per-scan batch size; a scan never overlaps its own previous run.
 
-### 2. Monitor A — `centrals-monitor`
-- **Inputs:** the central cloud-server link/status (server-to-server, the same source `CentralTopologyService` uses today), plus `centrals.last_heartbeat_at` (RFC — Central heartbeat).
-- **Rule:** a central is `ONLINE` if the cloud WS is up **or** a heartbeat arrived within `CENTRAL_OFFLINE_AFTER` (default 5 min); else `OFFLINE`. Writes `centrals.connection_status` **only on change** (idempotent), with an audit row.
-- **Absorbs PR #19's reconcile** so the topology `GET` becomes a pure read.
+### 2. Monitor A — `centrals-monitor` (per-gateway liveness probe)
+
+- **Probe:** each gateway is reachable at its **own per-gateway tunnel host** — the central's hardware UUID is the subdomain — so the monitor issues a bounded-timeout `GET` to:
+
+  ```
+  GET https://{central.id}.y.myio.com.br/v2/slaves
+  e.g. https://295628b1-75c6-4854-8031-107cd9a2ab91.y.myio.com.br/v2/slaves
+  ```
+
+  A **2xx response ⇒ the central is `ONLINE`** (its API is up and can enumerate its slaves). A timeout, DNS/connection error, or non-2xx ⇒ `OFFLINE`. (A recent heartbeat, `centrals.last_heartbeat_at` within `CENTRAL_OFFLINE_AFTER`, is an optional secondary signal.)
+- **Per-central interval — project default, per-gateway override.** The probe runs every `CENTRAL_CHECK_INTERVAL_SECONDS` (a **project env default**, proposed **900 s / 15 min**); each central **MAY override** it with its own `check_interval_seconds` column, so a critical gateway can be probed more often and a flaky one less. The monitor schedules each central on **its own next-due time**, not one global sweep. (Distinct from the existing `centrals.frequency`, which is the central's *own* data-collection cadence — do not overload it.)
+- **Persisted on the central (new columns):**
+  - `last_gateway_check_at` (timestamptz) — when the probe last ran;
+  - `last_gateway_check_latency_ms` (int) — round-trip time, kept both for the cockpit and to **trend degradation** (a gateway answering slower over time);
+  - `connection_status` — written **only on change** (idempotent), with an RFC-0009 audit row.
+
+  Full per-probe detail (URL, HTTP status, latency, whether it caused a transition) goes to `orchestrator_devices_checks` for the cockpit's low-level view.
+- **Absorbs PR #19's reconcile** so the topology `GET` becomes a pure read; the `/v2/slaves` payload can additionally **seed the `devices-monitor`** (a bonus cross-check of which slaves the gateway currently reports).
 
 ### 3. Monitor B — `devices-monitor` (fixes M1 + M2)
 - **Connectivity (M1):** derive `devices.connectivity_status` from (a) the cloud-server per-device status, and (b) **telemetry freshness** — a device with a reading within `DEVICE_OFFLINE_AFTER` (default per device cadence, fallback 60 min) is `ONLINE`, stale is `OFFLINE`, never-seen stays `UNKNOWN`. Grouped, batched, change-only writes.
@@ -90,11 +104,13 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 | Var | Default | Meaning |
 |---|---|---|
 | `ORCH_DEVICES_ENABLE_CENTRALS` / `_DEVICES` / `_OS` | `true` | per-monitor enable flags (like the alarms `ENABLE_*_DISPATCH`) |
-| `CENTRALS_SCAN_INTERVAL_MS` / `DEVICES_` / `OS_` | 60s / 60s / 300s | scan cadence per monitor |
-| `CENTRAL_OFFLINE_AFTER` / `DEVICE_OFFLINE_AFTER` | 5m / 60m | staleness thresholds |
+| `CENTRAL_CHECK_INTERVAL_SECONDS` | **900** (15 min) | project default probe cadence; **overridable per central** via the `check_interval_seconds` column |
+| `CENTRAL_TUNNEL_HOST_TEMPLATE` | `https://{id}.y.myio.com.br` | per-gateway probe host; `{id}` = the central's UUID |
+| `CENTRAL_PROBE_PATH`, `CENTRAL_PROBE_TIMEOUT_MS` | `/v2/slaves`, `5000` | endpoint hit + bounded timeout (a hung gateway must not stall the scan) |
+| `DEVICES_SCAN_INTERVAL_MS` / `OS_SCAN_INTERVAL_MS` | 60s / 300s | scan cadence for the other two monitors |
+| `DEVICE_OFFLINE_AFTER` | 60m | device telemetry-freshness threshold |
 | `OS_SLA_*` / `OS_STALE_AFTER` | per type | work-order SLA windows |
 | `SCAN_BATCH_SIZE`, `SCAN_LEADER_LOCK` | 500, on | batching + advisory-lock HA guard |
-| `CLOUD_SERVER_BASE_URL`, service credential | — | the central cloud-server link (reused from topology) |
 
 ### 7. Admin cockpit — `/admin/orchestrator-devices` (served by the backend)
 
