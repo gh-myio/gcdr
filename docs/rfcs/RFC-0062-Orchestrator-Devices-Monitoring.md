@@ -103,8 +103,52 @@ A single timeout is **not** proof a gateway is down (a satellite/LTE hop blips).
 - **Recorded.** `orchestrator_devices_checks` logs, per probe: attempts made, which attempt succeeded (or all failed), per-attempt latency, and the policy used — so the cockpit shows *"central X: OFFLINE after 3/3 attempts under `default`"*.
 - This is the connectivity analogue of the alarm system's **hysteresis / cooldown** guards — a transient blip can't flap `connection_status` or spam OFFLINE incidents.
 
+### 2b. The `/v2/slaves` payload (one probe, two monitors)
+
+A live probe against a real gateway returns **`200` in ~2 s with a JSON array of ~199 slaves** — so the same call that proves the central is up **also carries the per-device state**, and one request feeds both the centrals- and devices-monitors. Shape (trimmed to the fields the monitors use):
+
+```jsonc
+// GET https://{central.id}.y.myio.com.br/v2/slaves  →  200, array of slaves
+[
+  {
+    "id": 106,                       // == GCDR devices.slave_id
+    "type": "outlet",                // slave hardware type
+    "name": "HIDR. SCMAL2ACACHICEBAL3",
+    "version": "6.0.0",              // central/slave firmware
+    "last_consumption": 0,           // last reading value (freshness hint)
+    "status": "online",              // ← per-device connectivity, reported by the gateway
+    "channels": [
+      { "id": 401, "type": "flow_sensor",     "channel": 1, "value": 0,   "input": 0,   "output": 0 },
+      { "id": 400, "type": "presence_sensor", "channel": 0, "value": 100, "input": 100, "output": 100 }
+    ],
+    "config": { "channelConfig": { /* channel0/1: channel_type, pulses, output */ } }
+  },
+  {
+    "id": 120,
+    "type": "three_phase_sensor",
+    "name": "3F SCMAL2ACCAGC x200 x200A",
+    "version": "6.0.0",
+    "last_consumption": 9,
+    "status": "online",
+    "channels": [],
+    "config": { "tolerance": 30, "min_variance": 20, "channelConfig": { /* … */ } }
+  }
+]
+```
+
+**How the monitors consume it:**
+- **`centrals-monitor`** — only needs the HTTP outcome: a `2xx` (under the retry policy, §2a) ⇒ `ONLINE`. The body is not required for the liveness verdict.
+- **`devices-monitor`** — reads the array and, per slave, uses:
+  - **`id`** — the `slave_id`; joined to GCDR devices by **`(central_id, slave_id)`** (channel-centric identity, RFC-0008 / migration 0029) to find the device row.
+  - **`status`** (`online` \| `offline` \| `bad`) — the **gateway-reported connectivity**, the **primary** source for `devices.connectivity_status` (far better than inferring from telemetry-freshness alone — it fixes **M1** directly). Telemetry-freshness stays a fallback for slaves the payload doesn't list.
+  - **`version`** — firmware inventory / drift detection per slave.
+  - **`last_consumption`** and **`channels[].value`** — freshness / health hints feeding `health_status` (`bad` status or a stuck value → `DEGRADED`/`CRITICAL`).
+- **Efficiency:** one `/v2/slaves` call per central per tick reconciles the central **and** all its devices — no per-device fan-out. A slave present in GCDR but **absent** from the payload is a signal too (removed / not seen); a slave in the payload but **absent** in GCDR flags an unregistered device.
+
+> Field notes from the live sample: `status` observed as `"online"`; `type` values seen include `outlet`, `three_phase_sensor`, `flow_sensor`, `presence_sensor`; `addr_low`/`addr_high` are the RF addressing; `code` was `null`. The monitor should treat unknown `type`/`status` values as pass-through (log, don't crash) since the central firmware owns this vocabulary.
+
 ### 3. Monitor B — `devices-monitor` (fixes M1 + M2)
-- **Connectivity (M1):** derive `devices.connectivity_status` from (a) the cloud-server per-device status, and (b) **telemetry freshness** — a device with a reading within `DEVICE_OFFLINE_AFTER` (default per device cadence, fallback 60 min) is `ONLINE`, stale is `OFFLINE`, never-seen stays `UNKNOWN`. Grouped, batched, change-only writes.
+- **Connectivity (M1):** the **primary** source is the per-slave **`status`** from the gateway's `/v2/slaves` payload (§2b), joined to devices by `(central_id, slave_id)` — `online`/`offline`/`bad` maps straight to `connectivity_status`. **Telemetry freshness** is the fallback for slaves the payload doesn't list: a reading within `DEVICE_OFFLINE_AFTER` (per-device cadence, fallback 60 min) is `ONLINE`, stale is `OFFLINE`, never-seen stays `UNKNOWN`. Grouped, batched, change-only writes.
 - **Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — and compute it from signals available to GCDR (connectivity, alarm state from the orchestrator, no-consumption incidents per RFC-0055, retry/error rates where exposed). `DashboardService.devices.health` stops being a mock and reads this column.
 - **Semantics:** `UNKNOWN` means *not yet observed*, never *silently healthy* — so a device the monitor cannot classify is visibly unknown, not falsely green.
 
