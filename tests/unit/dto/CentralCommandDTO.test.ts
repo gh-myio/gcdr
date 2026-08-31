@@ -52,6 +52,19 @@ describe('CentralCommandDTO', () => {
       }
     });
 
+    // A reboot never reads a payload, so storing one would retain a secret in a
+    // row that has no use for it. Accepting and ignoring is the worse of the two.
+    it('rejects a payload on a command that takes none', () => {
+      for (const type of ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI']) {
+        expect(() =>
+          CreateCommandSchema.parse({
+            type,
+            payload: { ssid: 'test-ssid', password: 'test-password-123' },
+          }),
+        ).toThrow();
+      }
+    });
+
     it('normalizes the country code to upper case', () => {
       const r = CreateCommandSchema.parse({
         type: 'SET_WIFI',

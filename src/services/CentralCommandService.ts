@@ -181,7 +181,11 @@ export class CentralCommandService {
         `Command ${commandId} changed concurrently (no longer ${cmd.status}); result report rejected`,
       );
     }
-    return updated;
+    // Stripped like every other return here. The caller is the central, which
+    // already holds this payload -- but a non-terminal report (QUEUED -> RUNNING)
+    // does not purge it, so without this the row's password would be echoed back
+    // out of the one path that skipped the strip.
+    return stripPayload(updated);
   }
 }
 

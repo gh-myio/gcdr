@@ -32,6 +32,13 @@ export const CreateCommandSchema = z
   .refine((d) => d.type !== 'SET_WIFI' || d.payload !== undefined, {
     message: 'SET_WIFI requires a payload with { ssid, password }',
     path: ['payload'],
+  })
+  // And the other way round: reboot/restart take no payload, so accepting one
+  // would write a secret into a row that never consumes it -- retention with no
+  // purpose. Rejecting is also the honest answer, since the value is ignored.
+  .refine((d) => d.type === 'SET_WIFI' || d.payload === undefined, {
+    message: 'only SET_WIFI takes a payload',
+    path: ['payload'],
   });
 export type CreateCommandDTO = z.infer<typeof CreateCommandSchema>;
 

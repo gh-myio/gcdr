@@ -281,6 +281,24 @@ describe('CentralCommandService', () => {
       expect(commands.update.mock.calls[0][2].stdout).toBe('[redacted] then [redacted] again');
     });
 
+    // The report path is the one return that used to hand the row straight back.
+    // The central already has this payload -- but a QUEUED -> RUNNING report does
+    // not purge it, so the row it echoed still carried the password.
+    it('does not return the payload to the central that reported the result', async () => {
+      const { svc } = makeService({
+        command: { ...running(), status: 'QUEUED' },
+        updateResult: {
+          id: 'cmd-1',
+          status: 'RUNNING',
+          type: 'SET_WIFI',
+          payload: { ssid: 'site-ap', password: SECRET, country: 'BR' },
+        },
+      });
+      const res = await svc.updateResult('t1', 'c1', 'cmd-1', { status: 'RUNNING' });
+      expect(res).not.toHaveProperty('payload');
+      expect(JSON.stringify(res)).not.toContain(SECRET);
+    });
+
     it('leaves the output of a command that carries no payload untouched', async () => {
       const { svc, commands } = makeService({
         command: { id: 'cmd-1', status: 'RUNNING', type: 'REBOOT', payload: null },
