@@ -85,6 +85,24 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
   Full per-probe detail (URL, HTTP status, latency, whether it caused a transition) goes to `orchestrator_devices_checks` for the cockpit's low-level view.
 - **Absorbs PR #19's reconcile** so the topology `GET` becomes a pure read; the `/v2/slaves` payload can additionally **seed the `devices-monitor`** (a bonus cross-check of which slaves the gateway currently reports).
 
+### 2a. Retry policy — the probe "policy book"
+
+A single timeout is **not** proof a gateway is down (a satellite/LTE hop blips). A probe therefore runs under a **retry policy** before any `OFFLINE` verdict: the central is marked `OFFLINE` only after the **whole retry sequence** fails; a 2xx on **any** attempt ⇒ `ONLINE`.
+
+- **A curated catalog ("book") of named policies** — a table `orchestrator_retry_policies (name, attempts jsonb, description)` so ops tune it without a deploy. `attempts` is an ordered backoff list of `{ delay_ms, timeout_ms? }`:
+
+  | policy | backoff before each attempt | total attempts |
+  |---|---|---|
+  | `strict` | `[0]` | 1 (no retry) |
+  | `default` | `[0, +5s, +15s]` | 3 |
+  | `lenient` (flaky LTE / satellite) | `[0, +10s, +30s, +60s]` | 4 |
+
+  (i.e. exactly your "try 1× at X s, then again at X+Y s, …" — expressed as an ordered, per-attempt backoff.)
+- **Per-gateway override + project default.** Each central references a policy by name via a nullable `centrals.retry_policy` column → falls back to the env default `CENTRAL_DEFAULT_RETRY_POLICY` (proposed `default`). A satellite gateway carries `lenient`; a wired one `strict`.
+- **Bounded.** The monitor caps a policy's **total wall-time** (Σ delays + timeouts) at `CENTRAL_PROBE_MAX_TOTAL_MS` so retries never stall a scan; a policy that would exceed it is clamped and flagged in the cockpit. All retries run inside the same tick.
+- **Recorded.** `orchestrator_devices_checks` logs, per probe: attempts made, which attempt succeeded (or all failed), per-attempt latency, and the policy used — so the cockpit shows *"central X: OFFLINE after 3/3 attempts under `default`"*.
+- This is the connectivity analogue of the alarm system's **hysteresis / cooldown** guards — a transient blip can't flap `connection_status` or spam OFFLINE incidents.
+
 ### 3. Monitor B — `devices-monitor` (fixes M1 + M2)
 - **Connectivity (M1):** derive `devices.connectivity_status` from (a) the cloud-server per-device status, and (b) **telemetry freshness** — a device with a reading within `DEVICE_OFFLINE_AFTER` (default per device cadence, fallback 60 min) is `ONLINE`, stale is `OFFLINE`, never-seen stays `UNKNOWN`. Grouped, batched, change-only writes.
 - **Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — and compute it from signals available to GCDR (connectivity, alarm state from the orchestrator, no-consumption incidents per RFC-0055, retry/error rates where exposed). `DashboardService.devices.health` stops being a mock and reads this column.
@@ -106,7 +124,9 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 | `ORCH_DEVICES_ENABLE_CENTRALS` / `_DEVICES` / `_OS` | `true` | per-monitor enable flags (like the alarms `ENABLE_*_DISPATCH`) |
 | `CENTRAL_CHECK_INTERVAL_SECONDS` | **900** (15 min) | project default probe cadence; **overridable per central** via the `check_interval_seconds` column |
 | `CENTRAL_TUNNEL_HOST_TEMPLATE` | `https://{id}.y.myio.com.br` | per-gateway probe host; `{id}` = the central's UUID |
-| `CENTRAL_PROBE_PATH`, `CENTRAL_PROBE_TIMEOUT_MS` | `/v2/slaves`, `5000` | endpoint hit + bounded timeout (a hung gateway must not stall the scan) |
+| `CENTRAL_PROBE_PATH`, `CENTRAL_PROBE_TIMEOUT_MS` | `/v2/slaves`, `5000` | endpoint hit + per-attempt bounded timeout (a hung gateway must not stall the scan) |
+| `CENTRAL_DEFAULT_RETRY_POLICY` | `default` | policy from the `orchestrator_retry_policies` book; **overridable per central** via `centrals.retry_policy` |
+| `CENTRAL_PROBE_MAX_TOTAL_MS` | `120000` | hard cap on a policy's total wall-time (Σ delays + timeouts) so retries can't stall a scan |
 | `DEVICES_SCAN_INTERVAL_MS` / `OS_SCAN_INTERVAL_MS` | 60s / 300s | scan cadence for the other two monitors |
 | `DEVICE_OFFLINE_AFTER` | 60m | device telemetry-freshness threshold |
 | `OS_SLA_*` / `OS_STALE_AFTER` | per type | work-order SLA windows |
