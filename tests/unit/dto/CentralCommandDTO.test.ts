@@ -38,6 +38,20 @@ describe('CentralCommandDTO', () => {
       ).toThrow();
     });
 
+    // `length(2)` accepted '12' and '  '. The country reaches myio-wifi-set and
+    // ends up in the regulatory domain, so two arbitrary characters are not the
+    // same thing as two letters.
+    it('rejects a two-character country that is not two letters', () => {
+      for (const country of ['12', '  ', 'B1']) {
+        expect(() =>
+          CreateCommandSchema.parse({
+            type: 'SET_WIFI',
+            payload: { ssid: 'test-ssid', password: 'test-password-123', country },
+          }),
+        ).toThrow();
+      }
+    });
+
     it('normalizes the country code to upper case', () => {
       const r = CreateCommandSchema.parse({
         type: 'SET_WIFI',

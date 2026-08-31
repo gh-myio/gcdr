@@ -215,4 +215,78 @@ describe('CentralCommandService', () => {
       );
     });
   });
+
+  // ---------------------------------------------------------------------
+  // The SET_WIFI secret
+  //
+  // The WiFi password is the only secret that ever reaches this service, and
+  // three things have to hold for it: it must not outlive the command, it must
+  // not come back through captured output (stdout/stderr are NOT stripped from
+  // operator-facing responses the way `payload` is), and the command carrying it
+  // must not be able to wedge the central's queue. None of the three was pinned.
+  // ---------------------------------------------------------------------
+  describe('the SET_WIFI secret', () => {
+    const SECRET = 'hunter2-hunter2';
+    const running = () => ({
+      id: 'cmd-1',
+      status: 'RUNNING',
+      type: 'SET_WIFI',
+      payload: { ssid: 'site-ap', password: SECRET, country: 'BR' },
+    });
+
+    it('purges the payload when the command reaches DONE', async () => {
+      const { svc, commands } = makeService({ command: running() });
+      await svc.updateResult('t1', 'c1', 'cmd-1', { status: 'DONE', exitCode: 0 });
+      expect(commands.update.mock.calls[0][2].payload).toBeNull();
+    });
+
+    it('purges the payload when the command reaches FAILED', async () => {
+      const { svc, commands } = makeService({ command: running() });
+      await svc.updateResult('t1', 'c1', 'cmd-1', { status: 'FAILED', exitCode: 1 });
+      expect(commands.update.mock.calls[0][2].payload).toBeNull();
+    });
+
+    it('leaves the payload in place while the command is still in flight', async () => {
+      // QUEUED -> RUNNING is the claim, not the end: the agent may still need to
+      // retry, so the network it was given is not pulled out from under it. The
+      // patch simply does not mention `payload`.
+      const { svc, commands } = makeService({ command: { ...running(), status: 'QUEUED' } });
+      await svc.updateResult('t1', 'c1', 'cmd-1', { status: 'RUNNING' });
+      expect(commands.update.mock.calls[0][2].payload).toBeUndefined();
+    });
+
+    it('redacts the password out of stdout, stderr and the error message', async () => {
+      const { svc, commands } = makeService({ command: running() });
+      await svc.updateResult('t1', 'c1', 'cmd-1', {
+        status: 'FAILED',
+        exitCode: 1,
+        stdout: `myio-wifi-set --ssid site-ap --password ${SECRET}`,
+        stderr: `wpa_supplicant rejected ${SECRET}`,
+        errorMessage: `${SECRET} was refused`,
+      });
+      const patch = commands.update.mock.calls[0][2];
+      expect(patch.stdout).toBe('myio-wifi-set --ssid site-ap --password [redacted]');
+      expect(patch.stderr).toBe('wpa_supplicant rejected [redacted]');
+      expect(patch.errorMessage).toBe('[redacted] was refused');
+      // The real assertion: nothing that is about to be written still carries it.
+      expect(JSON.stringify(patch)).not.toContain(SECRET);
+    });
+
+    it('redacts every occurrence, not only the first', async () => {
+      const { svc, commands } = makeService({ command: running() });
+      await svc.updateResult('t1', 'c1', 'cmd-1', {
+        status: 'FAILED',
+        stdout: `${SECRET} then ${SECRET} again`,
+      });
+      expect(commands.update.mock.calls[0][2].stdout).toBe('[redacted] then [redacted] again');
+    });
+
+    it('leaves the output of a command that carries no payload untouched', async () => {
+      const { svc, commands } = makeService({
+        command: { id: 'cmd-1', status: 'RUNNING', type: 'REBOOT', payload: null },
+      });
+      await svc.updateResult('t1', 'c1', 'cmd-1', { status: 'DONE', stdout: 'rebooting now' });
+      expect(commands.update.mock.calls[0][2].stdout).toBe('rebooting now');
+    });
+  });
 });

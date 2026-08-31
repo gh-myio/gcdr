@@ -51,7 +51,7 @@ describe('CentralCommandRepository.reapStalledJobs SQL shape', () => {
   const cutoff = new Date('2026-01-01T00:00:00.000Z');
   const { sql, params } = queryOf(repo.reapStalledJobsQuery(cutoff));
 
-  it('fails RUNNING commands older than the cutoff', () => {
+  it('fails stalled commands older than the cutoff', () => {
     expect(sql).toMatch(/^\s*update\s+"central_commands"/i);
     expect(sql).toMatch(/"updated_at"\s*</i);
     // status filter (RUNNING) and the new status (FAILED) are both bound params.
@@ -63,5 +63,26 @@ describe('CentralCommandRepository.reapStalledJobs SQL shape', () => {
         p instanceof Date ? p.getTime() === cutoff.getTime() : String(p).includes('2026-01-01'),
       ),
     ).toBe(true);
+  });
+
+  // A QUEUED command an offline central never claimed used to sit there for
+  // good. findActiveByCentral then rejected every new command for that central
+  // -- including the REBOOT an operator would reach for -- so one unreachable
+  // box deadlocked its own queue, with the SET_WIFI password still in the row.
+  it('reaps QUEUED as well as RUNNING, so an unclaimed command cannot deadlock the queue', () => {
+    expect(params).toContain('QUEUED');
+    expect(params).toContain('RUNNING');
+  });
+
+  // Whatever the reaper fails, it also strips: an abandoned SET_WIFI must not
+  // leave its password behind in a row nobody will ever look at again.
+  it('nulls the payload of everything it fails', () => {
+    expect(sql).toMatch(/"payload"\s*=/i);
+    expect(params).toContain(null);
+  });
+
+  it('returns what the sweep logs: the command and the central it belonged to', () => {
+    expect(sql).toMatch(/returning/i);
+    expect(sql).toMatch(/"central_id"/i);
   });
 });
