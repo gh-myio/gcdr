@@ -68,6 +68,7 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 
 ### 2. Monitor A — `centrals-monitor` (per-gateway liveness probe)
 
+- **Scope gate (master switch, per gateway).** A central enters the health-check routine **only if `centrals.monitoring_enabled = true`**. A central with it `false` is **skipped entirely** — no liveness probe, and **its devices are skipped too** (Phase 1 and Phase 2 of the devices-monitor). This lets ops roll monitoring out gateway-by-gateway (and freeze a decommissioned/in-maintenance gateway) without disabling the whole service. Default is set by `CENTRAL_MONITORING_ENABLED_DEFAULT` (env); the column overrides per central. Every scan begins by selecting only enabled centrals due for their tick.
 - **Probe:** each gateway is reachable at its **own per-gateway tunnel host** — the central's hardware UUID is the subdomain — so the monitor issues a bounded-timeout `GET` to:
 
   ```
@@ -148,9 +149,39 @@ A live probe against a real gateway returns **`200` in ~2 s with a JSON array of
 > Field notes from the live sample: `status` observed as `"online"`; `type` values seen include `outlet`, `three_phase_sensor`, `flow_sensor`, `presence_sensor`; `addr_low`/`addr_high` are the RF addressing; `code` was `null`. The monitor should treat unknown `type`/`status` values as pass-through (log, don't crash) since the central firmware owns this vocabulary.
 
 ### 3. Monitor B — `devices-monitor` (fixes M1 + M2)
-- **Connectivity (M1):** the **primary** source is the per-slave **`status`** from the gateway's `/v2/slaves` payload (§2b), joined to devices by `(central_id, slave_id)` — `online`/`offline`/`bad` maps straight to `connectivity_status`. **Telemetry freshness** is the fallback for slaves the payload doesn't list: a reading within `DEVICE_OFFLINE_AFTER` (per-device cadence, fallback 60 min) is `ONLINE`, stale is `OFFLINE`, never-seen stays `UNKNOWN`. Grouped, batched, change-only writes.
-- **Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — and compute it from signals available to GCDR (connectivity, alarm state from the orchestrator, no-consumption incidents per RFC-0055, retry/error rates where exposed). `DashboardService.devices.health` stops being a mock and reads this column.
-- **Semantics:** `UNKNOWN` means *not yet observed*, never *silently healthy* — so a device the monitor cannot classify is visibly unknown, not falsely green.
+
+Runs in **two phases per central**, right after `centrals-monitor` confirms the gateway is reachable.
+
+**Phase 1 — liveness (reuses the `/v2/slaves` probe).** The per-slave **`status`** (`online`/`offline`/`bad`) the gateway reports (§2b), joined to devices by `(central_id, slave_id)`, is the **instant** connectivity signal for `devices.connectivity_status`.
+
+**Phase 2 — telemetry pull + freshness (per slave).** For each slave the monitor then fetches its **last completed window** of readings from the gateway and persists the last real reading, per device domain:
+
+| device domain | endpoint (on `https://{central.id}.y.myio.com.br`) |
+|---|---|
+| energy / consumption | `GET /consumption/slave/{slaveId}/minute/{start}/{end}` |
+| temperature | `GET /temperature_history/slave/{slaveId}/{start}/{end}` |
+| water / pulses | consumption/pulses variant (per firmware — TBD) |
+
+`start`/`end` are URL-encoded (`%20` for the space). The consumption response is a `{ slaveId, type, values: [{ timestamp, value }] }` envelope (newest first), e.g.:
+
+```jsonc
+// GET /consumption/slave/151/minute/2026-08-31%2017:00:00/2026-08-31%2018:00:00
+{ "slaveId": 151, "type": "minute",
+  "values": [
+    { "timestamp": "2026-08-31T17:55:00.000Z", "value": 228 },
+    { "timestamp": "2026-08-31T17:00:00.000Z", "value": 228 }
+  ] }
+```
+
+- **Persist per device:** `last_timestamp_telemetry` (newest `timestamp` in the window) and `last_value_telemetry` (its `value`) — **updated only when the window actually returned data**. An **empty** window does **not** overwrite them, so a gap never clobbers the last real reading.
+- **Windowed & cursor-based.** The tick runs **after a window closes** — e.g. at ~**01:30** it fetches the **00:00–01:00** window — advancing a per-slave cursor `last_fetch_energy_telemetry`. Concretely: if the cursor is `2026-08-31 17:00:00` and there is **no data** for the slave in `16:00–17:00`, the cursor advances but `last_timestamp_telemetry`/`last_value_telemetry` are **left untouched**.
+- **Offline by freshness (default 24 h, per-slave override).** A slave with **no new data for `TELEMETRY_OFFLINE_AFTER`** (default **24 h**) ⇒ `connectivity_status = OFFLINE`, even if `/v2/slaves` still said `online`. This is a **default policy**; each slave may override it via a **freshness policy book** — `orchestrator_freshness_policies (name, offline_after, window, granularity, …)` referenced by a nullable `devices.freshness_policy` column (the same "book + per-entity override + env default" pattern as the retry policies, §2a).
+
+**Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — computed from connectivity, the gateway `status` (`bad` ⇒ `DEGRADED`), telemetry staleness (`last_timestamp_telemetry` age), alarm state (orchestrator), and no-consumption incidents (RFC-0055). `DashboardService.devices.health` stops being a mock and reads this column.
+
+**Semantics:** `UNKNOWN` means *not yet observed*, never *silently healthy* — a device the monitor cannot classify is visibly unknown, not falsely green.
+
+**New device columns (additive migration):** `connectivity_status` (exists), `health_status`, `last_timestamp_telemetry`, `last_value_telemetry`, `last_fetch_energy_telemetry` (cursor), `freshness_policy` (nullable → default). Written **only** by this service (single owner).
 
 ### 4. Monitor C — `os-monitor` (Work Orders)
 - **Inputs:** `wo_*` open orders and their SLA/lifecycle timestamps.
@@ -166,13 +197,18 @@ A live probe against a real gateway returns **`200` in ~2 s with a JSON array of
 | Var | Default | Meaning |
 |---|---|---|
 | `ORCH_DEVICES_ENABLE_CENTRALS` / `_DEVICES` / `_OS` | `true` | per-monitor enable flags (like the alarms `ENABLE_*_DISPATCH`) |
+| `CENTRAL_MONITORING_ENABLED_DEFAULT` + `centrals.monitoring_enabled` (column) | env default + per-central | **master gate** — only centrals with this on enter the routine (liveness + their devices) |
 | `CENTRAL_CHECK_INTERVAL_SECONDS` | **900** (15 min) | project default probe cadence; **overridable per central** via the `check_interval_seconds` column |
 | `CENTRAL_TUNNEL_HOST_TEMPLATE` | `https://{id}.y.myio.com.br` | per-gateway probe host; `{id}` = the central's UUID |
 | `CENTRAL_PROBE_PATH`, `CENTRAL_PROBE_TIMEOUT_MS` | `/v2/slaves`, `5000` | endpoint hit + per-attempt bounded timeout (a hung gateway must not stall the scan) |
 | `CENTRAL_DEFAULT_RETRY_POLICY` | `default` | policy from the `orchestrator_retry_policies` book; **overridable per central** via `centrals.retry_policy` |
 | `CENTRAL_PROBE_MAX_TOTAL_MS` | `120000` | hard cap on a policy's total wall-time (Σ delays + timeouts) so retries can't stall a scan |
 | `DEVICES_SCAN_INTERVAL_MS` / `OS_SCAN_INTERVAL_MS` | 60s / 300s | scan cadence for the other two monitors |
-| `DEVICE_OFFLINE_AFTER` | 60m | device telemetry-freshness threshold |
+| `TELEMETRY_WINDOW` / `TELEMETRY_GRANULARITY` | 1h / `minute` | per-slave telemetry pull window + granularity |
+| `TELEMETRY_FETCH_LAG_MINUTES` | 30 | run the pull **after** the window closes (e.g. 01:30 fetches 00:00–01:00) |
+| `TELEMETRY_OFFLINE_AFTER` | **24h** | no data for this long ⇒ device `OFFLINE`; **overridable per slave** via `devices.freshness_policy` |
+| `DEFAULT_FRESHNESS_POLICY` | `default` | policy from the `orchestrator_freshness_policies` book |
+| `TELEMETRY_ENDPOINT_ENERGY` / `_TEMPERATURE` | `/consumption/slave/{id}/minute/{s}/{e}`, `/temperature_history/slave/{id}/{s}/{e}` | per-domain pull endpoints |
 | `OS_SLA_*` / `OS_STALE_AFTER` | per type | work-order SLA windows |
 | `SCAN_BATCH_SIZE`, `SCAN_LEADER_LOCK` | 500, on | batching + advisory-lock HA guard |
 
