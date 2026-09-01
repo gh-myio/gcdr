@@ -12,7 +12,7 @@
 
 > **Implementation status (living — Phase 1 in progress on `feat/rfc-0062-orchestrator-devices`).**
 > - ✅ **Batch 1 — runtime skeleton (write-safe).** Migration `0070` (additive columns + `orchestrator_devices_{control,runs,checks}` + retry/freshness policy books, all seeded SAFE: MASTER off, shadow on, canonical/incident off) + Drizzle schema; `reserveConnection()` (db.ts); worker entrypoint (scheduler, top-down gates, heartbeat, no-overlap, graceful shutdown); per-monitor advisory lock on a reserved connection (§1); `/v2/slaves` client with tolerant Zod + retry book + error taxonomy (§4/§5). Writes nothing canonical.
-> - ⏳ **Batch 2 — monitors in shadow.** centrals-monitor (evidence only) → devices-monitor (shadow: `proposed_write` + `unknown_reason`) → sanity gate. Canonical writes + incident emission stay OFF.
+> - ✅ **Batch 2 — monitors in shadow (write-safe).** The Phase-1 device connectivity rides the centrals sweep (one `/v2/slaves` probe reconciles the central + all its slaves, no fan-out). `centralsMonitor.ts`: probe under the retry book → **evidence always written** (`last_gateway_check_*`, `probe_result`) → central + per-device status classified via the deterministic `ladder.ts` and recorded to the shadow ledger (`proposed_write` + `unknown_reason`); cascade suppression (central down ⇒ devices `CENTRAL_UNREACHABLE`, no device down-flip). `sanityGate.ts` computes the fleet-wide mass-transition guard and records it, fronting the (still-disabled) canonical apply. Canonical writes + incident emission remain OFF.
 > - ⬜ **Pending.** Enable canonical writes behind the flag (item 7) → incident emission (§8) → config/compose + tests + operator docs → cockpit (Phase 2) → telemetry fan-out (Phase 2) → os-monitor (Phase 3).
 
 ---

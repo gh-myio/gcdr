@@ -21,6 +21,7 @@ import { waitForDatabaseReady } from '../infrastructure/database/drizzle/db';
 import { workerConfig } from './orchestrator-devices/config';
 import { loadControl, heartbeat, type ControlState, type MonitorName } from './orchestrator-devices/control';
 import { withMonitorLock } from './orchestrator-devices/advisoryLock';
+import { runCentralsSweep } from './orchestrator-devices/centralsMonitor';
 
 function log(level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>): void {
   const line = { t: new Date().toISOString(), svc: 'orchestrator-devices', level, msg, ...extra };
@@ -32,11 +33,12 @@ function log(level: 'info' | 'warn' | 'error', msg: string, extra?: Record<strin
 type MonitorFn = (control: ControlState) => Promise<void>;
 
 const monitors: Record<MonitorName, MonitorFn> = {
-  centrals: async () => {
-    log('info', 'centrals-monitor: not yet implemented (batch 2) — gate+lock OK');
-  },
+  // Phase 1: one /v2/slaves probe per central reconciles the central AND all its
+  // slaves (evidence always; status/health → shadow ledger). No fan-out.
+  centrals: (control) => runCentralsSweep(control, log),
+  // Phase 2: the per-slave telemetry pull fan-out (freshness gate, full health).
   devices: async () => {
-    log('info', 'devices-monitor: not yet implemented (batch 2) — gate+lock OK');
+    log('info', 'devices-monitor: Phase 2 telemetry fan-out — not yet implemented');
   },
   os: async () => {
     log('info', 'os-monitor: Phase 3 (contract-blocked) — skipped');
