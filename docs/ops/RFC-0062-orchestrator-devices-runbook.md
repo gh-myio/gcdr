@@ -270,7 +270,7 @@ In shadow you expect `mode=shadow` and `applied=0`.
 psqlc "SELECT entity_type, entity_id, computed_state, caused_transition,
               latency_ms, policy,
               proposed_write,
-              proposed_write->>'unknown_reason' AS unknown_reason
+              proposed_write->>'unknownReason' AS unknown_reason
        FROM orchestrator_devices_checks
        WHERE run_id = (SELECT id FROM orchestrator_devices_runs ORDER BY created_at DESC LIMIT 1)
        ORDER BY entity_type, entity_id
@@ -302,9 +302,9 @@ Run a scan (Section 6). Expect proposals of **ONLINE / HEALTHY**:
 
 ```bash
 psqlc "SELECT entity_type, computed_state,
-              proposed_write->>'connection_status'   AS c_status,
-              proposed_write->>'connectivity_status' AS d_conn,
-              proposed_write->>'health_status'       AS d_health
+              proposed_write->>'connectionStatus'    AS c_status,
+              proposed_write->>'connectivityStatus'  AS d_conn,
+              proposed_write->>'healthStatus'        AS d_health
        FROM orchestrator_devices_checks
        WHERE run_id=(SELECT id FROM orchestrator_devices_runs ORDER BY created_at DESC LIMIT 1)
        ORDER BY entity_type LIMIT 10;"
@@ -321,9 +321,9 @@ tunnel is down). After the retry policy exhausts, expect:
 
 ```bash
 psqlc "SELECT entity_type, computed_state,
-              proposed_write->>'connection_status'   AS c_status,
-              proposed_write->>'connectivity_status' AS d_conn,
-              proposed_write->>'unknown_reason'      AS unknown_reason
+              proposed_write->>'connectionStatus'    AS c_status,
+              proposed_write->>'connectivityStatus'  AS d_conn,
+              proposed_write->>'unknownReason'       AS unknown_reason
        FROM orchestrator_devices_checks
        WHERE run_id=(SELECT id FROM orchestrator_devices_runs ORDER BY created_at DESC LIMIT 1)
        ORDER BY entity_type LIMIT 10;"
@@ -369,12 +369,12 @@ Quick divergence review (centrals):
 ```bash
 psqlc "SELECT c.id,
               c.connection_status                      AS current_status,
-              k.proposed_write->>'connection_status'   AS proposed_status
+              k.proposed_write->>'connectionStatus'   AS proposed_status
        FROM orchestrator_devices_checks k
        JOIN centrals c ON c.id = k.entity_id
-       WHERE k.entity_type='CENTRAL'
+       WHERE k.entity_type='central'
          AND k.run_id=(SELECT id FROM orchestrator_devices_runs ORDER BY created_at DESC LIMIT 1)
-         AND c.connection_status IS DISTINCT FROM k.proposed_write->>'connection_status';"
+         AND c.connection_status IS DISTINCT FROM k.proposed_write->>'connectionStatus';"
 ```
 
 ### Flip: shadow OFF + canonical ON (single statement, no redeploy)
