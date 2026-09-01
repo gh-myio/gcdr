@@ -2997,7 +2997,7 @@ export const orchestratorFreshnessPolicies = pgTable('orchestrator_freshness_pol
   name:                varchar('name', { length: 50 }).primaryKey(),
   mode:                varchar('mode', { length: 10 }).notNull(),   // arrival | change
   offlineAfterSeconds: integer('offline_after_seconds').notNull(),
-  window:              varchar('window', { length: 20 }),
+  windowSize:          varchar('window_size', { length: 20 }),      // "window" is reserved in Postgres
   granularity:         varchar('granularity', { length: 20 }),
   description:         text('description'),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

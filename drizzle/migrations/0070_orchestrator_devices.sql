@@ -86,13 +86,13 @@ CREATE TABLE orchestrator_freshness_policies (
   name                 varchar(50) PRIMARY KEY,
   mode                 varchar(10) NOT NULL CHECK (mode IN ('arrival','change')),
   offline_after_seconds integer NOT NULL,
-  window               varchar(20),
+  window_size          varchar(20),  -- "window" is a reserved word in Postgres
   granularity          varchar(20),
   description          text,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now()
 );
-INSERT INTO orchestrator_freshness_policies (name, mode, offline_after_seconds, window, granularity, description) VALUES
+INSERT INTO orchestrator_freshness_policies (name, mode, offline_after_seconds, window_size, granularity, description) VALUES
   ('default',      'arrival', 86400,  '1h',  'minute', 'energy/temperature — no arrival for 24h ⇒ OFFLINE (hypothesis)'),
   ('water-default','change',  259200, 'day', 'second', 'water — no reading CHANGE for 72h ⇒ stuck-or-offline (hypothesis)');
 
