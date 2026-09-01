@@ -184,6 +184,15 @@ const PAGE_HTML = `<!doctype html>
   .login-error { color:var(--bad-fg); font-size:12px; margin-bottom:10px; display:none; }
   .login-error.show { display:block; }
   .dot { color:#16a34a; } #connBadge button { margin-left:6px; }
+  .help-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9998; }
+  .help-modal.hidden { display:none; }
+  .help-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; max-width:820px; width:92%; max-height:86vh; display:flex; flex-direction:column; }
+  .help-head { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--border); }
+  .help-body { padding:6px 18px 18px; overflow-y:auto; font-size:12.5px; }
+  .help-body h3 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 6px; }
+  .help-body ul { margin:6px 0; padding-left:18px; } .help-body li { margin:4px 0; }
+  .help-tbl { width:100%; border-collapse:collapse; } .help-tbl td { border-bottom:1px solid var(--rowb); padding:5px 8px; vertical-align:top; }
+  .help-tbl td:first-child { white-space:nowrap; color:var(--accent); width:200px; }
 </style></head>
 <body>
 <header>
@@ -192,6 +201,7 @@ const PAGE_HTML = `<!doctype html>
   <label class="mut"><input type="checkbox" id="auto" checked> auto 10s</label>
   <span id="err" class="bad" style="display:none"></span>
   <span class="spacer"></span>
+  <button onclick="showHelp()" title="help">? Help</button>
   <button id="themeBtn" onclick="toggleTheme()" title="toggle light/dark">🌙 dark</button>
 </header>
 
@@ -202,6 +212,41 @@ const PAGE_HTML = `<!doctype html>
     <input type="password" id="pw" placeholder="Password" onkeypress="if(event.key==='Enter')checkPassword()">
     <div id="loginErr" class="login-error">Invalid password. Try again.</div>
     <button onclick="checkPassword()" style="width:100%">Unlock</button>
+  </div>
+</div>
+
+<div id="help-modal" class="help-modal hidden" onclick="if(event.target===this)hideHelp()">
+  <div class="help-box">
+    <div class="help-head"><b>orchestrator-devices — cockpit help</b><button onclick="hideHelp()">✕ close</button></div>
+    <div class="help-body">
+      <p>Read-only view of the RFC-0062 worker (Phase 1). It <b>only reads</b> — all flips (enable a gateway, turn on canonical writes / incidents) happen in the DB control table or via the runbook (<code>docs/ops/RFC-0062-orchestrator-devices-runbook.md</code>). Control buttons are Phase 2B.</p>
+
+      <h3>Sections</h3>
+      <ul>
+        <li><b>Summary</b> — worker state: MASTER on/off, heartbeat freshness (healthy = a recent tick), the live FLAGS, and how many gateways are enabled.</li>
+        <li><b>Recent runs</b> — one row per scan. <b>mode</b>: <span class="mode-shadow">shadow</span> (computes proposals, writes nothing canonical) · <span class="mode-canonical">canonical</span> (writes status) · <span class="mode-held">held</span> (sanity gate blocked the write). <b>applied/audited</b> = canonical writes/audit rows. <b>incidents</b> = candidates (posted/dry/disabled).</li>
+        <li><b>Divergence</b> — where the current canonical status differs from what the latest scan <i>proposed</i>. This is the shadow-vs-reality delta you review before cutover; empty = canonical already matches.</li>
+        <li><b>Checks (shadow ledger)</b> — per-entity detail: computed state, <code>proposed_write</code>, unknown_reason, latency, and the causing signal. Filter by central / customer / reason / state.</li>
+      </ul>
+
+      <h3>Flags (live in the DB, seeded SAFE)</h3>
+      <table class="help-tbl">
+        <tr><td><code>shadow_mode</code></td><td>on ⇒ computes proposals, never touches canonical columns.</td></tr>
+        <tr><td><code>canonical_writes_enabled</code></td><td>off ⇒ status columns are not written (even if shadow is off).</td></tr>
+        <tr><td><code>incident_emission_enabled</code></td><td>off ⇒ incidents are built but not posted to ALARMS (dry-run/disabled).</td></tr>
+        <tr><td><code>sanity_max_fleet_flip_pct</code></td><td>mass-transition circuit breaker: if more than this % of the fleet flips down in one tick, canonical writes are <b>held</b>.</td></tr>
+        <tr><td><code>incident_open_after_ticks</code></td><td>debounce — this many consecutive down checks before an incident opens.</td></tr>
+      </table>
+
+      <h3>States</h3>
+      <table class="help-tbl">
+        <tr><td>connectivity</td><td><b>ONLINE</b> / <b>OFFLINE</b> / <b>UNKNOWN</b></td></tr>
+        <tr><td>health</td><td><b>HEALTHY</b> / <b>DEGRADED</b> / <b>CRITICAL</b> / <b>UNKNOWN</b></td></tr>
+        <tr><td>unknown_reason</td><td><code>AWAITING_FIRST_SCAN</code> (warming up) · <code>NEVER_OBSERVED</code> (commissioning/data) · <code>SCAN_FAILED</code> (5xx/parse) · <code>CENTRAL_UNREACHABLE</code> (parent central down — cascade, not device-offline) · <code>AUTH_ERROR</code> (our credential) · <code>CONFIG_ERROR</code> (NXDOMAIN/4xx)</td></tr>
+      </table>
+
+      <p class="mut">Probe verdicts: a genuine down (timeout/conn/5xx after retries) ⇒ central OFFLINE + its devices UNKNOWN/CENTRAL_UNREACHABLE. <code>401/403</code> ⇒ AUTH_ERROR (not a down verdict). NXDOMAIN/4xx ⇒ CONFIG_ERROR. Auto-refresh is every 10s (toggle in the header). Password is the shared admin password (<code>DB_ADMIN_PASSWORD</code>).</p>
+    </div>
   </div>
 </div>
 <main>
@@ -227,6 +272,9 @@ const PAGE_HTML = `<!doctype html>
   function toggleTheme(){ const next = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
     try{ localStorage.setItem('od-theme',next); }catch(e){} applyTheme(next); }
   try{ applyTheme(localStorage.getItem('od-theme')||'light'); }catch(e){ applyTheme('light'); }
+  function showHelp(){ $('help-modal').classList.remove('hidden'); }
+  function hideHelp(){ $('help-modal').classList.add('hidden'); }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideHelp(); });
   let pw = '';
   function setConnected(on){
     $('login-modal').classList.toggle('hidden', on);
