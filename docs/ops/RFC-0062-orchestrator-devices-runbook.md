@@ -563,8 +563,30 @@ psqlc "SELECT created_at, scanned, changed, failures, notes->>'mode' AS mode
   older than `ORCH_DEVICES_LEDGER_RETENTION_DAYS` (default 7) at the end of each sweep — the
   operational ledger is bounded automatically, no separate cron. Raise the value if you need a
   longer shadow-comparison history; audit_logs is unaffected.
-- **Devices monitored:** only `status='ACTIVE'`, non-deleted devices with a `slave_id` under an
-  enabled central are classified/written. Inactive/soft-deleted devices are never touched.
+- **Scope monitored:** the worker scans only centrals with `monitoring_enabled = true`
+  **AND `status='ACTIVE'`** (archived/inactive gateways are skipped even if the flag is on);
+  within those, only devices with `status='ACTIVE'`, `deleted_at IS NULL` and a `slave_id` are
+  classified/written. The cockpit's device/central queries use the same filter, so its counts
+  match what the worker would actually touch.
+
+## 13b. Cockpit controls & auth (Phase 2A/2B)
+
+The `/admin/orchestrator-devices` cockpit is observability **plus** a first set of Phase-2B write
+controls, all `confirm()`-gated and written to `audit_logs`:
+
+| Endpoint | Action | Audit event |
+|---|---|---|
+| `PATCH /api/centrals/:id/monitoring` | per-central monitoring flag | `orchestrator_devices.central.monitoring_toggle` |
+| `PATCH /api/centrals/monitoring/bulk` | bulk enable/disable (**ACTIVE only**) | `orchestrator_devices.central.monitoring_bulk` |
+| `POST  /api/centrals/:id/recheck` | manual probe — **evidence refresh only** (writes `last_gateway_check_*`/`probe_result`, **not** the ledger, divergence or canonical status) | `orchestrator_devices.central.manual_recheck` |
+
+- **Auth decision (⚠️ pending, deliberate & temporary):** these controls are gated by
+  **`DB_ADMIN_PASSWORD`** — the same shared secret as the sibling `/admin/*` panels — **not** the
+  RFC-0062 §7 target of RBAC `orchestrator_devices.control`. Acceptable for an internal cockpit for
+  now; before this becomes a broadly-accessible surface, either implement the RBAC permission or
+  record the admin-password model as the accepted long-term auth. **Do not add heavier controls
+  (MASTER / canonical / incident flags, kick-scan) under admin-password** — those stay DB/runbook
+  only until the decision is settled.
 
 ## 14. Running the worker unit tests
 

@@ -261,7 +261,10 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     checkIntervalSeconds: centrals.checkIntervalSeconds, retryPolicy: centrals.retryPolicy,
     lastGatewayCheckAt: centrals.lastGatewayCheckAt,
     lastGatewaySuccessCheckAt: centrals.lastGatewaySuccessCheckAt,
-  }).from(centrals).where(eq(centrals.monitoringEnabled, true))) as CentralRow[];
+  }).from(centrals).where(and(
+    eq(centrals.monitoringEnabled, true),
+    eq(centrals.status, 'ACTIVE'), // never scan archived/inactive gateways, even if the flag is on
+  ))) as CentralRow[];
 
   const due = enabled
     .filter((c) => isDue(c, workerConfig.checkIntervalSeconds, workerConfig.checkJitterPct))
