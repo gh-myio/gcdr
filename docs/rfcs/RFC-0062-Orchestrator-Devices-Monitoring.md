@@ -104,7 +104,7 @@ flowchart LR
   DB --> DASH
 ```
 
-- **Deploys like the Alarm Orchestrator.** Same GCDR image; the container `command` selects `node dist/workers/orchestrator-devices.js`; a `.env.dokploy.orchestrator-devices` sets role/intervals/thresholds and the shared `DATABASE_URL`. It serves no HTTP beyond `/healthz`.
+- **Deploys like the Alarm Orchestrator.** Same GCDR image; the container `command` is `node dist/workers/orchestrator-devices.worker.js`; a `.env.dokploy.orchestrator-devices` sets intervals/thresholds and the shared `DATABASE_URL`. It serves **no HTTP** — liveness is a **DB heartbeat healthcheck** (`orchestrator-devices.healthcheck.js`, checking `MASTER.last_run_at` freshness), not an HTTP endpoint (§1).
 - **Off the request path.** Nothing in the API mutates connectivity/health anymore; the API only reads. PR #19's `GET` reconcile is put behind a flag and retired after shadow-mode validates the new writer (§9).
 - **GCDR decides, ALARMS dispatches.** The worker computes offline/degraded and pushes an incident candidate; ALARMS owns persistence, lifecycle, and the panel — exactly the split RFC-0055 already uses.
 
@@ -132,7 +132,7 @@ Rationale: liveness + connectivity is cheap and idempotent (one call reconciles 
 
 - **Worker entrypoint** `src/workers/orchestrator-devices.worker.ts` → `dist/workers/`. `package.json` gains `worker:orchestrator-devices`.
 - **Replicas — MVP runs one.** Confirmed: there is **no PgBouncer/pooler** between the GCDR app and Postgres (direct `postgres:5432`; the app uses postgres-js' in-process pool). The MVP Dokploy deploy runs **`replicas: 1`**, so **HA is an explicit non-goal for v1**. A single process with a "never overlap my own run" guard is sufficient for correctness.
-- **Advisory lock as insurance, not architecture.** Each monitor scan takes a **session-level `pg_try_advisory_lock`** on a **dedicated connection held for the leader's lifetime** — *not* a pooled connection (a pooled lock binds to a socket that can be recycled and silently lost). The codebase already reserves a socket for pinned work (`db.ts` `.reserve()` for `executeRawScript`); reuse that pattern. Advisory-lock keys are namespaced and **registered in a table in this doc** to avoid collisions. This protects only against an accidental second instance (e.g. a rolling deploy surge); it is **not** sold as HA.
+- **Advisory lock as insurance, not architecture.** Each monitor scan takes a **session-level `pg_try_advisory_lock`** on a **dedicated (reserved) connection, per scan (acquire → run → release)** — *not* a pooled connection (a pooled lock binds to a socket that can be recycled and silently lost), and not held across scans (so a reserved socket is never pinned for the process lifetime). The codebase already reserves a socket for pinned work (`db.ts` `.reserve()` for `executeRawScript`); reuse that pattern. Advisory-lock keys are namespaced and **registered in a table in this doc** to avoid collisions. This protects only against an accidental second instance (e.g. a rolling deploy surge); it is **not** sold as HA.
 - **Liveness of the worker itself.** The worker heartbeats `orchestrator_devices_control.last_run_at` every tick; an alert fires if it goes stale (**who watches the watchman** — a stalled worker must not fail silently, re-creating M2/M3).
 - **Control hierarchy (three levels, all runtime-toggleable, all audited):**
   1. **MASTER switch** — one flag stops/starts the **entire** tick. Boot default `ORCH_DEVICES_MASTER_ENABLED`; live value in a `scope='MASTER'` row read at the top of every tick.
@@ -333,7 +333,7 @@ When a device or central goes down, the worker raises an **incident candidate** 
 
 **Debounce (anti-flap).** An incident opens only after the down state **persists** beyond `INCIDENT_OPEN_AFTER` (default: 2 consecutive failed ticks / configurable minutes). A gateway that drops and returns in 2 minutes produces an **event in `orchestrator_devices_checks`, not an incident** — support is never paged for a blip.
 
-**Producer authority.** GCDR-orchestrator-devices is the **single writer of connectivity**, therefore **AUTHORITATIVE for the kinds it owns** (`CENTRAL_OFFLINE` / `DEVICE_OFFLINE` / `DEVICE_DEGRADED`). It does **not** touch `NO_CONSUMPTION` (that stays an Alarms-side producer). This closes RFC-0031's open `AUTHORITATIVE`/`PARTIAL` question for these kinds: authoritative in its own domain, not a partial contributor to another producer's kind.
+**Producer authority.** GCDR-orchestrator-devices is the single writer of connectivity, so it is **conceptually authoritative for its own status columns** — but it **posts RFC-0031 candidates as `mode=PARTIAL`** (the conservative choice, until full central coverage is proven; the implementation uses PARTIAL). It does **not** touch `NO_CONSUMPTION` (that stays an Alarms-side producer). Revisit promoting these kinds to `AUTHORITATIVE` on the wire only once coverage guarantees are established.
 
 **Enrichment.** GCDR provides the batch lookup (device name/slaveId, central name, customer name) so incident payloads and the panel don't carry raw UUIDs — the same enrichment endpoint RFC-0055 defines.
 
@@ -345,9 +345,9 @@ When a device or central goes down, the worker raises an **incident candidate** 
 
 The v1 hard cutover ("turn off the old writer, turn on the new") is rejected. The single-writer transition (§2) happens in stages:
 
-1. **Shadow.** The new worker runs and **computes** every status + incident it *would* write, logging them to `orchestrator_devices_checks` (a shadow ledger) — **without** touching the canonical columns and **without** emitting incidents. The old PR #19 GET reconcile stays **behind a flag, still writing**, so there is never a window with no writer.
+1. **Shadow.** The new worker runs and **computes** every status + incident it *would* write, logging them to `orchestrator_devices_checks` (a shadow ledger) — **without** touching the canonical columns and **without** emitting incidents. **Dependency (not yet true on this branch):** *if* PR #19 is merged with its GET reconcile behind a flag (default on), it keeps writing as the interim baseline so there is never a window with no writer during shadow. If PR #19 is not merged that way, connectivity simply stays at its last-known/`UNKNOWN` values until cutover — decide this before enabling shadow in prod.
 2. **Compare.** For **N days**, a divergence metric compares shadow vs. the current writer (and, for freshness, how many devices the 24h/72h rules *would* flag — this is also how the thresholds get **validated/calibrated** before they gate anything).
-3. **Switch.** Only when divergence is within an agreed bound, a **feature flag** promotes the worker to canonical writer and enables incident emission; the PR #19 flag is turned off in the same step.
+3. **Switch (canonical only).** Only when divergence is within an agreed bound, flip `shadow_mode=false` + `canonical_writes_enabled=true` to promote the worker to canonical writer; if PR #19's flagged reconcile is in place, turn it off in the same step. **Incident emission is NOT enabled here** — it is a **separate, later step** (§8/§10), turned on only after canonical writes are validated *and* the ALARMS `/incidents/candidates` integration is verified. Never enable canonical and incident emission in the same change.
 4. **Rollback** — see §10.
 
 ### 10. Rollback — a first-class requirement
@@ -411,8 +411,10 @@ Two classes always written to the audit log:
 | `TELEMETRY_OFFLINE_AFTER` / `WATER_STALE_AFTER` | **24h / 72h** (**hypothesis**, validated in shadow) | arrival / change freshness |
 | `SANITY_MAX_FLEET_FLIP_PCT` | `30` | mass-transition circuit breaker (§7) |
 | `INCIDENT_OPEN_AFTER` | 2 ticks | incident debounce (§8) |
-| `INCIDENTS_CANDIDATES_URL` | — | ALARMS `POST /incidents/candidates` (RFC-0031) |
-| `SHADOW_MODE` / `CANONICAL_WRITES_ENABLED` / `INCIDENT_EMISSION_ENABLED` | `true` / `false` / `false` | rollback flags (§10) |
+| `ALARMS_API_URL` / `ALARMS_API_TOKEN` | unset | ALARMS base URL + token for `POST /incidents/candidates` (RFC-0031). **Absent URL ⇒ dry-run** (candidates logged, never posted). Token via Dokploy secret, never logged. |
+| `HEALTHCHECK_MAX_STALE_MS` | `180000` | container healthcheck fails if `MASTER.last_run_at` is older than this |
+
+> **The rollback/safety switches are NOT env vars.** `shadow_mode`, `canonical_writes_enabled`, `incident_emission_enabled`, `sanity_max_fleet_flip_pct` and `incident_open_after_ticks` live in the **DB** row `orchestrator_devices_control (scope='FLAGS')`, seeded SAFE by migration 0070 and read at the top of every tick (authoritative). Flip them with a `jsonb_set` UPDATE — no redeploy (§10, runbook). `ORCH_DEVICES_MASTER_ENABLED` env is only a boot fallback used when the MASTER control row is absent.
 
 ### 15. Metrics & success criteria (not "UNKNOWN → 0")
 
@@ -433,7 +435,7 @@ Two classes always written to the audit log:
 - **New tables:** `orchestrator_devices_control` (MASTER/monitor rows, rollback flags, `last_run_at`), `orchestrator_devices_runs` (one row per scan), `orchestrator_devices_checks` (one row per entity per scan — bounded/rolled-up, also the shadow ledger), `orchestrator_retry_policies`, `orchestrator_freshness_policies`.
 - **Incidents** live in the **ALARMS** DB (RFC-0055 model), not GCDR — GCDR only produces candidates + enrichment.
 
-> Migration number: pick the next free number at implementation time (governance runbook) — do **not** hardcode one here.
+> Migration: **`drizzle/migrations/0070_orchestrator_devices.sql`** (on this branch; applied via the custom runner `npm run db:mig:up`). Additive-only.
 
 ## Drawbacks
 
