@@ -560,6 +560,10 @@ const PAGE_HTML = `<!doctype html>
     else { setConnected(false); $('pw').focus(); }
   })();
   setInterval(()=>{ if($('auto').checked && pw) load(); },10000);
+  // Fix transient narrow layout: the Nunito web-font swaps in after the first
+  // layout and can leave CSS-grid tracks stale until a reflow (a manual window
+  // resize is what "fixes" it). Force one reflow once the fonts finish loading.
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(function(){ document.body.style.display='none'; void document.body.offsetHeight; document.body.style.display=''; }); }
 </script>
 </body></html>`;
 
