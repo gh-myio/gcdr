@@ -806,6 +806,9 @@ export const centrals = pgTable('centrals', {
   checkIntervalSeconds: integer('check_interval_seconds'),
   retryPolicy: varchar('retry_policy', { length: 50 }),
   lastGatewayCheckAt: timestamp('last_gateway_check_at', { withTimezone: true }),
+  // Last SUCCESSFUL probe (OK). Distinct from lastGatewayCheckAt (last attempt);
+  // drives the cockpit "last successful sync" + the DEGRADED→OFFLINE grace window.
+  lastGatewaySuccessCheckAt: timestamp('last_gateway_success_check_at', { withTimezone: true }),
   lastGatewayCheckLatencyMs: integer('last_gateway_check_latency_ms'),
   probeResult: varchar('probe_result', { length: 40 }),
 

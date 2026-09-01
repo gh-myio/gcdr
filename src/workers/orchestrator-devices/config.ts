@@ -36,6 +36,11 @@ export const workerConfig = {
   probeMaxTotalMs: intEnv('CENTRAL_PROBE_MAX_TOTAL_MS', 120_000),
   statusToken: process.env.CLOUD_STATUS_TOKEN, // optional X-Status-Token (reused from PR #19 wiring)
 
+  // Grace window (§5): after a probe starts failing, a central is held in DEGRADED
+  // (warning) and only proposed OFFLINE once it has had NO successful sync for this
+  // many minutes. Default 5. The cockpit reads the same value to derive its display.
+  offlineGraceMin: intEnv('ORCH_DEVICES_OFFLINE_GRACE_MIN', 5),
+
   // Scheduling (§3): project-default cadence + jitter to avoid a thundering herd.
   checkIntervalSeconds: intEnv('CENTRAL_CHECK_INTERVAL_SECONDS', 900),
   checkJitterPct: intEnv('CENTRAL_CHECK_JITTER_PCT', 20),

@@ -28,6 +28,7 @@ import { probeGateway, type RetryAttempt, type RetryPolicy, type ProbeOutcome } 
 import { classifyDevice, isDeviceTransition, type Classification } from './ladder';
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
+import { centralVerdict } from './verdict';
 import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
 import { buildCandidatePayload, debounceForCandidate, emitCandidate, type DownCandidate } from './incidents';
 
@@ -42,6 +43,7 @@ interface CentralRow {
   checkIntervalSeconds: number | null;
   retryPolicy: string | null;
   lastGatewayCheckAt: Date | null;
+  lastGatewaySuccessCheckAt: Date | null;
 }
 interface DeviceRow {
   id: string;
@@ -88,28 +90,6 @@ async function loadRetryPolicies(): Promise<Map<string, RetryPolicy>> {
   return map;
 }
 
-/** Map a probe outcome to the central's proposed status + how its devices should
- *  be classified when there is no payload to classify from (auth/config/down). */
-function centralVerdict(outcome: ProbeOutcome, current: string): {
-  reachable: boolean;
-  genuineDown: boolean; // a real down (not auth/config) — the only thing that opens CENTRAL_OFFLINE
-  proposedStatus: string;
-  probeResult: string;
-  deviceFallback: Classification | null;
-} {
-  if (outcome.ok) return { reachable: true, genuineDown: false, proposedStatus: 'ONLINE', probeResult: 'OK', deviceFallback: null };
-  if (outcome.kind === 'AUTH_ERROR') {
-    return { reachable: false, genuineDown: false, proposedStatus: current, probeResult: 'AUTH_ERROR',
-      deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'AUTH_ERROR' } };
-  }
-  if (outcome.kind === 'CONFIG_ERROR') {
-    return { reachable: false, genuineDown: false, proposedStatus: current, probeResult: 'CONFIG_ERROR',
-      deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'CONFIG_ERROR' } };
-  }
-  // Genuine down (timeout / conn refused / 5xx / parse-fail after retries).
-  return { reachable: false, genuineDown: true, proposedStatus: 'OFFLINE', probeResult: outcome.kind,
-    deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'CENTRAL_UNREACHABLE' } };
-}
 
 function deviceCheckRow(runId: string, centralId: string, d: DeviceRow, cls: Classification, inputStatus: string | null, latencyMs: number, policy: string): { row: CheckInsert; transition: boolean; flipsToDown: boolean } {
   const transition = isDeviceTransition(d, cls);
@@ -134,11 +114,14 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
     maxTotalMs: workerConfig.probeMaxTotalMs,
     statusToken: workerConfig.statusToken,
   });
-  const verdict = centralVerdict(outcome, c.connectionStatus);
+  const now = new Date();
+  const verdict = centralVerdict(outcome, c.connectionStatus, c.lastGatewaySuccessCheckAt, workerConfig.offlineGraceMin * 60_000, now.getTime());
 
-  // ── Evidence (item 4) — ALWAYS written (not canonical status). ──
+  // ── Evidence (item 4) — ALWAYS written (not canonical status). last_gateway_check_at
+  //    is the last ATTEMPT; last_gateway_success_check_at is stamped ONLY on success. ──
   await db.update(centrals).set({
-    lastGatewayCheckAt: new Date(),
+    lastGatewayCheckAt: now,
+    ...(outcome.ok ? { lastGatewaySuccessCheckAt: now } : {}),
     lastGatewayCheckLatencyMs: outcome.latencyMs,
     probeResult: verdict.probeResult,
   }).where(eq(centrals.id, c.id));
@@ -150,7 +133,7 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
 
   // ── Incident candidate (item 8): only a GENUINE down opens CENTRAL_OFFLINE;
   //    AUTH_ERROR/CONFIG_ERROR never do. Debounce + emission decided by the caller. ──
-  if (verdict.genuineDown) {
+  if (verdict.genuineDown && verdict.pastGrace) {
     downCandidates.push({ kind: 'CENTRAL_OFFLINE', entityType: 'central', entityId: c.id, tenantId: c.tenantId, customerId: c.customerId, centralId: c.id, causingSignal: `probe:${verdict.probeResult}` });
   }
 
@@ -277,6 +260,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     id: centrals.id, tenantId: centrals.tenantId, customerId: centrals.customerId, connectionStatus: centrals.connectionStatus,
     checkIntervalSeconds: centrals.checkIntervalSeconds, retryPolicy: centrals.retryPolicy,
     lastGatewayCheckAt: centrals.lastGatewayCheckAt,
+    lastGatewaySuccessCheckAt: centrals.lastGatewaySuccessCheckAt,
   }).from(centrals).where(eq(centrals.monitoringEnabled, true))) as CentralRow[];
 
   const due = enabled
