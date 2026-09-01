@@ -102,8 +102,9 @@ async function attemptOnce(
       return { ok: false, kind: 'HTTP_5XX', httpStatus: res.status, message: `gateway ${res.status}` };
     }
     if (!res.ok) {
-      // Other non-2xx (4xx that is not auth) — treat as unreached-ish, retry.
-      return { ok: false, kind: 'HTTP_5XX', httpStatus: res.status, message: `unexpected status ${res.status}` };
+      // A non-auth 4xx (404/400/…) is deterministic — retrying won't help, and it
+      // is NOT a "central down" verdict; treat it as a config/contract error.
+      return { ok: false, kind: 'CONFIG_ERROR', httpStatus: res.status, message: `unexpected status ${res.status}` };
     }
 
     // Layer: valid payload — a 200 + HTML from a proxy is PARSE_FAIL, not healthy.

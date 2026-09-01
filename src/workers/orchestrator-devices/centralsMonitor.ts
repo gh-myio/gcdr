@@ -14,7 +14,7 @@
 // already sits in front of the (still-disabled) canonical apply path.
 // =============================================================================
 
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
 import { db } from '../../infrastructure/database/drizzle/db';
 import {
   centrals,
@@ -292,7 +292,12 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   const deviceRows = (await db.select({
     id: devices.id, tenantId: devices.tenantId, customerId: devices.customerId, centralId: devices.centralId, slaveId: devices.slaveId,
     connectivityStatus: devices.connectivityStatus, healthStatus: devices.healthStatus, unknownReason: devices.unknownReason,
-  }).from(devices).where(and(inArray(devices.centralId, dueIds), isNotNull(devices.slaveId), isNull(devices.deletedAt)))) as DeviceRow[];
+  }).from(devices).where(and(
+    inArray(devices.centralId, dueIds),
+    isNotNull(devices.slaveId),
+    isNull(devices.deletedAt),
+    eq(devices.status, 'ACTIVE'), // only monitor active devices — never write status on inactive ones
+  ))) as DeviceRow[];
 
   const devicesByCentral = new Map<string, DeviceRow[]>();
   for (const d of deviceRows) {
@@ -367,4 +372,15 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
     mode, applied, audited, sanityHeld: sanity.held, incidents,
   });
+
+  // Keep the operational ledger bounded (§7/§8) — never audit_logs.
+  await pruneLedger(workerConfig.ledgerRetentionDays);
+}
+
+/** Prune the high-frequency operational ledger beyond the retention window.
+ *  Cheap: both tables are indexed on their timestamp. */
+async function pruneLedger(retentionDays: number): Promise<void> {
+  const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
+  await db.delete(orchestratorDevicesChecks).where(lt(orchestratorDevicesChecks.createdAt, cutoff));
+  await db.delete(orchestratorDevicesRuns).where(lt(orchestratorDevicesRuns.startedAt, cutoff));
 }

@@ -42,6 +42,11 @@ export interface Transition {
 export interface CanonicalPlan {
   centralUpdates: { connectionStatus: string; ids: string[] }[];
   deviceUpdates: { connectivityStatus: string; healthStatus: string; unknownReason: string | null; ids: string[] }[];
+  // Connectivity edges (old != new) so we bump last(Dis)connectedAt like the
+  // DeviceRepository does — a health-only change within ONLINE must NOT re-stamp
+  // lastConnectedAt, so these are edges, not "target == ONLINE/OFFLINE".
+  deviceConnectedIds: string[]; // transitioned INTO ONLINE
+  deviceDisconnectedIds: string[]; // transitioned INTO OFFLINE
   auditRows: AuditInsert[];
 }
 
@@ -111,9 +116,18 @@ export function planCanonicalWrites(transitions: Transition[]): CanonicalPlan {
     ...deviceTs.filter((t) => !t.cascade).map((t) => auditRow(t, 'DEVICE_CONNECTIVITY_STATUS_CHANGED')),
   ];
 
+  const deviceConnectedIds = deviceTs
+    .filter((t) => t.oldValues.connectivityStatus !== 'ONLINE' && t.newValues.connectivityStatus === 'ONLINE')
+    .map((t) => t.entityId);
+  const deviceDisconnectedIds = deviceTs
+    .filter((t) => t.oldValues.connectivityStatus !== 'OFFLINE' && t.newValues.connectivityStatus === 'OFFLINE')
+    .map((t) => t.entityId);
+
   return {
     centralUpdates: [...centralByStatus].map(([connectionStatus, ids]) => ({ connectionStatus, ids })),
     deviceUpdates: [...deviceByTriple.values()].map((b) => ({ ...b.values, ids: b.ids })),
+    deviceConnectedIds,
+    deviceDisconnectedIds,
     auditRows,
   };
 }
@@ -121,9 +135,11 @@ export function planCanonicalWrites(transitions: Transition[]): CanonicalPlan {
 /** Execute a plan against the DB. Only-on-change + audit-only-on-transition are
  *  already baked into the plan (the caller passed only real transitions). */
 export async function executeCanonicalPlan(plan: CanonicalPlan): Promise<{ applied: number; audited: number }> {
+  const now = new Date();
   let applied = 0;
   for (const u of plan.centralUpdates) {
-    await db.update(centrals).set({ connectionStatus: u.connectionStatus as never }).where(inArray(centrals.id, u.ids));
+    // bump updatedAt so consumers see a fresh change stamp (not just the status).
+    await db.update(centrals).set({ connectionStatus: u.connectionStatus as never, updatedAt: now }).where(inArray(centrals.id, u.ids));
     applied += u.ids.length;
   }
   for (const u of plan.deviceUpdates) {
@@ -131,8 +147,16 @@ export async function executeCanonicalPlan(plan: CanonicalPlan): Promise<{ appli
       connectivityStatus: u.connectivityStatus as never,
       healthStatus: u.healthStatus as never,
       unknownReason: (u.unknownReason as never) ?? null,
+      updatedAt: now,
     }).where(inArray(devices.id, u.ids));
     applied += u.ids.length;
+  }
+  // Mirror DeviceRepository: stamp last(Dis)connectedAt on the connectivity edge.
+  if (plan.deviceConnectedIds.length > 0) {
+    await db.update(devices).set({ lastConnectedAt: now }).where(inArray(devices.id, plan.deviceConnectedIds));
+  }
+  if (plan.deviceDisconnectedIds.length > 0) {
+    await db.update(devices).set({ lastDisconnectedAt: now }).where(inArray(devices.id, plan.deviceDisconnectedIds));
   }
   if (plan.auditRows.length > 0) await db.insert(auditLogs).values(plan.auditRows);
   return { applied, audited: plan.auditRows.length };

@@ -451,8 +451,10 @@ Do this **only after** canonical writes are validated **and** ALARMS integration
 Set (via Dokploy env / secret; do not commit tokens):
 
 ```
-ALARMS_API_URL=https://<alarms-endpoint>
-ALARMS_API_TOKEN=<secret>
+# ALARMS_API_URL must include /api/v1 — the worker posts to
+# {ALARMS_API_URL}/incidents/candidates (i.e. .../api/v1/incidents/candidates).
+ALARMS_API_URL=https://<alarms-host>/api/v1
+ALARMS_API_TOKEN=<secret>   # never committed, never logged
 ```
 
 **With `ALARMS_API_URL` absent, the worker is in dry-run:** incident candidates are **logged as
@@ -551,3 +553,21 @@ psqlc "SELECT created_at, scanned, changed, failures, notes->>'mode' AS mode
 - Every flip in this runbook is a **DB `UPDATE`** — none require a redeploy.
 - The probe endpoint and canonical/evidence columns are the **only** ones the worker touches; do
   not assume any endpoint or column not listed here.
+- **Ledger retention:** the worker prunes `orchestrator_devices_checks` / `orchestrator_devices_runs`
+  older than `ORCH_DEVICES_LEDGER_RETENTION_DAYS` (default 7) at the end of each sweep — the
+  operational ledger is bounded automatically, no separate cron. Raise the value if you need a
+  longer shadow-comparison history; audit_logs is unaffected.
+- **Devices monitored:** only `status='ACTIVE'`, non-deleted devices with a `slave_id` under an
+  enabled central are classified/written. Inactive/soft-deleted devices are never touched.
+
+## 14. Running the worker unit tests
+
+The global Jest config enforces repo-wide coverage thresholds, so running **only** the worker
+suites reports a coverage failure even though the tests pass. Run them with coverage off:
+
+```bash
+npx jest tests/unit/workers --no-coverage
+# 4 suites, 44 tests — ladder, sanity gate, canonical apply, incidents
+```
+
+(Or run the full suite `npm run test:unit` to satisfy the global thresholds.)

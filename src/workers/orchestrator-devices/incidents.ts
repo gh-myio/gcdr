@@ -133,6 +133,7 @@ export async function emitCandidate(payload: IncidentCandidatePayload, config: E
   try {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (config.apiToken) headers.authorization = `Bearer ${config.apiToken}`; // never logged
+    // apiUrl must already include /api/v1 → posts to .../api/v1/incidents/candidates (RFC-0031).
     const res = await fetch(`${config.apiUrl.replace(/\/$/, '')}/incidents/candidates`, {
       method: 'POST', headers, body: JSON.stringify(payload),
     });

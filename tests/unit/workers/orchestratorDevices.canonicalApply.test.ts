@@ -80,6 +80,22 @@ describe('planCanonicalWrites — batching + audit-only-on-transition', () => {
     expect(offline?.ids.sort()).toEqual(['d1', 'd2']);
   });
 
+  it('computes connectivity edges for last(Dis)connectedAt (edges, not target match)', () => {
+    const reconnect: Transition = { entityType: 'device', entityId: 'd1', tenantId: 't1', centralId: 'c1',
+      oldValues: { connectivityStatus: 'OFFLINE', healthStatus: 'CRITICAL', unknownReason: null },
+      newValues: { connectivityStatus: 'ONLINE', healthStatus: 'HEALTHY', unknownReason: null }, cascade: false, causingSignal: 'gateway:online' };
+    const disconnect = deviceT('d2', 'c1', 'OFFLINE', 'CRITICAL', null); // old ONLINE → OFFLINE
+    const healthOnly: Transition = { entityType: 'device', entityId: 'd3', tenantId: 't1', centralId: 'c1',
+      oldValues: { connectivityStatus: 'ONLINE', healthStatus: 'HEALTHY', unknownReason: null },
+      newValues: { connectivityStatus: 'ONLINE', healthStatus: 'DEGRADED', unknownReason: null }, cascade: false, causingSignal: 'gateway:bad' };
+    const plan = planCanonicalWrites([reconnect, disconnect, healthOnly]);
+    expect(plan.deviceConnectedIds).toEqual(['d1']);
+    expect(plan.deviceDisconnectedIds).toEqual(['d2']);
+    // a health-only change within ONLINE is in NEITHER edge list (no re-stamp)
+    expect(plan.deviceConnectedIds).not.toContain('d3');
+    expect(plan.deviceDisconnectedIds).not.toContain('d3');
+  });
+
   it('audit carries actor SYSTEM and old/new values', () => {
     const plan = planCanonicalWrites([centralT('c1', 'OFFLINE')]);
     const row = plan.auditRows[0];

@@ -46,6 +46,10 @@ export const workerConfig = {
   // Bounded per-scan batch.
   scanBatchSize: intEnv('SCAN_BATCH_SIZE', 500),
 
+  // Ledger retention (§7/§8): the high-frequency _checks/_runs rows are pruned
+  // beyond this age so the operational ledger stays bounded (never audit_logs).
+  ledgerRetentionDays: intEnv('ORCH_DEVICES_LEDGER_RETENTION_DAYS', 7),
+
   // Incidents (§8) — ALARMS multi-source ingestion (RFC-0031). Emission is also
   // gated by the incident_emission_enabled FLAG; absent URL ⇒ dry-run/log only.
   alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://gcdr-api.a.myio-bas.com
