@@ -4,7 +4,7 @@
 - Start Date: 2026-08-31
 - RFC PR: (leave this empty)
 - Tracking Issue: (leave this empty)
-- Status: **Draft v2 — review fixes applied (idempotency scoping, sourceLabel enum, read-only wording, scope-drift guard, one-time restore confirmation, audit actor contract)**
+- Status: **Draft v3 — BMAD roundtable fixes applied**
 - Related package: `packages/backend` (GCDR)
 - Primary files (new/changed): `src/services/CentralBackupService.ts` (extend),
   `src/services/CentralBackupJobService.ts` (new), `src/services/CentralRestoreService.ts`
@@ -32,6 +32,36 @@
 > record `user_id = NULL` with the origin in metadata, never `central:<uuid>`
 > in a uuid column (R6).
 
+> **Changelog v3 (BMAD roundtable):**
+> - **W1–W5 (architecture):** upload cap cut to 4 GiB with multipart upload
+>   specified as the prerequisite to raise it (DEC-13); idempotent re-claim of
+>   a RUNNING job whose claim response was lost (DEC-5); duplicate
+>   `central_restore_jobs_idempotency_unique` index removed from the migration;
+>   legacy-flow removal replaced by a measurable gate — usage counter +
+>   kill-switch (DEC-4); retention floor: never delete a central's last
+>   `AVAILABLE` backup (DEC-12).
+> - **A1–A5 (adversarial/dev):** migration dedup (with W3); agent heartbeat
+>   MUST (≤ 5 min) + PATCH error taxonomy and typed DTOs; `request_hash`
+>   canonicalization and same-key race resolution without 500s (DEC-8);
+>   S3-delete-before-`deleted_at` ordering + Standard-IA lifecycle cost note
+>   (DEC-12).
+> - **M1–M5 (business):** *Field replacement (hardware swap)* section with an
+>   explicit field-team assumption to validate; agent rollout promoted to Q1
+>   (GA blocker); *Success metrics (v1)* subsection + quarterly restore
+>   rehearsal; *Data protection* section (LGPD deletion path, 10-min download
+>   TTL, download alerting, SSE-KMS as GA prerequisite); mandatory `reason` on
+>   restore.
+> - **P1–P5 (doc-as-contract):** audit table repaired (orphan row) with the
+>   actor contract promoted to its own subsection; glossary; RFC 2119 keywords
+>   applied to agent-contract phrases; consolidated state-transition table;
+>   end-to-end sequence diagram + JSON examples for the agent endpoints;
+>   normative 30 s poll cadence.
+
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
+**SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this
+document are to be interpreted as described in
+[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
+
 ---
 
 ## Summary
@@ -51,6 +81,23 @@ S3 cleanup sweep, and complete RFC-0009 auditing.
 GCDR remains a **broker**: it never runs `pg_dump`/`pg_restore` and the dump
 bytes never transit through it. That boundary — established by migrations
 0051/0052 and `CentralBackupService` — is preserved unchanged.
+
+### Glossary
+
+- **Central** — the on-site controller box (called "gateway" in some older
+  docs; this RFC uses *central* throughout) running embedded
+  Postgres/TimescaleDB.
+- **Agent** — the `myio-gcdr-agent` process on the central; polls GCDR and runs
+  dump/upload/restore locally (RFC-0056 auth).
+- **Job** — the orchestration record (`central_backup_jobs` /
+  `central_restore_jobs`): who asked, claim, phases, terminal status.
+- **Artifact** — the produced backup: a `central_backups` row + its S3 object.
+- **Legacy slot flow** — the pre-RFC operator-facing presigned-PUT endpoints
+  (`POST /centrals/:id/backup` + confirm), deprecated by DEC-4.
+- **Phase vs status** — *status* is the job lifecycle (QUEUED…EXPIRED); *phase*
+  is the agent's position inside a RUNNING job. Note: `QUEUED` exists in
+  **both** enums with distinct semantics (status = "not yet claimed"; phase =
+  "no work started yet").
 
 ## Motivation
 
@@ -82,7 +129,7 @@ operational and security gaps:
    this; backup/restore needs the same guard.
 5. **No cancel for backups, no tenant-wide listings, no period filters.**
    Operators asked for: list jobs in a period (from/to) across the fleet, list
-   jobs of one gateway, cancel a job.
+   jobs of one central, cancel a job.
 6. **No retention.** Backups accumulate in S3 forever; `EXPIRED` exists in the
    0051 enum but nothing ever sets it, and nothing deletes the S3 object.
 7. **No rate limit / idempotency on job creation.** A stuck frontend retry loop
@@ -120,7 +167,7 @@ is swept to `EXPIRED`; a job whose central died mid-flight is swept to `FAILED`
 
 The **artifact** (the `central_backups` row + S3 object) and the **job** (the
 orchestration record) are separate resources: the job produces the artifact.
-Listing backups of a gateway, fetching backup metadata, and minting an audited
+Listing backups of a central, fetching backup metadata, and minting an audited
 download URL all operate on the artifact, exactly as today.
 
 ### Restoring a central (operator view)
@@ -169,6 +216,46 @@ Operator (JWT / API key)                     Central (agent_secret JWT)
 GCDR touches S3 only for `HeadObject` (verify), `DeleteObject` (retention), and
 presigning. Dump bytes never enter the GCDR process.
 
+#### End-to-end sequence (happy path, re-mint, mid-upload cancel)
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator (UI / API key)
+    participant G as GCDR
+    participant A as Central agent
+    participant S3 as AWS S3
+
+    Op->>G: POST /centrals/:id/backup-jobs (Idempotency-Key)
+    G-->>Op: 201 { jobId, status: QUEUED }
+    loop SHOULD poll every 30 s
+        A->>G: GET /central-agent/backup-jobs/next
+    end
+    G-->>A: 200 { jobId, uploadUrl, storageKey, maxBytes } (claim QUEUED→RUNNING)
+    A->>A: pg_dump -Fc (phase DUMP)
+    A->>G: PATCH backup-jobs/:jobId { phase: 'DUMP' } (heartbeat, MUST ≤ 5 min)
+    A->>S3: PUT dump bytes (presigned URL)
+    alt upload URL expired mid-transfer
+        A->>G: POST backup-jobs/:jobId/upload-url (re-mint, MAY)
+        G-->>A: 200 fresh PUT URL (same storage key)
+        A->>S3: PUT dump bytes (retry)
+    end
+    alt operator cancels during UPLOAD
+        Op->>G: POST backup-jobs/:jobId/cancel
+        G-->>Op: 200 job CANCELED
+        A->>G: PATCH { phase: 'UPLOAD' } (next heartbeat)
+        G-->>A: 409 JOB_CANCELED
+        A->>A: abort upload, delete local dump
+        Note over S3: orphaned partial object swept by retention (DEC-12)
+    else upload completes
+        A->>G: PATCH { result: { sha256, byteSize } } (final report, MUST)
+        G->>S3: HeadObject (server-side VERIFY: size + cap)
+        G->>G: artifact → AVAILABLE, job → DONE
+        G-->>A: 200 job DONE
+    end
+    Op->>G: GET /centrals/:id/backup-jobs/:jobId
+    G-->>Op: 200 { status: DONE }
+```
+
 ### Decisions
 
 **DEC-1 — New `central_backup_jobs` table; `central_backups` stays the artifact
@@ -208,18 +295,42 @@ central** (claim response + a re-mint action for TTL overruns, reusing CR-S9's
 same-key/no-new-row rule). The operator-facing job creation returns **no URL**.
 This closes gap #2 by extending the restore-side F-B3 boundary to backups.
 The legacy operator-facing slot endpoints (`POST /centrals/:id/backup`,
-`.../backups/:backupId/confirm`, `.../upload-url`) are **deprecated**: kept one
-release for the transition (some centrals may self-initiate scheduled local
-backups against them with their `CENTRAL_API_KEY`), then removed. *Rejected:*
-keeping both flows indefinitely — two write paths into the same artifact table
-is how state machines rot.
+`.../backups/:backupId/confirm`, `.../upload-url`) are **deprecated** (some
+centrals may self-initiate scheduled local backups against them with their
+`CENTRAL_API_KEY`). Removal is gated on measurables, not a release count:
+(a) a per-central **usage counter** for the legacy endpoints (structured log +
+derived metric) MUST ship with this RFC, so we know who still calls them;
+(b) an env **kill-switch** (`CENTRAL_LEGACY_BACKUP_FLOW_ENABLED=false`) MUST
+allow turning the legacy flow off without a deploy;
+(c) actual removal happens only when **scheduling is delivered OR the legacy
+flow shows zero usage for 30 consecutive days — whichever comes last**.
+*Rejected:* keeping both flows indefinitely — two write paths into the same
+artifact table is how state machines rot. *Rejected (v2 → v3):* "kept one
+release, then removed" — with no usage signal that was a guess wearing a
+deadline.
 
 **DEC-5 — Separate agent routes, not a unified "next work item".**
 `GET /central-agent/backup-jobs/next` + `PATCH /central-agent/backup-jobs/:jobId`
-mirror the restore/command pairs. *Rejected:* changing `jobs/next` to return a
-`kind`-discriminated union — it breaks every deployed agent, and the poll cost
-of one extra route (~2 req/min per central, within `centralPollRateLimiter`'s
-60/min budget) is negligible.
+mirror the restore/command pairs. The agent SHOULD poll every **30 s**
+(normative cadence, replacing the earlier "~2 req/min" estimate) — well within
+`centralPollRateLimiter`'s 60/min budget even with the extra route. *Rejected:*
+changing `jobs/next` to return a `kind`-discriminated union — it breaks every
+deployed agent.
+
+**Idempotent re-claim (lost claim response).** On flaky 4G the claim response
+can be lost *after* the QUEUED→RUNNING flip commits. Therefore
+`GET /central-agent/backup-jobs/next` MUST re-deliver the central's own
+RUNNING job — same `jobId`, presigned PUT URL re-minted (CR-S9 semantics) —
+when `current_phase IN ('QUEUED', 'DUMP')` and no progress report has been
+received yet. A lost response is not a second claim; the retrying agent
+converges on the same job instead of finding an empty queue plus a job that can
+only ever stall to FAILED.
+
+**Heartbeat.** During `DUMP` and `UPLOAD` the agent MUST send a progress PATCH
+at least every **5 minutes**, even without a phase change (a `logEntry`-only
+PATCH suffices). The heartbeat is what refreshes `updated_at` — the 30-minute
+stall sweep reaps on `updated_at`, and a legitimate multi-GB upload without
+heartbeats would be indistinguishable from a dead central.
 
 **DEC-6 — Split-verb RBAC (RFC-0057 P0.3 lesson), four permissions:**
 
@@ -271,6 +382,16 @@ backup jobs vs restore jobs). Replay semantics:
   damage), **required** for restore (`400 IDEMPOTENCY_KEY_MISSING`) — a
   duplicated restore is double downtime.
 
+**Canonicalization:** `request_hash` = sha256 of the request body **after Zod
+parsing** (defaults applied, unknown keys stripped), serialized as JSON with
+keys sorted lexicographically at every level — so `{}` and an explicit
+`{ "sourceLabel": "MANUAL" }` hash identically. **Same-key race:** two
+concurrent creates with the same key both pass the pre-check; the loser hits
+`23505` on the idempotency index. That violation is caught (unwrapped from
+`DrizzleQueryError.cause`), the winning row is re-fetched, and its
+`request_hash` compared: equal → `200` with the winner's job; different →
+`409 IDEMPOTENCY_KEY_REUSE`. Never a `500`.
+
 *Rejected:* uniqueness on `(tenant_id, key)` alone — a stuck client reusing a
 key across centrals would be handed an unrelated job, which for backup/restore
 is a correctness bug, not a convenience.
@@ -292,6 +413,13 @@ replayable after a fast failure/cancel (the one-active index only prevents
 *stacking*, not sequential replays), and for the most destructive operation in
 the system a one-row table is a fair price for at-most-once semantics.
 
+**Mandatory restore `reason` (v3).** `POST /centrals/:id/restore` MUST carry a
+`reason` field — enum `HARDWARE_SWAP | DISASTER_RECOVERY | ROLLBACK | OTHER` —
+plus `reasonNote` (free text), **required when `reason = 'OTHER'`**.
+Missing/invalid → `400`. The value is persisted on the restore job row
+(migration below) and recorded in the restore audit event metadata: the most
+destructive operation in the system must never leave "why" to archaeology.
+
 **DEC-10 — Integrity gate for restore.** A backup is restorable only when
 `status = 'AVAILABLE' AND sha256 IS NOT NULL` (400 otherwise). The claim
 response already ships `sha256` + `byteSize`; the agent MUST verify the digest
@@ -312,35 +440,56 @@ size authoritative at GCDR, digest authoritative at the central.
 - Known limitation carried over from CR-S7: the limiter is per-process; numbers
   above are per-replica until the Postgres fixed-window follow-up lands.
 
-**DEC-12 — Retention & cleanup.** Policy (env-tunable, applied per central):
-keep the newest `BACKUP_RETENTION_KEEP_LAST` (default **7**) `AVAILABLE`
-backups AND delete anything older than `BACKUP_RETENTION_MAX_AGE_DAYS` (default
-**90**), whichever removes more; never delete a backup referenced by a
-non-terminal restore job. A retention sweep (same scheduler family as
-`CentralRestoreSweep`, hourly) marks rows `EXPIRED`, calls S3 `DeleteObject`,
-and audits each deletion. `PENDING` artifact rows older than 24 h (upload never
+**DEC-12 — Retention & cleanup.** Policy (env-tunable, applied per central).
+The delete predicate, explicitly: a backup is expirable when
+`rank_per_central > BACKUP_RETENTION_KEEP_LAST OR created_at < now() -
+BACKUP_RETENTION_MAX_AGE_DAYS` (rank = row number ordered by `created_at DESC`
+within the central; defaults **7** / **90 days**), and it is not referenced by
+a non-terminal restore job. **Floor:** the sweep MUST NOT delete the most
+recent `AVAILABLE` backup of a central — even one past `MAX_AGE_DAYS` — so a
+central that has sat offline for months still keeps exactly one restorable
+backup. **Delete ordering:** the sweep first marks the row `EXPIRED`; S3
+`DeleteObject` runs next, and `deleted_at` is set **only after S3 confirms the
+deletion**. Rows in `EXPIRED AND deleted_at IS NULL` are retried every tick —
+no orphan objects silently paying storage. Each deletion is audited. The
+retention sweep MUST run hourly (same scheduler family as
+`CentralRestoreSweep`). `PENDING` artifact rows older than 24 h (upload never
 confirmed) → `EXPIRED`, object deleted if present. Manual
 `DELETE /centrals/:id/backups/:backupId` requires `centrals.backup.write` +
 `confirmationToken` (destructive, RFC-0061). S3 lifecycle rules on the
-`backups/` prefix act as a belt-and-suspenders backstop at
-`MAX_AGE_DAYS + 30`. *Rejected:* relying on S3 lifecycle alone — GCDR rows
-would dangle and restore would 404 at DOWNLOAD, the worst possible moment.
+`backups/` prefix act as a belt-and-suspenders backstop at `MAX_AGE_DAYS + 30`.
+**Cost note:** a lifecycle rule transitions objects S3 Standard →
+Standard-IA after 7 days — presigned GET works identically on IA, and most
+downloads happen within days of creation. Glacier tiers are *rejected*:
+retrieval latency at the exact moment an operator needs a restore is the wrong
+trade. *Rejected:* relying on S3 lifecycle alone — GCDR rows would dangle and
+restore would 404 at DOWNLOAD, the worst possible moment.
 
-**DEC-13 — Size cap.** `CENTRAL_BACKUP_MAX_BYTES` (default **10 GiB**).
-A presigned **PUT** cannot enforce `content-length-range` (that is a POST-policy
-feature), so the cap is enforced at verify time: `HeadObject.byteSize` over the
-cap → job `FAILED`, artifact `FAILED`, object deleted. Honest limitation: an
-abusive agent can still land an oversized object for the minutes until
-verification; the per-central rate limit bounds the blast radius. *Rejected:*
-presigned POST policies — the agent-side upload code and CR-S9 re-mint flow are
-built around PUT, and the marginal win doesn't justify the churn.
+**DEC-13 — Size cap.** `CENTRAL_BACKUP_MAX_BYTES` (default **4 GiB** — not 10:
+a single presigned PUT has a hard **5 GiB** S3 object-size limit, so any cap
+above what the transport can carry would be a lie). A presigned **PUT** cannot
+enforce `content-length-range` (that is a POST-policy feature), so enforcement
+stays at verify time: `HeadObject.byteSize` over the cap → job `FAILED`,
+artifact `FAILED`, object deleted. Honest limitation: an abusive agent can
+still land an oversized object for the minutes until verification; the
+per-central rate limit bounds the blast radius.
+Dumps that may exceed 4 GiB (Moxuara's TimescaleDB is the known worst case)
+require **multipart upload**, specified here as the prerequisite for raising
+the cap: GCDR performs `CreateMultipartUpload` at claim time; the agent obtains
+per-part presigned URLs via the CR-S9-style re-mint endpoint (part number as a
+parameter); the server performs `CompleteMultipartUpload` as part of VERIFY;
+per-part retry/resume also fixes 4G connection drops mid-upload. Tracked as a
+prioritized unresolved question. *Rejected:* presigned POST policies — the
+agent-side upload code and CR-S9 re-mint flow are built around PUT, and the
+marginal win doesn't justify the churn.
 
 **DEC-14 — S3 key layout stays `backups/{tenantId}/{centralId}/{backupId}.pgdump.custom`**
 (established by 0051). `customerId` is deliberately absent: centrals can be
 moved between customers, and the tenant+central pair is the stable physical
 identity; customer scoping is enforced at the API layer (DEC-7), not the key
-layout. Bucket: SSE-S3 minimum (SSE-KMS as a future hardening), block public
-access, no bucket-level listing granted to any app principal.
+layout. Bucket: SSE-S3 from day one; **SSE-KMS is a GA prerequisite** (see
+*Data protection*), block public access, no bucket-level listing granted to any
+app principal.
 
 **DEC-15 — Backups do NOT use `file_assets`.** `file_assets` (RFC-0030) is a
 generic owner-typed store for user uploads with a scan pipeline and inline
@@ -425,6 +574,12 @@ CREATE UNIQUE INDEX "central_restore_jobs_idempotency_unique"
   ON "central_restore_jobs" ("tenant_id", "central_id", "idempotency_key")
   WHERE "idempotency_key" IS NOT NULL;
 
+-- Mandatory restore reason (DEC-9, v3). Nullable at the column level for
+-- pre-existing rows; the API layer requires it on every new restore.
+ALTER TABLE "central_restore_jobs" ADD COLUMN "reason" varchar(32)
+  CHECK ("reason" IN ('HARDWARE_SWAP','DISASTER_RECOVERY','ROLLBACK','OTHER'));
+ALTER TABLE "central_restore_jobs" ADD COLUMN "reason_note" text;
+
 -- One-time restore confirmations (DEC-9): consumed atomically at execute.
 CREATE TABLE "central_restore_confirmations" (
   "id"          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -439,9 +594,6 @@ CREATE TABLE "central_restore_confirmations" (
 );
 CREATE INDEX "central_restore_confirmations_lookup_idx"
   ON "central_restore_confirmations" ("tenant_id", "token_hash");
-CREATE UNIQUE INDEX "central_restore_jobs_idempotency_unique"
-  ON "central_restore_jobs" ("tenant_id", "idempotency_key")
-  WHERE "idempotency_key" IS NOT NULL;
 
 -- Retention bookkeeping on the artifact (DEC-12):
 ALTER TABLE "central_backups" ADD COLUMN "expires_at" timestamptz;
@@ -452,6 +604,24 @@ CREATE INDEX "central_backups_retention_idx"
 
 No changes to `central_backups`' status enum: `EXPIRED` and `FAILED` already
 exist there (0051) — this RFC finally puts them to work.
+
+### Backup job state transitions (consolidated)
+
+Consolidates DEC-2, DEC-16 and the sweeps into one contract table:
+
+| From | To | Trigger | Who may cause it |
+|---|---|---|---|
+| — | QUEUED | `POST /centrals/:id/backup-jobs` | operator (`centrals.backup.write`) |
+| QUEUED | RUNNING | atomic claim via `backup-jobs/next` | central agent |
+| QUEUED | CANCELED | `POST .../backup-jobs/:jobId/cancel` | operator (`centrals.backup.write`) |
+| QUEUED | EXPIRED | unclaimed past `BACKUP_JOB_CLAIM_TTL` (24 h) | sweep |
+| RUNNING | DONE | final report + server-side VERIFY passes | agent report → server |
+| RUNNING | FAILED | agent `error` report; VERIFY size/cap mismatch; stalled > `BACKUP_STALL_TIMEOUT_MS` | agent / server / sweep |
+| RUNNING | CANCELED | cancel endpoint (advisory — agent learns via `409 JOB_CANCELED` on its next PATCH) | operator |
+| DONE / FAILED / CANCELED / EXPIRED | — | terminal; no exits (DEC-17: retry = new job) | — |
+
+All transitions are CAS-guarded (DEC-3, DEC-16): when two writers race, exactly
+one wins and the loser receives the CAS rejection.
 
 ### API surface
 
@@ -471,7 +641,7 @@ errors: house `AppError` envelope; all listings paginated
 | `GET /central-backups?from&to&status&centralId&customerId` | `centrals.backup.read` | 200 page (hierarchy-filtered) | — |
 | `GET /centrals/:id/backups/:backupId/download-url` | `centrals.backup.download` | 200 `{downloadUrl, sha256, byteSize, expiresIn}` | 404; 400 not AVAILABLE; 429 |
 | `DELETE /centrals/:id/backups/:backupId` | `centrals.backup.write` | 204 | 404; 428 no token; 409 referenced by active restore |
-| `POST /centrals/:id/restore` | `centrals.restore.execute` | 201 job | 404; 400 backup not restorable / no sha256 / no Idempotency-Key; 428 no `confirmationToken`; 409 `RESTORE_ACTIVE`; 429 |
+| `POST /centrals/:id/restore` | `centrals.restore.execute` | 201 job | 404; 400 backup not restorable / no sha256 / no Idempotency-Key / missing `reason` (or `reasonNote` when OTHER); 428 no `confirmationToken`; 409 `RESTORE_ACTIVE`; 429 |
 | `GET /centrals/:id/restore` / `.../:jobId` | `centrals.backup.read` | 200 | 404 |
 | `PATCH /centrals/:id/restore/:jobId` (cancel-only, unchanged) | `centrals.restore.execute` | 200 | 400 non-cancel patch; 409 terminal/CAS |
 
@@ -482,9 +652,77 @@ the central only ever sees its own rows):
 |---|---|---|
 | `GET /central-agent/backup-jobs/next` | 200 `{jobId, uploadUrl, storageKey, expiresIn, maxBytes}` / 204 | atomic claim QUEUED→RUNNING; creates the `central_backups` row (PENDING) + presigned PUT |
 | `PATCH /central-agent/backup-jobs/:jobId` | 200 job | phases forward-only + CAS (DEC-3); final report carries `sha256`+`byteSize` → server VERIFY → artifact AVAILABLE, job DONE; `409 JOB_CANCELED` tells the agent to abort |
-| `POST /central-agent/backup-jobs/:jobId/upload-url` | 200 re-minted PUT URL | CR-S9 semantics: same key, no new row, RUNNING only |
+| `POST /central-agent/backup-jobs/:jobId/upload-url` | 200 re-minted PUT URL | CR-S9 semantics: same key, no new row, RUNNING only; the agent MAY re-mint on TTL overrun |
 | `GET /central-agent/jobs/next` (restore) | unchanged | |
 | `PATCH /central-agent/restore/:jobId` | unchanged | |
+
+#### Agent PATCH contract (DTOs + error taxonomy)
+
+The `PATCH /central-agent/backup-jobs/:jobId` body is a discriminated union
+(Zod shapes):
+
+```ts
+// progress / heartbeat (DUMP and UPLOAD only — see below)
+{ phase: 'DUMP' | 'UPLOAD', logEntry?: string }
+
+// final report — MUST carry both fields
+{ result: { sha256: string /* exactly 64 hex chars */, byteSize: number /* integer > 0 */ } }
+
+// failure
+{ error: { message: string } }
+```
+
+There is **no** `phase: 'VERIFY'` in the agent DTO: VERIFY is executed by the
+**server** on receipt of the final report (`HeadObject` + size/cap cross-check),
+which then sets VERIFY→DONE or FAILED. An agent sending `phase: 'VERIFY'`
+receives `400`.
+
+Error taxonomy for the agent PATCH:
+
+| Response | Meaning | Agent behavior |
+|---|---|---|
+| `409 JOB_CANCELED` | operator canceled the job | abort dump/upload, delete the local dump file |
+| `409 JOB_ALREADY_TERMINAL` | job reached DONE/FAILED/EXPIRED meanwhile | discard local state for this job |
+| `400 PHASE_REGRESSION` | reported phase is behind `current_phase` | agent bug: log loudly and abort the job locally |
+
+On cancel during `UPLOAD` the agent aborts the S3 PUT; the orphaned partial
+object is swept by the PENDING-artifact retention pass (DEC-12) — the agent
+needs no S3 delete rights.
+
+#### Agent endpoint examples
+
+`GET /central-agent/backup-jobs/next` — claim:
+
+```json
+// 200 (job claimed; 204 when there is no queued work)
+{
+  "jobId": "7c1f4e2a-9b31-4c8d-a2f0-5e6d7a8b9c0d",
+  "uploadUrl": "https://gcdr-backups.s3.amazonaws.com/backups/...&X-Amz-Signature=...",
+  "storageKey": "backups/11111111-.../e982edf9-.../7c1f4e2a-....pgdump.custom",
+  "expiresIn": 3600,
+  "maxBytes": 4294967296
+}
+```
+
+`PATCH /central-agent/backup-jobs/:jobId` — heartbeat, then final report:
+
+```json
+// request (heartbeat during UPLOAD)
+{ "phase": "UPLOAD", "logEntry": "uploaded 1.2 GiB of 3.1 GiB" }
+
+// request (final report)
+{ "result": { "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "byteSize": 3328599452 } }
+
+// response 200 (after server-side VERIFY)
+{ "jobId": "7c1f4e2a-9b31-4c8d-a2f0-5e6d7a8b9c0d", "status": "DONE", "currentPhase": "DONE" }
+```
+
+`POST /central-agent/backup-jobs/:jobId/upload-url` — re-mint:
+
+```json
+// 200
+{ "uploadUrl": "https://gcdr-backups.s3.amazonaws.com/backups/...&X-Amz-Signature=...", "expiresIn": 3600 }
+```
 
 ### Authorization matrix (RFC-0057 format)
 
@@ -517,14 +755,16 @@ New `EventType`s (existing `CENTRAL_BACKUP_INITIATED/CONFIRMED/DOWNLOADED` and
 | `CENTRAL_BACKUP_DOWNLOADED` | download-url mint (existing, kept) | operator |
 | `CENTRAL_BACKUP_DELETED` | manual delete or retention sweep (metadata: which) | operator / SYSTEM |
 | `CENTRAL_RESTORE_CONFIRMATION_ISSUED` | 428 token handout | operator |
+| `CENTRAL_RESTORE_CANCELED` | operator cancel | operator |
 
-**Actor contract for SYSTEM events (R6):** when the actor is the central agent
-or a sweep — not a human — the audit row records **`user_id = NULL`** and the
-origin goes in `metadata`, e.g. `{ "origin": "central", "centralId": "<uuid>" }`
-or `{ "origin": "sweep", "sweep": "backup-retention" }`. Never encode
+#### Actor contract (R6)
+
+When the actor is the central agent or a sweep — not a human — the audit row
+records **`user_id = NULL`** and the origin goes in `metadata`, e.g.
+`{ "origin": "central", "centralId": "<uuid>" }` or
+`{ "origin": "sweep", "sweep": "backup-retention" }`. Never encode
 `central:<uuid>` (or any prefixed string) into a uuid-typed actor column — that
 exact pattern has broken audit writes in this codebase before.
-| `CENTRAL_RESTORE_CANCELED` | operator cancel | operator |
 
 Outcome events follow the command-result precedent (audit the outcome, not just
 the intent — see `central-agent.controller.ts` command PATCH).
@@ -552,11 +792,72 @@ the intent — see `central-agent.controller.ts` command PATCH).
 All isolated per-tick via `Promise.allSettled` like the existing sweeps; each
 exported as a `-Once()` function for cron/serverless drive.
 
+### Success metrics (v1)
+
+The feature is working when, per tenant:
+
+1. **Coverage:** ≥ **95%** of active centrals have an `AVAILABLE` backup newer
+   than 7 days.
+2. **Reliability:** job success rate `DONE / (DONE + FAILED + EXPIRED)` >
+   **90%**.
+3. **Latency:** median time from job creation to artifact `AVAILABLE`
+   (tracked; no hard target in v1 — this release establishes the baseline).
+
+Plus one process metric: a **quarterly restore rehearsal** on a reference
+central (dry-run restore of its latest backup) — a backup that has never been
+restored is a hypothesis, not a backup. The **"unprotected centrals" report**
+(centrals with no `AVAILABLE` backup < 7 days — the feed for metric 1) is a
+SHOULD for v1, promoted from *Future possibilities*: coverage you cannot see
+is coverage you do not have.
+
+## Field replacement (hardware swap)
+
+The dominant real-world restore scenario is a dead or degraded box being
+swapped in the field. The intended contract: **RFC-0056 re-enrollment binds
+the replacement hardware to the *same logical central*** — per RFC-0005 the
+`serialNumber` is the immutable logical identity (the `id` UUID and hardware
+details track it). Under that model the new box polls as the same
+`central_id`, so the existing **same-central restore** (0052's identity
+binding) covers hardware swap with no cross-central machinery: swap the box,
+re-enroll, restore the latest backup.
+
+> **Assumption to validate with the field team before implementation:** does
+> every deployment procedure actually re-enroll the replacement box as the
+> same logical central? If any real procedure creates a **new** central row on
+> swap (new serial → new row), the same-central binding makes every backup of
+> the old row unreachable exactly when it is needed most — and **cross-central
+> restore (Q3) is promoted to P0** for this feature to deliver its core value.
+
+## Data protection
+
+A backup is the customer's entire database; that deserves an explicit
+section, not scattered footnotes.
+
+- **LGPD / offboarding.** There MUST be a deletion path for *all* backups of a
+  given customer: enumerate the customer's centrals
+  (`centrals.customer_id`), then delete every `central_backups` row + S3
+  object through the same audit-and-S3-first machinery as retention (DEC-12).
+  v1 ships this as a documented **runbook** (SQL + sweep invocation); an admin
+  endpoint (`DELETE /customers/:id/central-backups`) is OPTIONAL and may
+  follow.
+- **Download URL TTL.** The presigned **GET** (download) TTL is **10 minutes**
+  — a download starts immediately or not at all. The presigned **PUT**
+  (upload) keeps its 1 h TTL: a multi-GB upload over 4G legitimately needs it
+  (and can re-mint).
+- **Download alerting.** The audit stream (`CENTRAL_BACKUP_DOWNLOADED`) MUST
+  feed an alert on more than N download-URL mints per day by a single
+  principal (default N = 5, env-tunable) — bulk exfiltration of dumps looks
+  exactly like this.
+- **SSE-KMS is a GA prerequisite** (reclassified from "future hardening"):
+  bucket-wide SSE-S3 is the day-one floor, but KMS key rotation is the only
+  real remediation for a leaked-presigned-URL pattern; GA does not ship
+  without it.
+
 ## Drawbacks
 
 - **Two backup entry paths during the deprecation window** (legacy slot flow +
   jobs) — mitigated by both funneling into the same artifact rows and CR-S4
-  verification, and by a hard removal date (DEC-4).
+  verification, and by the measurable removal gate + kill-switch (DEC-4).
 - **Agent firmware coupling**: the job flow only works once the fleet's
   `myio-gcdr-agent` ships the backup poll. Old agents simply never claim; jobs
   expire visibly (EXPIRED), which is at least honest.
@@ -607,24 +908,36 @@ exported as a `-Once()` function for cron/serverless drive.
 
 ## Unresolved questions
 
-1. **Scheduled backups** — should GCDR own cron-like per-central schedules
-   (e.g. nightly), or does the central's local cron keep initiating via its
-   API key? Deliberately out of scope; the jobs API is schedule-ready (a
-   scheduler is just another creator principal).
-2. **Cross-central restore** (restore central B from central A's backup) — 0052
+1. **Agent rollout sequencing (GA blocker — promoted from last place).** The
+   job flow delivers zero value until the fleet's `myio-gcdr-agent` ships the
+   backup poll: an old agent never claims, and every job an operator creates
+   just dies `EXPIRED` 24 h later. This RFC MUST NOT be declared GA without a
+   rollout plan carrying a measurable milestone — **% of the fleet on a
+   backup-poll-capable agent version** — as the GA criterion; the plan also
+   answers whether legacy-flow removal waits for full penetration or the DEC-4
+   kill-switch suffices.
+2. **Multipart upload for > 4 GiB dumps** (DEC-13, prioritized) — the
+   `CreateMultipartUpload` / per-part re-mint / server-side
+   `CompleteMultipartUpload` flow is sketched but not costed; it is the
+   prerequisite for raising `CENTRAL_BACKUP_MAX_BYTES`, and Moxuara-class
+   TimescaleDB dumps are the forcing function.
+3. **Cross-central restore** (restore central B from central A's backup) — 0052
    binds backup and target to the same central id (field-swap identity model).
    Real demand exists for "clone a config to a new site"; needs its own RFC
-   (identity, serials, MQTT credentials cannot be blindly restored).
-3. **SSE-KMS + per-tenant key material** for the `backups/` prefix — security
-   hardening not costed here.
+   (identity, serials, MQTT credentials cannot be blindly restored) — and it
+   becomes **P0** if the field-swap assumption fails validation (see *Field
+   replacement*).
 4. **Multi-replica rate limiting** — the Postgres fixed-window store (CR-S7
    follow-up) becomes more pressing once fleet-wide backup schedules exist.
-5. **Exact retention defaults** (7 / 90 days / 10 GiB) are proposals pending
+5. **Exact retention defaults** (7 / 90 days / 4 GiB) are proposals pending
    ops sizing against real dump sizes (Moxuara's TimescaleDB is the reference
    worst case).
-6. **Agent rollout sequencing** — which firmware version ships the backup poll,
-   and whether the legacy slot flow's removal must wait for full fleet
-   penetration or an env kill-switch suffices.
+6. **Scheduled backups** — should GCDR own cron-like per-central schedules
+   (e.g. nightly), or does the central's local cron keep initiating via its
+   API key? Deliberately down-ranked (was Q1): the dominant job-to-be-done is
+   the **on-demand backup before a risky operation** — the `sourceLabel` enum
+   (`PRE_FIRMWARE_UPGRADE`, `PRE_RESTORE`) is the tell. The jobs API stays
+   schedule-ready (a scheduler is just another creator principal).
 
 ## Future possibilities
 
@@ -637,5 +950,6 @@ exported as a `-Once()` function for cron/serverless drive.
 - Frontend: a Backup & Restore tab on the central detail page (gcdr-frontend),
   driven entirely by this API.
 - Prometheus metrics endpoint formalizing the counters in *Observability*.
-- Extending `central-backup-jobs` tenant-wide listing with fleet KPIs (success
-  rate, last-good-backup age per central — an "unprotected centrals" report).
+- Extending `central-backup-jobs` tenant-wide listing with richer fleet KPIs
+  (the "unprotected centrals" report itself moved into v1 as a SHOULD — see
+  *Success metrics (v1)*).
