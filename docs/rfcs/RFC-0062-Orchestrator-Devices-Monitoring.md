@@ -60,6 +60,11 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 ### 1. Deployment & runtime shape (mirrors the alarm-orchestrator)
 
 - **New worker entrypoint** `src/workers/orchestrator-devices.worker.ts`, built into `dist/workers/`. `package.json` gains `worker:orchestrator-devices`.
+- **Control hierarchy (three levels, all runtime-toggleable, all audited).** Every tick is gated top-down:
+  1. **MASTER switch** — one flag stops/starts the **entire** tick (all monitors, all gateways). Boot default from `ORCH_DEVICES_MASTER_ENABLED` (env); the live value is a `scope='MASTER'` row in `orchestrator_devices_control` that the worker reads at the top of every tick and the cockpit toggles at runtime. Master `off` ⇒ the worker idles (no probes, no writes).
+  2. **Per-monitor switch** — enable/disable `centrals` / `devices` / `os` individually (`scope='CENTRALS'|'DEVICES'|'OS'` rows; env default `ORCH_DEVICES_ENABLE_*`).
+  3. **Per-gateway switch** — `centrals.monitoring_enabled` (§2), gating a single central and its devices.
+  A tick runs a monitor only when **master ∧ monitor ∧ (per-gateway)** are all on. Every one of these toggles is an **audited** event (see §8).
 - **Dokploy container**: same image as the GCDR API, `command: ["node","dist/workers/orchestrator-devices.js"]`, own `.env.dokploy.orchestrator-devices`, shares the GCDR Postgres. Added to `docker-compose.dokploy.yml` as a sibling of the API (like `orchestrator-worker`/`dispatcher-worker` there).
 - **Leader lock (HA-safe):** each monitor scan acquires a **Postgres advisory lock** (`pg_try_advisory_lock`) keyed per monitor, so running >1 replica never double-scans. No new infra required.
 - **Queue (optional, phase 2):** for event-driven work and retries, reuse the alarm stack's **Redis/BullMQ** with a DLQ; the MVP is a timer loop + advisory lock and needs no Redis.
@@ -208,8 +213,9 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 ### 6. Configuration (`.env.dokploy.orchestrator-devices`)
 | Var | Default | Meaning |
 |---|---|---|
-| `ORCH_DEVICES_ENABLE_CENTRALS` / `_DEVICES` / `_OS` | `true` | per-monitor enable flags (like the alarms `ENABLE_*_DISPATCH`) |
-| `CENTRAL_MONITORING_ENABLED_DEFAULT` + `centrals.monitoring_enabled` (column) | env default + per-central | **master gate** — only centrals with this on enter the routine (liveness + their devices) |
+| `ORCH_DEVICES_MASTER_ENABLED` + `orchestrator_devices_control` (scope=`MASTER`) | env boot default + runtime row | **MASTER switch** — stops/starts the entire tick (all monitors, all gateways); toggled live from the cockpit, audited |
+| `ORCH_DEVICES_ENABLE_CENTRALS` / `_DEVICES` / `_OS` | `true` | per-monitor enable (boot default; runtime rows `scope=CENTRALS\|DEVICES\|OS`) |
+| `CENTRAL_MONITORING_ENABLED_DEFAULT` + `centrals.monitoring_enabled` (column) | env default + per-central | per-gateway gate — only centrals with this on enter the routine (liveness + their devices) |
 | `CENTRAL_CHECK_INTERVAL_SECONDS` | **900** (15 min) | project default probe cadence; **overridable per central** via the `check_interval_seconds` column |
 | `CENTRAL_TUNNEL_HOST_TEMPLATE` | `https://{id}.y.myio.com.br` | per-gateway probe host; `{id}` = the central's UUID |
 | `CENTRAL_PROBE_PATH`, `CENTRAL_PROBE_TIMEOUT_MS` | `/v2/slaves`, `5000` | endpoint hit + per-attempt bounded timeout (a hung gateway must not stall the scan) |
@@ -244,6 +250,17 @@ A self-contained HTML console **served by the GCDR API process**, in the exact f
 **Auth:** gated exactly like the other `/admin/*` cockpits — master key / `DISABLE_AUTH` operator path only (never a customer key); the cockpit is an internal operator tool, not a customer surface.
 
 **Data model for observability:** two small tables owned by this service — `orchestrator_devices_runs` (one row per scan) and `orchestrator_devices_checks` (one row per entity per scan, retained N days / rolled up), plus a `orchestrator_devices_control` row per monitor. These are the cockpit's source of truth and keep the low-level detail **out of `audit_logs`** (audit keeps only state-change events, per RFC-0009 / RFC-0060).
+
+### 8. Auditing — every control action and every transition is logged (RFC-0009)
+
+Auditing is a **cross-cutting requirement, not optional**. Two classes of event are written to the RFC-0009 audit log, always:
+
+- **Control actions** — the MASTER toggle, any per-monitor toggle, per-gateway `monitoring_enabled`, and any runtime override (interval, threshold, retry/freshness policy, pause/resume, kick-a-scan). Each records **actor** (the JWT operator, or `SYSTEM` for autonomous changes), **action**, **target** (scope / central / device / OS), **old → new** value, `requestId`, and timestamp. "Who turned monitoring off for gateway X, and when" is always answerable.
+- **State transitions** — every **on-change** write of `connection_status`, `connectivity_status`, `health_status`, plus each OS SLA breach / escalation raised, is audited with the **signal that caused it** (e.g. "central X → OFFLINE after 3/3 probe attempts under `default`"; "device Y → OFFLINE, no change in `reading` for 74 h").
+
+**Separation of concerns (per RFC-0060):** `audit_logs` holds only these **meaningful events** (control + transitions). The **high-frequency per-check detail** (every probe/pull, including no-ops where nothing changed) goes to `orchestrator_devices_checks` / `_runs` (bounded, rolled-up) — never to `audit_logs`, which must stay the "who changed what" ledger and not be flooded by scan noise.
+
+**Actor model:** operator-initiated control carries the authenticated user; autonomous reconciles carry a dedicated `SYSTEM`/service actor id — both are first-class, filterable actors in audit.
 
 ## Drawbacks
 
