@@ -52,7 +52,7 @@ export const workerConfig = {
 
   // Incidents (§8) — ALARMS multi-source ingestion (RFC-0031). Emission is also
   // gated by the incident_emission_enabled FLAG; absent URL ⇒ dry-run/log only.
-  alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://gcdr-api.a.myio-bas.com
+  alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://<alarms-host>/api/v1 (must include /api/v1)
   alarmsApiToken: process.env.ALARMS_API_TOKEN, // never logged
 } as const;
 

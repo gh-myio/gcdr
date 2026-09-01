@@ -567,7 +567,7 @@ suites reports a coverage failure even though the tests pass. Run them with cove
 
 ```bash
 npx jest tests/unit/workers --no-coverage
-# 4 suites, 44 tests — ladder, sanity gate, canonical apply, incidents
+# 5 suites, 51 tests — ladder, sanity gate, canonical apply, incidents, gateway client
 ```
 
 (Or run the full suite `npm run test:unit` to satisfy the global thresholds.)
