@@ -132,7 +132,9 @@ export async function emitCandidate(payload: IncidentCandidatePayload, config: E
   }
   try {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
-    if (config.apiToken) headers.authorization = `Bearer ${config.apiToken}`; // never logged
+    // ALARMS ingestion authenticates the M2M key via X-API-Key (not Bearer, which it
+    // reserves for JWTs). ALARMS_API_TOKEN is an API key, so send it as X-API-Key. (never logged)
+    if (config.apiToken) headers['x-api-key'] = config.apiToken;
     // apiUrl must already include /api/v1 → posts to .../api/v1/incidents/candidates (RFC-0031).
     const res = await fetch(`${config.apiUrl.replace(/\/$/, '')}/incidents/candidates`, {
       method: 'POST', headers, body: JSON.stringify(payload),

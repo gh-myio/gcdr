@@ -87,6 +87,15 @@ describe('incidents — emitCandidate (flag gate, dry-run, never throws, no toke
     expect(fetchMock).toHaveBeenCalledWith('https://alarms/incidents/candidates', expect.objectContaining({ method: 'POST' }));
   });
 
+  it('authenticates via X-API-Key (ALARMS ingestion), not Authorization/Bearer', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 202 });
+    const cfg: EmitConfig = { emissionEnabled: true, apiUrl: 'https://alarms', apiToken: TOKEN };
+    await emitCandidate(payload, cfg, log);
+    const headers = (fetchMock.mock.calls[0][1] as { headers: Record<string, string> }).headers;
+    expect(headers['x-api-key']).toBe(TOKEN);
+    expect(headers.authorization).toBeUndefined();
+  });
+
   it('non-2xx → "failed" (does not throw)', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 500 });
     const cfg: EmitConfig = { emissionEnabled: true, apiUrl: 'https://alarms', apiToken: TOKEN };

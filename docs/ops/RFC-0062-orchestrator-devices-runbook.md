@@ -453,8 +453,14 @@ Set (via Dokploy env / secret; do not commit tokens):
 ```
 # ALARMS_API_URL must include /api/v1 — the worker posts to
 # {ALARMS_API_URL}/incidents/candidates (i.e. .../api/v1/incidents/candidates).
-ALARMS_API_URL=https://<alarms-host>/api/v1
-ALARMS_API_TOKEN=<secret>   # never committed, never logged
+# Point at the ALARMS *API service* (not the orchestrator/dispatcher, which only
+# runs a health server and 404s the business routes):
+#   prod  https://alarms-api.a.myio-bas.com/api/v1
+#   local http://localhost:3001/api/v1   (the ALARMS API dev server)
+ALARMS_API_URL=https://alarms-api.a.myio-bas.com/api/v1
+# Sent as the X-API-Key header (the ALARMS ingestion authenticates M2M keys via
+# X-API-Key; Bearer is reserved for JWTs). never committed, never logged.
+ALARMS_API_TOKEN=<secret>
 ```
 
 **With `ALARMS_API_URL` absent, the worker is in dry-run:** incident candidates are **logged as
