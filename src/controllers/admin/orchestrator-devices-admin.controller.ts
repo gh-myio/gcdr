@@ -135,29 +135,46 @@ const PAGE_HTML = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>orchestrator-devices cockpit (read-only)</title>
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; background:#0f1720; color:#d7e0ea; }
-  header { padding:12px 16px; background:#111c28; border-bottom:1px solid #22303f; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  header h1 { font-size:14px; margin:0; color:#8fd6ff; font-weight:600; }
-  .ro { font-size:11px; color:#f0b429; border:1px solid #6b5312; background:#2a2109; padding:1px 6px; border-radius:3px; }
-  main { padding:16px; max-width:1400px; }
+  /* Light is the default; dark is opt-in via data-theme="dark" on <html>. */
+  :root {
+    --bg:#f6f8fa; --panel:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+    --th:#f3f4f6; --rowb:#eef0f2; --accent:#0369a1; --ro-fg:#92400e; --ro-bg:#fef3c7; --ro-bd:#fcd34d;
+    --input:#ffffff; --inbd:#cbd5e1; --btn:#e8eef4; --btnh:#dbe6f0;
+    --code:#0f766e; --ok-bg:#dcfce7; --ok-fg:#15803d; --bad-bg:#fee2e2; --bad-fg:#b91c1c;
+    --warn-bg:#fef3c7; --warn-fg:#92400e; --mode-shadow:#0369a1; --mode-canonical:#15803d; --mode-held:#b91c1c;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg:#0f1720; --panel:#111c28; --text:#d7e0ea; --muted:#5f7387; --border:#22303f;
+    --th:#0f1720; --rowb:#1a2733; --accent:#8fd6ff; --ro-fg:#f0b429; --ro-bg:#2a2109; --ro-bd:#6b5312;
+    --input:#0b131b; --inbd:#2a3a4b; --btn:#16324a; --btnh:#1d4b6e;
+    --code:#9fd0ff; --ok-bg:#0d3320; --ok-fg:#4ade80; --bad-bg:#3a1414; --bad-fg:#f87171;
+    --warn-bg:#3a2c0c; --warn-fg:#fbbf24; --mode-shadow:#8fd6ff; --mode-canonical:#4ade80; --mode-held:#f87171;
+    color-scheme: dark;
+  }
+  body { margin:0; font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; background:var(--bg); color:var(--text); }
+  header { padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:14px; margin:0; color:var(--accent); font-weight:600; }
+  .ro { font-size:11px; color:var(--ro-fg); border:1px solid var(--ro-bd); background:var(--ro-bg); padding:1px 6px; border-radius:3px; }
+  .spacer { flex:1; }
+  main { padding:16px; width:100%; box-sizing:border-box; }
   section { margin-bottom:22px; }
-  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#7b8ba0; border-bottom:1px solid #22303f; padding-bottom:5px; }
-  input,button { font:inherit; background:#0b131b; color:#d7e0ea; border:1px solid #2a3a4b; border-radius:4px; padding:5px 8px; }
-  button { cursor:pointer; background:#16324a; } button:hover { background:#1d4b6e; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); border-bottom:1px solid var(--border); padding-bottom:5px; }
+  input,button { font:inherit; background:var(--input); color:var(--text); border:1px solid var(--inbd); border-radius:4px; padding:5px 8px; }
+  button { cursor:pointer; background:var(--btn); border-color:var(--border); } button:hover { background:var(--btnh); }
   table { border-collapse:collapse; width:100%; font-size:12px; }
-  th,td { text-align:left; padding:4px 8px; border-bottom:1px solid #1a2733; vertical-align:top; }
-  th { color:#7b8ba0; font-weight:600; position:sticky; top:0; background:#0f1720; }
-  .wrap { overflow-x:auto; border:1px solid #1a2733; border-radius:6px; max-height:420px; overflow-y:auto; }
+  th,td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--rowb); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--th); }
+  .wrap { overflow-x:auto; border:1px solid var(--border); border-radius:6px; max-height:420px; overflow-y:auto; }
   .kv { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px; }
-  .card { background:#111c28; border:1px solid #22303f; border-radius:6px; padding:10px 12px; }
-  .card .lbl { color:#7b8ba0; font-size:11px; } .card .val { font-size:15px; margin-top:2px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+  .card .lbl { color:var(--muted); font-size:11px; } .card .val { font-size:15px; margin-top:2px; }
   .b { padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; }
-  .ok { background:#0d3320; color:#4ade80; } .bad { background:#3a1414; color:#f87171; }
-  .warn { background:#3a2c0c; color:#fbbf24; } .mut { color:#5f7387; }
+  .ok { background:var(--ok-bg); color:var(--ok-fg); } .bad { background:var(--bad-bg); color:var(--bad-fg); }
+  .warn { background:var(--warn-bg); color:var(--warn-fg); } .mut { color:var(--muted); }
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
-  code { color:#9fd0ff; white-space:pre-wrap; word-break:break-all; }
-  .mode-shadow{color:#8fd6ff}.mode-canonical{color:#4ade80}.mode-held{color:#f87171}
+  code { color:var(--code); white-space:pre-wrap; word-break:break-all; }
+  .mode-shadow{color:var(--mode-shadow)}.mode-canonical{color:var(--mode-canonical)}.mode-held{color:var(--mode-held)}
 </style></head>
 <body>
 <header>
@@ -166,6 +183,8 @@ const PAGE_HTML = `<!doctype html>
   <button onclick="connect()">Connect</button>
   <label class="mut"><input type="checkbox" id="auto" checked> auto 10s</label>
   <span id="err" class="bad" style="display:none"></span>
+  <span class="spacer"></span>
+  <button id="themeBtn" onclick="toggleTheme()" title="toggle light/dark">🌙 dark</button>
 </header>
 <main>
   <section><h2>Worker summary</h2><div id="summary" class="kv"></div></section>
@@ -184,6 +203,12 @@ const PAGE_HTML = `<!doctype html>
 </main>
 <script>
   const $=id=>document.getElementById(id);
+  // Theme: light by default; dark is opt-in and persisted.
+  function applyTheme(t){ if(t==='dark'){document.documentElement.setAttribute('data-theme','dark'); $('themeBtn').textContent='☀️ light';}
+    else{document.documentElement.removeAttribute('data-theme'); $('themeBtn').textContent='🌙 dark';} }
+  function toggleTheme(){ const next = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    try{ localStorage.setItem('od-theme',next); }catch(e){} applyTheme(next); }
+  try{ applyTheme(localStorage.getItem('od-theme')||'light'); }catch(e){ applyTheme('light'); }
   let pw = sessionStorage.getItem('odpw')||'';
   if(pw) $('pw').value=pw;
   function connect(){ pw=$('pw').value; sessionStorage.setItem('odpw',pw); load(); }
