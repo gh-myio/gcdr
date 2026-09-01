@@ -102,6 +102,11 @@ Per enabled central: `GET https://{central.id}.y.myio.com.br/v2/slaves`
 
 ## 2. Environment prerequisites
 
+> **Shell convention:** all command examples assume a **bash shell** (Linux — the
+> Dokploy/ops target), using `export`, the `psqlc` helper below, and `timeout`. On a
+> Windows/PowerShell dev box, translate accordingly (e.g. `$env:VAR=...` instead of
+> `export`, and run the `docker exec … psql` calls directly).
+
 ### Production (Dokploy)
 
 - Service defined in `docker-compose.dokploy.yml` (single replica, no public port, DB
