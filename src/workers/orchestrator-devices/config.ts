@@ -45,6 +45,11 @@ export const workerConfig = {
 
   // Bounded per-scan batch.
   scanBatchSize: intEnv('SCAN_BATCH_SIZE', 500),
+
+  // Incidents (§8) — ALARMS multi-source ingestion (RFC-0031). Emission is also
+  // gated by the incident_emission_enabled FLAG; absent URL ⇒ dry-run/log only.
+  alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://gcdr-api.a.myio-bas.com
+  alarmsApiToken: process.env.ALARMS_API_TOKEN, // never logged
 } as const;
 
 export type WorkerConfig = typeof workerConfig;

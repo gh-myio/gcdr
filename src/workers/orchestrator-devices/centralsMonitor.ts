@@ -29,6 +29,7 @@ import { classifyDevice, isDeviceTransition, type Classification } from './ladde
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
 import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
+import { buildCandidatePayload, debounceForCandidate, emitCandidate, type DownCandidate } from './incidents';
 
 type Logger = (level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>) => void;
 type CheckInsert = typeof orchestratorDevicesChecks.$inferInsert;
@@ -36,6 +37,7 @@ type CheckInsert = typeof orchestratorDevicesChecks.$inferInsert;
 interface CentralRow {
   id: string;
   tenantId: string;
+  customerId: string;
   connectionStatus: string;
   checkIntervalSeconds: number | null;
   retryPolicy: string | null;
@@ -44,6 +46,7 @@ interface CentralRow {
 interface DeviceRow {
   id: string;
   tenantId: string;
+  customerId: string;
   centralId: string | null;
   slaveId: number | null;
   connectivityStatus: string;
@@ -54,6 +57,7 @@ interface DeviceRow {
 interface CentralResult {
   checkRows: CheckInsert[];
   transitions: Transition[];
+  downCandidates: DownCandidate[];
   changed: number;
   skipped: number;
   failed: boolean;
@@ -88,21 +92,22 @@ async function loadRetryPolicies(): Promise<Map<string, RetryPolicy>> {
  *  be classified when there is no payload to classify from (auth/config/down). */
 function centralVerdict(outcome: ProbeOutcome, current: string): {
   reachable: boolean;
+  genuineDown: boolean; // a real down (not auth/config) — the only thing that opens CENTRAL_OFFLINE
   proposedStatus: string;
   probeResult: string;
   deviceFallback: Classification | null;
 } {
-  if (outcome.ok) return { reachable: true, proposedStatus: 'ONLINE', probeResult: 'OK', deviceFallback: null };
+  if (outcome.ok) return { reachable: true, genuineDown: false, proposedStatus: 'ONLINE', probeResult: 'OK', deviceFallback: null };
   if (outcome.kind === 'AUTH_ERROR') {
-    return { reachable: false, proposedStatus: current, probeResult: 'AUTH_ERROR',
+    return { reachable: false, genuineDown: false, proposedStatus: current, probeResult: 'AUTH_ERROR',
       deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'AUTH_ERROR' } };
   }
   if (outcome.kind === 'CONFIG_ERROR') {
-    return { reachable: false, proposedStatus: current, probeResult: 'CONFIG_ERROR',
+    return { reachable: false, genuineDown: false, proposedStatus: current, probeResult: 'CONFIG_ERROR',
       deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'CONFIG_ERROR' } };
   }
   // Genuine down (timeout / conn refused / 5xx / parse-fail after retries).
-  return { reachable: false, proposedStatus: 'OFFLINE', probeResult: outcome.kind,
+  return { reachable: false, genuineDown: true, proposedStatus: 'OFFLINE', probeResult: outcome.kind,
     deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'CENTRAL_UNREACHABLE' } };
 }
 
@@ -140,7 +145,14 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
 
   const checkRows: CheckInsert[] = [];
   const transitions: Transition[] = [];
+  const downCandidates: DownCandidate[] = [];
   let changed = 0, skipped = 0, deviceFlipsToDown = 0;
+
+  // ── Incident candidate (item 8): only a GENUINE down opens CENTRAL_OFFLINE;
+  //    AUTH_ERROR/CONFIG_ERROR never do. Debounce + emission decided by the caller. ──
+  if (verdict.genuineDown) {
+    downCandidates.push({ kind: 'CENTRAL_OFFLINE', entityType: 'central', entityId: c.id, tenantId: c.tenantId, customerId: c.customerId, centralId: c.id, causingSignal: `probe:${verdict.probeResult}` });
+  }
 
   // ── Central status classification (item 5) → shadow ledger + transition. ──
   const centralTransition = verdict.proposedStatus !== c.connectionStatus;
@@ -164,6 +176,43 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   const payloadBySlave = new Map<number, string>();
   if (outcome.ok) for (const s of outcome.slaves) payloadBySlave.set(s.id, s.status);
 
+  const dev = classifyDevices(c.id, centralDevices, verdict, payloadBySlave, outcome.latencyMs, policy.name, runId);
+  checkRows.push(...dev.checkRows);
+  transitions.push(...dev.transitions);
+  downCandidates.push(...dev.downCandidates);
+  changed += dev.changed;
+  skipped += dev.skipped;
+  deviceFlipsToDown += dev.deviceFlipsToDown;
+
+  return { checkRows, transitions, downCandidates, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown };
+}
+
+interface DeviceLoopResult {
+  checkRows: CheckInsert[];
+  transitions: Transition[];
+  downCandidates: DownCandidate[];
+  changed: number;
+  skipped: number;
+  deviceFlipsToDown: number;
+}
+
+/** Classify every slave of one central from the probe payload (or the fallback
+ *  when the central is unreachable). Pure of scheduling — just the per-device
+ *  shadow classification + transition + DEVICE_OFFLINE candidate collection. */
+function classifyDevices(
+  centralId: string,
+  centralDevices: DeviceRow[],
+  verdict: ReturnType<typeof centralVerdict>,
+  payloadBySlave: Map<number, string>,
+  latencyMs: number,
+  policyName: string,
+  runId: string,
+): DeviceLoopResult {
+  const checkRows: CheckInsert[] = [];
+  const transitions: Transition[] = [];
+  const downCandidates: DownCandidate[] = [];
+  let changed = 0, skipped = 0, deviceFlipsToDown = 0;
+
   for (const d of centralDevices) {
     let cls: Classification | null;
     let inputStatus: string | null;
@@ -178,22 +227,46 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
     }
     if (!cls) { skipped += 1; continue; }
 
-    const { row, transition, flipsToDown } = deviceCheckRow(runId, c.id, d, cls, inputStatus, outcome.latencyMs, policy.name);
+    const { row, transition, flipsToDown } = deviceCheckRow(runId, centralId, d, cls, inputStatus, latencyMs, policyName);
     if (transition) {
       changed += 1;
       transitions.push({
-        entityType: 'device', entityId: d.id, tenantId: d.tenantId, centralId: c.id,
+        entityType: 'device', entityId: d.id, tenantId: d.tenantId, centralId,
         oldValues: { connectivityStatus: d.connectivityStatus, healthStatus: d.healthStatus, unknownReason: d.unknownReason },
         newValues: { connectivityStatus: cls.connectivity, healthStatus: cls.health, unknownReason: cls.unknownReason },
         cascade: cls.unknownReason === 'CENTRAL_UNREACHABLE',
         causingSignal: inputStatus ?? 'unknown',
       });
     }
+    // DEVICE_OFFLINE candidate: only a real OFFLINE (gateway said offline). A
+    // cascade device is UNKNOWN (CENTRAL_UNREACHABLE), never OFFLINE, so it is
+    // naturally excluded here — no device-offline storm behind a down central.
+    if (cls.connectivity === 'OFFLINE') {
+      downCandidates.push({ kind: 'DEVICE_OFFLINE', entityType: 'device', entityId: d.id, tenantId: d.tenantId, customerId: d.customerId, centralId, causingSignal: inputStatus ?? 'gateway:offline' });
+    }
     if (flipsToDown) deviceFlipsToDown += 1;
     checkRows.push(row);
   }
 
-  return { checkRows, transitions, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown };
+  return { checkRows, transitions, downCandidates, changed, skipped, deviceFlipsToDown };
+}
+
+/** Decide + emit incident candidates (debounce → emit). A POST failure is
+ *  swallowed by emitCandidate, so this never fails the sweep. */
+async function emitIncidents(candidates: DownCandidate[], control: ControlState, log: Logger): Promise<{ posted: number; dryRun: number; disabled: number; debounced: number; failed: number }> {
+  let posted = 0, dryRun = 0, disabled = 0, debounced = 0, failed = 0;
+  const detectedAt = new Date().toISOString();
+  const emitCfg = { emissionEnabled: control.flags.incidentEmissionEnabled, apiUrl: workerConfig.alarmsApiUrl, apiToken: workerConfig.alarmsApiToken };
+  for (const cand of candidates) {
+    const due = await debounceForCandidate(cand, control.flags.incidentOpenAfterTicks);
+    if (!due) { debounced += 1; continue; }
+    const r = await emitCandidate(buildCandidatePayload(cand, detectedAt), emitCfg, log);
+    if (r === 'posted') posted += 1;
+    else if (r === 'dry-run') dryRun += 1;
+    else if (r === 'disabled') disabled += 1;
+    else failed += 1;
+  }
+  return { posted, dryRun, disabled, debounced, failed };
 }
 
 export async function runCentralsSweep(control: ControlState, log: Logger): Promise<void> {
@@ -201,7 +274,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   const defaultPolicy = policies.get(workerConfig.defaultRetryPolicy) ?? policies.get('default') ?? { name: 'default', attempts: [{ delay_ms: 0 }] };
 
   const enabled = (await db.select({
-    id: centrals.id, tenantId: centrals.tenantId, connectionStatus: centrals.connectionStatus,
+    id: centrals.id, tenantId: centrals.tenantId, customerId: centrals.customerId, connectionStatus: centrals.connectionStatus,
     checkIntervalSeconds: centrals.checkIntervalSeconds, retryPolicy: centrals.retryPolicy,
     lastGatewayCheckAt: centrals.lastGatewayCheckAt,
   }).from(centrals).where(eq(centrals.monitoringEnabled, true))) as CentralRow[];
@@ -217,7 +290,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
 
   const dueIds = due.map((c) => c.id);
   const deviceRows = (await db.select({
-    id: devices.id, tenantId: devices.tenantId, centralId: devices.centralId, slaveId: devices.slaveId,
+    id: devices.id, tenantId: devices.tenantId, customerId: devices.customerId, centralId: devices.centralId, slaveId: devices.slaveId,
     connectivityStatus: devices.connectivityStatus, healthStatus: devices.healthStatus, unknownReason: devices.unknownReason,
   }).from(devices).where(and(inArray(devices.centralId, dueIds), isNotNull(devices.slaveId), isNull(devices.deletedAt)))) as DeviceRow[];
 
@@ -235,6 +308,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   let scanned = 0, changed = 0, skipped = 0, failures = 0, deviceTotal = 0, deviceFlipsToDown = 0;
   const checkRows: CheckInsert[] = [];
   const transitions: Transition[] = [];
+  const downCandidates: DownCandidate[] = [];
 
   for (const c of due) {
     scanned += 1;
@@ -242,6 +316,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     const res = await processCentral(c, devicesByCentral.get(c.id) ?? [], policy, runId);
     checkRows.push(...res.checkRows);
     transitions.push(...res.transitions);
+    downCandidates.push(...res.downCandidates);
     changed += res.changed;
     skipped += res.skipped;
     if (res.failed) failures += 1;
@@ -249,7 +324,8 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     deviceFlipsToDown += res.deviceFlipsToDown;
   }
 
-  // Sanity gate (§7): fleet-wide down-flips — fronts the canonical apply.
+  // Sanity gate (§7): fleet-wide down-flips — fronts BOTH canonical apply and
+  // incident emission (a held gate blocks incidents too).
   const sanity = evaluateSanityGate({ totalInScope: deviceTotal, flippingToDown: deviceFlipsToDown, maxPct: control.flags.sanityMaxFleetFlipPct });
 
   // ── Canonical apply (item 7) — three guards: !shadow ∧ canonical_enabled ∧ !held. ──
@@ -267,7 +343,15 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     applied = r.applied; audited = r.audited;
   }
 
+  // Insert checks FIRST so the debounce query below sees this tick's state.
   if (checkRows.length > 0) await db.insert(orchestratorDevicesChecks).values(checkRows);
+
+  // ── Incidents (item 8) — sanity held blocks emission too. ──
+  const inc = (!sanity.held && downCandidates.length > 0)
+    ? await emitIncidents(downCandidates, control, log)
+    : { posted: 0, dryRun: 0, disabled: 0, debounced: 0, failed: 0 };
+
+  const incidents = { candidates: downCandidates.length, ...inc };
 
   await db.update(orchestratorDevicesRuns).set({
     finishedAt: new Date(), scanned, changed, skipped, failures,
@@ -275,11 +359,12 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
       mode, applied, audited, transitions: transitions.length,
       deviceTotal, deviceFlipsToDown,
       sanity: { held: sanity.held, flippedPct: Number(sanity.flippedPct.toFixed(1)), reason: sanity.reason ?? null },
+      incidents,
     },
   }).where(eq(orchestratorDevicesRuns.id, runId));
 
   log('info', 'centrals sweep done', {
     due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
-    mode, applied, audited, sanityHeld: sanity.held,
+    mode, applied, audited, sanityHeld: sanity.held, incidents,
   });
 }
