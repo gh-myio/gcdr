@@ -134,6 +134,8 @@ router.get('/', (_req: Request, res: Response) => {
 const PAGE_HTML = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>orchestrator-devices cockpit (read-only)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   /* Light is the default; dark is opt-in via data-theme="dark" on <html>. */
   :root {
@@ -152,7 +154,7 @@ const PAGE_HTML = `<!doctype html>
     --warn-bg:#3a2c0c; --warn-fg:#fbbf24; --mode-shadow:#8fd6ff; --mode-canonical:#4ade80; --mode-held:#f87171;
     color-scheme: dark;
   }
-  body { margin:0; font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; background:var(--bg); color:var(--text); }
+  body { margin:0; font:13px/1.45 'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
   header { padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   header h1 { font-size:14px; margin:0; color:var(--accent); font-weight:600; }
   .ro { font-size:11px; color:var(--ro-fg); border:1px solid var(--ro-bd); background:var(--ro-bg); padding:1px 6px; border-radius:3px; }
@@ -173,7 +175,7 @@ const PAGE_HTML = `<!doctype html>
   .ok { background:var(--ok-bg); color:var(--ok-fg); } .bad { background:var(--bad-bg); color:var(--bad-fg); }
   .warn { background:var(--warn-bg); color:var(--warn-fg); } .mut { color:var(--muted); }
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
-  code { color:var(--code); white-space:pre-wrap; word-break:break-all; }
+  code { color:var(--code); white-space:pre-wrap; word-break:break-all; font-family:ui-monospace,Menlo,Consolas,monospace; }
   .mode-shadow{color:var(--mode-shadow)}.mode-canonical{color:var(--mode-canonical)}.mode-held{color:var(--mode-held)}
   .login-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9999; }
   .login-modal.hidden { display:none; }
