@@ -851,31 +851,75 @@ cannot eliminate this class). And in a true disaster — the GCDR database
 itself lost — the bucket *is* the only source of truth and MUST be listable
 without a working GCDR.
 
-A dedicated **`central-backups-list` Lambda** (read-only IAM: `s3:ListBucket`
-+ `s3:GetObject` *metadata* on the backups prefix only, no GetObject body, no
-delete) receives a command payload and returns a manifest:
+A dedicated **`central-backups-list` Lambda** receives a command payload and
+returns a manifest. **IAM honesty:** S3 has no separate "HeadObject" action —
+`HeadObject` is authorized by `s3:GetObject`, so IAM *cannot* express
+"metadata but not body". The contract is therefore behavioral + compensating
+controls: the Lambda **MUST NOT call `GetObject`** (code review + CloudTrail
+assertion); it SHOULD satisfy the manifest from **`ListObjectsV2`** alone
+(key, byteSize, lastModified, etag) and call `HeadObject` only when the
+sha256 is requested; the execution role is **isolated to this function**,
+scoped to the backups prefix only, with no delete/put actions, CloudTrail
+data events enabled, and the manifest is never exposed to unauthenticated
+consumers.
+
+**Checksum contract (prerequisite):** an S3 ETag is NOT a sha256 (and is not
+even a plain MD5 for multipart uploads), so `checksumSha256` in the manifest
+only exists if the upload wrote it. The presigned PUT MUST sign and require
+the **`x-amz-meta-sha256`** header (the agent already computes the digest for
+its final report — same value); the multipart path MUST carry it on
+`CompleteMultipartUpload` or via the S3 native `ChecksumSHA256` feature.
+Objects missing the metadata (legacy uploads) appear in the manifest with
+`"checksumSha256": null`.
 
 ```jsonc
 // invoke payload (all filters optional)
 { "tenantId": "…", "centralId": "…", "prefix": "…", "modifiedAfter": "…" }
 // response: manifest of what S3 actually holds
 { "objects": [ { "key": "…", "byteSize": 123, "lastModified": "…",
-                 "checksumSha256": "…" } ], "truncated": false }
+                 "etag": "…", "checksumSha256": "… | null" } ],
+  "truncated": false }
 ```
 
 Two invocation paths, both MUST be supported:
 
 1. **Via GCDR (reconciliation):** `POST /central-backups/reconciliation-runs`
    (admin-only, `centrals.backup.write`) invokes the Lambda through the AWS
-   SDK and diffs the manifest against `central_backups`: rows `AVAILABLE`
-   with no object → flagged `MISSING_OBJECT` (audited, surfaced on the
-   unprotected-centrals report); objects with no row → listed as orphans for
-   the retention sweep to delete through the normal audited path. SHOULD also
-   run on a weekly schedule.
+   SDK and diffs the manifest against `central_backups`. Outcomes have an
+   explicit model:
+
+   - **Row `AVAILABLE`, object missing** → the row's new
+     **`integrity_status`** column (migration 0068: enum-via-CHECK
+     `OK | MISSING_OBJECT`, default `OK`) is set to `MISSING_OBJECT` —
+     `status` itself is untouched (it answers "what the lifecycle did", not
+     "what S3 holds"). Audited, blocks restore of that backup (400), and
+     surfaces on the unprotected-centrals report. A later run that finds the
+     object again sets it back to `OK`.
+   - **Object with no row** → **NOT deleted.** It becomes an
+     `ORPHAN_CANDIDATE` entry in the run report and enters **quarantine for
+     30 days** (tracked by first-seen date across runs). In a drift or
+     partial-DB-restore scenario that object may be the only real backup in
+     existence — deleting it on first sight is how you turn an incident into
+     a catastrophe. Deletion happens only after quarantine expires AND
+     through an explicit audited action (the run report lists expired
+     candidates; an operator confirms, or a documented auto-purge rule is
+     enabled deliberately).
+
+   The reconciliation SHOULD also run on a weekly schedule.
 2. **Direct invoke (disaster runbook):** ops calls the Lambda straight from
    AWS (console/CLI) when GCDR is down — the manifest is the restore shopping
    list. The DR runbook MUST document this path; it is the reason this is a
    Lambda and not just GCDR-side `ListObjectsV2` code.
+
+   **Human-readable catalog (DR prerequisite):** the S3 key layout is
+   UUID-based — without the GCDR database a manifest of UUIDs tells a human
+   nothing about *which shopping* a backup belongs to. GCDR therefore MUST
+   write a minimal catalog export to the bucket (e.g.
+   `catalog/centrals.json`, refreshed daily and on central create/rename):
+   `{ tenantId, customerId, customerName, centralId, centralName,
+   serialNumber, lastAvailableBackupAt }` per central. It contains names only
+   (no telemetry, no secrets), is covered by the same bucket protections, and
+   turns the DR manifest from a UUID puzzle into an actionable list.
 
 *Rejected:* GCDR-only listing (dies with GCDR — defeats the DR purpose);
 *rejected:* S3 Inventory reports as the primary mechanism (daily latency and
