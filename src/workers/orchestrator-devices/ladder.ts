@@ -83,3 +83,16 @@ export function classifyDevice(input: ClassifyInput): Classification {
   // Row 8: online + fresh + no alarms ⇒ HEALTHY.
   return { connectivity: 'ONLINE', health: 'HEALTHY', unknownReason: null };
 }
+
+/** Only-on-change predicate (pure): true iff the classification differs from the
+ *  device's current canonical state. The canonical apply writes only when true. */
+export function isDeviceTransition(
+  current: { connectivityStatus: string; healthStatus: string; unknownReason: string | null },
+  cls: Classification,
+): boolean {
+  return (
+    cls.connectivity !== current.connectivityStatus ||
+    cls.health !== current.healthStatus ||
+    (cls.unknownReason ?? null) !== (current.unknownReason ?? null)
+  );
+}

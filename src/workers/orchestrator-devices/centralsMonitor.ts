@@ -25,9 +25,10 @@ import {
 } from '../../infrastructure/database/drizzle/schema';
 import { workerConfig, gatewayUrl } from './config';
 import { probeGateway, type RetryAttempt, type RetryPolicy, type ProbeOutcome } from './gatewayClient';
-import { classifyDevice, type Classification } from './ladder';
+import { classifyDevice, isDeviceTransition, type Classification } from './ladder';
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
+import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
 
 type Logger = (level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>) => void;
 type CheckInsert = typeof orchestratorDevicesChecks.$inferInsert;
@@ -42,6 +43,7 @@ interface CentralRow {
 }
 interface DeviceRow {
   id: string;
+  tenantId: string;
   centralId: string | null;
   slaveId: number | null;
   connectivityStatus: string;
@@ -51,6 +53,7 @@ interface DeviceRow {
 
 interface CentralResult {
   checkRows: CheckInsert[];
+  transitions: Transition[];
   changed: number;
   skipped: number;
   failed: boolean;
@@ -104,10 +107,7 @@ function centralVerdict(outcome: ProbeOutcome, current: string): {
 }
 
 function deviceCheckRow(runId: string, centralId: string, d: DeviceRow, cls: Classification, inputStatus: string | null, latencyMs: number, policy: string): { row: CheckInsert; transition: boolean; flipsToDown: boolean } {
-  const transition =
-    cls.connectivity !== d.connectivityStatus ||
-    cls.health !== d.healthStatus ||
-    (cls.unknownReason ?? null) !== (d.unknownReason ?? null);
+  const transition = isDeviceTransition(d, cls);
   const flipsToDown = cls.connectivity === 'OFFLINE' && d.connectivityStatus !== 'OFFLINE';
   return {
     transition,
@@ -139,11 +139,20 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   }).where(eq(centrals.id, c.id));
 
   const checkRows: CheckInsert[] = [];
+  const transitions: Transition[] = [];
   let changed = 0, skipped = 0, deviceFlipsToDown = 0;
 
-  // ── Central status classification (item 5) → shadow ledger. ──
+  // ── Central status classification (item 5) → shadow ledger + transition. ──
   const centralTransition = verdict.proposedStatus !== c.connectionStatus;
-  if (centralTransition) changed += 1;
+  if (centralTransition) {
+    changed += 1;
+    transitions.push({
+      entityType: 'central', entityId: c.id, tenantId: c.tenantId, centralId: c.id,
+      oldValues: { connectionStatus: c.connectionStatus },
+      newValues: { connectionStatus: verdict.proposedStatus },
+      cascade: false, causingSignal: outcome.ok ? 'probe:OK' : `probe:${verdict.probeResult}`,
+    });
+  }
   checkRows.push({
     runId, monitor: 'centrals', entityType: 'central', entityId: c.id, centralId: c.id,
     input: { ok: outcome.ok, kind: outcome.ok ? null : outcome.kind, latencyMs: outcome.latencyMs, attempts: outcome.attempts, policy: policy.name },
@@ -170,12 +179,21 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
     if (!cls) { skipped += 1; continue; }
 
     const { row, transition, flipsToDown } = deviceCheckRow(runId, c.id, d, cls, inputStatus, outcome.latencyMs, policy.name);
-    if (transition) changed += 1;
+    if (transition) {
+      changed += 1;
+      transitions.push({
+        entityType: 'device', entityId: d.id, tenantId: d.tenantId, centralId: c.id,
+        oldValues: { connectivityStatus: d.connectivityStatus, healthStatus: d.healthStatus, unknownReason: d.unknownReason },
+        newValues: { connectivityStatus: cls.connectivity, healthStatus: cls.health, unknownReason: cls.unknownReason },
+        cascade: cls.unknownReason === 'CENTRAL_UNREACHABLE',
+        causingSignal: inputStatus ?? 'unknown',
+      });
+    }
     if (flipsToDown) deviceFlipsToDown += 1;
     checkRows.push(row);
   }
 
-  return { checkRows, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown };
+  return { checkRows, transitions, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown };
 }
 
 export async function runCentralsSweep(control: ControlState, log: Logger): Promise<void> {
@@ -199,7 +217,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
 
   const dueIds = due.map((c) => c.id);
   const deviceRows = (await db.select({
-    id: devices.id, centralId: devices.centralId, slaveId: devices.slaveId,
+    id: devices.id, tenantId: devices.tenantId, centralId: devices.centralId, slaveId: devices.slaveId,
     connectivityStatus: devices.connectivityStatus, healthStatus: devices.healthStatus, unknownReason: devices.unknownReason,
   }).from(devices).where(and(inArray(devices.centralId, dueIds), isNotNull(devices.slaveId), isNull(devices.deletedAt)))) as DeviceRow[];
 
@@ -216,12 +234,14 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
 
   let scanned = 0, changed = 0, skipped = 0, failures = 0, deviceTotal = 0, deviceFlipsToDown = 0;
   const checkRows: CheckInsert[] = [];
+  const transitions: Transition[] = [];
 
   for (const c of due) {
     scanned += 1;
     const policy = (c.retryPolicy && policies.get(c.retryPolicy)) || defaultPolicy;
     const res = await processCentral(c, devicesByCentral.get(c.id) ?? [], policy, runId);
     checkRows.push(...res.checkRows);
+    transitions.push(...res.transitions);
     changed += res.changed;
     skipped += res.skipped;
     if (res.failed) failures += 1;
@@ -229,16 +249,30 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     deviceFlipsToDown += res.deviceFlipsToDown;
   }
 
-  // Sanity gate (§7): fleet-wide down-flips. Recorded now; fronts the (still
-  // disabled) canonical apply. In shadow nothing is applied, so this is advisory.
+  // Sanity gate (§7): fleet-wide down-flips — fronts the canonical apply.
   const sanity = evaluateSanityGate({ totalInScope: deviceTotal, flippingToDown: deviceFlipsToDown, maxPct: control.flags.sanityMaxFleetFlipPct });
+
+  // ── Canonical apply (item 7) — three guards: !shadow ∧ canonical_enabled ∧ !held. ──
+  // Evidence (last_gateway_check_*/probe_result) was already written per central,
+  // OUTSIDE this gate. Here we touch canonical status only-on-change + audit.
+  let applied = 0, audited = 0;
+  const wantCanonical = canonicalWritesAllowed(control.flags);
+  let mode: 'shadow' | 'canonical' | 'held' = 'shadow';
+  if (wantCanonical && sanity.held) {
+    mode = 'held';
+    log('warn', 'SANITY GATE HELD canonical writes — nothing applied, proposals kept in ledger', { reason: sanity.reason, wouldApply: transitions.length });
+  } else if (shouldApplyCanonical(control.flags, sanity.held)) {
+    mode = 'canonical';
+    const r = await applyCanonical(transitions);
+    applied = r.applied; audited = r.audited;
+  }
 
   if (checkRows.length > 0) await db.insert(orchestratorDevicesChecks).values(checkRows);
 
   await db.update(orchestratorDevicesRuns).set({
     finishedAt: new Date(), scanned, changed, skipped, failures,
     notes: {
-      mode: canonicalWritesAllowed(control.flags) ? 'canonical' : 'shadow',
+      mode, applied, audited, transitions: transitions.length,
       deviceTotal, deviceFlipsToDown,
       sanity: { held: sanity.held, flippedPct: Number(sanity.flippedPct.toFixed(1)), reason: sanity.reason ?? null },
     },
@@ -246,7 +280,6 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
 
   log('info', 'centrals sweep done', {
     due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
-    mode: canonicalWritesAllowed(control.flags) ? 'canonical' : 'shadow', sanityHeld: sanity.held,
+    mode, applied, audited, sanityHeld: sanity.held,
   });
-  if (sanity.held) log('warn', 'sanity gate would HOLD canonical writes', { reason: sanity.reason });
 }
