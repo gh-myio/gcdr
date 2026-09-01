@@ -4,7 +4,7 @@
 - Start Date: 2026-08-31
 - RFC PR: (leave this empty)
 - Tracking Issue: (leave this empty)
-- Status: **Draft v1**
+- Status: **Draft v2 — review fixes applied (idempotency scoping, sourceLabel enum, read-only wording, scope-drift guard, one-time restore confirmation, audit actor contract)**
 - Related package: `packages/backend` (GCDR)
 - Primary files (new/changed): `src/services/CentralBackupService.ts` (extend),
   `src/services/CentralBackupJobService.ts` (new), `src/services/CentralRestoreService.ts`
@@ -19,6 +19,18 @@
   format), **RFC-0061** (API conventions: `Idempotency-Key`, `confirmationToken`),
   existing tables `central_backups` (0051), `central_restore_jobs` (0052),
   `central_commands` (0055)
+
+> **Changelog v2 (PR #53 review):** idempotency keys are now scoped per
+> operation + central and carry a request hash — replaying a key with a
+> different payload is `409` (R1); `sourceLabel` became a closed enum with a
+> CHECK (R2); the read-only wording was fixed — metadata read *is* intentionally
+> reachable by `policy:read-only`, download/restore never are (R3); new API-key
+> scopes must land in BOTH the entity union and the DTO enum with a
+> list-equality regression test (R4); the restore `confirmationToken` became a
+> **single-use** persisted nonce — a stateless HMAC was replayable within its
+> TTL after a fast failure/cancel (R5); audit events from the central/sweep
+> record `user_id = NULL` with the origin in metadata, never `central:<uuid>`
+> in a uuid column (R6).
 
 ---
 
@@ -84,7 +96,7 @@ operational and security gaps:
 ```
 POST /api/v1/centrals/e982edf9-.../backup-jobs
 Idempotency-Key: 0d9f...c2
-{ "sourceLabel": "pre-firmware-upgrade" }
+{ "sourceLabel": "PRE_FIRMWARE_UPGRADE" }
 
 → 201 { "jobId": "...", "status": "QUEUED", "requestedPhase": "DUMP" }
 ```
@@ -218,11 +230,19 @@ of one extra route (~2 req/min per central, within `centralPollRateLimiter`'s
 | `centrals.backup.download` | `central-backups:download` | mint download URL (reveal-class: the dump is the customer's whole DB) |
 | `centrals.restore.execute` | `central-restore:execute` | create restore job, cancel restore job |
 
-None of these is matched by `policy:read-only`'s `*.*.read` (only
-`centrals.backup.read` uses the `read` action verb, and metadata contains no
-secrets). `download` and `restore.execute` are granted by a new high-risk seed
+`centrals.backup.read` **is** matched by `policy:read-only`’s `*.*.read` —
+**intentionally**: job/backup *metadata* contains no secrets and belongs in a
+viewer’s read surface (the authorization matrix reflects this). What read-only
+can **never** reach are the non-read verbs: `write`, `download` and
+`restore.execute` — that is the whole point of the verb split. `download` and `restore.execute` are granted by a new high-risk seed
 policy `policy:central-ops-critical` attached to `role:super-admin` and
 `role:central-admin` only — never bundled into a wildcard write policy.
+**Implementation requirement (known drift):** the new API-key scopes MUST be
+added in **both** `src/domain/entities/CustomerApiKey.ts` (`ApiKeyScope` union)
+and `src/dto/request/CustomerApiKeyDTO.ts` (the validation enum) — the two
+lists have drifted before, leaving scopes that exist in the domain but fail DTO
+validation. A regression test MUST assert list equality between them.
+
 *Rejected:* riding on `centrals:write` (gap #3); *rejected:* a single
 `central-backups:manage` scope — a dashboard that shows backup history must not
 be able to exfiltrate dumps.
@@ -237,24 +257,40 @@ customer or descendants, out of reach → **404** (no existence leak); JWT → R
 stays valid). A nonexistent central is also `404`, indistinguishable from
 out-of-reach — deliberate.
 
-**DEC-8 — Idempotent creation.** `POST .../backup-jobs` and `POST .../restore`
-accept an `Idempotency-Key` header (RFC-0061 precedent). The key is stored on
-the job row (`idempotency_key`, unique per tenant where non-null); a replay
-returns the original job with `200` instead of creating a duplicate or bouncing
-off the one-active `409`. Optional for backup jobs (the one-active guard bounds
-the damage), **required** for restore (`400 IDEMPOTENCY_KEY_MISSING` without it)
-— a duplicated restore is double downtime.
+**DEC-8 — Idempotent creation (operation- and central-scoped).**
+`POST .../backup-jobs` and `POST .../restore` accept an `Idempotency-Key`
+header (RFC-0061 precedent). The key is stored on the job row together with a
+**`request_hash`** (sha256 of the canonicalized request body), and uniqueness
+is **per tenant + central** (the operation is already separated by table:
+backup jobs vs restore jobs). Replay semantics:
 
-**DEC-9 — Restore confirmation is server-side.** Without a valid
-`confirmationToken`, `POST /centrals/:id/restore` answers
-`428 CONFIRMATION_REQUIRED` with `{ confirmationToken, expiresIn: 300 }` — an
-HMAC (server secret) over `(tenantId, centralId, sourceBackupId, exp)`, stateless,
-5-minute TTL, single purpose. The retry carrying the token enqueues the job.
-The token binds to the *specific backup*, so a UI race that swaps the selected
-backup invalidates the confirmation. *Rejected:* frontend-only "type DELETE"
-ritual (bypassed by any API caller); *rejected:* a stored one-time token —
-stateless HMAC needs no table and the one-active index already prevents replay
-from stacking jobs.
+- same key, same central, same `request_hash` → `200` with the original job;
+- same key with a **different central or different body** →
+  `409 IDEMPOTENCY_KEY_REUSE` (never silently returns someone else’s job);
+- absent key: optional for backup jobs (the one-active guard bounds the
+  damage), **required** for restore (`400 IDEMPOTENCY_KEY_MISSING`) — a
+  duplicated restore is double downtime.
+
+*Rejected:* uniqueness on `(tenant_id, key)` alone — a stuck client reusing a
+key across centrals would be handed an unrelated job, which for backup/restore
+is a correctness bug, not a convenience.
+
+**DEC-9 — Restore confirmation is a server-side, single-use nonce.** Without a
+valid `confirmationToken`, `POST /centrals/:id/restore` answers
+`428 CONFIRMATION_REQUIRED` with `{ confirmationToken, expiresIn: 300 }`. The
+token is a random 256-bit value whose sha256 lands in
+`central_restore_confirmations` (tenant, central, **specific backup**, issuer,
+5-minute TTL). The retry carrying the token enqueues the job only if the row is
+**consumed atomically** (`UPDATE … SET consumed_at = now() WHERE token_hash = …
+AND consumed_at IS NULL AND expires_at > now()` returning a row) — a token is
+good for exactly one restore attempt, ever. Binding to the specific backup
+means a UI race that swaps the selected backup invalidates the confirmation;
+expired/consumed rows are purged by the retention sweep.
+*Rejected:* frontend-only "type DELETE" ritual (bypassed by any API caller);
+*rejected (v1 → v2):* a **stateless HMAC** token — within its TTL it was
+replayable after a fast failure/cancel (the one-active index only prevents
+*stacking*, not sequential replays), and for the most destructive operation in
+the system a one-row table is a fair price for at-most-once semantics.
 
 **DEC-10 — Integrity gate for restore.** A backup is restorable only when
 `status = 'AVAILABLE' AND sha256 IS NOT NULL` (400 otherwise). The claim
@@ -357,8 +393,10 @@ CREATE TABLE "central_backup_jobs" (
   "backup_id"       uuid REFERENCES "central_backups"("id"), -- set at claim
   "status"          "central_backup_job_status" NOT NULL DEFAULT 'QUEUED',
   "current_phase"   "central_backup_job_phase"  NOT NULL DEFAULT 'QUEUED',
-  "source_label"    varchar(32),
+  "source_label"    varchar(32) NOT NULL DEFAULT 'MANUAL'
+    CHECK ("source_label" IN ('MANUAL','SCHEDULED','PRE_RESTORE','PRE_FIRMWARE_UPGRADE')),
   "idempotency_key" varchar(255),
+  "request_hash"    char(64),          -- sha256 of the canonical request body (DEC-8)
   "log_entries"     jsonb NOT NULL DEFAULT '[]',
   "error_message"   text,
   "created_at"      timestamptz NOT NULL DEFAULT now(),
@@ -377,11 +415,30 @@ CREATE INDEX "central_backup_jobs_status_updated_idx"      -- sweeps
 CREATE UNIQUE INDEX "central_backup_jobs_one_active_per_central"
   ON "central_backup_jobs" ("central_id") WHERE "status" IN ('QUEUED', 'RUNNING');
 CREATE UNIQUE INDEX "central_backup_jobs_idempotency_unique"
-  ON "central_backup_jobs" ("tenant_id", "idempotency_key")
+  ON "central_backup_jobs" ("tenant_id", "central_id", "idempotency_key")
   WHERE "idempotency_key" IS NOT NULL;
 
--- Restore jobs gain the same idempotency column (DEC-8):
+-- Restore jobs gain the same idempotency columns (DEC-8):
 ALTER TABLE "central_restore_jobs" ADD COLUMN "idempotency_key" varchar(255);
+ALTER TABLE "central_restore_jobs" ADD COLUMN "request_hash" char(64);
+CREATE UNIQUE INDEX "central_restore_jobs_idempotency_unique"
+  ON "central_restore_jobs" ("tenant_id", "central_id", "idempotency_key")
+  WHERE "idempotency_key" IS NOT NULL;
+
+-- One-time restore confirmations (DEC-9): consumed atomically at execute.
+CREATE TABLE "central_restore_confirmations" (
+  "id"          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "tenant_id"   uuid NOT NULL,
+  "central_id"  uuid NOT NULL REFERENCES "centrals"("id"),
+  "backup_id"   uuid NOT NULL REFERENCES "central_backups"("id"),
+  "token_hash"  char(64) NOT NULL,       -- sha256 of the handed-out token
+  "issued_to"   uuid,                    -- operator user id (audit trail)
+  "expires_at"  timestamptz NOT NULL,
+  "consumed_at" timestamptz,
+  "created_at"  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX "central_restore_confirmations_lookup_idx"
+  ON "central_restore_confirmations" ("tenant_id", "token_hash");
 CREATE UNIQUE INDEX "central_restore_jobs_idempotency_unique"
   ON "central_restore_jobs" ("tenant_id", "idempotency_key")
   WHERE "idempotency_key" IS NOT NULL;
@@ -456,10 +513,17 @@ New `EventType`s (existing `CENTRAL_BACKUP_INITIATED/CONFIRMED/DOWNLOADED` and
 |---|---|---|
 | `CENTRAL_BACKUP_JOB_CREATED` | POST backup-jobs | operator |
 | `CENTRAL_BACKUP_JOB_CANCELED` | cancel | operator |
-| `CENTRAL_BACKUP_JOB_COMPLETED` / `_FAILED` / `_EXPIRED` | terminal transition | SYSTEM (`central:<id>` or sweep) |
+| `CENTRAL_BACKUP_JOB_COMPLETED` / `_FAILED` / `_EXPIRED` | terminal transition | SYSTEM (see actor contract below) |
 | `CENTRAL_BACKUP_DOWNLOADED` | download-url mint (existing, kept) | operator |
 | `CENTRAL_BACKUP_DELETED` | manual delete or retention sweep (metadata: which) | operator / SYSTEM |
 | `CENTRAL_RESTORE_CONFIRMATION_ISSUED` | 428 token handout | operator |
+
+**Actor contract for SYSTEM events (R6):** when the actor is the central agent
+or a sweep — not a human — the audit row records **`user_id = NULL`** and the
+origin goes in `metadata`, e.g. `{ "origin": "central", "centralId": "<uuid>" }`
+or `{ "origin": "sweep", "sweep": "backup-retention" }`. Never encode
+`central:<uuid>` (or any prefixed string) into a uuid-typed actor column — that
+exact pattern has broken audit writes in this codebase before.
 | `CENTRAL_RESTORE_CANCELED` | operator cancel | operator |
 
 Outcome events follow the command-result precedent (audit the outcome, not just
