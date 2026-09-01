@@ -126,6 +126,21 @@ router.get('/api/divergence', async (_req: Request, res: Response) => {
   }
 });
 
+// ── Centrals list (CENTRAIS tab) — status + probe evidence + device count ────
+router.get('/api/centrals', async (_req: Request, res: Response) => {
+  try {
+    const centrals = (await db.execute(sql`
+      select c.id, c.name, c.connection_status, c.monitoring_enabled,
+             c.last_gateway_check_at, c.last_gateway_check_latency_ms, c.probe_result,
+             (select count(*)::int from devices d where d.central_id = c.id and d.deleted_at is null) as device_count
+      from centrals c
+      order by c.monitoring_enabled desc, c.name asc`)) as unknown as Rows;
+    res.json({ centrals });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── The page ─────────────────────────────────────────────────────────────────
 router.get('/', (_req: Request, res: Response) => {
   res.type('html').send(PAGE_HTML);
@@ -200,6 +215,21 @@ const PAGE_HTML = `<!doctype html>
   tr.grp-detail td { background:var(--bg); font-size:11px; }
   .chips .b { margin-right:4px; }
   .morebtn { margin-top:8px; }
+  /* Tabs (segmented slider) */
+  .tabs { display:inline-flex; gap:2px; background:var(--th); border:1px solid var(--border); border-radius:10px; padding:3px; margin-bottom:22px; flex-wrap:wrap; }
+  .tab { border:0; background:transparent; color:var(--muted); padding:7px 16px; border-radius:8px; font-weight:700; font-size:12px; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; }
+  .tab:hover { color:var(--text); }
+  .tab.active { background:var(--panel); color:var(--accent); box-shadow:0 1px 3px rgba(0,0,0,.18); }
+  .tabpanel { display:none; } .tabpanel.active { display:block; }
+  /* Centrals cards */
+  .cgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+  .ccard { background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--muted); border-radius:10px; padding:12px 14px; }
+  .ccard.on { border-left-color:var(--ok-fg); } .ccard.off { border-left-color:var(--bad-fg); } .ccard.unk { border-left-color:var(--muted); }
+  .ccard .cname { font-weight:700; margin-bottom:8px; }
+  .ccard .crow { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:3px 0; border-bottom:1px dashed var(--rowb); }
+  .ccard .crow:last-child { border-bottom:0; } .ccard .crow .k { color:var(--muted); }
+  .soon { color:var(--muted); font-size:14px; padding:48px 20px; text-align:center; border:1px dashed var(--border); border-radius:10px; }
+  .strip-detail { font-size:12px; }
   .login-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9999; }
   .login-modal.hidden { display:none; }
   .login-box { background:var(--panel); padding:32px; border-radius:12px; border:1px solid var(--border); text-align:center; max-width:380px; width:90%; }
@@ -248,23 +278,49 @@ const PAGE_HTML = `<!doctype html>
   </div>
 </div>
 <main>
-  <section class="strip" id="strip"></section>
-  <section><h2 data-i18n="latest">Latest scan</h2><div id="latest" class="panels"></div></section>
-  <section><h2 data-i18n="divergence_h">Divergence</h2><div id="divPanel"></div></section>
-  <section><h2 data-i18n="runs">Recent runs</h2>
-    <div class="wrap"><table id="runs"></table></div>
-    <button class="morebtn" id="runsMore" onclick="toggleRuns()"></button>
-  </section>
-  <section><h2 data-i18n="checks">Checks (shadow ledger)</h2>
-    <div class="filters">
-      <input id="fCentral" data-i18n-ph="ph_central" placeholder="centralId (uuid)" style="width:260px">
-      <input id="fCustomer" data-i18n-ph="ph_customer" placeholder="customerId (uuid)" style="width:260px">
-      <input id="fReason" data-i18n-ph="ph_reason" placeholder="unknown_reason">
-      <input id="fState" data-i18n-ph="ph_state" placeholder="state (e.g. OFFLINE)">
-      <button onclick="loadChecks()" data-i18n="filter">Filter</button>
-    </div>
-    <div class="wrap"><table id="checks"></table></div>
-  </section>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="dashboard" onclick="setTab('dashboard')" data-i18n="tab_dashboard">Dashboard</button>
+    <button class="tab" data-tab="centrals" onclick="setTab('centrals')" data-i18n="tab_centrals">Centrals</button>
+    <button class="tab" data-tab="devices" onclick="setTab('devices')" data-i18n="tab_devices">Devices</button>
+    <button class="tab" data-tab="os" onclick="setTab('os')" data-i18n="tab_os">Work orders</button>
+    <button class="tab" data-tab="scans" onclick="setTab('scans')" data-i18n="tab_scans">Scans</button>
+  </div>
+
+  <div class="tabpanel active" id="tab-dashboard">
+    <section class="strip" id="strip"></section>
+    <section><h2 data-i18n="latest">Latest scan</h2><div id="latest" class="panels"></div></section>
+    <section><h2 data-i18n="divergence_h">Divergence</h2><div id="divPanel"></div></section>
+  </div>
+
+  <div class="tabpanel" id="tab-centrals">
+    <section><h2 data-i18n="tab_centrals">Centrals</h2><div id="centralsGrid" class="cgrid"></div></section>
+  </div>
+
+  <div class="tabpanel" id="tab-devices">
+    <section><div class="soon"><span data-i18n="soon">Coming soon</span> · devices</div></section>
+  </div>
+
+  <div class="tabpanel" id="tab-os">
+    <section><div class="soon"><span data-i18n="soon">Coming soon</span> · work orders</div></section>
+  </div>
+
+  <div class="tabpanel" id="tab-scans">
+    <section><h2 data-i18n="runs">Recent runs</h2>
+      <div class="wrap"><table id="runs"></table></div>
+      <button class="morebtn" id="runsMore" onclick="toggleRuns()"></button>
+    </section>
+    <section><h2 data-i18n="checks">Checks (shadow ledger)</h2>
+      <div class="filters">
+        <input id="fCentral" data-i18n-ph="ph_central" placeholder="centralId (uuid)" style="width:260px">
+        <input id="fCustomer" data-i18n-ph="ph_customer" placeholder="customerId (uuid)" style="width:260px">
+        <input id="fReason" data-i18n-ph="ph_reason" placeholder="unknown_reason">
+        <input id="fState" data-i18n-ph="ph_state" placeholder="state (e.g. OFFLINE)">
+        <button onclick="loadChecks()" data-i18n="filter">Filter</button>
+        <label class="mut"><input type="checkbox" id="fHistory" onchange="loadChecks()"> <span data-i18n="include_history">include history</span></label>
+      </div>
+      <div class="wrap"><table id="checks"></table></div>
+    </section>
+  </div>
 </main>
 <script>
   const $=id=>document.getElementById(id);
@@ -308,8 +364,8 @@ const PAGE_HTML = `<!doctype html>
       '</table><p class="mut">Probe: queda genuína (timeout/conn/5xx) ⇒ central OFFLINE + devices UNKNOWN/CENTRAL_UNREACHABLE. 401/403 ⇒ AUTH_ERROR. NXDOMAIN/4xx ⇒ CONFIG_ERROR. A senha é <code>DB_ADMIN_PASSWORD</code>.</p>',
   };
   const I18N = {
-    'en': {ro:'READ-ONLY · Phase 2A',connected:'connected',logout:'Logout',auto:'auto 10s',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE · idle',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'probe',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices'},
-    'pt-BR': {ro:'SOMENTE LEITURA · Phase 2A',connected:'conectado',logout:'Sair',auto:'auto 10s',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO · ocioso',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'probe',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices'},
+    'en': {ro:'READ-ONLY · Phase 2A',connected:'connected',logout:'Logout',auto:'auto 10s',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE MODE',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'probe',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices',include_history:'include history',recheck_now:'Recheck now',enable_canonical:'Enable canonical',last_observed:'last observed',phase2b:'Phase 2B — coming',tab_dashboard:'Dashboard',tab_centrals:'Centrals',tab_devices:'Devices',tab_os:'Work orders',tab_scans:'Scans',soon:'Coming soon',monitoring:'monitoring',last_sync:'last sync'},
+    'pt-BR': {ro:'SOMENTE LEITURA · Phase 2A',connected:'conectado',logout:'Sair',auto:'auto 10s',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'probe',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices',include_history:'incluir histórico',recheck_now:'Rechecar agora',enable_canonical:'Ligar canonical',last_observed:'visto por último',phase2b:'Phase 2B — em breve',tab_dashboard:'Dashboard',tab_centrals:'Centrais',tab_devices:'Dispositivos',tab_os:'Ordem de serviço',tab_scans:'Varreduras',soon:'Em breve',monitoring:'monitoramento',last_sync:'último sync'},
   };
   let lang = 'en';
   try { lang = localStorage.getItem('od-lang') || (((navigator.language||'').toLowerCase().indexOf('pt')===0) ? 'pt-BR' : 'en'); } catch(e){}
@@ -354,10 +410,30 @@ const PAGE_HTML = `<!doctype html>
     return r.json();
   }
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-  function ageStr(ms){ if(ms==null)return '—'; const s=Math.round(ms/1000); return s<90?s+'s':Math.round(s/60)+'m'; }
+  function ageStr(ms){ if(ms==null)return '—'; const s=Math.round(ms/1000); if(s<90)return s+'s'; const m=Math.round(s/60); if(m<90)return m+'m'; const h=Math.round(m/60); return h<48?h+'h':Math.round(h/24)+'d'; }
+  function ago(iso){ if(!iso)return '—'; return ageStr(Date.now()-new Date(iso).getTime()); }
+  function onoff(v){ return v?'on':'off'; }
   function tbl(el, cols, rows, cell){ el.innerHTML='<tr>'+cols.map(c=>'<th>'+t('col_'+c)+'</th>').join('')+'</tr>'+
     rows.map(r=>'<tr>'+cols.map(c=>'<td>'+cell(r,c)+'</td>').join('')+'</tr>').join(''); }
-  let allRuns=[], runsExpanded=false;
+  let allRuns=[], runsExpanded=false, lastDiv={centrals:[],devices:[]};
+  function setTab(name){
+    document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===name));
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('active', p.id==='tab-'+name));
+    try{ localStorage.setItem('od-tab',name); }catch(e){}
+  }
+  function statusCls(st){ return st==='ONLINE'?'on':(st==='OFFLINE'?'off':'unk'); }
+  function renderCentrals(list){
+    const el=$('centralsGrid'); if(!el)return;
+    if(!list||!list.length){ el.innerHTML='<div class="soon">—</div>'; return; }
+    el.innerHTML=list.map(c=>{ const st=c.connection_status||'UNKNOWN'; const k=statusCls(st);
+      return '<div class="ccard '+k+'"><div class="cname">'+esc(c.name||c.id)+'</div>'+
+        '<div class="crow"><span class="k">status</span>'+chip(st,k==='on'?'ok':(k==='off'?'bad':'mut'))+'</div>'+
+        '<div class="crow"><span class="k">'+t('monitoring')+'</span>'+(c.monitoring_enabled?chip('on','ok'):chip('off','mut'))+'</div>'+
+        '<div class="crow"><span class="k">'+t('last_sync')+'</span><span>'+ago(c.last_gateway_check_at)+'</span></div>'+
+        '<div class="crow"><span class="k">'+t('probe')+'</span><span>'+esc(c.probe_result||'—')+(c.last_gateway_check_latency_ms!=null?' · '+c.last_gateway_check_latency_ms+'ms':'')+'</span></div>'+
+        '<div class="crow"><span class="k">'+t('devices')+'</span><span>'+(c.device_count||0)+'</span></div></div>';
+    }).join('');
+  }
   function chip(txt,cls){ return '<span class="b '+(cls||'')+'">'+esc(txt)+'</span>'; }
   function prow(k,v){ return '<div class="row"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
   function posture(s){ const f=s.flags||{};
@@ -371,8 +447,7 @@ const PAGE_HTML = `<!doctype html>
   function renderStrip(s){ const f=s.flags||{}; const p=posture(s);
     $('strip').innerHTML =
       '<span class="posture '+p.cls+'">'+p.label+'</span>'+
-      '<span class="mut">MASTER '+(s.master?'on':'off')+'</span>'+
-      '<span class="strip-pills">'+pill('shadow',!!f.shadow_mode,false)+pill('canonical',!!f.canonical_writes_enabled,true)+pill('incidents',!!f.incident_emission_enabled,true)+'</span>'+
+      '<span class="strip-detail mut">MASTER '+(s.master?'on':'off')+' · shadow '+onoff(f.shadow_mode)+' · canonical '+onoff(f.canonical_writes_enabled)+' · incidents '+onoff(f.incident_emission_enabled)+'</span>'+
       '<span class="strip-right"><span class="'+(s.healthy?'ok':'bad')+'">'+t('worker')+' '+(s.healthy?t('val_healthy'):t('val_stale'))+'</span> <span class="mut">· '+t('last_tick')+' '+ageStr(s.ageMs)+'</span><br>'+
       '<span class="mut">'+s.enabledGateways+' '+t('gateways_enabled')+' · sanity '+(f.sanity_max_fleet_flip_pct==null?'?':f.sanity_max_fleet_flip_pct)+'% · debounce '+(f.incident_open_after_ticks==null?'?':f.incident_open_after_ticks)+'</span></span>';
   }
@@ -394,11 +469,20 @@ const PAGE_HTML = `<!doctype html>
       prow('sanity', (n.sanity&&n.sanity.held)?chip('HELD','bad'):chip('ok','ok'))+'</div>';
     $('latest').innerHTML=p1+p2;
   }
-  function renderDivergence(d){
+  function renderDivergence(d, checks){
+    d=d||{}; checks=checks||[];
     const cs=(d.centrals||[]), dv=(d.devices||[]); const total=cs.length+dv.length;
     if(total===0){ $('divPanel').innerHTML='<div class="alert calm">'+t('no_div')+'</div>'; return; }
+    const info={}; // per-central probe + last observed, from the most recent check
+    checks.forEach(c=>{ const id=c.central_id; if(!id||info[id])return; const inp=c.input||{}; info[id]={probe:inp.gatewayStatus||inp.kind||'', at:c.created_at}; });
+    const ph2b=' disabled title="'+t('phase2b')+'"';
     let h='<div class="alert"><div class="big">'+total+' '+t('div_one')+'</div>';
-    cs.forEach(c=>{ h+='<div class="drow"><b>'+esc(c.name||c.id)+'</b> <span class="mut">central</span> '+chip(c.current,'ok')+' <span class="arrow">→</span> '+chip(c.proposed,'bad')+'</div>'; });
+    cs.forEach(c=>{ const nfo=info[c.id]||{};
+      h+='<div class="drow"><b>'+esc(c.name||c.id)+'</b> <span class="mut">central</span> '+chip(c.current,'ok')+' <span class="arrow">→</span> '+chip(c.proposed,'bad')+
+        (nfo.probe?' '+chip(String(nfo.probe).replace('probe:',''),'mut'):'')+
+        (nfo.at?' <span class="mut">· '+t('last_observed')+' '+ago(nfo.at)+'</span>':'')+
+        ' <button'+ph2b+'>'+t('recheck_now')+'</button> <button'+ph2b+'>'+t('enable_canonical')+'</button></div>';
+    });
     dv.forEach(x=>{ h+='<div class="drow"><b>'+esc(x.name||x.id)+'</b> <span class="mut">device</span> '+chip(x.current,'ok')+' <span class="arrow">→</span> '+chip(x.proposed,'bad')+'</div>'; });
     $('divPanel').innerHTML=h+'</div>';
   }
@@ -446,8 +530,9 @@ const PAGE_HTML = `<!doctype html>
     try{
       const s=await api('summary'); renderStrip(s);
       allRuns=(await api('runs?limit=50')).runs||[]; renderRuns();
-      renderDivergence(await api('divergence'));
-      await loadChecks();
+      lastDiv = await api('divergence');
+      renderCentrals((await api('centrals')).centrals||[]);
+      await loadChecks(); // renders latest scan + grouped checks + divergence (enriched)
     }catch(e){ $('err').textContent=e.message; $('err').style.display='inline'; }
   }
   async function loadChecks(){
@@ -457,11 +542,18 @@ const PAGE_HTML = `<!doctype html>
     if($('fReason').value)q.set('reason',$('fReason').value.trim());
     if($('fState').value)q.set('state',$('fState').value.trim());
     q.set('limit','500');
-    const checks=(await api('checks?'+q.toString())).checks||[];
+    let checks=(await api('checks?'+q.toString())).checks||[];
+    // Default: latest run only. "include history" keeps the full recent window.
+    if(!$('fHistory').checked && allRuns[0] && allRuns[0].started_at){
+      const t0=new Date(allRuns[0].started_at).getTime();
+      checks=checks.filter(c=>new Date(c.created_at).getTime()>=t0);
+    }
     renderLatest(allRuns[0], checks.find(c=>c.entity_type==='device')||checks[0]);
     renderGroupedChecks(checks);
+    renderDivergence(lastDiv, checks);
   }
   applyLang();
+  try{ setTab(localStorage.getItem('od-tab')||'dashboard'); }catch(e){ setTab('dashboard'); }
   (async function initAuth(){
     const stored = sessionStorage.getItem('odpw')||'';
     if(stored && await validate(stored)){ pw=stored; setConnected(true); load(); }
