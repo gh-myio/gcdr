@@ -31,6 +31,18 @@ Three concrete, live gaps show GCDR has no operational-monitoring plane today:
 
 GCDR already owns the master data (`centrals`, `devices`, `wo_*`) and the DB; what it lacks is a **continuously-running, off-request-path** process that observes reality and reconciles it. Standing that up as a separate deployable — exactly as the Alarm Orchestrator did — keeps the hot API path clean and lets the monitor scale and restart independently.
 
+## Scope & phasing (the MVP is one thing, not three)
+
+This RFC describes the **end state** — three monitors — but it is **not** approved as a single implementation. The service ships in ordered phases; each phase is independently deployable and delivers value on its own. **Only Phase 1 is in scope for the first implementation PR;** Phases 2–3 are follow-up learn-and-extend increments that reuse the same worker skeleton, control hierarchy (§1), and audit plane (§8).
+
+| Phase | Scope | Fixes | Ships |
+|---|---|---|---|
+| **1 — MVP (required)** | `centrals-monitor` liveness probe (§2 + retry book §2a) **and** `devices-monitor` connectivity/health from `/v2/slaves` + freshness (§3 Phase 1, and the arrival/change freshness gate). Single-writer cutover of `connection_status` / `connectivity_status` / `health_status` (removes PR #19's GET-reconcile). | **M1, M2, M3** | The worker container + the connectivity/health columns + the audit of transitions. The dashboard stops being a mock. |
+| **2 — Cockpit** | `/admin/orchestrator-devices` observability console (§7): runs/checks tables, live tail, control row (pause/resume/kick), hardened auth. | operability of Phase 1 | A read/observe + control surface over Phase 1's tables. |
+| **3 — OS SLA** | `os-monitor` (§4): overdue / SLA-breach / stale watchdog + escalation. Requires the WO SLA contract (§4) to be pinned first. | **M4** | Work-order escalation off the request path. |
+
+Rationale: the three monitors have **different risk profiles** (a liveness probe is cheap and idempotent; a telemetry fan-out is I/O-heavy; an OS SLA watchdog needs a state contract that does not exist yet). Bundling them would make the first PR un-reviewable and couple a well-understood fix (M1/M2) to an under-specified one (M4). Phase 1 is the whole reason the service exists; everything else is additive.
+
 ## Guide-level explanation
 
 `orchestrator-devices` is **one process with three monitors**, each a scheduled (and, where a signal exists, event-driven) loop. It holds no user session; it authenticates to external sources with a service credential and writes to the GCDR DB directly.
@@ -51,7 +63,7 @@ GCDR already owns the master data (`centrals`, `devices`, `wo_*`) and the DB; wh
 
 - **Deploys like the Alarm Orchestrator.** Same GCDR image; the container's `command` selects the worker entrypoint (`node dist/workers/orchestrator-devices.js`); a `.env.dokploy.orchestrator-devices` sets its role, intervals, thresholds and the shared `DATABASE_URL`. It does **not** serve HTTP (beyond a `/healthz` liveness probe).
 - **Off the request path.** Nothing in the API mutates connectivity/health anymore; the API only reads. PR #19's `GET` reconcile is removed and its logic moves here (M3).
-- **Single writer.** This service becomes the **one** writer of `connection_status` / `connectivity_status` / `healthStatus`, resolving the "two writers" ambiguity flagged in RFC-0023 (energy-ingestion vs GCDR) and PR #19.
+- **Single writer.** This service becomes the **one** writer of `connection_status` / `connectivity_status` / `health_status`, resolving the "two writers" ambiguity flagged in RFC-0023 (energy-ingestion vs GCDR) and PR #19. **§1a** enumerates exactly which current writers are removed (PR #19's GET reconcile) vs. demoted to an input signal (ingestion freshness) — the cutover is part of Phase 1.
 
 For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% online / 1771 desconhecido" and starts reflecting reality, updated every scan interval — without anyone opening a page.
 
@@ -70,6 +82,19 @@ For an operator: the dashboard's "Saúde dos Dispositivos" stops reading "1% onl
 - **Queue (optional, phase 2):** for event-driven work and retries, reuse the alarm stack's **Redis/BullMQ** with a DLQ; the MVP is a timer loop + advisory lock and needs no Redis.
 - **Liveness:** a minimal `/healthz` endpoint (or a heartbeat row) so Dokploy can health-check the worker.
 - **Graceful shutdown & backpressure:** bounded per-scan batch size; a scan never overlaps its own previous run.
+
+### 1a. Writer ownership — current writers → target
+
+"Single writer" is only meaningful if the RFC says **exactly which existing writers are removed, kept, or demoted to an input signal**. The cutover is part of Phase 1 (§Scope), and no other code path may write these three columns after it lands:
+
+| Column | Current writer(s) today | Target | Cutover action |
+|---|---|---|---|
+| `centrals.connection_status` | `CentralTopologyService.getTopology` (**on a GET**, PR #19) | `centrals-monitor` **only** | **Remove** the write from the GET; the GET becomes a pure read. Its probe logic moves into §2. |
+| `devices.connectivity_status` | (a) PR #19 topology GET reconcile; (b) energy-ingestion writing status on telemetry arrival (RFC-0023 Q4, the "two writers" ambiguity) | `devices-monitor` **only** | (a) **Removed** with the GET reconcile. (b) **Demoted to an input signal** — ingestion no longer writes `connectivity_status`; it may publish `last_telemetry_ts`/freshness that this monitor *reads* (§3 Phase 2), and this monitor decides the status. |
+| `devices.health_status` | *(none — column does not exist; today it is a `DashboardService` mock)* | `devices-monitor` **only** | **New** additive column, written only here from the precedence table (§3). |
+| `centrals.last_heartbeat_at` | energy-ingestion / heartbeat path (unchanged) | ingestion (**kept as-is**) | **Kept** — this is an *input* to the liveness verdict (optional secondary signal, §2), not a status this service owns. |
+
+The invariant after Phase 1: **`connection_status`, `connectivity_status`, and `health_status` have exactly one writer — this service.** Anything else that used to write them is either deleted (the GET reconcile) or reduced to feeding a signal (ingestion freshness, heartbeats).
 
 ### 2. Monitor A — `centrals-monitor` (per-gateway liveness probe)
 
@@ -153,11 +178,24 @@ A live probe against a real gateway returns **`200` in ~2 s with a JSON array of
 
 > Field notes from the live sample: `status` observed as `"online"`; `type` values seen include `outlet`, `three_phase_sensor`, `flow_sensor`, `presence_sensor`; `addr_low`/`addr_high` are the RF addressing; `code` was `null`. The monitor should treat unknown `type`/`status` values as pass-through (log, don't crash) since the central firmware owns this vocabulary.
 
+**Treating `/v2/slaves` as a formal dependency contract.** This endpoint is a source of truth for connectivity, so the monitor consumes it defensively — the central firmware owns and versions this vocabulary, and the monitor must degrade gracefully, never crash a scan, on anything unexpected:
+
+- **Auth.** The probe authenticates with the same service credential the tunnel already requires (the mechanism PR #19's topology call uses); no new secret. A `401/403` is a **distinct outcome from `OFFLINE`** — it means *the monitor's credential is wrong*, not *the central is down* — and is surfaced separately in the cockpit, not counted as a gateway-down transition.
+- **Schema validation.** The response is parsed through a **tolerant Zod schema**: required fields for the monitor's decisions (`id`, `status`) are validated; everything else is optional/pass-through. A slave row that fails required-field validation is **skipped with a logged warning** (and counted in the run), never allowed to abort the whole array.
+- **Unknown enum values.** Unknown `status` (anything not `online`/`offline`/`bad`) is treated as **`UNKNOWN`/not-a-verdict** (falls to the freshness gate), and unknown `type` is pass-through — the firmware may add values without a monitor deploy.
+- **Versioning / firmware drift.** The per-slave `version` is recorded (§2b) so firmware drift is visible; if a future firmware changes the payload shape, the tolerant schema keeps the monitor running on the fields it still recognizes while the drift shows up in the cockpit. A formal `/v2` → `/v3` bump would be handled by a versioned client, not silent breakage.
+- **No implicit trust for writes.** A slave **in the payload but absent in GCDR** is *flagged* (unregistered device), never auto-created; a slave **in GCDR but absent from the payload** is a "not seen" signal, not an auto-delete. The monitor reconciles *status*, it does not mutate device inventory.
+
 ### 3. Monitor B — `devices-monitor` (fixes M1 + M2)
 
 Runs in **two phases per central**, right after `centrals-monitor` confirms the gateway is reachable.
 
-**Phase 1 — liveness (reuses the `/v2/slaves` probe).** The per-slave **`status`** (`online`/`offline`/`bad`) the gateway reports (§2b), joined to devices by `(central_id, slave_id)`, is the **instant** connectivity signal for `devices.connectivity_status`.
+**Phase 1 — liveness (reuses the `/v2/slaves` probe).** The per-slave **`status`** (`online`/`offline`/`bad`) the gateway reports (§2b), joined to devices by `(central_id, slave_id)`, is the **instant** connectivity signal — but it is **not** taken at face value symmetrically. The gateway's `status` is authoritative **only in the negative direction**:
+
+- **`offline` ⇒ genuinely `OFFLINE`.** The gateway is asserting the slave is down — trust it, no freshness check needed. This is the fast, definitive path.
+- **`online` or `bad` ⇒ a *candidate*, not a verdict.** A slave can report `online` and still be **frozen/stuck** (last reading never advances). So `online`/`bad` **must pass the freshness gate** (Phase 2: 24 h arrival for energy/temperature, 72 h `reading`-change for water) before it counts as truly `ONLINE`. `bad` starts at least `DEGRADED`; `online` that fails the freshness gate is downgraded to `OFFLINE`-by-freshness even though the gateway said `online`.
+
+In short: **`offline` from the gateway wins immediately; `online`/`bad` are provisional and only survive if telemetry is actually fresh.** This is why Phase 2 is not optional for the health verdict — it's what distinguishes "reporting online" from "actually working".
 
 **Phase 2 — telemetry pull + freshness (per slave).** For each slave the monitor then fetches its **last completed window** of readings from the gateway and persists the last real reading, per device domain:
 
@@ -194,16 +232,49 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 - **Persist:** `last_value_telemetry` = the accumulated `reading`; `last_timestamp_telemetry` = the timestamp of the **last change** in `reading` (last non-zero delta), not merely the last row received.
 - **Alert/offline rule (default 72 h without change):** if `reading` has **not changed for `WATER_STALE_AFTER` (default 72 h)** the meter is flagged **stuck-or-offline** — either a genuine no-consumption or a jammed/dead meter (feeds RFC-0055's NO_CONSUMPTION incidents). This is *change-based* (`mode: change`), distinct from energy/temperature's *arrival-based* rule (`mode: arrival`); the freshness policy book carries the `mode` per policy.
 
-**Health (M2):** introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration — computed from connectivity, the gateway `status` (`bad` ⇒ `DEGRADED`), telemetry staleness (`last_timestamp_telemetry` age), alarm state (orchestrator), and no-consumption incidents (RFC-0055). `DashboardService.devices.health` stops being a mock and reads this column.
+**Tick budget — Phase 2 fan-out is bounded (answering "can this get expensive?").** Phase 1 is fan-out-free (one `/v2/slaves` per central reconciles the central *and* all its slaves' connectivity). Phase 2 is where cost lives — a per-slave, per-domain telemetry pull — so it runs under explicit budgets, never unbounded:
 
-**Semantics:** `UNKNOWN` means *not yet observed*, never *silently healthy* — a device the monitor cannot classify is visibly unknown, not falsely green.
+- **Per-central concurrency cap.** Within one central, at most `TELEMETRY_MAX_CONCURRENCY_PER_CENTRAL` (default **8**) slave pulls run in parallel, so one gateway/tunnel is never hammered with hundreds of simultaneous requests.
+- **Global concurrency cap.** Across all centrals, at most `TELEMETRY_MAX_CONCURRENCY_GLOBAL` (default **32**) pulls in flight, bounding total load on the worker and the tunnel fleet.
+- **Per-tick wall-time budget.** A telemetry scan is capped at `TELEMETRY_TICK_BUDGET_MS`; slaves not reached before the budget expires are **deferred to the next tick** (their cursor is *not* advanced, so nothing is skipped — just delayed), and the shortfall is logged/surfaced in the cockpit as "N slaves deferred (budget)". A tick **never** runs long enough to overlap the next one (the no-overlap guard, §1).
+- **Fairness cursor.** Slaves are pulled in **least-recently-fetched order** (by `last_fetch_energy_telemetry`), so under a tight budget every slave is eventually reached rather than a head-of-list set being pulled every tick and the tail starving.
+- **Degraded-mode signal.** If deferrals persist across K consecutive ticks (the scan can't keep up with the fleet at the configured interval), that is itself a health signal for the cockpit — either the interval is too aggressive or the fleet outgrew one worker (scale hint, §Future).
+
+Freshness thresholds are measured against **wall-clock age of the data**, not against whether this tick happened to pull the slave — so a deferred slave is never *mistakenly* marked stale just because the budget skipped it this round.
+
+**Health (M2) — deterministic precedence.** Introduce `devices.health_status` (`HEALTHY | DEGRADED | CRITICAL | UNKNOWN`) — a small additive migration. It is **not** computed from a vague blend of signals; it is resolved by a **fixed precedence ladder**, evaluated top-down, **first match wins**. This removes the ambiguity the review flagged ("online but stale 26 h — is it OFFLINE, DEGRADED or CRITICAL?"): the ladder answers it deterministically.
+
+| # | Condition (evaluated in order, first match wins) | `connectivity_status` | `health_status` |
+|---|---|---|---|
+| 1 | Central `monitoring_enabled = false`, or slave never yet observed by any scan | `UNKNOWN` | `UNKNOWN` |
+| 2 | Central `OFFLINE` (its `/v2/slaves` probe failed under the retry policy, §2a) | `UNKNOWN` (can't observe the slave) | `UNKNOWN` |
+| 3 | Gateway `status = offline` in `/v2/slaves` | `OFFLINE` | `CRITICAL` |
+| 4 | Telemetry stale beyond the **hard** limit — energy/temp: no arrival for **≥ `TELEMETRY_OFFLINE_AFTER`** (24 h); water: no `reading` **change** for **≥ `WATER_STALE_AFTER`** (72 h) — *even if* gateway said `online`/`bad` | `OFFLINE` | `CRITICAL` |
+| 5 | Gateway `status = bad` (reporting, but self-flagged unhealthy) | `ONLINE` | `DEGRADED` |
+| 6 | Gateway `status = online` but telemetry stale in the **soft** band (older than one expected cadence, below the hard limit of #4) | `ONLINE` | `DEGRADED` |
+| 7 | Open alarm (orchestrator) or active RFC-0055 no-consumption incident on the device | `ONLINE` | `DEGRADED` |
+| 8 | Gateway `status = online` **and** telemetry fresh **and** no alarms/incidents | `ONLINE` | `HEALTHY` |
+
+Key precedence rules baked into the ladder: **`offline` from the gateway (row 3) outranks everything except "can't observe" (rows 1–2)** — it's the definitive-down path. **The hard-staleness rule (row 4) outranks the gateway's `online`/`bad` claim** — a frozen meter reporting `online` is `OFFLINE/CRITICAL`, not falsely green. The **soft** band (row 6) is what turns "online but a bit late" into `DEGRADED` rather than immediately `OFFLINE`. `DashboardService.devices.health` stops being a mock and reads `health_status` directly; the counts it renders are just a `GROUP BY health_status`.
+
+**Semantics:** `UNKNOWN` (rows 1–2) means *not yet observed / cannot observe*, never *silently healthy* — a device the monitor cannot classify is visibly unknown, not falsely green.
 
 **New device columns (additive migration):** `connectivity_status` (exists), `health_status`, `last_timestamp_telemetry`, `last_value_telemetry`, `last_fetch_energy_telemetry` (cursor), `freshness_policy` (nullable → default). Written **only** by this service (single owner).
 
-### 4. Monitor C — `os-monitor` (Work Orders)
+### 4. Monitor C — `os-monitor` (Work Orders) — **Phase 3, contract-blocked**
+
+> **Status: deliberately under-specified here, and deferred to Phase 3.** WO is **event-sourced with status projected via the rules engine**, so an SLA watchdog cannot be built until the SLA contract below is pinned in its own mini-RFC/decision record. This section states the *shape*, not an implementable spec — bundling it into Phase 1 would couple a well-understood fix (M1/M2) to an unresolved data model. Listed so the end state is visible, not so it ships first.
+
 - **Inputs:** `wo_*` open orders and their SLA/lifecycle timestamps.
-- **Rules:** flag **overdue** (past due date), **SLA-breached** (elapsed > SLA window for its type/priority), and **stale** (no progress in `OS_STALE_AFTER`). On breach, emit an **escalation event** (and/or create/annotate an OS, or notify via the existing dispatch channels) — deny-by-default, one escalation per breach per window (idempotent, keyed by order + rule).
+- **Rules (shape):** flag **overdue** (past due date), **SLA-breached** (elapsed > SLA window for its type/priority), and **stale** (no progress in `OS_STALE_AFTER`). On breach, emit an **escalation event** (and/or create/annotate an OS, or notify via the existing dispatch channels) — deny-by-default, one escalation per breach per window (idempotent, keyed by order + rule).
 - Reuses the existing RFC-0009 audit and the alarm-orchestrator's dispatch where notification is wanted, rather than re-implementing channels.
+
+**Contract to pin before Phase 3 (blockers):**
+1. **Where the due date / SLA window lives** — a column on `wo_*`, a rule-engine-derived projection, or per-type/priority config? An event-sourced order has no ambient "due date" unless one is projected.
+2. **SLA source of truth per type × priority** — the table/config that maps `(work_order_type, priority) → sla_window`, and whether it's versioned.
+3. **Escalation idempotency key** — the exact key (`order_id + rule + breach_window`?) so a breach escalates once, not every scan.
+4. **Which OS event is appended** — the concrete event type written back to the event-sourced order on breach/escalation (so the projection reflects it), vs. a side annotation.
+5. **Interaction with the rules engine** — does `os-monitor` *emit an event the rules engine consumes*, or *write a breach flag directly*? (Prefer the former, to keep the rules engine as the single projector of WO status.)
 
 ### 5. Outputs & contracts
 - **State reconcile:** `centrals.connection_status`, `devices.connectivity_status`, `devices.health_status` — change-only, audited.
@@ -228,6 +299,9 @@ Runs in **two phases per central**, right after `centrals-monitor` confirms the 
 | `WATER_STALE_AFTER` (change) | **72h** | water: no **change** in `reading` for this long ⇒ stuck-or-offline alert |
 | `DEFAULT_FRESHNESS_POLICY` | `default` | policy from the `orchestrator_freshness_policies` book (carries `mode: arrival \| change`) |
 | `TELEMETRY_ENDPOINT_ENERGY` / `_TEMPERATURE` / `_WATER` | `/consumption/slave/{id}/minute/{s}/{e}`, `/temperature_history/slave/{id}/{s}/{e}`, `/flow/slave/{id}/{channel}/{s}/{e}` | per-domain pull endpoints |
+| `TELEMETRY_MAX_CONCURRENCY_PER_CENTRAL` | **8** | max parallel slave pulls against a single gateway/tunnel (Phase 2 fan-out cap) |
+| `TELEMETRY_MAX_CONCURRENCY_GLOBAL` | **32** | max parallel slave pulls across the whole fleet |
+| `TELEMETRY_TICK_BUDGET_MS` | **240000** | per-tick wall-time cap; slaves not reached are deferred (cursor not advanced), never skipped |
 | `OS_SLA_*` / `OS_STALE_AFTER` | per type | work-order SLA windows |
 | `SCAN_BATCH_SIZE`, `SCAN_LEADER_LOCK` | 500, on | batching + advisory-lock HA guard |
 
@@ -247,7 +321,12 @@ A self-contained HTML console **served by the GCDR API process**, in the exact f
 **Controls (admin-gated):**
 - Pause / resume a monitor; **run a scan now** (kick); adjust an interval/threshold at runtime (persisted to the control row, bounded to sane ranges); optionally re-check a single central/device on demand.
 
-**Auth:** gated exactly like the other `/admin/*` cockpits — master key / `DISABLE_AUTH` operator path only (never a customer key); the cockpit is an internal operator tool, not a customer surface.
+**Auth — two tiers, not a single master-key gate.** A panel that only *shows* runs/checks is low-risk; a panel that **pauses monitors and rewrites thresholds** is a control-plane surface and must not ride on `DISABLE_AUTH`/master-key alone. So the cockpit splits its surface:
+
+- **Read-only view** (per-monitor status, runs, checks, live tail, reconcile deltas) — gated like the sibling `/admin/*` observability cockpits (operator path, never a customer key).
+- **Control actions** (MASTER toggle, per-monitor/per-gateway enable, interval/threshold/policy overrides, pause/resume/kick) — require a **real authenticated operator with an explicit RBAC permission** (`orchestrator_devices.control`), **not** an env flag. `DISABLE_AUTH` **must not** unlock control actions; the control endpoints are RBAC-checked independently of the page gate. Every control action is **mandatorily audited** (§8) with the authenticated actor — an unauthenticated or unauthorized control call is rejected, not silently applied. This is the same read-vs-write split the RFC-0057 secrets work landed (`reveal` vs `manage`): observing state and mutating it are different permissions.
+
+The worker itself never serves HTTP and never trusts the cockpit blindly — it reads the `orchestrator_devices_control` row and validates every override against sane bounds (§7 controls) before acting, so a bad/malicious control value is clamped, not obeyed.
 
 **Data model for observability:** two small tables owned by this service — `orchestrator_devices_runs` (one row per scan) and `orchestrator_devices_checks` (one row per entity per scan, retained N days / rolled up), plus a `orchestrator_devices_control` row per monitor. These are the cockpit's source of truth and keep the low-level detail **out of `audit_logs`** (audit keeps only state-change events, per RFC-0009 / RFC-0060).
 
@@ -287,8 +366,8 @@ Auditing is a **cross-cutting requirement, not optional**. Two classes of event 
 ## Unresolved questions
 
 1. **Codebase home** — a worker inside the GCDR repo (proposed) vs. a small standalone service. The GCDR-in-repo option reuses entities/migrations but adds a worker build target.
-2. **Telemetry-freshness source** — does GCDR read the ingestion `last_telemetry_ts` / readings directly (cross-DB), or does ingestion push freshness to GCDR? (ties to RFC-0023).
-3. **`health_status` inputs** — the exact signal set and thresholds for `DEGRADED`/`CRITICAL` (connectivity + alarms + no-consumption + retries?), and who is authoritative.
+2. **Telemetry-freshness source** — the *ownership* is resolved (§1a: ingestion is demoted to a freshness *signal*, this monitor is the single writer of status); what remains open is the **transport** — does GCDR read the ingestion `last_telemetry_ts` / readings directly (cross-DB), or does ingestion push freshness to GCDR? (ties to RFC-0023.) The primary path is anyway the gateway `/v2/slaves` `status` + per-slave pull (§3), with ingestion freshness as a secondary/fallback signal.
+3. **`health_status` inputs** — **resolved** by the deterministic precedence ladder in §3 (rows 1–8). Remaining tuning knob: the exact width of the **soft** staleness band (row 6, "older than one expected cadence") per domain, and whether an open alarm should ever escalate `DEGRADED`→`CRITICAL` rather than staying `DEGRADED` (row 7).
 4. **Redis now or later** — is durable retry / event fan-out needed in v1, or is the advisory-lock timer loop enough?
 5. **Escalation delivery** — does `os-monitor` dispatch directly (reusing channels) or only emit events for the alarm-orchestrator to dispatch?
 6. **Dokploy build path** — the GCDR backend still builds on-host (GHCR cutover pending); a new worker container should ship via the same GHCR image to avoid the OOM build path.
