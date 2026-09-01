@@ -479,7 +479,18 @@ the cap: GCDR performs `CreateMultipartUpload` at claim time; the agent obtains
 per-part presigned URLs via the CR-S9-style re-mint endpoint (part number as a
 parameter); the server performs `CompleteMultipartUpload` as part of VERIFY;
 per-part retry/resume also fixes 4G connection drops mid-upload. Tracked as a
-prioritized unresolved question. *Rejected:* presigned POST policies — the
+prioritized unresolved question.
+
+> **Coverage decision (PRODUCT — required before implementation kickoff):**
+> v1 with single-PUT **explicitly does NOT protect centrals whose dump exceeds
+> 4 GiB** — and Moxuara, the known worst case, is in that class. This cannot be
+> resolved by engineering defaults; product MUST pick one:
+> **(a)** accept that Moxuara-class centrals stay on the legacy/manual path
+> until multipart ships (and the legacy kill-switch of DEC-4 MUST NOT fire
+> before that), or **(b)** promote multipart upload from "prerequisite to raise
+> the cap" to a **requirement of the first implementation**, accepting the
+> extra scope. The RFC intentionally does not choose — shipping v1 while
+> silently excluding the fleet's biggest database would be the worst outcome. *Rejected:* presigned POST policies — the
 agent-side upload code and CR-S9 re-mint flow are built around PUT, and the
 marginal win doesn't justify the churn.
 
@@ -920,7 +931,10 @@ section, not scattered footnotes.
    `CreateMultipartUpload` / per-part re-mint / server-side
    `CompleteMultipartUpload` flow is sketched but not costed; it is the
    prerequisite for raising `CENTRAL_BACKUP_MAX_BYTES`, and Moxuara-class
-   TimescaleDB dumps are the forcing function.
+   TimescaleDB dumps are the forcing function. **Carries a mandatory product
+   decision (see the Coverage decision callout in DEC-13): exclude
+   Moxuara-class centrals from v1, or make multipart part of the first
+   implementation.**
 3. **Cross-central restore** (restore central B from central A's backup) — 0052
    binds backup and target to the same central id (field-swap identity model).
    Real demand exists for "clone a config to a new site"; needs its own RFC
