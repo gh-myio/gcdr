@@ -650,6 +650,7 @@ errors: house `AppError` envelope; all listings paginated
 | `GET /centrals/:id/backups?status&from&to` | `centrals.backup.read` | 200 page | 404 |
 | `GET /centrals/:id/backups/:backupId` | `centrals.backup.read` | 200 metadata | 404 |
 | `GET /central-backups?from&to&status&centralId&customerId` | `centrals.backup.read` | 200 page (hierarchy-filtered) | — |
+| `POST /central-backups/reconciliation-runs` | `centrals.backup.write` | 202 run summary — invokes the list Lambda and diffs S3 vs registry (DEC-19) | — |
 | `GET /centrals/:id/backups/:backupId/download-url` | `centrals.backup.download` | 200 `{downloadUrl, sha256, byteSize, expiresIn}` | 404; 400 not AVAILABLE; 429 |
 | `DELETE /centrals/:id/backups/:backupId` | `centrals.backup.write` | 204 | 404; 428 no token; 409 referenced by active restore |
 | `POST /centrals/:id/restore` | `centrals.restore.execute` | 201 job | 404; 400 backup not restorable / no sha256 / no Idempotency-Key / missing `reason` (or `reasonNote` when OTHER); 428 no `confirmationToken`; 409 `RESTORE_ACTIVE`; 429 |
@@ -838,6 +839,50 @@ re-enroll, restore the latest backup.
 > swap (new serial → new row), the same-central binding makes every backup of
 > the old row unreachable exactly when it is needed most — and **cross-central
 > restore (Q3) is promoted to P0** for this feature to deliver its core value.
+
+## S3-side listing & reconciliation (Lambda)
+
+**DEC-19 — An AWS Lambda lists what is *actually* in the bucket, on command.**
+The database registry (`central_backups`) is the operational source of truth,
+but it can drift from S3 reality in both directions: an `AVAILABLE` row whose
+object was lost, and orphan objects paying storage with no row (a failed
+upload, a bug, a delete that half-happened — DEC-12's retry loop shrinks but
+cannot eliminate this class). And in a true disaster — the GCDR database
+itself lost — the bucket *is* the only source of truth and MUST be listable
+without a working GCDR.
+
+A dedicated **`central-backups-list` Lambda** (read-only IAM: `s3:ListBucket`
++ `s3:GetObject` *metadata* on the backups prefix only, no GetObject body, no
+delete) receives a command payload and returns a manifest:
+
+```jsonc
+// invoke payload (all filters optional)
+{ "tenantId": "…", "centralId": "…", "prefix": "…", "modifiedAfter": "…" }
+// response: manifest of what S3 actually holds
+{ "objects": [ { "key": "…", "byteSize": 123, "lastModified": "…",
+                 "checksumSha256": "…" } ], "truncated": false }
+```
+
+Two invocation paths, both MUST be supported:
+
+1. **Via GCDR (reconciliation):** `POST /central-backups/reconciliation-runs`
+   (admin-only, `centrals.backup.write`) invokes the Lambda through the AWS
+   SDK and diffs the manifest against `central_backups`: rows `AVAILABLE`
+   with no object → flagged `MISSING_OBJECT` (audited, surfaced on the
+   unprotected-centrals report); objects with no row → listed as orphans for
+   the retention sweep to delete through the normal audited path. SHOULD also
+   run on a weekly schedule.
+2. **Direct invoke (disaster runbook):** ops calls the Lambda straight from
+   AWS (console/CLI) when GCDR is down — the manifest is the restore shopping
+   list. The DR runbook MUST document this path; it is the reason this is a
+   Lambda and not just GCDR-side `ListObjectsV2` code.
+
+*Rejected:* GCDR-only listing (dies with GCDR — defeats the DR purpose);
+*rejected:* S3 Inventory reports as the primary mechanism (daily latency and
+CSV-manifest plumbing for a bucket this size is heavier than a list call —
+MAY be adopted later purely as a cost optimization for very large fleets);
+*rejected:* granting the Lambda delete rights — deletion stays exclusively in
+GCDR's audited sweep.
 
 ## Data protection
 
