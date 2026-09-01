@@ -175,17 +175,35 @@ const PAGE_HTML = `<!doctype html>
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
   code { color:var(--code); white-space:pre-wrap; word-break:break-all; }
   .mode-shadow{color:var(--mode-shadow)}.mode-canonical{color:var(--mode-canonical)}.mode-held{color:var(--mode-held)}
+  .login-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9999; }
+  .login-modal.hidden { display:none; }
+  .login-box { background:var(--panel); padding:32px; border-radius:12px; border:1px solid var(--border); text-align:center; max-width:380px; width:90%; }
+  .login-box h2 { color:var(--accent); margin:0 0 8px; font-size:16px; }
+  .login-box p { color:var(--muted); margin:0 0 16px; font-size:12px; }
+  .login-box input { width:100%; padding:10px 12px; margin-bottom:12px; box-sizing:border-box; }
+  .login-error { color:var(--bad-fg); font-size:12px; margin-bottom:10px; display:none; }
+  .login-error.show { display:block; }
+  .dot { color:#16a34a; } #connBadge button { margin-left:6px; }
 </style></head>
 <body>
 <header>
   <h1>orchestrator-devices</h1><span class="ro">READ-ONLY · Phase 2A</span>
-  <input id="pw" type="password" placeholder="admin password" style="width:160px">
-  <button onclick="connect()">Connect</button>
+  <span id="connBadge" style="display:none"><span class="dot">●</span> connected <button onclick="logout()">Logout</button></span>
   <label class="mut"><input type="checkbox" id="auto" checked> auto 10s</label>
   <span id="err" class="bad" style="display:none"></span>
   <span class="spacer"></span>
   <button id="themeBtn" onclick="toggleTheme()" title="toggle light/dark">🌙 dark</button>
 </header>
+
+<div id="login-modal" class="login-modal">
+  <div class="login-box">
+    <h2>orchestrator-devices</h2>
+    <p>Enter the admin password to view the cockpit.</p>
+    <input type="password" id="pw" placeholder="Password" onkeypress="if(event.key==='Enter')checkPassword()">
+    <div id="loginErr" class="login-error">Invalid password. Try again.</div>
+    <button onclick="checkPassword()" style="width:100%">Unlock</button>
+  </div>
+</div>
 <main>
   <section><h2>Worker summary</h2><div id="summary" class="kv"></div></section>
   <section><h2>Recent runs</h2><div class="wrap"><table id="runs"></table></div></section>
@@ -209,9 +227,21 @@ const PAGE_HTML = `<!doctype html>
   function toggleTheme(){ const next = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
     try{ localStorage.setItem('od-theme',next); }catch(e){} applyTheme(next); }
   try{ applyTheme(localStorage.getItem('od-theme')||'light'); }catch(e){ applyTheme('light'); }
-  let pw = sessionStorage.getItem('odpw')||'';
-  if(pw) $('pw').value=pw;
-  function connect(){ pw=$('pw').value; sessionStorage.setItem('odpw',pw); load(); }
+  let pw = '';
+  function setConnected(on){
+    $('login-modal').classList.toggle('hidden', on);
+    $('connBadge').style.display = on ? 'inline' : 'none';
+  }
+  async function validate(candidate){
+    try{ const r = await fetch('/admin/orchestrator-devices/api/summary',{headers:{'x-admin-password':candidate}}); return r.ok; }
+    catch(e){ return false; }
+  }
+  async function checkPassword(){
+    const val = $('pw').value;
+    if(await validate(val)){ pw=val; sessionStorage.setItem('odpw',pw); $('loginErr').classList.remove('show'); setConnected(true); load(); }
+    else { $('loginErr').classList.add('show'); $('pw').value=''; $('pw').focus(); }
+  }
+  function logout(){ pw=''; sessionStorage.removeItem('odpw'); $('pw').value=''; $('loginErr').classList.remove('show'); $('err').style.display='none'; setConnected(false); $('pw').focus(); }
   async function api(path){
     const r = await fetch('/admin/orchestrator-devices/api/'+path,{headers:{'x-admin-password':pw}});
     if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error||('HTTP '+r.status));
@@ -284,7 +314,11 @@ const PAGE_HTML = `<!doctype html>
   function card(l,v){ return '<div class="card"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>'; }
   function badBool(v,safeWhenFalse){ const on=v===true||v==='true'; const cls=(on!==!!safeWhenFalse)?(safeWhenFalse?'bad':'ok'):'ok';
     return '<span class="b '+(on?(safeWhenFalse?'warn':'ok'):(safeWhenFalse?'ok':'mut'))+'">'+(on?'ON':'off')+'</span>'; }
-  if(pw) load();
+  (async function initAuth(){
+    const stored = sessionStorage.getItem('odpw')||'';
+    if(stored && await validate(stored)){ pw=stored; setConnected(true); load(); }
+    else { setConnected(false); $('pw').focus(); }
+  })();
   setInterval(()=>{ if($('auto').checked && pw) load(); },10000);
 </script>
 </body></html>`;
