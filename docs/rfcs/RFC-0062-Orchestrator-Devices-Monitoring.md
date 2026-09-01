@@ -10,6 +10,11 @@
 
 > **What changed in v2.** The v1 draft tried to ship three monitors as one thing, sold `2xx == ONLINE` as truth, proposed a hard single-writer cutover, and left "emit incidents in ALARMS" as a generic phrase. v2 responds to a full review round: it **slices the MVP** (gateway **and** devices connectivity, not health/telemetry), replaces the **hard cutover with shadow-mode + rollback flags**, makes **`UNKNOWN` an explainable state** (`unknown_reason`), **stops treating a 2xx as health truth**, adds a **sanity gate** against mass-transition writes, and — the big one — turns the ALARMS integration into a **hard incident contract** (kinds, dedupe keys, lifecycle, cascade suppression). Advisory-lock leadership is retained but explicitly scoped to a **single-replica MVP** (no external pooler confirmed; HA is a non-goal for v1).
 
+> **Implementation status (living — Phase 1 in progress on `feat/rfc-0062-orchestrator-devices`).**
+> - ✅ **Batch 1 — runtime skeleton (write-safe).** Migration `0070` (additive columns + `orchestrator_devices_{control,runs,checks}` + retry/freshness policy books, all seeded SAFE: MASTER off, shadow on, canonical/incident off) + Drizzle schema; `reserveConnection()` (db.ts); worker entrypoint (scheduler, top-down gates, heartbeat, no-overlap, graceful shutdown); per-monitor advisory lock on a reserved connection (§1); `/v2/slaves` client with tolerant Zod + retry book + error taxonomy (§4/§5). Writes nothing canonical.
+> - ⏳ **Batch 2 — monitors in shadow.** centrals-monitor (evidence only) → devices-monitor (shadow: `proposed_write` + `unknown_reason`) → sanity gate. Canonical writes + incident emission stay OFF.
+> - ⬜ **Pending.** Enable canonical writes behind the flag (item 7) → incident emission (§8) → config/compose + tests + operator docs → cockpit (Phase 2) → telemetry fan-out (Phase 2) → os-monitor (Phase 3).
+
 ---
 
 ## Summary

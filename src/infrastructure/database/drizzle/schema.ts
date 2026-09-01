@@ -68,6 +68,12 @@ export const centralTypeEnum = pgEnum('central_type', ['NODEHUB', 'GATEWAY', 'ED
 
 export const connectionStatusEnum = pgEnum('connection_status', ['ONLINE', 'OFFLINE', 'DEGRADED', 'MAINTENANCE']);
 
+// RFC-0062 (orchestrator-devices): derived device health + explainable UNKNOWN.
+export const healthStatusEnum = pgEnum('health_status', ['HEALTHY', 'DEGRADED', 'CRITICAL', 'UNKNOWN']);
+export const deviceUnknownReasonEnum = pgEnum('device_unknown_reason', [
+  'AWAITING_FIRST_SCAN', 'NEVER_OBSERVED', 'SCAN_FAILED', 'CENTRAL_UNREACHABLE', 'AUTH_ERROR', 'CONFIG_ERROR',
+]);
+
 export const groupTypeEnum = pgEnum('group_type', ['USER', 'DEVICE', 'ASSET', 'MIXED']);
 
 export const integrationTypeEnum = pgEnum('integration_type', ['INBOUND', 'OUTBOUND', 'BIDIRECTIONAL']);
@@ -402,6 +408,14 @@ export const devices = pgTable('devices', {
   connectivityStatus: connectivityStatusEnum('connectivity_status').notNull().default('UNKNOWN'),
   lastConnectedAt: timestamp('last_connected_at', { withTimezone: true }),
   lastDisconnectedAt: timestamp('last_disconnected_at', { withTimezone: true }),
+
+  // RFC-0062 orchestrator-devices — device state written ONLY by the worker.
+  healthStatus: healthStatusEnum('health_status').notNull().default('UNKNOWN'),
+  unknownReason: deviceUnknownReasonEnum('unknown_reason'),
+  lastTimestampTelemetry: timestamp('last_timestamp_telemetry', { withTimezone: true }),
+  lastValueTelemetry: numeric('last_value_telemetry'),
+  lastFetchEnergyTelemetry: timestamp('last_fetch_energy_telemetry', { withTimezone: true }),
+  freshnessPolicy: varchar('freshness_policy', { length: 50 }),
 
   // Credentials and Telemetry
   credentials: jsonb('credentials'),
@@ -783,6 +797,17 @@ export const centrals = pgTable('centrals', {
   // Status
   status: entityStatusEnum('status').notNull().default('ACTIVE'),
   connectionStatus: connectionStatusEnum('connection_status').notNull().default('OFFLINE'),
+
+  // RFC-0062 orchestrator-devices — per-gateway monitoring gate + probe evidence.
+  // connection_status above is the CANONICAL status, written by devices-monitor
+  // from /v2/slaves (§2); the fields here are the probe evidence written by
+  // centrals-monitor. monitoring_enabled is opt-in (rolled out gateway-by-gateway).
+  monitoringEnabled: boolean('monitoring_enabled').notNull().default(false),
+  checkIntervalSeconds: integer('check_interval_seconds'),
+  retryPolicy: varchar('retry_policy', { length: 50 }),
+  lastGatewayCheckAt: timestamp('last_gateway_check_at', { withTimezone: true }),
+  lastGatewayCheckLatencyMs: integer('last_gateway_check_latency_ms'),
+  probeResult: varchar('probe_result', { length: 40 }),
 
   // Version
   firmwareVersion: varchar('firmware_version', { length: 50 }).notNull(),
@@ -2953,4 +2978,79 @@ export const invExternalPushOutbox = pgTable('inv_external_push_outbox', {
 }, (table) => ({
   drainIdx:    index('inv_external_push_outbox_drain_idx').on(table.tenantId, table.status, table.nextAttemptAt),
   statusCheck: check('inv_external_push_outbox_status_check', sql`${table.status} IN ('PENDING','FAILED','DONE')`),
+}));
+
+// ── RFC-0062 orchestrator-devices operational tables (migration 0070) ─────────
+
+// Retry policy "book" (§4): named, ordered backoff lists tuned without a deploy.
+export const orchestratorRetryPolicies = pgTable('orchestrator_retry_policies', {
+  name:        varchar('name', { length: 50 }).primaryKey(),
+  attempts:    jsonb('attempts').notNull(),          // [{delay_ms, timeout_ms?}]
+  description: text('description'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Freshness policy "book" (§6): arrival (energy/temp) vs change (water). The
+// offline_after_seconds defaults (24h/72h) are a hypothesis validated in shadow.
+export const orchestratorFreshnessPolicies = pgTable('orchestrator_freshness_policies', {
+  name:                varchar('name', { length: 50 }).primaryKey(),
+  mode:                varchar('mode', { length: 10 }).notNull(),   // arrival | change
+  offlineAfterSeconds: integer('offline_after_seconds').notNull(),
+  window:              varchar('window', { length: 20 }),
+  granularity:         varchar('granularity', { length: 20 }),
+  description:         text('description'),
+  createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  modeCheck: check('orchestrator_freshness_policies_mode_check', sql`${table.mode} IN ('arrival','change')`),
+}));
+
+// Worker control plane (§1/§9/§10): MASTER + per-monitor gates + FLAGS (rollback
+// switches: shadow_mode / canonical_writes_enabled / incident_emission_enabled).
+// last_run_at is the worker's heartbeat.
+export const orchestratorDevicesControl = pgTable('orchestrator_devices_control', {
+  scope:     varchar('scope', { length: 20 }).primaryKey(),  // MASTER|CENTRALS|DEVICES|OS|FLAGS
+  enabled:   boolean('enabled').notNull().default(true),
+  config:    jsonb('config').notNull().default({}),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+});
+
+// Per-scan run ledger (§7/§12): one row per monitor scan.
+export const orchestratorDevicesRuns = pgTable('orchestrator_devices_runs', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  monitor:    varchar('monitor', { length: 20 }).notNull(),  // centrals|devices|os
+  startedAt:  timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  scanned:    integer('scanned').notNull().default(0),
+  changed:    integer('changed').notNull().default(0),
+  skipped:    integer('skipped').notNull().default(0),
+  deferred:   integer('deferred').notNull().default(0),
+  failures:   integer('failures').notNull().default(0),
+  notes:      jsonb('notes').notNull().default({}),
+}, (table) => ({
+  monitorIdx: index('orchestrator_devices_runs_monitor_idx').on(table.monitor, table.startedAt),
+}));
+
+// Per-entity per-scan detail + shadow ledger (§7/§9): proposed_write records what
+// the worker WOULD write while shadow_mode is on — never audit_logs (§13/RFC-0060).
+export const orchestratorDevicesChecks = pgTable('orchestrator_devices_checks', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  runId:            uuid('run_id').references(() => orchestratorDevicesRuns.id, { onDelete: 'cascade' }),
+  monitor:          varchar('monitor', { length: 20 }).notNull(),
+  entityType:       varchar('entity_type', { length: 20 }).notNull(),  // central|device
+  entityId:         uuid('entity_id').notNull(),
+  centralId:        uuid('central_id'),
+  input:            jsonb('input'),
+  computedState:    varchar('computed_state', { length: 30 }),
+  proposedWrite:    jsonb('proposed_write'),
+  causedTransition: boolean('caused_transition').notNull().default(false),
+  latencyMs:        integer('latency_ms'),
+  policy:           varchar('policy', { length: 50 }),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  entityIdx:  index('orchestrator_devices_checks_entity_idx').on(table.entityType, table.entityId, table.createdAt),
+  createdIdx: index('orchestrator_devices_checks_created_idx').on(table.createdAt),
 }));

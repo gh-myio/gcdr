@@ -63,6 +63,21 @@ export async function executeRawScript(sqlText: string): Promise<unknown> {
   }
 }
 
+/**
+ * Reserve a DEDICATED connection pinned to one socket, for session-level
+ * advisory locks (RFC-0062 orchestrator-devices leader lock). The caller MUST
+ * `release()` it when done.
+ *
+ * Safe because there is **no external transaction pooler (PgBouncer) in front of
+ * this Postgres** — `DATABASE_URL` points straight at the DB and postgres.js
+ * pools in-process. A session-level `pg_advisory_lock` therefore stays valid as
+ * long as it runs on this same reserved socket for the lock's whole lifetime.
+ * (Behind a transaction-pooling PgBouncer it would be unsafe — it is not.)
+ */
+export async function reserveConnection(): Promise<Awaited<ReturnType<typeof queryClient.reserve>>> {
+  return queryClient.reserve();
+}
+
 // Export schema for use in queries
 export { schema };
 
