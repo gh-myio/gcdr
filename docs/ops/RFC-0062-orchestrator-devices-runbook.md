@@ -379,7 +379,7 @@ psqlc "SELECT c.id,
        JOIN centrals c ON c.id = k.entity_id
        WHERE k.entity_type='central'
          AND k.run_id=(SELECT id FROM orchestrator_devices_runs ORDER BY created_at DESC LIMIT 1)
-         AND c.connection_status IS DISTINCT FROM k.proposed_write->>'connectionStatus';"
+         AND c.connection_status::text IS DISTINCT FROM k.proposed_write->>'connectionStatus';"
 ```
 
 ### Flip: shadow OFF + canonical ON (single statement, no redeploy)

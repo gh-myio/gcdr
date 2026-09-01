@@ -115,6 +115,7 @@ import {
 import { simulatorAdminController } from './controllers/admin/simulator-admin.controller';
 import { singleDashboardController } from './controllers/single-dashboard.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
+import { orchestratorDevicesAdminController } from './controllers/admin/orchestrator-devices-admin.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
 import { centralPreKeyAuth, startLockoutJanitor } from './middleware/centralPreKeyAuth';
@@ -189,6 +190,9 @@ app.use('/admin/users', userAdminController);
 
 // API Monitor UI
 app.use('/admin/monitor', monitorAdminController);
+
+// orchestrator-devices cockpit (RFC-0062 Phase 2A — read-only observability)
+app.use('/admin/orchestrator-devices', orchestratorDevicesAdminController);
 
 // =============================================================================
 // Security Middleware (after admin routes that need relaxed CSP)
