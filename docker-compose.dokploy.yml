@@ -1,0 +1,60 @@
+# =============================================================================
+# Dokploy Compose — orchestrator-devices worker (RFC-0062)
+#
+# A headless GCDR worker deployed alongside the API (which ships via dokploy.yml).
+# Same image as the API, different command. It serves NO HTTP and exposes NO
+# public port — it probes gateways and reconciles state off the request path.
+#
+# Postgres is a Dokploy-managed service (see dokploy.yml notes); this worker
+# reaches it via the same `database-url` provided at deploy time as DATABASE_URL.
+#
+# SAFETY: the worker boots SAFE regardless of this file — migration 0070 seeds the
+# `orchestrator_devices_control` table with MASTER off, shadow_mode on, canonical
+# writes off and incident emission off. A fresh deploy therefore never writes
+# canonical status or opens an incident until an operator flips the DB flags
+# (see docs/ops/RFC-0062-orchestrator-devices-runbook.md).
+#
+# GHCR note (RFC-0062 Q6): to avoid on-host OOM builds, this should ship via the
+# same GHCR image the API cutover uses (build in CI → pull here) rather than
+# building on the Dokploy host. The `build:` block below mirrors dokploy.yml for
+# parity until that cutover lands.
+# =============================================================================
+
+services:
+  orchestrator-devices:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    command: ["node", "dist/workers/orchestrator-devices.worker.js"]
+
+    # Non-secret config lives here; DATABASE_URL and ALARMS_API_TOKEN come from the
+    # Dokploy environment/secrets, NOT from the committed file.
+    env_file:
+      - .env.dokploy.orchestrator-devices
+
+    # No `ports:` — the worker is internal-only (no HTTP surface).
+
+    # Liveness from the DB heartbeat (last_run_at), not an HTTP endpoint. Catches a
+    # crashed OR hung worker. start_period covers boot + first tick.
+    healthcheck:
+      test: ["CMD", "node", "dist/workers/orchestrator-devices.healthcheck.js"]
+      interval: 60s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+
+    # on-failure (not always/unless-stopped): a genuine crash restarts, but the
+    # process is not force-cycled in a way that hides a crash-loop — every restart's
+    # structured JSON logs go to stdout and are visible in Dokploy.
+    restart: on-failure
+
+    deploy:
+      replicas: 1 # single replica — HA is a non-goal for Phase 1 (RFC-0062 §1)
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.1"
