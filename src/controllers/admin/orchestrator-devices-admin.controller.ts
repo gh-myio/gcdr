@@ -177,6 +177,29 @@ const PAGE_HTML = `<!doctype html>
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
   code { color:var(--code); white-space:pre-wrap; word-break:break-all; font-family:ui-monospace,Menlo,Consolas,monospace; }
   .mode-shadow{color:var(--mode-shadow)}.mode-canonical{color:var(--mode-canonical)}.mode-held{color:var(--mode-held)}
+  /* Blocks / panels */
+  .strip { display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:22px; }
+  .posture { font-size:15px; font-weight:800; padding:4px 14px; border-radius:8px; letter-spacing:.02em; }
+  .posture.ok{ background:var(--ok-bg); color:var(--ok-fg); } .posture.info{ background:var(--ro-bg); color:var(--accent); } .posture.warn{ background:var(--warn-bg); color:var(--warn-fg); }
+  .strip-pills { display:flex; gap:6px; flex-wrap:wrap; }
+  .pill { font-size:11px; padding:2px 9px; border-radius:11px; border:1px solid var(--border); white-space:nowrap; }
+  .pill-on{ background:var(--ok-bg); color:var(--ok-fg); border-color:transparent; } .pill-off{ background:transparent; color:var(--muted); } .pill-warn{ background:var(--warn-bg); color:var(--warn-fg); border-color:transparent; }
+  .strip-right { margin-left:auto; font-size:12px; text-align:right; }
+  .panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .panel h4 { margin:0 0 10px; font-size:13px; color:var(--accent); }
+  .panel .row { display:flex; justify-content:space-between; gap:12px; padding:4px 0; border-bottom:1px dashed var(--rowb); }
+  .panel .row:last-child{ border-bottom:0; } .panel .row .k{ color:var(--muted); } .panel .row .v{ text-align:right; font-weight:600; }
+  .alert { border:1px solid var(--border); border-left:4px solid var(--bad-fg); background:var(--bad-bg); border-radius:8px; padding:12px 16px; }
+  .alert.calm { border-left-color:var(--ok-fg); background:var(--ok-bg); }
+  .alert .big { font-size:14px; font-weight:800; margin-bottom:6px; }
+  .alert .drow { display:flex; gap:10px; align-items:center; padding:3px 0; flex-wrap:wrap; }
+  .arrow { color:var(--muted); }
+  tr.grp { cursor:pointer; } tr.grp:hover td { background:var(--th); }
+  tr.grp .caret { color:var(--muted); display:inline-block; width:12px; }
+  tr.grp-detail td { background:var(--bg); font-size:11px; }
+  .chips .b { margin-right:4px; }
+  .morebtn { margin-top:8px; }
   .login-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9999; }
   .login-modal.hidden { display:none; }
   .login-box { background:var(--panel); padding:32px; border-radius:12px; border:1px solid var(--border); text-align:center; max-width:380px; width:90%; }
@@ -225,16 +248,20 @@ const PAGE_HTML = `<!doctype html>
   </div>
 </div>
 <main>
-  <section><h2 data-i18n="summary">Worker summary</h2><div id="summary" class="kv"></div></section>
-  <section><h2 data-i18n="runs">Recent runs</h2><div class="wrap"><table id="runs"></table></div></section>
-  <section><h2 data-i18n="divergence">Divergence — canonical vs proposed (latest run)</h2><div class="wrap"><table id="div"></table></div></section>
+  <section class="strip" id="strip"></section>
+  <section><h2 data-i18n="latest">Latest scan</h2><div id="latest" class="panels"></div></section>
+  <section><h2 data-i18n="divergence_h">Divergence</h2><div id="divPanel"></div></section>
+  <section><h2 data-i18n="runs">Recent runs</h2>
+    <div class="wrap"><table id="runs"></table></div>
+    <button class="morebtn" id="runsMore" onclick="toggleRuns()"></button>
+  </section>
   <section><h2 data-i18n="checks">Checks (shadow ledger)</h2>
     <div class="filters">
-      <input id="fCentral" data-i18n-ph="ph_central" placeholder="centralId (uuid)" style="width:280px">
-      <input id="fCustomer" data-i18n-ph="ph_customer" placeholder="customerId (uuid)" style="width:280px">
+      <input id="fCentral" data-i18n-ph="ph_central" placeholder="centralId (uuid)" style="width:260px">
+      <input id="fCustomer" data-i18n-ph="ph_customer" placeholder="customerId (uuid)" style="width:260px">
       <input id="fReason" data-i18n-ph="ph_reason" placeholder="unknown_reason">
       <input id="fState" data-i18n-ph="ph_state" placeholder="state (e.g. OFFLINE)">
-      <button onclick="load()" data-i18n="filter">Filter</button>
+      <button onclick="loadChecks()" data-i18n="filter">Filter</button>
     </div>
     <div class="wrap"><table id="checks"></table></div>
   </section>
@@ -281,8 +308,8 @@ const PAGE_HTML = `<!doctype html>
       '</table><p class="mut">Probe: queda genuína (timeout/conn/5xx) ⇒ central OFFLINE + devices UNKNOWN/CENTRAL_UNREACHABLE. 401/403 ⇒ AUTH_ERROR. NXDOMAIN/4xx ⇒ CONFIG_ERROR. A senha é <code>DB_ADMIN_PASSWORD</code>.</p>',
   };
   const I18N = {
-    'en': {ro:'READ-ONLY · Phase 2A',connected:'connected',logout:'Logout',auto:'auto 10s',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal'},
-    'pt-BR': {ro:'SOMENTE LEITURA · Phase 2A',connected:'conectado',logout:'Sair',auto:'auto 10s',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal'},
+    'en': {ro:'READ-ONLY · Phase 2A',connected:'connected',logout:'Logout',auto:'auto 10s',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE · idle',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'probe',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices'},
+    'pt-BR': {ro:'SOMENTE LEITURA · Phase 2A',connected:'conectado',logout:'Sair',auto:'auto 10s',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO · ocioso',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'probe',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices'},
   };
   let lang = 'en';
   try { lang = localStorage.getItem('od-lang') || (((navigator.language||'').toLowerCase().indexOf('pt')===0) ? 'pt-BR' : 'en'); } catch(e){}
@@ -330,41 +357,96 @@ const PAGE_HTML = `<!doctype html>
   function ageStr(ms){ if(ms==null)return '—'; const s=Math.round(ms/1000); return s<90?s+'s':Math.round(s/60)+'m'; }
   function tbl(el, cols, rows, cell){ el.innerHTML='<tr>'+cols.map(c=>'<th>'+t('col_'+c)+'</th>').join('')+'</tr>'+
     rows.map(r=>'<tr>'+cols.map(c=>'<td>'+cell(r,c)+'</td>').join('')+'</tr>').join(''); }
+  let allRuns=[], runsExpanded=false;
+  function chip(txt,cls){ return '<span class="b '+(cls||'')+'">'+esc(txt)+'</span>'; }
+  function prow(k,v){ return '<div class="row"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
+  function posture(s){ const f=s.flags||{};
+    if(!s.master) return {label:t('safe_idle'), cls:'ok'};
+    if(f.canonical_writes_enabled && !f.shadow_mode) return {label:'CANONICAL', cls:'warn'};
+    if(f.shadow_mode) return {label:'SHADOW', cls:'info'};
+    return {label:'ACTIVE', cls:'info'};
+  }
+  function pill(label,on,goodWhenOff){ const cls=on?(goodWhenOff?'pill-warn':'pill-on'):'pill-off';
+    return '<span class="pill '+cls+'">'+label+': '+(on?'on':'off')+'</span>'; }
+  function renderStrip(s){ const f=s.flags||{}; const p=posture(s);
+    $('strip').innerHTML =
+      '<span class="posture '+p.cls+'">'+p.label+'</span>'+
+      '<span class="mut">MASTER '+(s.master?'on':'off')+'</span>'+
+      '<span class="strip-pills">'+pill('shadow',!!f.shadow_mode,false)+pill('canonical',!!f.canonical_writes_enabled,true)+pill('incidents',!!f.incident_emission_enabled,true)+'</span>'+
+      '<span class="strip-right"><span class="'+(s.healthy?'ok':'bad')+'">'+t('worker')+' '+(s.healthy?t('val_healthy'):t('val_stale'))+'</span> <span class="mut">· '+t('last_tick')+' '+ageStr(s.ageMs)+'</span><br>'+
+      '<span class="mut">'+s.enabledGateways+' '+t('gateways_enabled')+' · sanity '+(f.sanity_max_fleet_flip_pct==null?'?':f.sanity_max_fleet_flip_pct)+'% · debounce '+(f.incident_open_after_ticks==null?'?':f.incident_open_after_ticks)+'</span></span>';
+  }
+  function renderLatest(run, sample){
+    if(!run){ $('latest').innerHTML='<div class="panel mut">'+t('no_runs')+'</div>'; return; }
+    const n=run.notes||{}; const inc=n.incidents||{};
+    const central = sample ? (sample.central_name||sample.central_id||'—') : '—';
+    const inp = sample ? (sample.input||{}) : {};
+    const probe = inp.gatewayStatus||inp.kind||'';
+    const lat = (sample && sample.latency_ms!=null) ? sample.latency_ms+'ms' : '—';
+    const p1='<div class="panel"><h4>'+esc(central)+'</h4>'+
+      prow(t('probe'), probe?chip(String(probe).replace('probe:',''),'bad'):'—')+
+      prow(t('col_latency'), esc(lat))+
+      prow(t('col_mode'), '<span class="mode-'+(n.mode||'shadow')+'">'+esc(n.mode||'—')+'</span>')+'</div>';
+    const p2='<div class="panel"><h4>'+t('summary')+'</h4>'+
+      prow(t('suppressed'), esc(n.deviceTotal==null?'—':n.deviceTotal)+' <span class="mut">CENTRAL_UNREACHABLE</span>')+
+      prow(t('canon_writes'), esc(n.applied==null?0:n.applied))+
+      prow(t('inc_candidates'), esc(inc.candidates==null?0:inc.candidates)+' <span class="mut">('+(inc.disabled||0)+' disabled / '+(inc.dryRun||0)+' dry / '+(inc.posted||0)+' posted)</span>')+
+      prow('sanity', (n.sanity&&n.sanity.held)?chip('HELD','bad'):chip('ok','ok'))+'</div>';
+    $('latest').innerHTML=p1+p2;
+  }
+  function renderDivergence(d){
+    const cs=(d.centrals||[]), dv=(d.devices||[]); const total=cs.length+dv.length;
+    if(total===0){ $('divPanel').innerHTML='<div class="alert calm">'+t('no_div')+'</div>'; return; }
+    let h='<div class="alert"><div class="big">'+total+' '+t('div_one')+'</div>';
+    cs.forEach(c=>{ h+='<div class="drow"><b>'+esc(c.name||c.id)+'</b> <span class="mut">central</span> '+chip(c.current,'ok')+' <span class="arrow">→</span> '+chip(c.proposed,'bad')+'</div>'; });
+    dv.forEach(x=>{ h+='<div class="drow"><b>'+esc(x.name||x.id)+'</b> <span class="mut">device</span> '+chip(x.current,'ok')+' <span class="arrow">→</span> '+chip(x.proposed,'bad')+'</div>'; });
+    $('divPanel').innerHTML=h+'</div>';
+  }
+  function renderRuns(){
+    const rows = runsExpanded ? allRuns : allRuns.slice(0,5);
+    tbl($('runs'),['started','monitor','mode','scanned','changed','failures','applied','audited','incidents'],rows,(r,c)=>{
+      const n=r.notes||{}; const inc=n.incidents||{};
+      if(c==='started')return esc((r.started_at||'').toString().slice(0,19).replace('T',' '));
+      if(c==='mode'){const m=n.mode||'—';return '<span class="mode-'+m+'">'+esc(m)+'</span>';}
+      if(c==='applied')return esc(n.applied==null?0:n.applied);
+      if(c==='audited')return esc(n.audited==null?0:n.audited);
+      if(c==='incidents')return esc(inc.candidates==null?0:inc.candidates);
+      if(c==='monitor')return esc(r.monitor);
+      return esc(r[c]);
+    });
+    const b=$('runsMore');
+    if(allRuns.length>5){ b.style.display='inline-block'; b.textContent = runsExpanded ? t('less') : t('more')+' ('+allRuns.length+')'; }
+    else b.style.display='none';
+  }
+  function toggleRuns(){ runsExpanded=!runsExpanded; renderRuns(); }
+  function toggleGrp(i){ const d=$('gd'+i), c=$('ca'+i); if(!d)return; const open=d.style.display==='none'; d.style.display=open?'':'none'; if(c)c.textContent=open?'▾':'▸'; }
+  function renderGroupedChecks(checks){
+    const groups=new Map();
+    checks.forEach(c=>{ const pw=c.proposed_write||{}, inp=c.input||{};
+      const reason=pw.unknownReason||''; const signal=inp.gatewayStatus||inp.kind||(inp.ok===false?'probe-fail':'');
+      const key=(c.central_name||c.central_id)+'|'+c.computed_state+'|'+reason+'|'+signal;
+      let g=groups.get(key); if(!g){ g={central:c.central_name||c.central_id||'—',state:c.computed_state,reason:reason,signal:signal,items:[]}; groups.set(key,g); }
+      g.items.push(c);
+    });
+    const arr=[...groups.values()].sort((a,b)=>b.items.length-a.items.length);
+    const el=$('checks');
+    if(arr.length===0){ el.innerHTML='<tr><td class="mut">—</td></tr>'; return; }
+    el.innerHTML='<tr><th></th><th>Central</th><th>'+t('devices')+'</th><th>'+t('col_state')+'</th><th>'+t('col_reason')+'</th><th>'+t('col_signal')+'</th></tr>'+
+      arr.map((g,i)=>{
+        const head='<tr class="grp" onclick="toggleGrp('+i+')"><td><span class="caret" id="ca'+i+'">▸</span></td><td>'+esc(g.central)+'</td><td>'+g.items.length+'</td><td>'+esc(g.state)+'</td><td>'+(g.reason?chip(g.reason,'mut'):'')+'</td><td>'+esc(g.signal)+'</td></tr>';
+        const detail='<tr class="grp-detail" id="gd'+i+'" style="display:none"><td colspan="6">'+
+          g.items.slice(0,200).map(c=>{ const pw=c.proposed_write||{};
+            return '<div class="chips">'+esc(c.device_name||c.entity_id)+' — '+chip('conn '+(pw.connectivityStatus||'?'))+chip('health '+(pw.healthStatus||'?'))+(pw.unknownReason?chip(pw.unknownReason,'mut'):'')+(c.latency_ms!=null?' <span class="mut">'+c.latency_ms+'ms</span>':'')+' <details style="display:inline-block;vertical-align:middle"><summary class="mut">raw</summary><code>'+esc(JSON.stringify(pw))+'</code></details></div>';
+          }).join('')+(g.items.length>200?'<div class="mut">… +'+(g.items.length-200)+'</div>':'')+'</td></tr>';
+        return head+detail;
+      }).join('');
+  }
   async function load(){
     $('err').style.display='none';
     try{
-      const s=await api('summary');
-      const flags=s.flags||{};
-      $('summary').innerHTML=[
-        card('MASTER', s.master? '<span class="b ok">ON</span>':'<span class="b bad">OFF</span>'),
-        card(t('lbl_heartbeat'), (s.healthy?'<span class="b ok">'+t('val_healthy')+'</span>':'<span class="b bad">'+t('val_stale')+'</span>')+' <span class="mut">'+ageStr(s.ageMs)+'</span>'),
-        card('shadow_mode', badBool(flags.shadow_mode,true)),
-        card('canonical_writes', badBool(flags.canonical_writes_enabled,false)),
-        card('incident_emission', badBool(flags.incident_emission_enabled,false)),
-        card(t('lbl_monitors'), (s.monitors||[]).map(m=>m.scope+':'+(m.enabled?'on':'off')).join('  ')),
-        card(t('lbl_gateways'), s.enabledGateways),
-        card('sanity/debounce', 'flip '+(flags.sanity_max_fleet_flip_pct??'?')+'% · '+(flags.incident_open_after_ticks??'?')+' ticks'),
-      ].join('');
-
-      const runs=(await api('runs?limit=25')).runs;
-      tbl($('runs'),['started','monitor','mode','scanned','changed','failures','applied','audited','incidents'],runs,(r,c)=>{
-        const n=r.notes||{}; const inc=n.incidents||{};
-        if(c==='started')return esc((r.started_at||'').toString().slice(0,19).replace('T',' '));
-        if(c==='mode'){const m=n.mode||'—';return '<span class="mode-'+m+'">'+m+'</span>';}
-        if(c==='applied')return esc(n.applied??0);
-        if(c==='audited')return esc(n.audited??0);
-        if(c==='incidents')return esc((inc.candidates??0)+' (post '+(inc.posted??0)+'/dry '+(inc.dryRun??0)+'/dis '+(inc.disabled??0)+')');
-        if(c==='monitor')return esc(r.monitor);
-        return esc(r[c]);
-      });
-
-      const d=await api('divergence');
-      const dv=[...d.centrals.map(x=>({t:'central',...x})),...d.devices.map(x=>({t:'device',...x}))];
-      tbl($('div'),['type','name','current','proposed','current_health','proposed_health'],dv,(r,c)=>{
-        if(c==='type')return esc(r.t); return esc(r[c]);
-      });
-      if(dv.length===0) $('div').innerHTML='<tr><td class="mut">'+t('div_empty')+'</td></tr>';
-
+      const s=await api('summary'); renderStrip(s);
+      allRuns=(await api('runs?limit=50')).runs||[]; renderRuns();
+      renderDivergence(await api('divergence'));
       await loadChecks();
     }catch(e){ $('err').textContent=e.message; $('err').style.display='inline'; }
   }
@@ -374,25 +456,11 @@ const PAGE_HTML = `<!doctype html>
     if($('fCustomer').value)q.set('customerId',$('fCustomer').value.trim());
     if($('fReason').value)q.set('reason',$('fReason').value.trim());
     if($('fState').value)q.set('state',$('fState').value.trim());
-    q.set('limit','150');
-    const checks=(await api('checks?'+q.toString())).checks;
-    tbl($('checks'),['created','type','name','state','proposed','reason','transition','latency','signal'],checks,(r,c)=>{
-      const pw=r.proposed_write||{}; const inp=r.input||{};
-      if(c==='created')return esc((r.created_at||'').toString().slice(11,19));
-      if(c==='type')return esc(r.entity_type);
-      if(c==='name')return esc(r.central_name||r.device_name||r.entity_id);
-      if(c==='state')return esc(r.computed_state);
-      if(c==='proposed')return '<code>'+esc(JSON.stringify(pw))+'</code>';
-      if(c==='reason')return esc(pw.unknownReason||'');
-      if(c==='transition')return r.caused_transition?'<span class="b warn">'+t('yes')+'</span>':'<span class="mut">'+t('no')+'</span>';
-      if(c==='latency')return esc(r.latency_ms!=null?r.latency_ms+'ms':'');
-      if(c==='signal')return esc(inp.gatewayStatus||inp.kind||(inp.ok===false?'probe-fail':''));
-      return esc(r[c]);
-    });
+    q.set('limit','500');
+    const checks=(await api('checks?'+q.toString())).checks||[];
+    renderLatest(allRuns[0], checks.find(c=>c.entity_type==='device')||checks[0]);
+    renderGroupedChecks(checks);
   }
-  function card(l,v){ return '<div class="card"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>'; }
-  function badBool(v,safeWhenFalse){ const on=v===true||v==='true'; const cls=(on!==!!safeWhenFalse)?(safeWhenFalse?'bad':'ok'):'ok';
-    return '<span class="b '+(on?(safeWhenFalse?'warn':'ok'):(safeWhenFalse?'ok':'mut'))+'">'+(on?'ON':'off')+'</span>'; }
   applyLang();
   (async function initAuth(){
     const stored = sessionStorage.getItem('odpw')||'';
