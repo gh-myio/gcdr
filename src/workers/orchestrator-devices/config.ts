@@ -63,8 +63,17 @@ export const workerConfig = {
 
 export type WorkerConfig = typeof workerConfig;
 
-/** Build the probe URL for a central by its hardware UUID. */
+// A central id becomes a SUBDOMAIN of the tunnel host, so it must be a strict UUID
+// and nothing else — this both sanitizes the value and blocks request-forgery/SSRF
+// (an id carrying `/`, `.`, `@`, `\` etc. could otherwise redirect the probe to an
+// arbitrary host). The recheck endpoint takes the id from the request path.
+const CENTRAL_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Build the probe URL for a central by its hardware UUID. Throws on a non-UUID id. */
 export function gatewayUrl(centralId: string): string {
+  if (!CENTRAL_ID_RE.test(centralId)) {
+    throw new Error('gatewayUrl: centralId must be a UUID');
+  }
   const host = workerConfig.tunnelHostTemplate.replace('{id}', centralId);
   return `${host}${workerConfig.probePath}`;
 }
