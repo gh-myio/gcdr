@@ -51,6 +51,18 @@ export const workerConfig = {
   // Bounded per-scan batch.
   scanBatchSize: intEnv('SCAN_BATCH_SIZE', 500),
 
+  // How many central probes run concurrently within a sweep (RFC-0062 hardening).
+  // Serial sweeps of an unreachable fleet took many minutes and froze the heartbeat;
+  // bounded concurrency keeps a full sweep short without a thundering herd. Keep it
+  // below the DB pool size so per-central evidence writes never starve.
+  probeConcurrency: intEnv('ORCH_DEVICES_PROBE_CONCURRENCY', 8),
+
+  // The scheduler heartbeats at the top of every tick, but a long sweep would let
+  // the stamp go stale mid-tick (false "worker hung"). This interval re-stamps the
+  // heartbeat DURING a running tick. Must stay well under HEALTHCHECK_MAX_STALE_MS.
+  // Floored at 5s so a bad env (0/negative) can't turn setInterval into a DB-hammer.
+  heartbeatIntervalMs: Math.max(5_000, intEnv('ORCH_DEVICES_HEARTBEAT_INTERVAL_MS', 30_000)),
+
   // Ledger retention (§7/§8): the high-frequency _checks/_runs rows are pruned
   // beyond this age so the operational ledger stays bounded (never audit_logs).
   ledgerRetentionDays: intEnv('ORCH_DEVICES_LEDGER_RETENTION_DAYS', 7),

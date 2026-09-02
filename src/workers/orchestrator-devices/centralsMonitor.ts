@@ -29,6 +29,7 @@ import { classifyDevice, isDeviceTransition, type Classification } from './ladde
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
 import { centralVerdict } from './verdict';
+import { mapWithConcurrency } from './concurrency';
 import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
 import { buildCandidatePayload, debounceForCandidate, emitCandidate, type DownCandidate } from './incidents';
 
@@ -302,10 +303,15 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   const transitions: Transition[] = [];
   const downCandidates: DownCandidate[] = [];
 
-  for (const c of due) {
-    scanned += 1;
+  // Probe centrals with bounded concurrency (RFC-0062 hardening) — each keeps its
+  // own per-central timeout and writes its own evidence; only HOW MANY run at once
+  // changes. Results are merged in input order so counters/ledger are unchanged.
+  const results = await mapWithConcurrency(due, workerConfig.probeConcurrency, (c) => {
     const policy = (c.retryPolicy && policies.get(c.retryPolicy)) || defaultPolicy;
-    const res = await processCentral(c, devicesByCentral.get(c.id) ?? [], policy, runId);
+    return processCentral(c, devicesByCentral.get(c.id) ?? [], policy, runId);
+  });
+  for (const res of results) {
+    scanned += 1;
     checkRows.push(...res.checkRows);
     transitions.push(...res.transitions);
     downCandidates.push(...res.downCandidates);

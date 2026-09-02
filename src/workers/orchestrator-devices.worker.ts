@@ -56,6 +56,11 @@ async function runTick(): Promise<void> {
     return;
   }
   ticking = true;
+  // Keep the heartbeat fresh DURING the tick: a long sweep (fleet of unreachable
+  // gateways) must not let last_run_at go stale and look like a hung worker
+  // (RFC-0062 hardening). Cleared in finally. Errors are swallowed — a missed
+  // heartbeat must never crash the tick.
+  const hb = setInterval(() => { void heartbeat().catch(() => {}); }, workerConfig.heartbeatIntervalMs);
   try {
     const control = await loadControl(workerConfig.masterEnabledBoot);
     await heartbeat(); // liveness stamp regardless of gates
@@ -87,6 +92,7 @@ async function runTick(): Promise<void> {
   } catch (err) {
     log('error', 'tick failed', { error: err instanceof Error ? err.message : String(err) });
   } finally {
+    clearInterval(hb);
     ticking = false;
   }
 }
