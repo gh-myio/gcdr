@@ -24,7 +24,7 @@ import {
   orchestratorRetryPolicies,
 } from '../../infrastructure/database/drizzle/schema';
 import { workerConfig, gatewayUrl } from './config';
-import { probeGateway, type RetryAttempt, type RetryPolicy, type ProbeOutcome } from './gatewayClient';
+import { probeGateway, type RetryAttempt, type RetryPolicy } from './gatewayClient';
 import { classifyDevice, isDeviceTransition, type Classification } from './ladder';
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
