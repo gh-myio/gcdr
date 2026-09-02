@@ -473,6 +473,24 @@ const PAGE_HTML = `<!doctype html>
   .help-body ul { margin:6px 0; padding-left:18px; } .help-body li { margin:4px 0; }
   .help-tbl { width:100%; border-collapse:collapse; } .help-tbl td { border-bottom:1px solid var(--rowb); padding:5px 8px; vertical-align:top; }
   .help-tbl td:first-child { white-space:nowrap; color:var(--accent); width:200px; }
+  .kpi.k-warn .n{ color:#d97706; }
+  #filtersBtn.has { border-color:var(--accent); font-weight:700; }
+  #filtersBtn .fic{ opacity:.85; }
+  .grace-info { cursor:pointer; } .grace-info b { color:var(--accent); }
+  .flt-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9997; }
+  .flt-modal.hidden { display:none; }
+  .flt-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; max-width:560px; width:92%; max-height:88vh; display:flex; flex-direction:column; }
+  .flt-head { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--border); font-weight:700; }
+  .flt-body { padding:6px 18px 12px; overflow-y:auto; }
+  .flt-row { margin:12px 0; }
+  .flt-row label.lbl { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:5px; }
+  .flt-row select, .flt-row input[type=text], .flt-row input[type=number] { width:100%; box-sizing:border-box; }
+  .flt-chk { display:flex; gap:14px; flex-wrap:wrap; }
+  .flt-chk label { display:flex; align-items:center; gap:5px; font-size:12.5px; text-transform:none; letter-spacing:0; color:var(--text); }
+  .flt-two { display:flex; gap:10px; } .flt-two > div { flex:1; }
+  .flt-foot { display:flex; justify-content:space-between; gap:10px; padding:12px 18px; border-top:1px solid var(--border); }
+  .flt-foot .right { display:flex; gap:8px; }
+  .flt-hint { font-size:11.5px; color:var(--muted); margin-top:6px; }
 </style></head>
 <body>
 <header>
@@ -483,6 +501,7 @@ const PAGE_HTML = `<!doctype html>
   <span class="spacer"></span>
   <button id="langBtn" onclick="toggleLang()" title="idioma / language"></button>
   <button onclick="showHelp()" title="help" data-i18n="help">? Help</button>
+  <button onclick="openSettings()" title="settings / configurações">⚙</button>
   <button id="themeBtn" onclick="toggleTheme()" title="toggle light/dark">🌙</button>
 </header>
 
@@ -503,6 +522,81 @@ const PAGE_HTML = `<!doctype html>
   <div class="help-box">
     <div class="help-head"><b data-i18n="help_title">orchestrator-devices — cockpit help</b><button onclick="hideHelp()" data-i18n="close">✕ close</button></div>
     <div class="help-body" id="helpBody"></div>
+  </div>
+</div>
+
+<div id="filters-modal" class="flt-modal hidden" onclick="if(event.target===this)closeFilters()">
+  <div class="flt-box">
+    <div class="flt-head"><span data-i18n="filters_title">Filters &amp; sorting</span><button onclick="closeFilters()" data-i18n="close">✕ close</button></div>
+    <div class="flt-body">
+      <div class="flt-row"><label class="lbl" data-i18n="f_sort">Sort by</label>
+        <select id="mSort">
+          <option value="name_asc" data-i18n="sort_name_asc">Name A→Z</option>
+          <option value="name_desc" data-i18n="sort_name_desc">Name Z→A</option>
+          <option value="offline_desc" data-i18n="sort_offline_desc">Offline longest first</option>
+          <option value="offline_asc" data-i18n="sort_offline_asc">Offline shortest first</option>
+          <option value="sync_desc" data-i18n="sort_sync_desc">Last sync: newest</option>
+          <option value="sync_asc" data-i18n="sort_sync_asc">Last sync: oldest</option>
+          <option value="dev_desc" data-i18n="sort_dev_desc">Most devices</option>
+          <option value="dev_asc" data-i18n="sort_dev_asc">Fewest devices</option>
+        </select>
+      </div>
+      <div class="flt-row"><label class="lbl" data-i18n="f_scope">Scope</label>
+        <select id="mScope">
+          <option value="monitored" data-i18n="scope_monitored">Monitored</option>
+          <option value="all" data-i18n="scope_all">All</option>
+          <option value="unmonitored" data-i18n="scope_unmonitored">Not monitored</option>
+        </select>
+      </div>
+      <div class="flt-row"><label class="lbl" data-i18n="f_name">Name contains</label>
+        <input type="text" id="mQ" data-i18n-ph="f_name_ph" placeholder="name or UUID (ignore case)">
+      </div>
+      <div class="flt-row"><label class="lbl" data-i18n="f_status">Status</label>
+        <div class="flt-chk">
+          <label><input type="checkbox" id="mSt_ONLINE"> <span data-i18n="st_online">ONLINE</span></label>
+          <label><input type="checkbox" id="mSt_OFFLINE"> <span data-i18n="st_offline">OFFLINE</span></label>
+          <label><input type="checkbox" id="mSt_WARNING"> <span data-i18n="st_warning">WARNING</span></label>
+          <label><input type="checkbox" id="mSt_UNKNOWN"> <span data-i18n="st_unknown">UNKNOWN</span></label>
+        </div>
+      </div>
+      <div class="flt-row"><label class="lbl" data-i18n="f_lastsync">Last sync</label>
+        <select id="mLastSync">
+          <option value="any" data-i18n="ls_any">Any</option>
+          <option value="1h" data-i18n="ls_1h">Within 1h</option>
+          <option value="24h" data-i18n="ls_24h">Within 24h</option>
+          <option value="over24h" data-i18n="ls_over24h">Over 24h ago</option>
+          <option value="never" data-i18n="ls_never">Never synced</option>
+        </select>
+      </div>
+      <div class="flt-row flt-two">
+        <div><label class="lbl" data-i18n="f_devices">Devices (min–max)</label>
+          <div class="flt-two"><div><input type="number" id="mMinDev" min="0" placeholder="min"></div><div><input type="number" id="mMaxDev" min="0" placeholder="max"></div></div>
+        </div>
+      </div>
+      <div class="flt-row flt-chk">
+        <label><input type="checkbox" id="mDiv"> <span data-i18n="f_divergent">Only with divergence</span></label>
+      </div>
+    </div>
+    <div class="flt-foot">
+      <button onclick="clearFilters()" data-i18n="f_clear">Clear</button>
+      <div class="right"><button onclick="closeFilters()" data-i18n="btn_cancel">Cancel</button><button onclick="applyFilters()" data-i18n="f_apply">Apply</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="settings-modal" class="flt-modal hidden" onclick="if(event.target===this)closeSettings()">
+  <div class="flt-box">
+    <div class="flt-head"><span data-i18n="settings_title">Settings</span><button onclick="closeSettings()" data-i18n="close">✕ close</button></div>
+    <div class="flt-body">
+      <div class="flt-row"><label class="lbl" data-i18n="f_grace">Offline grace window (min)</label>
+        <input type="number" id="sGrace" min="1" step="1">
+        <div class="flt-hint" id="graceHint"></div>
+      </div>
+    </div>
+    <div class="flt-foot">
+      <button onclick="resetSettings()" data-i18n="f_reset_default">Reset to default</button>
+      <div class="right"><button onclick="closeSettings()" data-i18n="btn_cancel">Cancel</button><button onclick="applySettings()" data-i18n="f_save">Save</button></div>
+    </div>
   </div>
 </div>
 <main>
@@ -529,8 +623,10 @@ const PAGE_HTML = `<!doctype html>
     <section><h2 data-i18n="tab_centrals">Centrals</h2>
       <div id="cKpis" class="kpis"></div>
       <div id="cFilters" class="filters">
-        <input id="cSearch" data-i18n-ph="ph_search" placeholder="search name" oninput="cPage=0;renderCentrals()" style="width:340px;max-width:100%">
+        <input id="cSearch" data-i18n-ph="ph_search" placeholder="search name or UUID" oninput="cFilter.q=this.value;cPage=0;saveFilter();renderCentrals()" style="width:300px;max-width:100%">
+        <button id="filtersBtn" onclick="openFilters()"><span class="fic">⇅</span> <span data-i18n="filters_btn">Filters</span> <span id="fBadge" class="mut"></span></button>
         <span id="cCount" class="mut"></span>
+        <span id="graceInfo" class="mut grace-info" onclick="openSettings()"></span>
         <span class="mut" data-i18n="filter_hint">click a KPI to filter · total = all</span>
       </div>
       <div id="centralsGrid" class="cgrid"></div>
@@ -609,8 +705,8 @@ const PAGE_HTML = `<!doctype html>
       '</table><p class="mut">Probe: queda genuína (timeout/conn/5xx) ⇒ central OFFLINE + devices UNKNOWN/CENTRAL_UNREACHABLE. 401/403 ⇒ AUTH_ERROR. NXDOMAIN/4xx ⇒ CONFIG_ERROR. A senha é <code>DB_ADMIN_PASSWORD</code>.</p>',
   };
   const I18N = {
-    'en': {ro:'CONTROLS · admin password',connected:'connected',logout:'Logout',auto:'auto',auto_in:'refresh in {s}s',fetch_err:'Cockpit server unreachable — retrying',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE MODE',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'connectivity test',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices',include_history:'include history',recheck_now:'Recheck now',enable_canonical:'Enable canonical',last_observed:'last observed',phase2b:'Phase 2B — coming',tab_dashboard:'Dashboard',tab_centrals:'Centrals',tab_devices:'Devices',tab_os:'Work orders',tab_scans:'Scans',soon:'Coming soon',monitoring:'monitoring',last_sync:'last sync',ph_search:'search name',show_all:'show all',kpi_total:'total',page:'page',devices_hint:'Device states from the latest scan (Phase 2 telemetry pending)',filter_hint:'click a KPI to filter · total = all',no_data_off:'monitoring off · no probe data yet',confirm_mon_on:'Enable monitoring for "{name}"? The worker will start probing this gateway. This action is audited.',confirm_mon_off:'Disable monitoring for "{name}"? The worker will stop probing this gateway. This action is audited.',toggle_err:'Failed to change monitoring:',mon_on_title:'Enable monitoring',mon_off_title:'Disable monitoring',btn_cancel:'Cancel',btn_on:'Enable',btn_off:'Disable',kpi_card_title:'Status indicators',last_syncs:'Last syncs',sync_summary:'Sync summary',dash_ind_centrals:'Central status indicators',probe_ok:'Responding',probe_ok_slow:'Responding (slow)',probe_timeout:'No response',probe_conn:'No connection',probe_http:'Server error',probe_parse:'Bad response',probe_auth:'Auth error',probe_config:'Config error',probe_never:'Never tested',force_sync:'Refresh evidence',confirm_sync:'Run a manual probe for "{name}"? It updates ONLY the last check / probe result — it does NOT recompute the ledger, divergence or canonical status. Audited.',sync_done:'Evidence updated: {result}. Wait for the next sweep to refresh proposed_write / divergence.',sync_err:'Recheck failed:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'UNKNOWN',st_warning:'WARNING',last_attempt:'last attempt',last_success:'last success',div_help:'Stored status (canonical) differs from what the worker would write (proposed)',mon_card_title:'Monitoring',mon_all_on:'Enable all',mon_all_off:'Disable all',confirm_all_on:'Enable monitoring on ALL centrals? The worker will start probing every gateway. This action is audited.',confirm_all_off:'Disable monitoring on ALL centrals? The worker will stop probing every gateway. This action is audited.',bulk_done:'{n} central(s) updated',devices_list:'Devices',loading:'Loading'},
-    'pt-BR': {ro:'CONTROLES · senha admin',connected:'conectado',logout:'Sair',auto:'auto',auto_in:'atualiza em {s}s',fetch_err:'Servidor do cockpit indisponível — tentando de novo',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'teste de conexão',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices',include_history:'incluir histórico',recheck_now:'Rechecar agora',enable_canonical:'Ligar canonical',last_observed:'visto por último',phase2b:'Phase 2B — em breve',tab_dashboard:'Dashboard',tab_centrals:'Centrais',tab_devices:'Dispositivos',tab_os:'Ordem de serviço',tab_scans:'Varreduras',soon:'Em breve',monitoring:'monitoramento',last_sync:'último sync',ph_search:'buscar nome',show_all:'mostrar todas',kpi_total:'total',page:'página',devices_hint:'Estados dos devices do último sweep (telemetria Phase 2 pendente)',filter_hint:'clique num KPI para filtrar · total = todas',no_data_off:'monitoramento desligado · sem dados de sondagem ainda',confirm_mon_on:'Ligar monitoramento de "{name}"? O worker passará a sondar esse gateway. Esta ação é auditada.',confirm_mon_off:'Desligar monitoramento de "{name}"? O worker deixará de sondar esse gateway. Esta ação é auditada.',toggle_err:'Falha ao alterar monitoramento:',mon_on_title:'Ligar monitoramento',mon_off_title:'Desligar monitoramento',btn_cancel:'Cancelar',btn_on:'Ligar',btn_off:'Desligar',kpi_card_title:'Indicadores de Status',last_syncs:'Últimos Syncs',sync_summary:'Resumo do Sync',dash_ind_centrals:'Indicadores de Status das Centrais',probe_ok:'Respondendo',probe_ok_slow:'Respondendo (lento)',probe_timeout:'Sem resposta',probe_conn:'Sem conexão',probe_http:'Erro no servidor',probe_parse:'Resposta inválida',probe_auth:'Erro de autenticação',probe_config:'Erro de configuração',probe_never:'Nunca testado',force_sync:'Atualizar evidência',confirm_sync:'Executar um probe manual em "{name}"? Atualiza APENAS a última verificação / resultado do probe — NÃO recalcula ledger, divergência nem status canônico. Auditado.',sync_done:'Evidência atualizada: {result}. Aguarde o próximo sweep para atualizar o proposed_write / divergência.',sync_err:'Falha ao rechecar:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'DESCONHECIDO',st_warning:'ATENÇÃO',last_attempt:'última tentativa',last_success:'último sucesso',div_help:'O status gravado (canônico) difere do que o worker gravaria (proposto)',mon_card_title:'Monitoramento',mon_all_on:'Ativar todos',mon_all_off:'Desativar todos',confirm_all_on:'Ativar monitoramento em TODAS as centrais? O worker passará a sondar todos os gateways. Esta ação é auditada.',confirm_all_off:'Desativar monitoramento em TODAS as centrais? O worker deixará de sondar todos os gateways. Esta ação é auditada.',bulk_done:'{n} central(is) atualizada(s)',devices_list:'Dispositivos',loading:'Carregando'},
+    'en': {ro:'CONTROLS · admin password',connected:'connected',logout:'Logout',auto:'auto',auto_in:'refresh in {s}s',fetch_err:'Cockpit server unreachable — retrying',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE MODE',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'connectivity test',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices',include_history:'include history',recheck_now:'Recheck now',enable_canonical:'Enable canonical',last_observed:'last observed',phase2b:'Phase 2B — coming',tab_dashboard:'Dashboard',tab_centrals:'Centrals',tab_devices:'Devices',tab_os:'Work orders',tab_scans:'Scans',soon:'Coming soon',monitoring:'monitoring',last_sync:'last sync',ph_search:'search name',show_all:'show all',kpi_total:'total',page:'page',devices_hint:'Device states from the latest scan (Phase 2 telemetry pending)',filter_hint:'click a KPI to filter · total = all',no_data_off:'monitoring off · no probe data yet',confirm_mon_on:'Enable monitoring for "{name}"? The worker will start probing this gateway. This action is audited.',confirm_mon_off:'Disable monitoring for "{name}"? The worker will stop probing this gateway. This action is audited.',toggle_err:'Failed to change monitoring:',mon_on_title:'Enable monitoring',mon_off_title:'Disable monitoring',btn_cancel:'Cancel',btn_on:'Enable',btn_off:'Disable',kpi_card_title:'Status indicators',last_syncs:'Last syncs',sync_summary:'Sync summary',dash_ind_centrals:'Central status indicators',probe_ok:'Responding',probe_ok_slow:'Responding (slow)',probe_timeout:'No response',probe_conn:'No connection',probe_http:'Server error',probe_parse:'Bad response',probe_auth:'Auth error',probe_config:'Config error',probe_never:'Never tested',force_sync:'Refresh evidence',confirm_sync:'Run a manual probe for "{name}"? It updates ONLY the last check / probe result — it does NOT recompute the ledger, divergence or canonical status. Audited.',sync_done:'Evidence updated: {result}. Wait for the next sweep to refresh proposed_write / divergence.',sync_err:'Recheck failed:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'UNKNOWN',st_warning:'WARNING',last_attempt:'last attempt',last_success:'last success',div_help:'Stored status (canonical) differs from what the worker would write (proposed)',mon_card_title:'Monitoring',mon_all_on:'Enable all',mon_all_off:'Disable all',confirm_all_on:'Enable monitoring on ALL centrals? The worker will start probing every gateway. This action is audited.',confirm_all_off:'Disable monitoring on ALL centrals? The worker will stop probing every gateway. This action is audited.',bulk_done:'{n} central(s) updated',devices_list:'Devices',loading:'Loading',filters_btn:'Filters',filters_title:'Filters & sorting',filters_active:'{n} active',settings_title:'Settings',f_sort:'Sort by',sort_name_asc:'Name A→Z',sort_name_desc:'Name Z→A',sort_offline_desc:'Offline longest first',sort_offline_asc:'Offline shortest first',sort_sync_desc:'Last sync: newest',sort_sync_asc:'Last sync: oldest',sort_dev_desc:'Most devices',sort_dev_asc:'Fewest devices',f_scope:'Scope',scope_monitored:'Monitored',scope_all:'All',scope_unmonitored:'Not monitored',f_name:'Name contains',f_name_ph:'name or UUID (ignore case)',f_status:'Status',f_lastsync:'Last sync',ls_any:'Any',ls_1h:'Within 1h',ls_24h:'Within 24h',ls_over24h:'Over 24h ago',ls_never:'Never synced',f_devices:'Devices (min–max)',f_divergent:'Only with divergence',f_apply:'Apply',f_clear:'Clear',f_grace:'Offline grace window (min)',f_grace_hint:'Display-only override stored in this browser. The worker keeps using its ORCH_DEVICES_OFFLINE_GRACE_MIN env (default {d} min). Changes how this cockpit derives ONLINE/WARNING/OFFLINE.',f_save:'Save',f_reset_default:'Reset to default',uuid:'UUID',grace_lbl:'OFFLINE grace'},
+    'pt-BR': {ro:'CONTROLES · senha admin',connected:'conectado',logout:'Sair',auto:'auto',auto_in:'atualiza em {s}s',fetch_err:'Servidor do cockpit indisponível — tentando de novo',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'teste de conexão',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices',include_history:'incluir histórico',recheck_now:'Rechecar agora',enable_canonical:'Ligar canonical',last_observed:'visto por último',phase2b:'Phase 2B — em breve',tab_dashboard:'Dashboard',tab_centrals:'Centrais',tab_devices:'Dispositivos',tab_os:'Ordem de serviço',tab_scans:'Varreduras',soon:'Em breve',monitoring:'monitoramento',last_sync:'último sync',ph_search:'buscar nome',show_all:'mostrar todas',kpi_total:'total',page:'página',devices_hint:'Estados dos devices do último sweep (telemetria Phase 2 pendente)',filter_hint:'clique num KPI para filtrar · total = todas',no_data_off:'monitoramento desligado · sem dados de sondagem ainda',confirm_mon_on:'Ligar monitoramento de "{name}"? O worker passará a sondar esse gateway. Esta ação é auditada.',confirm_mon_off:'Desligar monitoramento de "{name}"? O worker deixará de sondar esse gateway. Esta ação é auditada.',toggle_err:'Falha ao alterar monitoramento:',mon_on_title:'Ligar monitoramento',mon_off_title:'Desligar monitoramento',btn_cancel:'Cancelar',btn_on:'Ligar',btn_off:'Desligar',kpi_card_title:'Indicadores de Status',last_syncs:'Últimos Syncs',sync_summary:'Resumo do Sync',dash_ind_centrals:'Indicadores de Status das Centrais',probe_ok:'Respondendo',probe_ok_slow:'Respondendo (lento)',probe_timeout:'Sem resposta',probe_conn:'Sem conexão',probe_http:'Erro no servidor',probe_parse:'Resposta inválida',probe_auth:'Erro de autenticação',probe_config:'Erro de configuração',probe_never:'Nunca testado',force_sync:'Atualizar evidência',confirm_sync:'Executar um probe manual em "{name}"? Atualiza APENAS a última verificação / resultado do probe — NÃO recalcula ledger, divergência nem status canônico. Auditado.',sync_done:'Evidência atualizada: {result}. Aguarde o próximo sweep para atualizar o proposed_write / divergência.',sync_err:'Falha ao rechecar:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'DESCONHECIDO',st_warning:'ATENÇÃO',last_attempt:'última tentativa',last_success:'último sucesso',div_help:'O status gravado (canônico) difere do que o worker gravaria (proposto)',mon_card_title:'Monitoramento',mon_all_on:'Ativar todos',mon_all_off:'Desativar todos',confirm_all_on:'Ativar monitoramento em TODAS as centrais? O worker passará a sondar todos os gateways. Esta ação é auditada.',confirm_all_off:'Desativar monitoramento em TODAS as centrais? O worker deixará de sondar todos os gateways. Esta ação é auditada.',bulk_done:'{n} central(is) atualizada(s)',devices_list:'Dispositivos',loading:'Carregando',filters_btn:'Filtros',filters_title:'Filtros e ordenação',filters_active:'{n} ativo(s)',settings_title:'Configurações',f_sort:'Ordenar por',sort_name_asc:'Nome A→Z',sort_name_desc:'Nome Z→A',sort_offline_desc:'Offline há mais tempo',sort_offline_asc:'Offline há menos tempo',sort_sync_desc:'Último sync: mais recente',sort_sync_asc:'Último sync: mais antigo',sort_dev_desc:'Mais dispositivos',sort_dev_asc:'Menos dispositivos',f_scope:'Escopo',scope_monitored:'Monitoradas',scope_all:'Todas',scope_unmonitored:'Não monitoradas',f_name:'Nome contém',f_name_ph:'nome ou UUID (ignora maiúsc.)',f_status:'Status',f_lastsync:'Último sync',ls_any:'Qualquer',ls_1h:'Na última 1h',ls_24h:'Nas últimas 24h',ls_over24h:'Há mais de 24h',ls_never:'Nunca sincronizou',f_devices:'Dispositivos (mín–máx)',f_divergent:'Só com divergência',f_apply:'Aplicar',f_clear:'Limpar',f_grace:'Janela de graça p/ OFFLINE (min)',f_grace_hint:'Override apenas de exibição, salvo neste navegador. O worker continua usando o env ORCH_DEVICES_OFFLINE_GRACE_MIN (default {d} min). Muda como este cockpit deriva ONLINE/ATENÇÃO/OFFLINE.',f_save:'Salvar',f_reset_default:'Voltar ao padrão',uuid:'UUID',grace_lbl:'graça OFFLINE'},
   };
   let lang = 'en';
   try { lang = localStorage.getItem('od-lang') || (((navigator.language||'').toLowerCase().indexOf('pt')===0) ? 'pt-BR' : 'en'); } catch(e){}
@@ -633,7 +729,7 @@ const PAGE_HTML = `<!doctype html>
   try{ applyTheme(localStorage.getItem('od-theme')||'light'); }catch(e){ applyTheme('light'); }
   function showHelp(){ $('help-modal').classList.remove('hidden'); }
   function hideHelp(){ $('help-modal').classList.add('hidden'); }
-  document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideHelp(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideHelp(); closeFilters(); closeSettings(); } });
   let pw = '';
   function setConnected(on){
     $('login-modal').classList.toggle('hidden', on);
@@ -674,10 +770,30 @@ const PAGE_HTML = `<!doctype html>
       '<span class="dot unk" title="unknown"></span>'+unk; }
   function tbl(el, cols, rows, cell){ el.innerHTML='<tr>'+cols.map(c=>'<th>'+t('col_'+c)+'</th>').join('')+'</tr>'+
     rows.map(r=>'<tr>'+cols.map(c=>'<td>'+cell(r,c)+'</td>').join('')+'</tr>').join(''); }
-  var OFFLINE_GRACE_MS=(__OFFLINE_GRACE_MIN__)*60000; // injected from ORCH_DEVICES_OFFLINE_GRACE_MIN
-  let allRuns=[], runsExpanded=false, lastDiv={centrals:[],devices:[]}, allCentrals=[], cPage=0, cKpiFilter='all', kpiCardDone=false, centralsCardDone=false, monCardDone=false, dashIndCardDone=false, lastSyncsCardDone=false, autoLeft=10, cDivMap={}, devCache={};
+  // Grace window: server env default (injected) + optional per-browser display override.
+  // The override only changes how THIS cockpit derives ONLINE/WARNING/OFFLINE; the worker
+  // keeps using its ORCH_DEVICES_OFFLINE_GRACE_MIN env for the canonical decision.
+  var OFFLINE_GRACE_DEFAULT_MIN=(__OFFLINE_GRACE_MIN__);
+  var graceMin=OFFLINE_GRACE_DEFAULT_MIN;
+  var OFFLINE_GRACE_MS=graceMin*60000;
+  function loadSettings(){ try{ var v=parseInt(localStorage.getItem('od-grace-min'),10); if(!isNaN(v)&&v>0) graceMin=v; }catch(e){} OFFLINE_GRACE_MS=graceMin*60000; }
+  function saveSettings(v){ graceMin=(v&&v>0)?v:OFFLINE_GRACE_DEFAULT_MIN; OFFLINE_GRACE_MS=graceMin*60000;
+    try{ if(graceMin===OFFLINE_GRACE_DEFAULT_MIN) localStorage.removeItem('od-grace-min'); else localStorage.setItem('od-grace-min',String(graceMin)); }catch(e){} updateGraceInfo(); }
+  function updateGraceInfo(){ var el=$('graceInfo'); if(el){ var ov=(graceMin!==OFFLINE_GRACE_DEFAULT_MIN)?' *':''; el.innerHTML='<b>'+t('grace_lbl')+':</b> '+graceMin+' min'+ov+' ⚙'; }
+    var h=$('graceHint'); if(h) h.textContent=t('f_grace_hint').replace('{d}',OFFLINE_GRACE_DEFAULT_MIN); }
+  let allRuns=[], runsExpanded=false, lastDiv={centrals:[],devices:[]}, allCentrals=[], cPage=0, kpiCardDone=false, centralsCardDone=false, monCardDone=false, dashIndCardDone=false, lastSyncsCardDone=false, autoLeft=10, cDivMap={}, devCache={};
   let cPageSize=10;
-  function setKpiFilter(f){ cKpiFilter = (cKpiFilter===f) ? '' : f; cPage=0; renderCentrals(); }
+  // Unified centrals filter/sort state (persisted). statuses=[] ⇒ "all in scope";
+  // a single status is what the KPI tiles toggle. Default scope = monitored centrals.
+  var cSort='name_asc';
+  var cFilter={ scope:'monitored', statuses:[], q:'', divergent:false, lastSync:'any', minDev:null, maxDev:null };
+  function saveFilter(){ try{ localStorage.setItem('od-filter', JSON.stringify({ sort:cSort, filter:cFilter })); }catch(e){} }
+  function loadFilter(){ try{ var s=JSON.parse(localStorage.getItem('od-filter')||'null'); if(s&&s.filter){ if(s.sort) cSort=s.sort; for(var k in cFilter){ if(s.filter[k]!==undefined) cFilter[k]=s.filter[k]; } } }catch(e){} }
+  function setKpiFilter(f){
+    if(f===''||f==='all'){ cFilter.statuses=[]; }
+    else { cFilter.statuses = (cFilter.statuses.length===1 && cFilter.statuses[0]===f) ? [] : [f]; }
+    cPage=0; saveFilter(); renderCentrals();
+  }
   function setPageSize(v){ cPageSize=parseInt(v,10)||10; cPage=0; renderCentrals(); }
   function setTab(name){
     document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===name));
@@ -685,7 +801,8 @@ const PAGE_HTML = `<!doctype html>
     try{ localStorage.setItem('od-tab',name); }catch(e){}
   }
   function statusCls(st){ return st==='ONLINE'?'on':(st==='OFFLINE'?'off':(st==='WARNING'?'warn':'unk')); }
-  function kpi(n,l,cls,fk){ fk=fk||''; const act=(fk!==''&&cKpiFilter===fk)?' active':'';
+  function kpiActive(fk){ if(fk===''||fk==='all') return cFilter.statuses.length===0; return cFilter.statuses.length===1 && cFilter.statuses[0]===fk; }
+  function kpi(n,l,cls,fk){ fk=fk||''; const act=kpiActive(fk)?' active':'';
     return '<div class="kpi '+(cls||'')+act+'" onclick="setKpiFilter(\\''+fk+'\\')"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
   // Derived operational status from probe evidence (mirrors the worker's grace rule):
   //   never probed ⇒ UNKNOWN; last probe OK ⇒ ONLINE; a failing probe ⇒ WARNING until
@@ -762,7 +879,7 @@ const PAGE_HTML = `<!doctype html>
     return {label:r, cls:'warn', ms:null};
   }
   function centralInfoHtml(c){
-    var parts=['<b>status</b> '+effStatus(c),'<b>'+t('monitoring')+'</b> '+(c.monitoring_enabled?'on':'off')];
+    var parts=['<b>'+t('uuid')+'</b> '+esc(c.id),'<b>status</b> '+effStatus(c),'<b>'+t('monitoring')+'</b> '+(c.monitoring_enabled?'on':'off')];
     if(hasData(c)){ parts.push('<b>'+t('probe')+'</b> '+esc(probeVerdict(c).label)); parts.push('<b>'+t('devices')+'</b> '+(c.device_count||0)); }
     return parts.join(' · ');
   }
@@ -832,7 +949,7 @@ const PAGE_HTML = `<!doctype html>
     });
   }
   function cPageDelta(d){ cPage+=d; renderCentrals(); }
-  function goCentrals(fk){ cKpiFilter=fk; cPage=0; setTab('centrals'); renderCentrals(); }
+  function goCentrals(fk){ cFilter.statuses=(fk===''||fk==='all')?[]:[fk]; cPage=0; saveFilter(); setTab('centrals'); renderCentrals(); }
   // Dashboard "Indicadores de Status" card — wraps the indicator groups (Centrais now;
   // Dispositivos / OS to come), mirroring the CENTRAIS tab. Wrapped once.
   function ensureDashIndCard(){
@@ -905,30 +1022,88 @@ const PAGE_HTML = `<!doctype html>
       await msgDialog((enabled?t('mon_all_on'):t('mon_all_off')), t('bulk_done').replace('{n}', r.affected));
     }catch(e){ await msgDialog(t('toggle_err'), e.message); }
   }
+  // ── Filters & sorting modal ──────────────────────────────────────────────────
+  function updateFilterBadge(){
+    var n=0;
+    if(cFilter.scope!=='monitored') n++;
+    if(cFilter.statuses.length) n++;
+    if((cFilter.q||'').trim()) n++;
+    if(cFilter.divergent) n++;
+    if(cFilter.lastSync && cFilter.lastSync!=='any') n++;
+    if(cFilter.minDev!=null || cFilter.maxDev!=null) n++;
+    if(cSort!=='name_asc') n++;
+    var b=$('fBadge'); if(b) b.textContent = n?('('+t('filters_active').replace('{n}',n)+')'):'';
+    var btn=$('filtersBtn'); if(btn) btn.classList.toggle('has', n>0);
+  }
+  function openFilters(){
+    $('mSort').value=cSort; $('mScope').value=cFilter.scope; $('mQ').value=cFilter.q||'';
+    ['ONLINE','OFFLINE','WARNING','UNKNOWN'].forEach(function(s){ var e=$('mSt_'+s); if(e) e.checked=cFilter.statuses.indexOf(s)>=0; });
+    $('mDiv').checked=!!cFilter.divergent; $('mLastSync').value=cFilter.lastSync||'any';
+    $('mMinDev').value=(cFilter.minDev!=null?cFilter.minDev:''); $('mMaxDev').value=(cFilter.maxDev!=null?cFilter.maxDev:'');
+    $('filters-modal').classList.remove('hidden');
+  }
+  function closeFilters(){ $('filters-modal').classList.add('hidden'); }
+  function applyFilters(){
+    cSort=$('mSort').value; cFilter.scope=$('mScope').value; cFilter.q=$('mQ').value;
+    var sts=[]; ['ONLINE','OFFLINE','WARNING','UNKNOWN'].forEach(function(s){ if($('mSt_'+s).checked) sts.push(s); }); cFilter.statuses=sts;
+    cFilter.divergent=$('mDiv').checked; cFilter.lastSync=$('mLastSync').value;
+    var mn=parseInt($('mMinDev').value,10), mx=parseInt($('mMaxDev').value,10);
+    cFilter.minDev=isNaN(mn)?null:mn; cFilter.maxDev=isNaN(mx)?null:mx;
+    if($('cSearch')) $('cSearch').value=cFilter.q;
+    cPage=0; saveFilter(); closeFilters(); renderCentrals();
+  }
+  function clearFilters(){
+    cSort='name_asc'; cFilter={ scope:'monitored', statuses:[], q:'', divergent:false, lastSync:'any', minDev:null, maxDev:null };
+    if($('cSearch')) $('cSearch').value=''; cPage=0; saveFilter(); openFilters(); renderCentrals();
+  }
+  // ── Settings modal (display-only grace override) ─────────────────────────────
+  function openSettings(){ $('sGrace').value=graceMin; updateGraceInfo(); $('settings-modal').classList.remove('hidden'); }
+  function closeSettings(){ $('settings-modal').classList.add('hidden'); }
+  function applySettings(){ var v=parseInt($('sGrace').value,10); saveSettings(isNaN(v)?OFFLINE_GRACE_DEFAULT_MIN:v); closeSettings(); renderCentrals(); renderDashCentrals(); }
+  function resetSettings(){ saveSettings(OFFLINE_GRACE_DEFAULT_MIN); $('sGrace').value=graceMin; renderCentrals(); renderDashCentrals(); }
+  // Scope base = the fleet the KPIs and list operate over. Default: monitored centrals.
+  function baseCentrals(){ var sc=cFilter.scope;
+    return allCentrals.filter(function(c){ if(sc==='monitored') return !!c.monitoring_enabled; if(sc==='unmonitored') return !c.monitoring_enabled; return true; }); }
+  function sinceSuccessMs(c){ var okAt=c.last_gateway_success_check_at?new Date(c.last_gateway_success_check_at).getTime():null; return okAt?(Date.now()-okAt):Infinity; }
+  function lastSyncMs(c){ var s=c.last_gateway_success_check_at||c.last_gateway_check_at; return s?new Date(s).getTime():0; }
+  function passLastSync(c){ var w=cFilter.lastSync; if(!w||w==='any') return true;
+    if(w==='never') return !c.last_gateway_success_check_at;
+    var s=lastSyncMs(c); var age=s?(Date.now()-s):Infinity;
+    if(w==='1h') return age<=3600000; if(w==='24h') return age<=86400000; if(w==='over24h') return age>86400000; return true; }
+  function sortCentrals(arr){ var BIG=8640000000000000; // never-synced OFFLINE ⇒ top of "offline longest"
+    function nm(c){ return String(c.name||c.id||'').toLowerCase(); }
+    function offMs(c){ if(effStatus(c)!=='OFFLINE') return -1; var s=sinceSuccessMs(c); return s===Infinity?BIG:s; }
+    var f={ name_asc:function(a,b){return nm(a).localeCompare(nm(b));}, name_desc:function(a,b){return nm(b).localeCompare(nm(a));},
+      offline_desc:function(a,b){return offMs(b)-offMs(a);}, offline_asc:function(a,b){return offMs(a)-offMs(b);},
+      sync_desc:function(a,b){return lastSyncMs(b)-lastSyncMs(a);}, sync_asc:function(a,b){return lastSyncMs(a)-lastSyncMs(b);},
+      dev_desc:function(a,b){return (b.device_count||0)-(a.device_count||0);}, dev_asc:function(a,b){return (a.device_count||0)-(b.device_count||0);} };
+    return arr.slice().sort(f[cSort]||f.name_asc); }
   function renderCentrals(){
     const el=$('centralsGrid'); if(!el)return;
     ensureKpiCard(); ensureCentralsCard();
-    const total=allCentrals.length;
-    const on=allCentrals.filter(c=>effStatus(c)==='ONLINE').length;
-    const off=allCentrals.filter(c=>effStatus(c)==='OFFLINE').length;
-    const unk=allCentrals.filter(c=>effStatus(c)==='UNKNOWN').length;
-    const mon=allCentrals.filter(c=>c.monitoring_enabled).length;
+    const base=baseCentrals();
+    const total=base.length;
+    const on=base.filter(c=>effStatus(c)==='ONLINE').length;
+    const off=base.filter(c=>effStatus(c)==='OFFLINE').length;
+    const warn=base.filter(c=>effStatus(c)==='WARNING').length;
+    const unk=base.filter(c=>effStatus(c)==='UNKNOWN').length;
     const divIds=new Set((lastDiv.centrals||[]).map(x=>x.id));
     cDivMap={}; (lastDiv.centrals||[]).forEach(function(x){ cDivMap[x.id]={current:x.current, proposed:x.proposed}; });
-    if($('cKpis')) $('cKpis').innerHTML = kpi(total,t('kpi_total'),'','all')+kpi(on,t('st_online'),'k-on','ONLINE')+kpi(off,t('st_offline'),'k-off','OFFLINE')+kpi(unk,t('st_unknown'),'k-unk','UNKNOWN')+kpiActionsTile();
-    const kf=cKpiFilter;
-    const q=(($('cSearch')&&$('cSearch').value)||'').trim().toLowerCase();
-    const recent=c=>c.last_gateway_check_at && (Date.now()-new Date(c.last_gateway_check_at).getTime()<86400000);
-    const list=allCentrals.filter(c=>{
-      const st=effStatus(c);
-      if(kf===''){ if(!(c.monitoring_enabled || divIds.has(c.id) || recent(c))) return false; }        // focused (default)
-      else if(kf==='ONLINE'||kf==='OFFLINE'||kf==='UNKNOWN'){ if(st!==kf) return false; }
-      else if(kf==='monitoring'){ if(!c.monitoring_enabled) return false; }
-      else if(kf==='divergent'){ if(!divIds.has(c.id)) return false; }
-      // kf==='all' (total) → no segment filter, show every central
-      if(q && !String(c.name||'').toLowerCase().includes(q)) return false;
+    if($('cKpis')) $('cKpis').innerHTML = kpi(total,t('kpi_total'),'','all')+kpi(on,t('st_online'),'k-on','ONLINE')+kpi(off,t('st_offline'),'k-off','OFFLINE')+kpi(warn,t('st_warning'),'k-warn','WARNING')+kpi(unk,t('st_unknown'),'k-unk','UNKNOWN')+kpiActionsTile();
+    const q=(cFilter.q||'').trim().toLowerCase();
+    const sts=cFilter.statuses;
+    var list=base.filter(function(c){
+      if(sts.length && sts.indexOf(effStatus(c))<0) return false;
+      if(cFilter.divergent && !divIds.has(c.id)) return false;
+      if(!passLastSync(c)) return false;
+      var dc=c.device_count||0;
+      if(cFilter.minDev!=null && dc<cFilter.minDev) return false;
+      if(cFilter.maxDev!=null && dc>cFilter.maxDev) return false;
+      if(q){ var hay=(String(c.name||'')+' '+String(c.id||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
       return true;
     });
+    list=sortCentrals(list);
+    updateFilterBadge(); updateGraceInfo();
     if($('cCount')) $('cCount').textContent = list.length+' / '+total;
     const pages=Math.max(1, Math.ceil(list.length/cPageSize));
     if(cPage>=pages) cPage=pages-1; if(cPage<0) cPage=0;
@@ -1111,6 +1286,9 @@ const PAGE_HTML = `<!doctype html>
     renderGroupedChecks(checks);
     renderDevices(checks);
   }
+  loadSettings(); loadFilter();
+  try{ if($('cSearch')) $('cSearch').value=cFilter.q||''; }catch(e){}
+  updateGraceInfo();
   applyLang();
   try{ setTab(localStorage.getItem('od-tab')||'dashboard'); }catch(e){ setTab('dashboard'); }
   (async function initAuth(){
