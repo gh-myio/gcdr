@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/docs && cp docs/openapi.yaml dist/docs/openapi.yaml",
     "start": "node dist/app.js",
+    "worker:orchestrator-devices": "node dist/workers/orchestrator-devices.worker.js",
+    "worker:orchestrator-devices:dev": "tsx watch --env-file-if-exists=.env --env-file-if-exists=.env.local src/workers/orchestrator-devices.worker.ts",
     "dev": "tsx watch --env-file-if-exists=.env --env-file-if-exists=.env.local src/app.ts",
     "dev:debug": "tsx watch --inspect --env-file-if-exists=.env --env-file-if-exists=.env.local src/app.ts",
     "dev:debug-brk": "tsx watch --inspect-brk --env-file-if-exists=.env --env-file-if-exists=.env.local src/app.ts",
