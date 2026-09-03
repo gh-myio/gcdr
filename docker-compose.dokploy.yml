@@ -14,18 +14,19 @@
 # canonical status or opens an incident until an operator flips the DB flags
 # (see docs/ops/RFC-0062-orchestrator-devices-runbook.md).
 #
-# GHCR note (RFC-0062 Q6): to avoid on-host OOM builds, this should ship via the
-# same GHCR image the API cutover uses (build in CI → pull here) rather than
-# building on the Dokploy host. The `build:` block below mirrors dokploy.yml for
-# parity until that cutover lands.
+# GHCR note (RFC-0062 Q6): to avoid on-host OOM builds, this ships via the same
+# GHCR image the API uses — built in CI (.github/workflows/build-and-deploy.yml,
+# tags :latest + :sha-<commit>) and PULLED here, not built on the Dokploy host.
 # =============================================================================
 
 services:
   orchestrator-devices:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+    # Pull the SAME CI-built image as the API (ghcr.io/gh-myio/gcdr:latest, pushed on
+    # every desenv build) instead of building on-host — avoids the Dokploy-host OOM
+    # build and guarantees the exact code the CI produced. Requires the host to be
+    # logged in to GHCR (the API already pulls from there). Pin to :sha-<commit> if
+    # you want a deterministic, non-floating deploy.
+    image: ghcr.io/gh-myio/gcdr:latest
     command: ["node", "dist/workers/orchestrator-devices.worker.js"]
 
     # Non-secret config lives here; DATABASE_URL and ALARMS_API_TOKEN come from the
