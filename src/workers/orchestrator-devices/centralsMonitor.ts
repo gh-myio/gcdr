@@ -359,22 +359,36 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
 
   // ── Durable connectivity timeline (append-ON-CHANGE) — one row per central whose
   //    ONLINE/DEGRADED/OFFLINE/UNKNOWN state differs from its last recorded state.
-  //    Not pruned; records the PROPOSED state in shadow, canonical once live. ──
-  const lastStatus = await loadLastCentralStatus(dueIds);
-  const historyRows: StatusHistoryInsert[] = [];
-  for (const res of results) {
-    const sig = res.timelineSignal;
-    const last = lastStatus.get(sig.centralId) ?? null;
-    const next: TimelineStatus = nextTimelineStatus(sig, last);
-    if (next !== last) {
-      historyRows.push({
-        tenantId: sig.tenantId, customerId: sig.customerId, entityType: 'central',
-        entityId: sig.centralId, centralId: sig.centralId,
-        fromStatus: last, toStatus: next, probeResult: sig.probeResult, mode,
-      });
+  //    Not pruned; records the PROPOSED state in shadow, canonical once live.
+  //    Secondary observability: a failure here (e.g. migration 0072 not yet applied)
+  //    must NEVER abort the canonical sweep — swallow + warn, like incident emission. ──
+  // Surfaced in the run's notes so a timeline failure is VISIBLE in the DB (not only
+  // in stdout) — otherwise a sweep looks 100% OK while the timeline is silently broken.
+  let timelineInserted = 0;
+  let timelineFailed = false;
+  let timelineError: string | undefined;
+  try {
+    const lastStatus = await loadLastCentralStatus(dueIds);
+    const historyRows: StatusHistoryInsert[] = [];
+    for (const res of results) {
+      const sig = res.timelineSignal;
+      const last = lastStatus.get(sig.centralId) ?? null;
+      const next: TimelineStatus = nextTimelineStatus(sig, last);
+      if (next !== last) {
+        historyRows.push({
+          tenantId: sig.tenantId, customerId: sig.customerId, entityType: 'central',
+          entityId: sig.centralId, centralId: sig.centralId,
+          fromStatus: last, toStatus: next, probeResult: sig.probeResult, mode,
+        });
+      }
     }
+    if (historyRows.length > 0) await db.insert(orchestratorDevicesStatusHistory).values(historyRows);
+    timelineInserted = historyRows.length;
+  } catch (err) {
+    timelineFailed = true;
+    timelineError = err instanceof Error ? err.message : String(err);
+    log('warn', 'timeline history write failed (sweep continues)', { error: timelineError });
   }
-  if (historyRows.length > 0) await db.insert(orchestratorDevicesStatusHistory).values(historyRows);
 
   // ── Incidents (item 8) — sanity held blocks emission too. ──
   const inc = (!sanity.held && downCandidates.length > 0)
@@ -390,12 +404,14 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
       deviceTotal, deviceFlipsToDown,
       sanity: { held: sanity.held, flippedPct: Number(sanity.flippedPct.toFixed(1)), reason: sanity.reason ?? null },
       incidents,
+      timeline: { inserted: timelineInserted, failed: timelineFailed, ...(timelineError ? { error: timelineError } : {}) },
     },
   }).where(eq(orchestratorDevicesRuns.id, runId));
 
   log('info', 'centrals sweep done', {
     due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
     mode, applied, audited, sanityHeld: sanity.held, incidents,
+    timeline: { inserted: timelineInserted, failed: timelineFailed },
   });
 
   // Keep the operational ledger bounded (§7/§8) — never audit_logs.
