@@ -433,10 +433,14 @@ async function pruneLedger(retentionDays: number): Promise<void> {
 async function loadLastCentralStatus(centralIds: string[]): Promise<Map<string, string>> {
   const m = new Map<string, string>();
   if (centralIds.length === 0) return m;
+  // Build "IN ($1::uuid, $2::uuid, ...)" via sql.join — NOT `= ANY(${centralIds}::uuid[])`:
+  // interpolating a JS array renders as a row `($1, $2, ...)`, and `(row)::uuid[]` is
+  // invalid Postgres ("cannot cast type record to uuid[]"), which threw every tick.
+  const ids = sql.join(centralIds.map((id) => sql`${id}::uuid`), sql`, `);
   const rows = (await db.execute(sql`
     SELECT DISTINCT ON (central_id) central_id, to_status
     FROM orchestrator_devices_status_history
-    WHERE entity_type = 'central' AND central_id = ANY(${centralIds}::uuid[])
+    WHERE entity_type = 'central' AND central_id IN (${ids})
     ORDER BY central_id, created_at DESC
   `)) as unknown as Array<{ central_id: string; to_status: string }>;
   for (const r of rows) m.set(r.central_id, r.to_status);
