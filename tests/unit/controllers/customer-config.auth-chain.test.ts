@@ -20,6 +20,19 @@ jest.mock('../../../src/services/CustomerConfigService', () => ({
   },
 }));
 
+// RFC-0231 §8 — backfill-from-tb shares this router; stub it so a POST succeeds
+// once auth passes, same as the config-CRUD stubs above.
+jest.mock('../../../src/services/CustomerConfigBackfillService', () => ({
+  customerConfigBackfillService: {
+    backfillCustomer: jest.fn().mockResolvedValue({
+      customerId: 'stub', changed: false, applied: false, dryRun: true, diff: [],
+    }),
+  },
+}));
+jest.mock('../../../src/middleware/audit', () => ({
+  logAuditEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
 // API-key validation leaf used by hybridAuthMiddleware.
 jest.mock('../../../src/services/CustomerApiKeyService', () => ({
   customerApiKeyService: {
@@ -211,6 +224,95 @@ describe('/config — JWT RBAC (DEC-8)', () => {
         TENANT_A,
         expect.objectContaining({ permission: 'customers.hierarchy.update' }),
       );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('RFC-0231 §8: POST /backfill-from-tb requires the SAME write permission as PUT/PATCH/DELETE (200 when allowed)', async () => {
+    (decodeJWT as jest.Mock).mockReturnValue(jwtUser);
+    (authorizationService.evaluatePermission as jest.Mock).mockResolvedValue({ allowed: true });
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${cfgUrl(srv.url, OWN_CUSTOMER)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer jwt', 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(200);
+      expect(authorizationService.evaluatePermission).toHaveBeenCalledWith(
+        TENANT_A,
+        expect.objectContaining({ permission: 'customers.hierarchy.update', resourceScope: `customer:${OWN_CUSTOMER}` }),
+      );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('RFC-0231 §8: POST /backfill-from-tb denies a JWT lacking the write permission (403)', async () => {
+    (decodeJWT as jest.Mock).mockReturnValue(jwtUser);
+    (authorizationService.evaluatePermission as jest.Mock).mockResolvedValue({ allowed: false });
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${cfgUrl(srv.url, OWN_CUSTOMER)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer jwt', 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(403);
+    } finally {
+      await srv.close();
+    }
+  });
+});
+
+describe('/config/backfill-from-tb — API key scope (RFC-0231 §8)', () => {
+  it('a customer API key holding only customers:read is rejected on POST — proves the browser-exposed gcdrApiKey (read-only) cannot reach this endpoint', async () => {
+    // hybridAuthByMethod resolves POST to the WRITE scope tier and forwards it as
+    // requiredScope to validateApiKey — the real CustomerApiKeyService (its own
+    // unit suite covers this) rejects when the key's scopes don't include it. This
+    // mock simulates exactly that rejection for a read-only key.
+    (customerApiKeyService.validateApiKey as jest.Mock).mockImplementation(
+      (_apiKey: string, _ip: string, requiredScope?: string | string[]) => {
+        const required = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
+        if (required.includes('customers:write')) {
+          return Promise.reject(new (jest.requireActual('../../../src/shared/errors/AppError').ForbiddenError)(
+            'API key missing required scope: customers:write',
+          ));
+        }
+        return Promise.resolve(apiKeyCtx('SELF'));
+      },
+    );
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${cfgUrl(srv.url, OWN_CUSTOMER)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { 'x-api-key': 'gcdr_cust_read_only', 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(403);
+      // Confirms the write scope was actually what got requested for this route —
+      // same tier as PUT/PATCH/DELETE, not the read tier GET uses.
+      expect(customerApiKeyService.validateApiKey).toHaveBeenCalledWith(
+        'gcdr_cust_read_only',
+        expect.any(String),
+        'customers:write',
+      );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('a customer API key WITH write scope reaches POST /backfill-from-tb (200)', async () => {
+    (customerApiKeyService.validateApiKey as jest.Mock).mockResolvedValue(apiKeyCtx('SELF'));
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${cfgUrl(srv.url, OWN_CUSTOMER)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { 'x-api-key': 'gcdr_cust_write', 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(200);
     } finally {
       await srv.close();
     }

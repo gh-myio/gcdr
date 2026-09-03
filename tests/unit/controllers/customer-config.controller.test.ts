@@ -16,7 +16,19 @@ jest.mock('../../../src/services/CustomerConfigService', () => ({
   },
 }));
 
+jest.mock('../../../src/services/CustomerConfigBackfillService', () => ({
+  customerConfigBackfillService: {
+    backfillCustomer: jest.fn(),
+  },
+}));
+
+jest.mock('../../../src/middleware/audit', () => ({
+  logAuditEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { customerConfigService } from '../../../src/services/CustomerConfigService';
+import { customerConfigBackfillService } from '../../../src/services/CustomerConfigBackfillService';
+import { logAuditEvent } from '../../../src/middleware/audit';
 import configController, { configSecretsRouter } from '../../../src/controllers/customer-config.controller';
 import { errorHandler } from '../../../src/middleware/errorHandler';
 
@@ -26,6 +38,8 @@ const REQUEST_ID = '72290bdb-9127-4049-83a9-3ebd1e40f99a';
 const CUSTOMER_ID = '84e0370e-636a-4741-9874-504b5e0b3577';
 
 const svc = customerConfigService as jest.Mocked<typeof customerConfigService>;
+const backfillSvc = customerConfigBackfillService as jest.Mocked<typeof customerConfigBackfillService>;
+const auditMock = logAuditEvent as jest.Mock;
 
 function buildApp(contextOverrides: Record<string, unknown> = {}, user?: Request['user']) {
   const app = express();
@@ -178,6 +192,127 @@ describe('customer-config.controller — config CRUD', () => {
     try {
       const res = await fetch(base(srv.url));
       expect(res.status).toBe(404);
+    } finally {
+      await srv.close();
+    }
+  });
+});
+
+describe('customer-config.controller — POST /backfill-from-tb (RFC-0231 §8)', () => {
+  it('defaults dryRun to true and forwards attrs + actorId to the backfill service', async () => {
+    backfillSvc.backfillCustomer.mockResolvedValue({
+      customerId: CUSTOMER_ID,
+      changed: true,
+      applied: false,
+      dryRun: true,
+      diff: [{ path: 'alarms.notificationsEnabled', from: undefined, to: true }],
+    });
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${base(srv.url)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: { alarmNotificationsEnabled: true } }),
+      });
+      const body = (await res.json()) as { success: boolean; data: { dryRun: boolean } };
+      expect(res.status).toBe(200);
+      expect(body.data.dryRun).toBe(true);
+      expect(backfillSvc.backfillCustomer).toHaveBeenCalledWith(
+        TENANT_ID,
+        CUSTOMER_ID,
+        { alarmNotificationsEnabled: true },
+        { dryRun: true, actorId: USER_ID },
+      );
+      // dry-run must never emit an audit event.
+      expect(auditMock).not.toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('?dryRun=false applies the backfill and emits a CUSTOMER_CONFIG_UPDATED audit event', async () => {
+    backfillSvc.backfillCustomer.mockResolvedValue({
+      customerId: CUSTOMER_ID,
+      changed: true,
+      applied: true,
+      dryRun: false,
+      diff: [{ path: 'alarms.notificationsEnabled', from: undefined, to: true }],
+    });
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${base(srv.url)}/backfill-from-tb?dryRun=false`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: { alarmNotificationsEnabled: true } }),
+      });
+      expect(res.status).toBe(200);
+      expect(backfillSvc.backfillCustomer).toHaveBeenCalledWith(
+        TENANT_ID,
+        CUSTOMER_ID,
+        { alarmNotificationsEnabled: true },
+        { dryRun: false, actorId: USER_ID },
+      );
+      expect(auditMock).toHaveBeenCalledWith(
+        TENANT_ID,
+        'CUSTOMER_CONFIG_UPDATED',
+        expect.objectContaining({
+          entityType: 'customer.config',
+          entityId: CUSTOMER_ID,
+          metadata: expect.objectContaining({ method: 'BACKFILL' }),
+        }),
+      );
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('does not emit an audit event when applied is false even with dryRun=false (no-op diff)', async () => {
+    backfillSvc.backfillCustomer.mockResolvedValue({
+      customerId: CUSTOMER_ID,
+      changed: false,
+      applied: false,
+      dryRun: false,
+      diff: [],
+    });
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${base(srv.url)}/backfill-from-tb?dryRun=false`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(200);
+      expect(auditMock).not.toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('400s when attrs is missing or not a plain object', async () => {
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${base(srv.url)}/backfill-from-tb`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: ['not', 'an', 'object'] }),
+      });
+      expect(res.status).toBe(400);
+      expect(backfillSvc.backfillCustomer).not.toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('400s on an invalid customerId', async () => {
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${srv.url}/customers/not-a-uuid/config/backfill-from-tb`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attrs: {} }),
+      });
+      expect(res.status).toBe(400);
+      expect(backfillSvc.backfillCustomer).not.toHaveBeenCalled();
     } finally {
       await srv.close();
     }
