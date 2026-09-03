@@ -3057,3 +3057,24 @@ export const orchestratorDevicesChecks = pgTable('orchestrator_devices_checks', 
   entityIdx:  index('orchestrator_devices_checks_entity_idx').on(table.entityType, table.entityId, table.createdAt),
   createdIdx: index('orchestrator_devices_checks_created_idx').on(table.createdAt),
 }));
+
+// RFC-0062 — durable connectivity timeline. Unlike the high-frequency _checks/_runs
+// ledger (pruned to ORCH_DEVICES_LEDGER_RETENTION_DAYS), this table is append-ON-CHANGE
+// only (one row per ONLINE/DEGRADED/OFFLINE/UNKNOWN transition) and is NOT pruned, so a
+// per-central timeline survives long-term. In shadow mode it records the PROPOSED state.
+export const orchestratorDevicesStatusHistory = pgTable('orchestrator_devices_status_history', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull(),
+  customerId:  uuid('customer_id'),
+  entityType:  varchar('entity_type', { length: 20 }).notNull().default('central'), // central|device (future)
+  entityId:    uuid('entity_id').notNull(),
+  centralId:   uuid('central_id'),
+  fromStatus:  varchar('from_status', { length: 30 }),                              // null on the first-ever record
+  toStatus:    varchar('to_status', { length: 30 }).notNull(),                      // ONLINE|DEGRADED|OFFLINE|UNKNOWN
+  probeResult: varchar('probe_result', { length: 30 }),
+  mode:        varchar('mode', { length: 20 }),                                     // shadow|canonical|held
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  centralIdx: index('orchestrator_devices_status_history_central_idx').on(table.centralId, table.createdAt),
+  tenantIdx:  index('orchestrator_devices_status_history_tenant_idx').on(table.tenantId, table.createdAt),
+}));

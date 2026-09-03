@@ -1,4 +1,4 @@
-import { centralVerdict } from '../../../src/workers/orchestrator-devices/verdict';
+import { centralVerdict, nextTimelineStatus } from '../../../src/workers/orchestrator-devices/verdict';
 import type { ProbeOutcome } from '../../../src/workers/orchestrator-devices/gatewayClient';
 
 // Grace window + a fixed "now" so the tests are deterministic.
@@ -60,5 +60,24 @@ describe('centralVerdict — grace window (DEGRADED → OFFLINE)', () => {
     expect(v.proposedStatus).toBe('OFFLINE'); // = current
     expect(v.genuineDown).toBe(false);
     expect(v.probeResult).toBe('CONFIG_ERROR');
+  });
+});
+
+describe('nextTimelineStatus — durable timeline state (carries last on indeterminate)', () => {
+  it('reachable ⇒ ONLINE', () => {
+    expect(nextTimelineStatus({ reachable: true, genuineDown: false, pastGrace: false }, 'OFFLINE')).toBe('ONLINE');
+  });
+  it('genuine down within grace ⇒ DEGRADED', () => {
+    expect(nextTimelineStatus({ reachable: false, genuineDown: true, pastGrace: false }, 'ONLINE')).toBe('DEGRADED');
+  });
+  it('genuine down past grace ⇒ OFFLINE', () => {
+    expect(nextTimelineStatus({ reachable: false, genuineDown: true, pastGrace: true }, 'DEGRADED')).toBe('OFFLINE');
+  });
+  it('indeterminate (auth/config) CARRIES the last known state (no fake transition)', () => {
+    expect(nextTimelineStatus({ reachable: false, genuineDown: false, pastGrace: false }, 'ONLINE')).toBe('ONLINE');
+    expect(nextTimelineStatus({ reachable: false, genuineDown: false, pastGrace: false }, 'OFFLINE')).toBe('OFFLINE');
+  });
+  it('indeterminate with no prior state ⇒ UNKNOWN', () => {
+    expect(nextTimelineStatus({ reachable: false, genuineDown: false, pastGrace: false }, null)).toBe('UNKNOWN');
   });
 });

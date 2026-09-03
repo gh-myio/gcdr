@@ -48,3 +48,21 @@ export function centralVerdict(
   return { reachable: false, genuineDown: true, pastGrace, proposedStatus: pastGrace ? 'OFFLINE' : 'DEGRADED', probeResult: outcome.kind,
     deviceFallback: { connectivity: 'UNKNOWN', health: 'UNKNOWN', unknownReason: 'CENTRAL_UNREACHABLE' } };
 }
+
+export type TimelineStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'UNKNOWN';
+
+/**
+ * The connectivity state for the durable timeline (orchestrator_devices_status_history).
+ * OK ⇒ ONLINE; a genuine down ⇒ DEGRADED within grace, OFFLINE past grace; an
+ * INDETERMINATE probe (AUTH_ERROR/CONFIG_ERROR — not reachable, not a genuine down)
+ * CARRIES the last known state so it never records a fake transition. With no prior
+ * state to carry, it is UNKNOWN. Pure — unit-testable without a DB.
+ */
+export function nextTimelineStatus(
+  v: Pick<CentralVerdict, 'reachable' | 'genuineDown' | 'pastGrace'>,
+  last: string | null,
+): TimelineStatus {
+  if (v.reachable) return 'ONLINE';
+  if (v.genuineDown) return v.pastGrace ? 'OFFLINE' : 'DEGRADED';
+  return (last as TimelineStatus) ?? 'UNKNOWN';
+}

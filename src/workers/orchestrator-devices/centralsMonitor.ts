@@ -14,13 +14,14 @@
 // already sits in front of the (still-disabled) canonical apply path.
 // =============================================================================
 
-import { and, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '../../infrastructure/database/drizzle/db';
 import {
   centrals,
   devices,
   orchestratorDevicesRuns,
   orchestratorDevicesChecks,
+  orchestratorDevicesStatusHistory,
   orchestratorRetryPolicies,
 } from '../../infrastructure/database/drizzle/schema';
 import { workerConfig, gatewayUrl } from './config';
@@ -28,13 +29,14 @@ import { probeGateway, type RetryAttempt, type RetryPolicy } from './gatewayClie
 import { classifyDevice, isDeviceTransition, type Classification } from './ladder';
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
-import { centralVerdict } from './verdict';
+import { centralVerdict, nextTimelineStatus, type TimelineStatus } from './verdict';
 import { mapWithConcurrency } from './concurrency';
 import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
 import { buildCandidatePayload, debounceForCandidate, emitCandidate, type DownCandidate } from './incidents';
 
 type Logger = (level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>) => void;
 type CheckInsert = typeof orchestratorDevicesChecks.$inferInsert;
+type StatusHistoryInsert = typeof orchestratorDevicesStatusHistory.$inferInsert;
 
 interface CentralRow {
   id: string;
@@ -57,6 +59,15 @@ interface DeviceRow {
   unknownReason: string | null;
 }
 
+interface TimelineSignal {
+  centralId: string;
+  tenantId: string;
+  customerId: string;
+  reachable: boolean;
+  genuineDown: boolean;
+  pastGrace: boolean;
+  probeResult: string;
+}
 interface CentralResult {
   checkRows: CheckInsert[];
   transitions: Transition[];
@@ -66,6 +77,7 @@ interface CentralResult {
   failed: boolean;
   deviceTotal: number;
   deviceFlipsToDown: number;
+  timelineSignal: TimelineSignal;
 }
 
 /** Deterministic per-central jitter in [-jitterPct, +jitterPct]/100 so scans
@@ -168,7 +180,8 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   skipped += dev.skipped;
   deviceFlipsToDown += dev.deviceFlipsToDown;
 
-  return { checkRows, transitions, downCandidates, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown };
+  return { checkRows, transitions, downCandidates, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown,
+    timelineSignal: { centralId: c.id, tenantId: c.tenantId, customerId: c.customerId, reachable: verdict.reachable, genuineDown: verdict.genuineDown, pastGrace: verdict.pastGrace, probeResult: verdict.probeResult } };
 }
 
 interface DeviceLoopResult {
@@ -344,6 +357,25 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   // Insert checks FIRST so the debounce query below sees this tick's state.
   if (checkRows.length > 0) await db.insert(orchestratorDevicesChecks).values(checkRows);
 
+  // ── Durable connectivity timeline (append-ON-CHANGE) — one row per central whose
+  //    ONLINE/DEGRADED/OFFLINE/UNKNOWN state differs from its last recorded state.
+  //    Not pruned; records the PROPOSED state in shadow, canonical once live. ──
+  const lastStatus = await loadLastCentralStatus(dueIds);
+  const historyRows: StatusHistoryInsert[] = [];
+  for (const res of results) {
+    const sig = res.timelineSignal;
+    const last = lastStatus.get(sig.centralId) ?? null;
+    const next: TimelineStatus = nextTimelineStatus(sig, last);
+    if (next !== last) {
+      historyRows.push({
+        tenantId: sig.tenantId, customerId: sig.customerId, entityType: 'central',
+        entityId: sig.centralId, centralId: sig.centralId,
+        fromStatus: last, toStatus: next, probeResult: sig.probeResult, mode,
+      });
+    }
+  }
+  if (historyRows.length > 0) await db.insert(orchestratorDevicesStatusHistory).values(historyRows);
+
   // ── Incidents (item 8) — sanity held blocks emission too. ──
   const inc = (!sanity.held && downCandidates.length > 0)
     ? await emitIncidents(downCandidates, control, log)
@@ -376,4 +408,21 @@ async function pruneLedger(retentionDays: number): Promise<void> {
   const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
   await db.delete(orchestratorDevicesChecks).where(lt(orchestratorDevicesChecks.createdAt, cutoff));
   await db.delete(orchestratorDevicesRuns).where(lt(orchestratorDevicesRuns.startedAt, cutoff));
+  // NB: orchestrator_devices_status_history is intentionally NOT pruned — it is the
+  // durable timeline (tiny: one row per state change), meant to outlive the ledger.
+}
+
+/** Last recorded timeline state per central (DISTINCT ON), to decide if this tick is a
+ *  transition worth appending. Empty map for an empty id list. */
+async function loadLastCentralStatus(centralIds: string[]): Promise<Map<string, string>> {
+  const m = new Map<string, string>();
+  if (centralIds.length === 0) return m;
+  const rows = (await db.execute(sql`
+    SELECT DISTINCT ON (central_id) central_id, to_status
+    FROM orchestrator_devices_status_history
+    WHERE entity_type = 'central' AND central_id = ANY(${centralIds}::uuid[])
+    ORDER BY central_id, created_at DESC
+  `)) as unknown as Array<{ central_id: string; to_status: string }>;
+  for (const r of rows) m.set(r.central_id, r.to_status);
+  return m;
 }
