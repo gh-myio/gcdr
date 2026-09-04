@@ -35,6 +35,7 @@ export const CreateCustomerSchema = z.object({
     })
     .optional(),
   externalId: z.string().max(255).optional(),
+  ingestionCustomerId: z.string().uuid().optional().nullable(), // customer id in the ingestion system
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -82,6 +83,7 @@ export const UpdateCustomerSchema = z.object({
     .optional()
     .nullable(),
   externalId: z.string().max(255).optional().nullable(),
+  ingestionCustomerId: z.string().uuid().optional().nullable(), // customer id in the ingestion system
   metadata: z.record(z.unknown()).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE'] as const).optional(),
   config: z.object({

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ruleService } from '../services/RuleService';
 import { alarmBundleService } from '../services/AlarmBundleService';
+import { customerService } from '../services/CustomerService';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import { CentralRepository } from '../repositories/CentralRepository';
 import {
@@ -724,6 +725,48 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
       // handler previously dropped them, so the no-consumption evaluator never
       // received any rule. Included only when present → byte-identical bundle
       // for customers without NC rules. NOT exposed on /simple (Node-RED).
+      ...(bundle.noConsumptionRules?.length ? { noConsumptionRules: bundle.noConsumptionRules } : {}),
+    }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /ingestion/customers/:ingestionCustomerId/alarm-rules/bundle/to-verify-service
+ * Same as /customers/:customerId/alarm-rules/bundle/to-verify-service but keyed by the
+ * customer's INGESTION-system id (customers.ingestion_customer_id) instead of the GCDR
+ * internal customerId. Resolves ingestionCustomerId → internal customer, then returns the
+ * identical verify bundle. 404 when no customer maps to that ingestion id (in the tenant).
+ */
+export const getAlarmBundleVerifyByIngestionHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { ingestionCustomerId } = req.params;
+    const { domain, deviceType, includeDisabled } = req.query;
+    const centralId = req.headers['x-central-id'] as string | undefined;
+
+    if (!ingestionCustomerId) {
+      throw new ValidationError('ingestionCustomerId is required');
+    }
+
+    // Resolve the ingestion-system id → GCDR internal customer (throws NotFoundError → 404).
+    const customer = await customerService.getByIngestionCustomerId(tenantId, ingestionCustomerId);
+
+    const bundle = await alarmBundleService.verifyBundle({
+      tenantId,
+      customerId: customer.id,
+      centralId,
+      domain: domain as string | undefined,
+      deviceType: deviceType as string | undefined,
+      includeDisabled: includeDisabled === 'true',
+    });
+
+    // Identical response shape to /to-verify-service (byte-identical for the verify consumer).
+    sendSuccess(res, {
+      versionId: bundle.meta.version,
+      deviceIndex: bundle.deviceIndex,
+      rules: bundle.rules,
       ...(bundle.noConsumptionRules?.length ? { noConsumptionRules: bundle.noConsumptionRules } : {}),
     }, 200, requestId);
   } catch (err) {

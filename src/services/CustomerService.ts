@@ -185,6 +185,14 @@ export class CustomerService {
     return customer;
   }
 
+  async getByIngestionCustomerId(tenantId: string, ingestionCustomerId: string): Promise<Customer> {
+    const customer = await this.repository.getByIngestionCustomerId(tenantId, ingestionCustomerId);
+    if (!customer) {
+      throw new NotFoundError(`Customer with ingestion customer ID ${ingestionCustomerId} not found`);
+    }
+    return customer;
+  }
+
   async getEnrichedByExternalId(
     tenantId: string,
     externalId: string,
