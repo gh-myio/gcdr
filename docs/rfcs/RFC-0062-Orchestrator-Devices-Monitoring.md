@@ -543,6 +543,7 @@ Two classes always written to the audit log:
    - **Physical scope edit vs. soft-mute** — the MVP mutates `scope_entity_ids` (no evaluator change) + bundle-cache invalidation; the soft-mute (`muted_until`, evaluator-honoured) is cleaner but needs evaluator/ALARMS support. Decide when to migrate.
    - **Restore trigger** — day-rollover only (proposed), or also when a rule/device is manually re-added mid-day.
    - **Interaction with ALARMS auto-resolve** — muting mid-day removes the device from evaluation; confirm this does not strand an open NO_CONSUMPTION incident on the ALARMS side.
+   - **Source of truth for `todayCount`** — is ALARMS **authoritative** (queried live every tick), or does GCDR keep a **local per-day snapshot/cache** it reconciles against ALARMS? This decides how the monitor behaves when ALARMS is slow/oscillating: mutating rule scope on a **fragile read** is riskier than merely emitting an incident, so a local snapshot (fail-safe to "no change" on a bad read) may be required before this is allowed to write.
 
 ## Future possibilities
 
