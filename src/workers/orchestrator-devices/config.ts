@@ -79,8 +79,10 @@ export const workerConfig = {
   rulesAlarmsReader: (process.env.ORCH_DEVICES_RULES_ALARMS_READER === 'http' ? 'http' : 'mock') as 'mock' | 'http',
   // Read endpoint base (must include /api/v1); falls back to ALARMS_API_URL.
   alarmsReadUrl: process.env.ALARMS_READ_API_URL ?? process.env.ALARMS_API_URL,
-  // DEDICATED read-scoped key (least privilege; separate from the producer write token). Never logged.
-  alarmsReadToken: process.env.ALARMS_READ_API_KEY,
+  // DEDICATED read-scoped key (least privilege; separate from the producer write token).
+  // Falls back to ALARMS_API_TOKEN when a dedicated read key isn't set (dev convenience;
+  // prod should set ALARMS_READ_API_KEY explicitly). Never logged.
+  alarmsReadToken: process.env.ALARMS_READ_API_KEY ?? process.env.ALARMS_API_TOKEN,
   // Localhost demo: JSON map deviceId->count to force auto-mute in mock mode, e.g. '{"<uuid>":3}'.
   rulesMockCounts: process.env.RULES_MOCK_COUNTS,
 } as const;
