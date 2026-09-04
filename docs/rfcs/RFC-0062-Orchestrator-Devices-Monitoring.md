@@ -465,22 +465,25 @@ sequenceDiagram
   // (single source of truth). Include it only if the cap is decided to live in ALARMS.
 }
 ```
-- `todayCount` — **occurrences within the local day** (the rollup counter), per the critical semantic in §11b. **This is the only field GCDR strictly needs.**
+- `todayCount` — the count of **canonical NO_CONSUMPTION buckets observed in the local day** for the device, from a **persistent, idempotent per-day rollup** (ALARMS-side). **This is the only field GCDR strictly needs.** It must **NOT** be derived from counting `incidents` rows (deduped per day → 0/1) nor from the current `slot_count`/`empty_slots` (that is the producer's *current* evidence, which an AUTHORITATIVE ingestion can reshape/remove). The rollup is what makes the count stable and immune to evidence reshaping.
 - `maxDailyOccurrences` — **optional, diagnostic echo only.** ⚠️ **Threshold ownership is an OPEN DECISION — avoid two sources of truth.** Recommended: the **GCDR rule owns the cap** (it already owns rule config and is what `rules-monitor` acts on), so ALARMS returns **only `todayCount`** and this field is omitted. Return it **only** if the cap is decided to live in the ALARMS rollup instead — in which case GCDR must NOT also carry it. Exactly one owner; the endpoint must not imply both.
 
 **Counting semantics (must be pinned exactly):**
 
 | question | contract |
 |---|---|
-| Multiple occurrences same day | count **N** (the whole point) — NOT collapsed to 1. |
-| Incident open vs. resolved | occurrences count **regardless of open/resolved** — the cap is "how many times today", not "is it open now". |
-| Reopened same day | occurrences keep accruing on the **same daily rollup** (count continues, does not reset). |
-| Dedupe key | RFC-0055 NO_CONSUMPTION key **includes day** → one rollup per (tenant, customer, device, day); `todayCount` is that rollup's occurrence counter. |
+| Counting unit | **canonical buckets**, not detection events — via an **idempotent upsert per bucket** keyed by the natural key `tenantId + customerId + kind + timezone + day + deviceId + bucketFrom` (**central/rule are NOT part of the identity**). Matches the ED-1221 lifecycle. |
+| Re-post of the same bucket | **does NOT increment** (idempotent on the natural key). |
+| New `bucketFrom` in the same day | **increments**. |
+| Incident open vs. resolved | count **regardless of open/resolved**; resolve/reopen **does NOT reset**. |
 | Day boundary | `[windowStart, windowEnd)` computed in `timezone`, **per-customer local**, returned in the response so GCDR can verify. |
+| NOT derived from | counting `incidents` rows (day-deduped → 0/1) or the current `slot_count`/`empty_slots` (reshapable by AUTHORITATIVE ingestion). |
 
 **Fail-safe (non-negotiable — this monitor WRITES rule scope).** On any non-2xx, timeout, malformed body, or a **requested `deviceId` missing** from `counts`, `rules-monitor` treats the read as **no data → NO CHANGE** for the affected devices this tick (never mute, never restore). A muted device with unknown count is **not** restored on a bad read; an unmuted device with unknown count is **not** muted. Mutating rules on a fragile read is worse than doing nothing.
 
-**Performance.** Batch (`deviceIds[]`, ≤ 500/call) → one call per rule scope, not N calls. ALARMS should serve this from the per-day rollup it already maintains (indexed by tenant/customer/device/day), so it is a cheap aggregate read.
+**Performance & paging.** Batch (`deviceIds[]`, ≤ 500/call) → one call per rule scope, served from the per-day rollup. **Above 500 devices, GCDR chunks into multiple batch calls** — **no server-side pagination** on this endpoint, to keep the contract **stateless and predictable** (a second consumption mode is unnecessary for a read-only batch count).
+
+**Build order (agreed).** ALARMS ships the **persistent occurrence rollup table first**, then exposes this endpoint on top of it — the rollup is what guarantees idempotency and reshape-immunity; the endpoint is a thin read over it.
 
 **Open (Unresolved §6):** authoritative live query vs. a GCDR local per-day snapshot reconciled against this endpoint — the snapshot makes the fail-safe trivial (last-good count) when ALARMS oscillates.
 
