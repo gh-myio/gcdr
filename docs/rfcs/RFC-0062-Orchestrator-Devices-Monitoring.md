@@ -458,13 +458,15 @@ sequenceDiagram
   "windowEnd":   "2026-09-05T03:00:00.000Z",   // exclusive
   "asOf":        "2026-09-04T14:32:10.000Z",   // when ALARMS computed this
   "counts": [
-    { "deviceId": "<uuid>", "todayCount": 3, "maxDailyOccurrences": 3, "lastOccurrenceAt": "2026-09-04T13:10:00.000Z" },
-    { "deviceId": "<uuid>", "todayCount": 0, "maxDailyOccurrences": 3, "lastOccurrenceAt": null }
+    { "deviceId": "<uuid>", "todayCount": 3, "lastOccurrenceAt": "2026-09-04T13:10:00.000Z" },
+    { "deviceId": "<uuid>", "todayCount": 0, "lastOccurrenceAt": null }
   ]
+  // maxDailyOccurrences intentionally OMITTED — recommended: the GCDR rule owns the cap
+  // (single source of truth). Include it only if the cap is decided to live in ALARMS.
 }
 ```
-- `todayCount` — **occurrences within the local day** (the rollup counter), per the critical semantic in §11b.
-- `maxDailyOccurrences` — **optional convenience echo** if ALARMS knows the rule's allowance; **GCDR's rule config remains authoritative for the cap** (contract #2). GCDR compares `todayCount` against its own cap.
+- `todayCount` — **occurrences within the local day** (the rollup counter), per the critical semantic in §11b. **This is the only field GCDR strictly needs.**
+- `maxDailyOccurrences` — **optional, diagnostic echo only.** ⚠️ **Threshold ownership is an OPEN DECISION — avoid two sources of truth.** Recommended: the **GCDR rule owns the cap** (it already owns rule config and is what `rules-monitor` acts on), so ALARMS returns **only `todayCount`** and this field is omitted. Return it **only** if the cap is decided to live in the ALARMS rollup instead — in which case GCDR must NOT also carry it. Exactly one owner; the endpoint must not imply both.
 
 **Counting semantics (must be pinned exactly):**
 
@@ -588,7 +590,7 @@ Two classes always written to the audit log:
 5. **Notification of incidents** — panel-only vs. dispatch via channels/EMAIL_RELAY (reuse RFC-0055's dispatch), per customer/central opt-in.
 6. **`rules-monitor` (§11b) — contracts to pin before implementing:**
    - **ALARMS read endpoint** for per-day NO_CONSUMPTION occurrence counts — **drafted in §11c** (`POST /incidents/counts/daily`); does not exist in ALARMS yet (§8 is write-only). Pin the shape, counting semantics, and fail-safe with the ALARMS team.
-   - **Where the daily allowance `maxDailyOccurrences` lives** on the NO_CONSUMPTION rule config (today the window may be implicit) — until pinned, fail-open (never mute).
+   - **Threshold ownership — where the daily allowance `maxDailyOccurrences` lives.** Recommended: the **GCDR rule** owns it (single source of truth; ALARMS returns only `todayCount`, §11c) — avoid a dual source of truth. Today the window may be implicit; until pinned, fail-open (never mute).
    - **Day-boundary timezone** — tenant-local, per-customer source of truth (not UTC).
    - **Physical scope edit vs. soft-mute** — the MVP mutates `scope_entity_ids` (no evaluator change) + bundle-cache invalidation; the soft-mute (`muted_until`, evaluator-honoured) is cleaner but needs evaluator/ALARMS support. Decide when to migrate.
    - **Restore trigger** — day-rollover only (proposed), or also when a rule/device is manually re-added mid-day.
