@@ -178,7 +178,8 @@ export const customers = pgTable('customers', {
   address: jsonb('address'),
 
   // External integration
-  externalId: varchar('external_id', { length: 255 }),
+  externalId: varchar('external_id', { length: 255 }),        // ThingsBoard customer id (tbId)
+  ingestionCustomerId: uuid('ingestion_customer_id'),          // customer id in the INGESTION system (distinct from external_id)
 
   // Configuration
   settings: jsonb('settings').notNull().default({}),
@@ -204,6 +205,7 @@ export const customers = pgTable('customers', {
   tenantTypeIdx: index('customers_tenant_type_idx').on(table.tenantId, table.type),
   tenantStatusIdx: index('customers_tenant_status_idx').on(table.tenantId, table.status),
   externalIdIdx: index('customers_external_id_idx').on(table.externalId),
+  ingestionCustomerIdIdx: index('customers_ingestion_customer_id_idx').on(table.tenantId, table.ingestionCustomerId),
 }));
 
 // =============================================================================

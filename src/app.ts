@@ -47,6 +47,7 @@ import {
   getAlarmBundleVersionsHandler,
   invalidateAlarmBundleCacheHandler,
   getAlarmBundleVerifyHandler,
+  getAlarmBundleVerifyByIngestionHandler,
   listInternalSupportRulesHandler,
   integrationsController,
   customerApiKeysController,
@@ -261,6 +262,8 @@ apiV1Router.use('/auth', authController);
 
 // Bundle Verify — health check for bundle config (no cache, no bundle generated)
 apiV1Router.get('/customers/:customerId/alarm-rules/bundle/to-verify-service', authMiddleware, getAlarmBundleVerifyHandler);
+// Same bundle, keyed by the customer's INGESTION-system id (customers.ingestion_customer_id).
+apiV1Router.get('/ingestion/customers/:ingestionCustomerId/alarm-rules/bundle/to-verify-service', authMiddleware, getAlarmBundleVerifyByIngestionHandler);
 
 // Bundle Cache Invalidation (must come before /bundle routes)
 apiV1Router.delete('/customers/:customerId/alarm-rules/bundle/cache', hybridAuthMiddleware(PERM_BUNDLES_READ), invalidateAlarmBundleCacheHandler);

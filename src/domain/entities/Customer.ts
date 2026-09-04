@@ -29,7 +29,8 @@ export interface Customer extends BaseEntity {
   depth: number;
 
   // External integration
-  externalId?: string;
+  externalId?: string;              // ThingsBoard customer id (tbId)
+  ingestionCustomerId?: string;     // customer id in the INGESTION system (distinct from externalId)
 
   // Basic Info
   name: string;
