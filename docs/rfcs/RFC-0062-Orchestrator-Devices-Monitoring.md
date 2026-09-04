@@ -380,11 +380,9 @@ If, in production, the ladder mass-misclassifies (e.g. everyone `OFFLINE` on a F
 - when a device **hits its daily cap**, **remove it from the rule** so it stops evaluating for the rest of the day (auto-mute); and
 - **at the day rollover** — when the new day naturally has **zero** incidents — **put it back** (auto-restore).
 
-**Signal — read from ALARMS, per current day.** The count of a device's `NO_CONSUMPTION` incidents for the current day lives in the **ALARMS** plane (NO_CONSUMPTION stays an Alarms-side producer, §8). This monitor therefore **reads** ALARMS — the **first read dependency** (§8 was write-only). Contract to pin (Unresolved): a read/aggregate endpoint, e.g.
-```
-GET {ALARMS_API_URL}/incidents/count?kind=NO_CONSUMPTION&day={localDay}&customerId=… → { [deviceId]: count }
-```
-scoped to the tenant, authenticated with the same `X-API-Key` the producer uses. The **day boundary is tenant-local** (a UTC midnight would mute/restore at the wrong local time) — the timezone source must be pinned.
+**Signal — read from ALARMS, per current day.** The `NO_CONSUMPTION` **daily occurrence count** for a device lives in the **ALARMS** plane (NO_CONSUMPTION stays an Alarms-side producer, §8). This monitor therefore **reads** ALARMS — the **first read dependency** (§8 was write-only). Full contract in **§11c**; the batch endpoint is `POST {ALARMS_API_URL}/incidents/counts/daily`.
+
+> **Critical semantic — `todayCount` is OCCURRENCES, not incident rows.** RFC-0055's NO_CONSUMPTION dedupe key **includes the day**, so there is **one incident per device per day** (a per-day rollup). "N times/day" therefore means the **occurrence counter on that daily rollup**, not a count of incident rows (which would only ever be 0 or 1). The read contract (§11c) MUST return the occurrence count `N`. The **day boundary is tenant-local** (a UTC midnight would mute/restore at the wrong local time).
 
 **Decision (per rule, per device in scope).**
 
@@ -431,6 +429,58 @@ sequenceDiagram
     W->>DB: HOLD; record anomaly (no rule mutation)
   end
 ```
+
+### 11c. Proposed ALARMS read contract (`POST /incidents/counts/daily`)
+
+> **Contract #1 — the blocker for implementing §11b.** This endpoint does **not** exist in ALARMS yet. It is drafted here as a concrete shape so the ALARMS review is on a real request/response, not an abstraction. `rules-monitor` stays **implementation-blocked** until this is agreed and shipped by ALARMS.
+
+**Endpoint.** `POST {ALARMS_API_URL}/incidents/counts/daily` — POST (not GET) because the request is a **batch** with a `deviceIds[]` body. It is a **read** (no side effects), idempotent, cacheable within its `asOf`. Auth: **`X-API-Key`** (the same key the producer already uses, §8).
+
+**Request (batch, one call per rule scope):**
+```json
+{
+  "tenantId":   "11111111-1111-1111-1111-111111111111",
+  "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",
+  "kind":       "NO_CONSUMPTION",
+  "timezone":   "America/Sao_Paulo",          // local-day window; REQUIRED (never UTC-assumed)
+  "day":        "2026-09-04",                  // optional; default = current local day in `timezone`
+  "deviceIds":  ["<uuid>", "<uuid>", "..."]    // batch; REQUIRED, bounded (<= 500 per call)
+}
+```
+
+**Response — MUST echo a row for EVERY requested `deviceId`** (0 when none), so absence is an error, never an implicit zero:
+```json
+{
+  "kind":        "NO_CONSUMPTION",
+  "timezone":    "America/Sao_Paulo",
+  "day":         "2026-09-04",
+  "windowStart": "2026-09-04T03:00:00.000Z",   // local-day start, in UTC
+  "windowEnd":   "2026-09-05T03:00:00.000Z",   // exclusive
+  "asOf":        "2026-09-04T14:32:10.000Z",   // when ALARMS computed this
+  "counts": [
+    { "deviceId": "<uuid>", "todayCount": 3, "maxDailyOccurrences": 3, "lastOccurrenceAt": "2026-09-04T13:10:00.000Z" },
+    { "deviceId": "<uuid>", "todayCount": 0, "maxDailyOccurrences": 3, "lastOccurrenceAt": null }
+  ]
+}
+```
+- `todayCount` — **occurrences within the local day** (the rollup counter), per the critical semantic in §11b.
+- `maxDailyOccurrences` — **optional convenience echo** if ALARMS knows the rule's allowance; **GCDR's rule config remains authoritative for the cap** (contract #2). GCDR compares `todayCount` against its own cap.
+
+**Counting semantics (must be pinned exactly):**
+
+| question | contract |
+|---|---|
+| Multiple occurrences same day | count **N** (the whole point) — NOT collapsed to 1. |
+| Incident open vs. resolved | occurrences count **regardless of open/resolved** — the cap is "how many times today", not "is it open now". |
+| Reopened same day | occurrences keep accruing on the **same daily rollup** (count continues, does not reset). |
+| Dedupe key | RFC-0055 NO_CONSUMPTION key **includes day** → one rollup per (tenant, customer, device, day); `todayCount` is that rollup's occurrence counter. |
+| Day boundary | `[windowStart, windowEnd)` computed in `timezone`, **per-customer local**, returned in the response so GCDR can verify. |
+
+**Fail-safe (non-negotiable — this monitor WRITES rule scope).** On any non-2xx, timeout, malformed body, or a **requested `deviceId` missing** from `counts`, `rules-monitor` treats the read as **no data → NO CHANGE** for the affected devices this tick (never mute, never restore). A muted device with unknown count is **not** restored on a bad read; an unmuted device with unknown count is **not** muted. Mutating rules on a fragile read is worse than doing nothing.
+
+**Performance.** Batch (`deviceIds[]`, ≤ 500/call) → one call per rule scope, not N calls. ALARMS should serve this from the per-day rollup it already maintains (indexed by tenant/customer/device/day), so it is a cheap aggregate read.
+
+**Open (Unresolved §6):** authoritative live query vs. a GCDR local per-day snapshot reconciled against this endpoint — the snapshot makes the fail-safe trivial (last-good count) when ALARMS oscillates.
 
 ### 12. Admin cockpit — `/admin/orchestrator-devices`
 
@@ -480,7 +530,7 @@ Two classes always written to the audit log:
 | `RULES_CHECK_INTERVAL_SECONDS` | `300` | `rules-monitor` cadence (§11b) + a day-rollover pass shortly after local midnight |
 | `RULES_MAX_MUTE_PCT` | `30` | rules sanity gate — HOLD if a tick would mute more than this % of a rule's devices (lives in the DB FLAGS row) |
 | `RULES_LOCAL_TZ` | tenant-local | day boundary for the per-day NO_CONSUMPTION count / rollover — **must be tenant-local, not UTC** (contract to pin: per-customer TZ source) |
-| ALARMS **read** (reuses `ALARMS_API_URL`) | unset | `rules-monitor` reads `{ALARMS_API_URL}/incidents/count?kind=NO_CONSUMPTION&day=…` (contract to pin) — first read dependency; absent ⇒ rules-monitor idles (fail-open, never mutes) |
+| ALARMS **read** (reuses `ALARMS_API_URL`) | unset | `rules-monitor` posts to `{ALARMS_API_URL}/incidents/counts/daily` (§11c contract) — first read dependency; absent/failing ⇒ **no change** (fail-safe, never mutes/restores) |
 | `ALARMS_API_URL` / `ALARMS_API_TOKEN` | unset | ALARMS ingestion base (**must include `/api/v1`**) + token; the worker posts to `{ALARMS_API_URL}/incidents/candidates` (RFC-0031). **Absent URL ⇒ dry-run** (candidates logged, never posted). Token via Dokploy secret, never logged. |
 | `HEALTHCHECK_MAX_STALE_MS` | `180000` | container healthcheck fails if `MASTER.last_run_at` is older than this |
 
@@ -537,7 +587,7 @@ Two classes always written to the audit log:
 4. **Gateway concurrency ceiling (Phase 2)** — how many simultaneous connections a real gateway sustains before degrading — must be measured before the fan-out is sized.
 5. **Notification of incidents** — panel-only vs. dispatch via channels/EMAIL_RELAY (reuse RFC-0055's dispatch), per customer/central opt-in.
 6. **`rules-monitor` (§11b) — contracts to pin before implementing:**
-   - **ALARMS read endpoint** for per-day NO_CONSUMPTION incident counts (shape, auth, tenant scoping, pagination) — none exists yet; §8 is write-only.
+   - **ALARMS read endpoint** for per-day NO_CONSUMPTION occurrence counts — **drafted in §11c** (`POST /incidents/counts/daily`); does not exist in ALARMS yet (§8 is write-only). Pin the shape, counting semantics, and fail-safe with the ALARMS team.
    - **Where the daily allowance `maxDailyOccurrences` lives** on the NO_CONSUMPTION rule config (today the window may be implicit) — until pinned, fail-open (never mute).
    - **Day-boundary timezone** — tenant-local, per-customer source of truth (not UTC).
    - **Physical scope edit vs. soft-mute** — the MVP mutates `scope_entity_ids` (no evaluator change) + bundle-cache invalidation; the soft-mute (`muted_until`, evaluator-honoured) is cleaner but needs evaluator/ALARMS support. Decide when to migrate.
