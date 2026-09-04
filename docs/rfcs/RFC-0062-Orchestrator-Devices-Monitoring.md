@@ -430,21 +430,20 @@ sequenceDiagram
   end
 ```
 
-### 11c. Proposed ALARMS read contract (`POST /incidents/counts/daily`)
+### 11c. ALARMS read contract (`POST /incidents/counts/daily`) — FINAL
 
-> **Contract #1 — the blocker for implementing §11b.** This endpoint does **not** exist in ALARMS yet. It is drafted here as a concrete shape so the ALARMS review is on a real request/response, not an abstraction. `rules-monitor` stays **implementation-blocked** until this is agreed and shipped by ALARMS.
+> **Contract #1 — FINALIZED in ALARMS RFC-0035 / PR #25** (`gh-myio/alarms-backend` PR #25). This is no longer a proposal: the shape and semantics below are the agreed contract. ALARMS ships the **persistent occurrence rollup first**, then this endpoint over it. `rules-monitor` may be built now (shadow-first), consuming this contract behind a pluggable reader.
 
-**Endpoint.** `POST {ALARMS_API_URL}/incidents/counts/daily` — POST (not GET) because the request is a **batch** with a `deviceIds[]` body. It is a **read** (no side effects), idempotent, cacheable within its `asOf`. Auth: **`X-API-Key`** (the same key the producer already uses, §8).
+**Endpoint.** `POST {ALARMS_API_URL}/incidents/counts/daily` (i.e. `/api/v1/incidents/counts/daily`) — POST (not GET) because the request is a **batch** with a `deviceIds[]` body. It is a **read** (no side effects), idempotent, cacheable within its `asOf`. **Auth: a DEDICATED read-scoped `X-API-Key`** — separate from the producer write key (least privilege). **v1 accepts only `kind = "NO_CONSUMPTION"`; any other kind ⇒ `400`.**
 
 **Request (batch, one call per rule scope):**
 ```json
 {
-  "tenantId":   "11111111-1111-1111-1111-111111111111",
-  "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",
-  "kind":       "NO_CONSUMPTION",
-  "timezone":   "America/Sao_Paulo",          // local-day window; REQUIRED (never UTC-assumed)
-  "day":        "2026-09-04",                  // optional; default = current local day in `timezone`
-  "deviceIds":  ["<uuid>", "<uuid>", "..."]    // batch; REQUIRED, bounded (<= 500 per call)
+  "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",  // tenant derived from the API key (no tenantId in the request)
+  "kind":       "NO_CONSUMPTION",                          // v1: only this value; else 400
+  "timezone":   "America/Sao_Paulo",                       // local-day window; REQUIRED (never UTC-assumed)
+  "day":        "2026-09-04",                              // optional; omitted ⇒ ALARMS uses "today" in `timezone`
+  "deviceIds":  ["<uuid>", "<uuid>", "..."]                // 1..500; above 500, GCDR chunks client-side
 }
 ```
 
@@ -465,14 +464,14 @@ sequenceDiagram
   // (single source of truth). Include it only if the cap is decided to live in ALARMS.
 }
 ```
-- `todayCount` — the count of **canonical NO_CONSUMPTION buckets observed in the local day** for the device, from a **persistent, idempotent per-day rollup** (ALARMS-side). **This is the only field GCDR strictly needs.** It must **NOT** be derived from counting `incidents` rows (deduped per day → 0/1) nor from the current `slot_count`/`empty_slots` (that is the producer's *current* evidence, which an AUTHORITATIVE ingestion can reshape/remove). The rollup is what makes the count stable and immune to evidence reshaping.
-- `maxDailyOccurrences` — **optional, diagnostic echo only.** ⚠️ **Threshold ownership is an OPEN DECISION — avoid two sources of truth.** Recommended: the **GCDR rule owns the cap** (it already owns rule config and is what `rules-monitor` acts on), so ALARMS returns **only `todayCount`** and this field is omitted. Return it **only** if the cap is decided to live in the ALARMS rollup instead — in which case GCDR must NOT also carry it. Exactly one owner; the endpoint must not imply both.
+- `todayCount` — the count of **canonical NO_CONSUMPTION buckets observed in the local day** for the device, from a **persistent, idempotent per-day rollup** (ALARMS-side). **This is the only field GCDR strictly needs.** It is **NOT** a count of `incidents` rows (deduped per day → 0/1), **NOT** a count of *episodes*, and **NOT** the current `slot_count`/`empty_slots` (the producer's *current* evidence, reshapable/removable by an AUTHORITATIVE ingestion). The rollup is what makes the count stable and immune to evidence reshaping.
+- `maxDailyOccurrences` — **not returned.** The cap belongs to the **GCDR rule** (single source of truth); ALARMS returns **only `todayCount`**. ⚠️ **GCDR TODO (ED-1224):** the rule cap must be expressed in the **same unit as `todayCount` — canonical slots/buckets — NOT "episodes"**, otherwise the comparison `todayCount >= cap` is meaningless (a bucket count vs an episode count are incomparable). Documenting/normalizing the cap unit on the rule config is a GCDR-side prerequisite for Monitor D.
 
 **Counting semantics (must be pinned exactly):**
 
 | question | contract |
 |---|---|
-| Counting unit | **canonical buckets**, not detection events — via an **idempotent upsert per bucket** keyed by the natural key `tenantId + customerId + kind + timezone + day + deviceId + bucketFrom` (**central/rule are NOT part of the identity**). Matches the ED-1221 lifecycle. |
+| Counting unit | **canonical buckets**, not detection events / not episodes — via an **idempotent upsert per bucket** keyed by the rollup natural key `tenantId + customerId + kind + day + deviceId + bucketFrom` (**central/rule are NOT part of the identity; `timezone` is NOT part of the key** — it is an informational window-echo column). Matches the ED-1221 lifecycle. |
 | Re-post of the same bucket | **does NOT increment** (idempotent on the natural key). |
 | New `bucketFrom` in the same day | **increments**. |
 | Incident open vs. resolved | count **regardless of open/resolved**; resolve/reopen **does NOT reset**. |
@@ -593,7 +592,7 @@ Two classes always written to the audit log:
 5. **Notification of incidents** — panel-only vs. dispatch via channels/EMAIL_RELAY (reuse RFC-0055's dispatch), per customer/central opt-in.
 6. **`rules-monitor` (§11b) — contracts to pin before implementing:**
    - **ALARMS read endpoint** for per-day NO_CONSUMPTION occurrence counts — **drafted in §11c** (`POST /incidents/counts/daily`); does not exist in ALARMS yet (§8 is write-only). Pin the shape, counting semantics, and fail-safe with the ALARMS team.
-   - **Threshold ownership — where the daily allowance `maxDailyOccurrences` lives.** Recommended: the **GCDR rule** owns it (single source of truth; ALARMS returns only `todayCount`, §11c) — avoid a dual source of truth. Today the window may be implicit; until pinned, fail-open (never mute).
+   - **Threshold ownership + UNIT — where the daily allowance `maxDailyOccurrences` lives.** Owner: the **GCDR rule** (single source of truth; ALARMS returns only `todayCount`, §11c). ⚠️ **GCDR TODO (ED-1224):** express the cap in **canonical slot/bucket units** matching `todayCount` — **not "episodes"** (else `todayCount >= cap` compares apples to oranges). Today the window may be implicit; until normalized, fail-open (never mute).
    - **Day-boundary timezone** — tenant-local, per-customer source of truth (not UTC).
    - **Physical scope edit vs. soft-mute** — the MVP mutates `scope_entity_ids` (no evaluator change) + bundle-cache invalidation; the soft-mute (`muted_until`, evaluator-honoured) is cleaner but needs evaluator/ALARMS support. Decide when to migrate.
    - **Restore trigger** — day-rollover only (proposed), or also when a rule/device is manually re-added mid-day.
