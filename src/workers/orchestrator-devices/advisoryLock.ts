@@ -14,14 +14,14 @@
 // the same reserved socket — which reserveConnection() guarantees.
 //
 // Key namespace (registered in migration 0070): classid 0x4F44 ('OD'), objid
-// 1=centrals, 2=devices, 3=os.
+// 1=centrals, 2=devices, 3=os, 4=rules.
 // =============================================================================
 
 import { reserveConnection } from '../../infrastructure/database/drizzle/db';
 import type { MonitorName } from './control';
 
 const CLASS_ID = 0x4f44; // 'OD' — Orchestrator Devices
-const OBJ_ID: Record<MonitorName, number> = { centrals: 1, devices: 2, os: 3 };
+const OBJ_ID: Record<MonitorName, number> = { centrals: 1, devices: 2, os: 3, rules: 4 };
 
 type Reserved = Awaited<ReturnType<typeof reserveConnection>>;
 

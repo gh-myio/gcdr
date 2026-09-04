@@ -16,7 +16,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../infrastructure/database/drizzle/db';
 import { orchestratorDevicesControl } from '../../infrastructure/database/drizzle/schema';
 
-export type MonitorName = 'centrals' | 'devices' | 'os';
+export type MonitorName = 'centrals' | 'devices' | 'os' | 'rules';
 
 export interface OrchestratorFlags {
   /** When true, the worker COMPUTES status/incidents and writes them to the
@@ -67,6 +67,7 @@ export async function loadControl(masterBootDefault: boolean): Promise<ControlSt
       centrals: byScope.get('CENTRALS')?.enabled ?? true,
       devices: byScope.get('DEVICES')?.enabled ?? true,
       os: byScope.get('OS')?.enabled ?? false,
+      rules: byScope.get('RULES')?.enabled ?? true, // Monitor D (RFC-0062 §11b); shadow-safe by default
     },
     flags: {
       shadowMode: cfg.shadow_mode ?? FLAG_DEFAULTS.shadowMode,

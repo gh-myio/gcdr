@@ -71,6 +71,18 @@ export const workerConfig = {
   // gated by the incident_emission_enabled FLAG; absent URL ⇒ dry-run/log only.
   alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://<alarms-host>/api/v1 (must include /api/v1)
   alarmsApiToken: process.env.ALARMS_API_TOKEN, // never logged
+
+  // ── rules-monitor (Monitor D, RFC-0062 §11b/§11c) ──────────────────────────
+  // Daily-count reader source: 'mock' (deterministic, localhost/shadow — no ALARMS
+  // needed) or 'http' (POST {alarmsReadUrl}/incidents/counts/daily). Defaults to mock
+  // until the ALARMS endpoint (RFC-0035) is live.
+  rulesAlarmsReader: (process.env.ORCH_DEVICES_RULES_ALARMS_READER === 'http' ? 'http' : 'mock') as 'mock' | 'http',
+  // Read endpoint base (must include /api/v1); falls back to ALARMS_API_URL.
+  alarmsReadUrl: process.env.ALARMS_READ_API_URL ?? process.env.ALARMS_API_URL,
+  // DEDICATED read-scoped key (least privilege; separate from the producer write token). Never logged.
+  alarmsReadToken: process.env.ALARMS_READ_API_KEY,
+  // Localhost demo: JSON map deviceId->count to force auto-mute in mock mode, e.g. '{"<uuid>":3}'.
+  rulesMockCounts: process.env.RULES_MOCK_COUNTS,
 } as const;
 
 export type WorkerConfig = typeof workerConfig;
