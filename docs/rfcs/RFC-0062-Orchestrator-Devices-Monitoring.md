@@ -25,7 +25,7 @@
 
 Introduce **`orchestrator-devices`**, a headless GCDR **worker service** — its own Dokploy container from the GCDR image — that continuously **observes the operational state of centrals, devices, and work orders**, reconciles that state into GCDR **off the request path**, and — when a device or central goes down — **raises an actionable incident in the ALARMS plane**. The API records *who exists*; this service tracks *what is currently happening to it* (online/offline, healthy/degraded, on-time/overdue) and both writes it back as first-class state **and** hands support an incident to act on.
 
-It follows the proven shape of the **Alarm Orchestrator** (`orchestrator` / `dispatcher` / `verify` workers, one image, per-role container): here the roles are **centrals-monitor**, **devices-monitor**, and **os-monitor**.
+It follows the proven shape of the **Alarm Orchestrator** (`orchestrator` / `dispatcher` / `verify` workers, one image, per-role container): here the roles are **centrals-monitor**, **devices-monitor**, **os-monitor**, and — extending the service from *liveness* to *rule orchestration* — **rules-monitor**, which keeps `NO_CONSUMPTION` rule membership honest by auto-muting a device that has hit its daily incident cap and restoring it at the local-day rollover (§11b).
 
 The nominal human in the loop is **support / atendimento**: they see an `OFFLINE`/`CRITICAL` incident, attempt a remote action (recheck, pause monitoring) from a panel, and dispatch a local team when needed.
 
@@ -122,6 +122,7 @@ The end state is three monitors; this is **not** one implementation. Each phase 
 | **1 — MVP (required)** | `centrals-monitor` liveness (§3–§5) **+** `devices-monitor` **connectivity** from the same `/v2/slaves` payload (§6 Phase 1) **+ reduced health** (connectivity + gateway `status`, no telemetry) **+ ALARMS incidents** for `CENTRAL_OFFLINE`/`DEVICE_OFFLINE` (§8) **+ cascade suppression** (§8) **+ shadow-mode → guarded cutover** (§9) **+ rollback flags** (§10). Single replica; advisory lock as anti-double-deploy insurance. | **M1, M3, partial M2** | Fixes the headline `UNKNOWN` gap **and** removes the GET-that-mutates, with an actionable incident, **without** the expensive/unvalidated telemetry fan-out. |
 | **2 — Telemetry + cockpit** | Per-slave telemetry pull (§6 Phase 2) → **full freshness gate + full health ladder + water 72h rule**, under a bounded tick budget. **+ Admin cockpit** `/admin/orchestrator-devices` (§12). | **full M2** | The freshness thresholds (24h/72h) are validated in shadow during Phase 1/2 before they gate anything real. |
 | **3 — OS SLA** | `os-monitor` (§11): overdue / SLA-breach / stale + escalation. | **M4** | **Contract-blocked** — WO SLA data model must be pinned first (§11). |
+| **4 — Rules orchestration** | `rules-monitor` (§11b): **NO_CONSUMPTION** daily-limit **auto-mute / restore** — read ALARMS per-day incident counts, remove a device from the rule when it hits its daily cap, re-add it at the local-day rollover. | new | Reads ALARMS (first read dependency); physical `scope_entity_ids` edit + durable restore ledger; shadow-first; NO_CONSUMPTION only (other rule types deferred). |
 
 Rationale: liveness + connectivity is cheap and idempotent (one call reconciles a central and all its slaves); the telemetry fan-out has a **qualitatively different load/failure profile** (per-slave, per-domain) and its freshness rules are business hypotheses; OS SLA needs a state contract that does not exist yet. Bundling them makes the first PR un-reviewable.
 
@@ -137,7 +138,7 @@ Rationale: liveness + connectivity is cheap and idempotent (one call reconciles 
 - **Liveness of the worker itself.** The worker heartbeats `orchestrator_devices_control.last_run_at` every tick; an alert fires if it goes stale (**who watches the watchman** — a stalled worker must not fail silently, re-creating M2/M3).
 - **Control hierarchy (three levels, all runtime-toggleable, all audited):**
   1. **MASTER switch** — one flag stops/starts the **entire** tick. Boot default `ORCH_DEVICES_MASTER_ENABLED`; live value in a `scope='MASTER'` row read at the top of every tick.
-  2. **Per-monitor switch** — `centrals`/`devices`/`os` individually.
+  2. **Per-monitor switch** — `centrals`/`devices`/`os`/`rules` individually.
   3. **Per-gateway switch** — `centrals.monitoring_enabled` (§3).
   A monitor runs only when **master ∧ monitor ∧ (gateway)** are all on. Every toggle is audited (§13).
 
@@ -151,6 +152,7 @@ The cutover (§9) makes this service the sole writer of the three status columns
 | `devices.connectivity_status` | (a) PR #19 GET reconcile; (b) energy-ingestion on telemetry arrival (RFC-0023 Q4) | **`devices-monitor`** only | (a) removed with the GET; (b) **demoted to an input signal** — ingestion stops writing status; it may publish freshness this monitor *reads* (§6 Phase 2). |
 | `devices.health_status` | *(none — column is new; today a mock)* | **`devices-monitor`** only | new additive column, written from the ladder (§6). |
 | `centrals.last_heartbeat_at` | ingestion/heartbeat path | ingestion (**kept**) | input to liveness, not a status we own. |
+| `rules.scope_entity_ids` (NO_CONSUMPTION) | human (UI/API) | human **+ `rules-monitor`** (auto-mute/restore, §11b) | `rules-monitor` may remove/re-add **only** devices it muted itself (tracked in the mute ledger); manual edits stay the human's — the two coexist via the ledger. |
 
 > **Resolving the internal two-writer bug (review finding C1).** `centrals-monitor` and `devices-monitor` must **not** both write `centrals.connection_status`. Decision: **`devices-monitor` is the sole writer of `connection_status`** (the `/v2/slaves` payload it consumes already carries the gateway's up/down). `centrals-monitor` writes only its **own** probe-evidence fields (`last_gateway_check_at`, `last_gateway_check_latency_ms`, `probe_result`) — never the canonical status. One column, one writer.
 
@@ -370,6 +372,120 @@ If, in production, the ladder mass-misclassifies (e.g. everyone `OFFLINE` on a F
 - **Shape:** flag **overdue** (past due date), **SLA-breached** (elapsed > SLA window for type/priority), **stale** (no progress in `OS_STALE_AFTER`); on breach, emit an escalation event, deny-by-default, one escalation per breach per window (idempotent, keyed by order + rule).
 - **Contract to pin first:** (1) where the due date / SLA window lives; (2) the `(type × priority) → sla_window` source of truth; (3) the escalation idempotency key; (4) which OS event is appended on breach; (5) whether the monitor emits an event the rules engine consumes (preferred) or writes a flag directly.
 
+### 11b. Monitor D — `rules-monitor` (NO_CONSUMPTION daily-limit auto-mute / restore)
+
+> **New attribution (proposed).** Extends the orchestrator from *"which entities are up/down"* to *"which rules should still be evaluating a device **today**"*. First — and, for now, **only** — rule type in scope: **`NO_CONSUMPTION`**. Other rule types (`ALARM_THRESHOLD`, `SLA`, `ESCALATION`, `MAINTENANCE_WINDOW`) are **explicitly out of scope** until this one is proven in shadow, the same phasing discipline as the monitors above.
+
+**Problem.** A `NO_CONSUMPTION` rule carries a **daily allowance** — a device may legitimately raise the alarm up to **N times per day** (e.g. 3). Once a device has already produced its N incidents **for the current day**, keeping it in the rule only re-fires the same condition: noise, not signal. Desired behaviour:
+- when a device **hits its daily cap**, **remove it from the rule** so it stops evaluating for the rest of the day (auto-mute); and
+- **at the day rollover** — when the new day naturally has **zero** incidents — **put it back** (auto-restore).
+
+**Signal — read from ALARMS, per current day.** The `NO_CONSUMPTION` **daily occurrence count** for a device lives in the **ALARMS** plane (NO_CONSUMPTION stays an Alarms-side producer, §8). This monitor therefore **reads** ALARMS — the **first read dependency** (§8 was write-only). Full contract in **§11c**; the batch endpoint is `POST {ALARMS_API_URL}/incidents/counts/daily`.
+
+> **Critical semantic — `todayCount` is OCCURRENCES, not incident rows.** RFC-0055's NO_CONSUMPTION dedupe key **includes the day**, so there is **one incident per device per day** (a per-day rollup). "N times/day" therefore means the **occurrence counter on that daily rollup**, not a count of incident rows (which would only ever be 0 or 1). The read contract (§11c) MUST return the occurrence count `N`. The **day boundary is tenant-local** (a UTC midnight would mute/restore at the wrong local time).
+
+**Decision (per rule, per device in scope).**
+
+| condition | action |
+|---|---|
+| `todayCount(device) >= rule.maxDailyOccurrences` | **MUTE** — remove `deviceId` from `rules.scope_entity_ids` |
+| local day rolled over (⇒ `todayCount = 0`) **and** device is muted-by-us | **RESTORE** — add `deviceId` back |
+| `rule.maxDailyOccurrences` missing / unpinned | **fail-open** — treat as "no cap", never mute |
+
+**Restore safety — never re-add what an operator removed.** The monitor restores **only devices it muted itself**. A durable ledger `orchestrator_rule_mutes (tenant_id, customer_id, rule_id, device_id, local_day, today_count, max_daily, muted_at, reason, restored_at)` records every auto-mute; restore re-adds **only** rows with `restored_at IS NULL` whose `local_day` is no longer today. A human's manual scope edit is invisible to this ledger and is **never** undone. This table is **durable** (NOT pruned) — it is both the audit trail and the restore source of truth.
+
+**Idempotency & anti-thrash.**
+- A daily count is **monotonic within a day** (incidents only accrue), so once muted a device stays muted until the **day changes** — the monitor never re-adds mid-day on a transient recount.
+- Mute/restore are **on-change only** and **idempotent** (removing an absent id / adding a present id is a no-op).
+- **Sanity gate (rules variant, §7 analog):** if a single tick would mute more than `RULES_MAX_MUTE_PCT` of a rule's devices, **HOLD** and raise an anomaly — a mass-mute is almost always a bad `todayCount` read (e.g. ALARMS read error), not reality.
+
+**Membership mutation — physical scope edit (MVP) vs. soft-mute (evolution).** The MVP mutates `rules.scope_entity_ids` **directly** because it works with the **existing** rule evaluator with **zero evaluator changes** (a device not in scope is simply not evaluated). Costs, all handled here:
+- it churns rule state → must **invalidate the alarm-bundle cache** (`DELETE /customers/:id/alarm-rules/bundle/cache`) on every change so Node-RED bundles / `X-Version-Id` consumers see it;
+- it relies on the restore ledger to avoid losing a device on a failed restore.
+
+The cleaner evolution is a **soft-mute** (`muted_until = end-of-local-day` per (rule, device)) that the evaluator honours — no array churn, trivial restore — but it needs evaluator/ALARMS support and is **deferred** (Unresolved).
+
+**Shadow → canonical (same discipline as §9).** In shadow the monitor **computes** every proposed mute/restore and logs it to the ledger **without** mutating any rule or invalidating any cache. Only under **`MASTER ∧ rules-monitor ∧ canonical_writes_enabled`** does it apply. Every mutation is **audited** (§13): `orchestrator_devices.rule.device_muted` / `rule.device_restored`, carrying `ruleId`, `deviceId`, `todayCount`, `maxDailyOccurrences`, `localDay`.
+
+**Writer ownership.** `rules-monitor` becomes a writer of `rules.scope_entity_ids` **only for auto-mute/restore of devices it manages** — never a device it did not mute. Manual rule editing (UI/API) stays the human's; the two coexist via the mute ledger (§2 gains a row).
+
+**Cadence.** Runs on its own interval `RULES_CHECK_INTERVAL_SECONDS` (default **300 s**), plus an explicit **day-rollover pass** shortly after each tenant-local midnight so restores are prompt. Cheap: one aggregate read per customer + set diffs, no per-device probe.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant W as worker (rules tick)
+  participant AL as ALARMS (read)
+  participant DB as GCDR DB (rules + mute ledger)
+  W->>W: read MASTER ∧ rules-monitor ∧ canonical gates
+  W->>AL: GET incidents/count?kind=NO_CONSUMPTION&day=localDay
+  AL-->>W: { deviceId: todayCount }
+  W->>W: per rule → diff scope vs (count >= maxDaily) + ledger
+  alt within sanity bound
+    W->>DB: MUTE (remove ids) / RESTORE (re-add muted-by-us on new day), audited
+    W->>DB: write mute ledger rows
+    W->>DB: invalidate alarm-bundle cache for touched customers
+  else mass-mute suspected
+    W->>DB: HOLD; record anomaly (no rule mutation)
+  end
+```
+
+### 11c. ALARMS read contract (`POST /incidents/counts/daily`) — FINAL
+
+> **Contract #1 — FINALIZED in ALARMS RFC-0035 / PR #25** (`gh-myio/alarms-backend` PR #25). This is no longer a proposal: the shape and semantics below are the agreed contract. ALARMS ships the **persistent occurrence rollup first**, then this endpoint over it. `rules-monitor` may be built now (shadow-first), consuming this contract behind a pluggable reader.
+
+**Endpoint.** `POST {ALARMS_API_URL}/incidents/counts/daily` (i.e. `/api/v1/incidents/counts/daily`) — POST (not GET) because the request is a **batch** with a `deviceIds[]` body. It is a **read** (no side effects), idempotent, cacheable within its `asOf`. **Auth: a DEDICATED read-scoped `X-API-Key`** — separate from the producer write key (least privilege). **v1 accepts only `kind = "NO_CONSUMPTION"`; any other kind ⇒ `400`.**
+
+**Request (batch, one call per rule scope):**
+```json
+{
+  "customerId": "84e0370e-636a-4741-9874-504b5e0b3577",  // tenant derived from the API key (no tenantId in the request)
+  "kind":       "NO_CONSUMPTION",                          // v1: only this value; else 400
+  "timezone":   "America/Sao_Paulo",                       // local-day window; REQUIRED (never UTC-assumed)
+  "day":        "2026-09-04",                              // optional; omitted ⇒ ALARMS uses "today" in `timezone`
+  "deviceIds":  ["<uuid>", "<uuid>", "..."]                // 1..500; above 500, GCDR chunks client-side
+}
+```
+
+**Response — MUST echo a row for EVERY requested `deviceId`** (0 when none), so absence is an error, never an implicit zero:
+```json
+{
+  "kind":        "NO_CONSUMPTION",
+  "timezone":    "America/Sao_Paulo",
+  "day":         "2026-09-04",
+  "windowStart": "2026-09-04T03:00:00.000Z",   // local-day start, in UTC
+  "windowEnd":   "2026-09-05T03:00:00.000Z",   // exclusive
+  "asOf":        "2026-09-04T14:32:10.000Z",   // when ALARMS computed this
+  "counts": [
+    { "deviceId": "<uuid>", "todayCount": 3, "lastOccurrenceAt": "2026-09-04T13:10:00.000Z" },
+    { "deviceId": "<uuid>", "todayCount": 0, "lastOccurrenceAt": null }
+  ]
+  // maxDailyOccurrences intentionally OMITTED — recommended: the GCDR rule owns the cap
+  // (single source of truth). Include it only if the cap is decided to live in ALARMS.
+}
+```
+- `todayCount` — the count of **canonical NO_CONSUMPTION buckets observed in the local day** for the device, from a **persistent, idempotent per-day rollup** (ALARMS-side). **This is the only field GCDR strictly needs.** It is **NOT** a count of `incidents` rows (deduped per day → 0/1), **NOT** a count of *episodes*, and **NOT** the current `slot_count`/`empty_slots` (the producer's *current* evidence, reshapable/removable by an AUTHORITATIVE ingestion). The rollup is what makes the count stable and immune to evidence reshaping.
+- `maxDailyOccurrences` — **not returned.** The cap belongs to the **GCDR rule** (single source of truth); ALARMS returns **only `todayCount`**. ⚠️ **GCDR TODO (ED-1224):** the rule cap must be expressed in the **same unit as `todayCount` — canonical slots/buckets — NOT "episodes"**, otherwise the comparison `todayCount >= cap` is meaningless (a bucket count vs an episode count are incomparable). Documenting/normalizing the cap unit on the rule config is a GCDR-side prerequisite for Monitor D.
+
+**Counting semantics (must be pinned exactly):**
+
+| question | contract |
+|---|---|
+| Counting unit | **canonical buckets**, not detection events / not episodes — via an **idempotent upsert per bucket** keyed by the rollup natural key `tenantId + customerId + kind + day + deviceId + bucketFrom` (**central/rule are NOT part of the identity; `timezone` is NOT part of the key** — it is an informational window-echo column). Matches the ED-1221 lifecycle. |
+| Re-post of the same bucket | **does NOT increment** (idempotent on the natural key). |
+| New `bucketFrom` in the same day | **increments**. |
+| Incident open vs. resolved | count **regardless of open/resolved**; resolve/reopen **does NOT reset**. |
+| Day boundary | `[windowStart, windowEnd)` computed in `timezone`, **per-customer local**, returned in the response so GCDR can verify. |
+| NOT derived from | counting `incidents` rows (day-deduped → 0/1) or the current `slot_count`/`empty_slots` (reshapable by AUTHORITATIVE ingestion). |
+
+**Fail-safe (non-negotiable — this monitor WRITES rule scope).** On any non-2xx, timeout, malformed body, or a **requested `deviceId` missing** from `counts`, `rules-monitor` treats the read as **no data → NO CHANGE** for the affected devices this tick (never mute, never restore). A muted device with unknown count is **not** restored on a bad read; an unmuted device with unknown count is **not** muted. Mutating rules on a fragile read is worse than doing nothing.
+
+**Performance & paging.** Batch (`deviceIds[]`, ≤ 500/call) → one call per rule scope, served from the per-day rollup. **Above 500 devices, GCDR chunks into multiple batch calls** — **no server-side pagination** on this endpoint, to keep the contract **stateless and predictable** (a second consumption mode is unnecessary for a read-only batch count).
+
+**Build order (agreed).** ALARMS ships the **persistent occurrence rollup table first**, then exposes this endpoint on top of it — the rollup is what guarantees idempotency and reshape-immunity; the endpoint is a thin read over it.
+
+**Open (Unresolved §6):** authoritative live query vs. a GCDR local per-day snapshot reconciled against this endpoint — the snapshot makes the fail-safe trivial (last-good count) when ALARMS oscillates.
+
 ### 12. Admin cockpit — `/admin/orchestrator-devices`
 
 Backend-served HTML console in the family of `/admin/simulator`, `/admin/monitor`, `/admin/db` (new `src/controllers/admin/devices-monitor-admin.controller.ts`, mounted before Helmet). The worker serves no HTTP; the cockpit is a read/observe view over the shared tables plus a live log tail, and writes controls to a control row the worker reads next tick.
@@ -388,6 +504,8 @@ Backend-served HTML console in the family of `/admin/simulator`, `/admin/monitor
 
 **Rollout day-zero (UX).** On first boot everything is `UNKNOWN` by definition; the cockpit and dashboard show **"first sweep in progress — X% observed"** with progress, so the launch is not mistaken for "still broken". The dashboard health card collapses the 7 states into three operator intents ("all good / look at this / broken now"); `UNKNOWN` (with its reason) never competes visually with `CRITICAL`; and the card links support to the incident/action path (it is not a dead-end thermometer).
 
+**Rules tab (§11b).** A new **Rules** tab surfaces `rules-monitor`: per `NO_CONSUMPTION` rule, the devices **auto-muted today** (`todayCount / maxDailyOccurrences`, muted-at, and the incident link), a **restore-now** manual action (audited), and the shadow-vs-canonical preview of what it *would* mute/restore. Same read-vs-control auth split (`orchestrator_devices.control`).
+
 ### 13. Auditing (RFC-0009)
 
 Two classes always written to the audit log:
@@ -401,7 +519,7 @@ Two classes always written to the audit log:
 | Var | Default | Meaning |
 |---|---|---|
 | `ORCH_DEVICES_MASTER_ENABLED` (+ `scope=MASTER` row) | boot default + runtime | **MASTER switch** |
-| `ORCH_DEVICES_ENABLE_CENTRALS`/`_DEVICES`/`_OS` | `true` | per-monitor enable |
+| `ORCH_DEVICES_ENABLE_CENTRALS`/`_DEVICES`/`_OS`/`_RULES` | `true` | per-monitor enable |
 | `CENTRAL_MONITORING_ENABLED_DEFAULT` (+ `centrals.monitoring_enabled`) | env + per-central | per-gateway gate |
 | `CENTRAL_CHECK_INTERVAL_SECONDS` | **900** | probe cadence; per-central override `check_interval_seconds` |
 | `CENTRAL_CHECK_JITTER_PCT` | `20` | schedule spread to avoid thundering herd |
@@ -413,6 +531,10 @@ Two classes always written to the audit log:
 | `SANITY_MAX_FLEET_FLIP_PCT` | `30` | mass-transition circuit breaker (§7) — lives in the DB FLAGS row |
 | `ORCH_DEVICES_LEDGER_RETENTION_DAYS` | `7` | prune `orchestrator_devices_checks`/`_runs` older than this each sweep (keeps the ledger bounded) |
 | `INCIDENT_OPEN_AFTER` | 2 ticks | incident debounce (§8) |
+| `RULES_CHECK_INTERVAL_SECONDS` | `300` | `rules-monitor` cadence (§11b) + a day-rollover pass shortly after local midnight |
+| `RULES_MAX_MUTE_PCT` | `30` | rules sanity gate — HOLD if a tick would mute more than this % of a rule's devices (lives in the DB FLAGS row) |
+| `RULES_LOCAL_TZ` | tenant-local | day boundary for the per-day NO_CONSUMPTION count / rollover — **must be tenant-local, not UTC** (contract to pin: per-customer TZ source) |
+| ALARMS **read** (reuses `ALARMS_API_URL`) | unset | `rules-monitor` posts to `{ALARMS_API_URL}/incidents/counts/daily` (§11c contract) — first read dependency; absent/failing ⇒ **no change** (fail-safe, never mutes/restores) |
 | `ALARMS_API_URL` / `ALARMS_API_TOKEN` | unset | ALARMS ingestion base (**must include `/api/v1`**) + token; the worker posts to `{ALARMS_API_URL}/incidents/candidates` (RFC-0031). **Absent URL ⇒ dry-run** (candidates logged, never posted). Token via Dokploy secret, never logged. |
 | `HEALTHCHECK_MAX_STALE_MS` | `180000` | container healthcheck fails if `MASTER.last_run_at` is older than this |
 
@@ -435,7 +557,8 @@ Two classes always written to the audit log:
 - **`devices`** (additive): `connectivity_status` (exists), `unknown_reason`, `health_status`, `last_timestamp_telemetry`, `last_value_telemetry`, `last_fetch_energy_telemetry`, `freshness_policy` (nullable → default).
 - **`centrals`** (additive): `monitoring_enabled`, `check_interval_seconds`, `retry_policy`, `last_gateway_check_at`, `last_gateway_check_latency_ms`, `probe_result`.
 - **New tables:** `orchestrator_devices_control` (MASTER/monitor rows, rollback flags, `last_run_at`), `orchestrator_devices_runs` (one row per scan), `orchestrator_devices_checks` (one row per entity per scan — bounded/rolled-up, also the shadow ledger), `orchestrator_retry_policies`, `orchestrator_freshness_policies`.
-- **Incidents** live in the **ALARMS** DB (RFC-0055 model), not GCDR — GCDR only produces candidates + enrichment.
+- **`rules-monitor` (§11b):** new durable ledger **`orchestrator_rule_mutes`** (`tenant_id, customer_id, rule_id, device_id, local_day, today_count, max_daily, muted_at, reason, restored_at`) — the auto-mute audit + restore source of truth; **not** pruned. `rules-monitor` **mutates** `rules.scope_entity_ids` for muted/restored devices (§2) and invalidates the alarm-bundle cache on change.
+- **Incidents** live in the **ALARMS** DB (RFC-0055 model), not GCDR — GCDR only produces candidates + enrichment. **`rules-monitor` additionally READS ALARMS** (per-day NO_CONSUMPTION incident counts, §11b) — the first read dependency (§8 is write-only).
 
 > Migration: **`drizzle/migrations/0070_orchestrator_devices.sql`** (on this branch; applied via the custom runner `npm run db:mig:up`). Additive-only.
 
@@ -467,6 +590,14 @@ Two classes always written to the audit log:
 3. **Freshness thresholds** — the 24h/72h and the soft-band width per domain: validated/calibrated from shadow data, not shipped as constants.
 4. **Gateway concurrency ceiling (Phase 2)** — how many simultaneous connections a real gateway sustains before degrading — must be measured before the fan-out is sized.
 5. **Notification of incidents** — panel-only vs. dispatch via channels/EMAIL_RELAY (reuse RFC-0055's dispatch), per customer/central opt-in.
+6. **`rules-monitor` (§11b) — contracts to pin before implementing:**
+   - **ALARMS read endpoint** for per-day NO_CONSUMPTION occurrence counts — **drafted in §11c** (`POST /incidents/counts/daily`); does not exist in ALARMS yet (§8 is write-only). Pin the shape, counting semantics, and fail-safe with the ALARMS team.
+   - **Threshold ownership + UNIT — where the daily allowance `maxDailyOccurrences` lives.** Owner: the **GCDR rule** (single source of truth; ALARMS returns only `todayCount`, §11c). ⚠️ **GCDR TODO (ED-1224):** express the cap in **canonical slot/bucket units** matching `todayCount` — **not "episodes"** (else `todayCount >= cap` compares apples to oranges). Today the window may be implicit; until normalized, fail-open (never mute).
+   - **Day-boundary timezone** — tenant-local, per-customer source of truth (not UTC).
+   - **Physical scope edit vs. soft-mute** — the MVP mutates `scope_entity_ids` (no evaluator change) + bundle-cache invalidation; the soft-mute (`muted_until`, evaluator-honoured) is cleaner but needs evaluator/ALARMS support. Decide when to migrate.
+   - **Restore trigger** — day-rollover only (proposed), or also when a rule/device is manually re-added mid-day.
+   - **Interaction with ALARMS auto-resolve** — muting mid-day removes the device from evaluation; confirm this does not strand an open NO_CONSUMPTION incident on the ALARMS side.
+   - **Source of truth for `todayCount`** — is ALARMS **authoritative** (queried live every tick), or does GCDR keep a **local per-day snapshot/cache** it reconciles against ALARMS? This decides how the monitor behaves when ALARMS is slow/oscillating: mutating rule scope on a **fragile read** is riskier than merely emitting an incident, so a local snapshot (fail-safe to "no change" on a bad read) may be required before this is allowed to write.
 
 ## Future possibilities
 
