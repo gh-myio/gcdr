@@ -16,6 +16,7 @@ import {
   numeric,
   boolean,
   timestamp,
+  date,
   jsonb,
   index,
   uniqueIndex,
@@ -3077,4 +3078,31 @@ export const orchestratorDevicesStatusHistory = pgTable('orchestrator_devices_st
 }, (table) => ({
   centralIdx: index('orchestrator_devices_status_history_central_idx').on(table.centralId, table.createdAt),
   tenantIdx:  index('orchestrator_devices_status_history_tenant_idx').on(table.tenantId, table.createdAt),
+}));
+
+// RFC-0062 Monitor D (rules-monitor) — durable auto-mute ledger. One row per device the
+// monitor auto-muted from a NO_CONSUMPTION rule for a given tenant-local day. It is BOTH
+// the audit trail and the restore source of truth: the monitor restores ONLY rows it
+// wrote (restored_at IS NULL, older than today) — a human's manual scope edit is invisible
+// here and never undone. NOT pruned. `mode` = shadow (proposed only) | canonical (applied).
+export const orchestratorRuleMutes = pgTable('orchestrator_rule_mutes', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  tenantId:   uuid('tenant_id').notNull(),
+  customerId: uuid('customer_id'),
+  ruleId:     uuid('rule_id').notNull(),
+  deviceId:   uuid('device_id').notNull(),
+  localDay:   date('local_day').notNull(),                         // tenant-local day this mute belongs to
+  todayCount: integer('today_count').notNull(),                    // canonical buckets observed at mute time
+  maxDaily:   integer('max_daily').notNull(),                      // cap (buckets) at mute time
+  reason:     varchar('reason', { length: 40 }),                   // e.g. DAILY_CAP
+  mode:       varchar('mode', { length: 20 }),                     // shadow | canonical
+  mutedAt:    timestamp('muted_at', { withTimezone: true }).notNull().defaultNow(),
+  restoredAt: timestamp('restored_at', { withTimezone: true }),    // null while active; set on restore
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // Idempotent: at most one auto-mute per (rule, device, local day) — a re-tick never
+  // writes a duplicate; monotonic daily count means the mute simply persists for the day.
+  ruleDeviceDayUnique: uniqueIndex('orchestrator_rule_mutes_rule_device_day_unique').on(table.ruleId, table.deviceId, table.localDay),
+  activeIdx: index('orchestrator_rule_mutes_active_idx').on(table.restoredAt, table.localDay), // find still-active mutes to restore
+  tenantIdx: index('orchestrator_rule_mutes_tenant_idx').on(table.tenantId, table.createdAt),
 }));

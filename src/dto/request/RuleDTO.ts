@@ -15,6 +15,10 @@ const NoConsumptionConfigSchema = z.object({
     .object({ start: z.string(), end: z.string() })
     .nullable()
     .optional(),
+  // RFC-0062 Monitor D — daily allowance in canonical buckets/slots (same unit as ALARMS
+  // todayCount). Optional/back-compat: absent => no cap => rules-monitor fail-open (never
+  // mutes). Positive integer when present.
+  maxDailyBucketsPerDay: z.number().int().positive().optional(),
 });
 const RulePrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 const ComparisonOperatorSchema = z.enum(['GT', 'GTE', 'LT', 'LTE', 'EQ', 'NEQ', 'BETWEEN', 'OUTSIDE']);
