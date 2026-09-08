@@ -185,6 +185,14 @@ export class CustomerService {
     return customer;
   }
 
+  async getByIngestionCustomerId(tenantId: string, ingestionCustomerId: string): Promise<Customer> {
+    const customer = await this.repository.getByIngestionCustomerId(tenantId, ingestionCustomerId);
+    if (!customer) {
+      throw new NotFoundError(`Customer with ingestion customer ID ${ingestionCustomerId} not found`);
+    }
+    return customer;
+  }
+
   async getEnrichedByExternalId(
     tenantId: string,
     externalId: string,
@@ -342,7 +350,7 @@ export class CustomerService {
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    const customer = await this.getById(tenantId, id);
+    await this.getById(tenantId, id); // existence check — throws NotFoundError
 
     // Check for children
     const children = await this.repository.getChildren(tenantId, id);

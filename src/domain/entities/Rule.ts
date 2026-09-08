@@ -156,6 +156,12 @@ export interface NoConsumptionConfig {
   graceWindows: number;        // consecutive empty windows tolerated before it counts (default 1)
   timezone: string;            // bucket alignment + day categorization (required)
   activeHours?: { start: string; end: string } | null; // HH:mm local; only evaluate inside these hours
+  // RFC-0062 rules-monitor (Monitor D) — daily allowance IN CANONICAL BUCKETS/SLOTS,
+  // the SAME unit as ALARMS `todayCount` (RFC-0035). When a device accumulates this many
+  // NO_CONSUMPTION buckets in the local day, the rules-monitor auto-mutes it (removes it
+  // from the rule's scope) until the next local-day rollover. NOT "episodes". Absent =>
+  // no cap => fail-open (the monitor never mutes). See resolveDailyBucketCap().
+  maxDailyBucketsPerDay?: number;
 }
 
 // Alarm lifecycle actions (RFC-0024)

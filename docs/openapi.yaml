@@ -2559,6 +2559,14 @@ components:
           type: string
         serialNumber:
           type: string
+        hardwareId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            UUID of the physical hardware — used as the tunnel/probe host subdomain
+            ({id}.y.myio.com.br, RFC-0062). null ⇒ the monitor falls back to the
+            central's own id.
         type:
           type: string
           enum: [NODEHUB, GATEWAY, EDGE_CONTROLLER, VIRTUAL]
@@ -2568,6 +2576,27 @@ components:
         connectionStatus:
           type: string
           enum: [ONLINE, OFFLINE, DEGRADED, MAINTENANCE]
+        monitoringEnabled:
+          type: boolean
+          description: RFC-0062 — whether the centrals-monitor worker probes this gateway.
+        lastGatewayCheckAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC-0062 probe evidence — timestamp of the last probe ATTEMPT (read-only).
+        lastGatewaySuccessCheckAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC-0062 probe evidence — timestamp of the last SUCCESSFUL probe (read-only; null = never succeeded).
+        lastGatewayCheckLatencyMs:
+          type: integer
+          nullable: true
+          description: RFC-0062 probe evidence — latency of the last probe in ms (read-only).
+        probeResult:
+          type: string
+          nullable: true
+          description: RFC-0062 probe evidence — result of the last probe (OK, TIMEOUT, CONN_REFUSED, AUTH_ERROR, CONFIG_ERROR, HTTP_5XX, PARSE_FAIL; read-only).
         firmwareVersion:
           type: string
         softwareVersion:
@@ -2682,6 +2711,19 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        hardwareId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            UUID of the physical hardware (tunnel/probe host subdomain, RFC-0062).
+            Omit or null ⇒ probe uses the central's own id. On update, explicit
+            null clears the override.
+        monitoringEnabled:
+          type: boolean
+          description: >-
+            RFC-0062 — per-gateway monitoring gate (update only). When true the
+            centrals-monitor worker probes this gateway.
         type:
           type: string
           enum: [NODEHUB, GATEWAY, EDGE_CONTROLLER, VIRTUAL]

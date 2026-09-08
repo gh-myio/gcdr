@@ -41,6 +41,13 @@ export const workerConfig = {
   // many minutes. Default 5. The cockpit reads the same value to derive its display.
   offlineGraceMin: intEnv('ORCH_DEVICES_OFFLINE_GRACE_MIN', 5),
 
+  // Hard-OFFLINE threshold (cockpit stage 2): a central is only shown as truly
+  // OFFLINE once (last_gateway_check_at − last_gateway_success_check_at) reaches
+  // this many minutes; below it a failing central is the stage-1 alert. A central
+  // that NEVER succeeded shows UNKNOWN (no evidence it was ever reachable).
+  // Env-only by design — the cockpit displays it but cannot change it.
+  offlineHardMin: intEnv('ORCH_DEVICES_OFFLINE_HARD_MIN', 150),
+
   // Scheduling (§3): project-default cadence + jitter to avoid a thundering herd.
   checkIntervalSeconds: intEnv('CENTRAL_CHECK_INTERVAL_SECONDS', 900),
   checkJitterPct: intEnv('CENTRAL_CHECK_JITTER_PCT', 20),
@@ -71,6 +78,20 @@ export const workerConfig = {
   // gated by the incident_emission_enabled FLAG; absent URL ⇒ dry-run/log only.
   alarmsApiUrl: process.env.ALARMS_API_URL, // e.g. https://<alarms-host>/api/v1 (must include /api/v1)
   alarmsApiToken: process.env.ALARMS_API_TOKEN, // never logged
+
+  // ── rules-monitor (Monitor D, RFC-0062 §11b/§11c) ──────────────────────────
+  // Daily-count reader source: 'mock' (deterministic, localhost/shadow — no ALARMS
+  // needed) or 'http' (POST {alarmsReadUrl}/incidents/counts/daily). Defaults to mock
+  // until the ALARMS endpoint (RFC-0035) is live.
+  rulesAlarmsReader: (process.env.ORCH_DEVICES_RULES_ALARMS_READER === 'http' ? 'http' : 'mock') as 'mock' | 'http',
+  // Read endpoint base (must include /api/v1); falls back to ALARMS_API_URL.
+  alarmsReadUrl: process.env.ALARMS_READ_API_URL ?? process.env.ALARMS_API_URL,
+  // DEDICATED read-scoped key (least privilege; separate from the producer write token).
+  // Falls back to ALARMS_API_TOKEN when a dedicated read key isn't set (dev convenience;
+  // prod should set ALARMS_READ_API_KEY explicitly). Never logged.
+  alarmsReadToken: process.env.ALARMS_READ_API_KEY ?? process.env.ALARMS_API_TOKEN,
+  // Localhost demo: JSON map deviceId->count to force auto-mute in mock mode, e.g. '{"<uuid>":3}'.
+  rulesMockCounts: process.env.RULES_MOCK_COUNTS,
 } as const;
 
 export type WorkerConfig = typeof workerConfig;
@@ -81,7 +102,11 @@ export type WorkerConfig = typeof workerConfig;
 // arbitrary host). The recheck endpoint takes the id from the request path.
 const CENTRAL_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Build the probe URL for a central by its hardware UUID. Throws on a non-UUID id. */
+/**
+ * Build the probe URL for a central by its hardware UUID — callers pass
+ * `central.hardwareId ?? central.id` (hardware_id overrides the tunnel
+ * subdomain; NULL falls back to the row id). Throws on a non-UUID id.
+ */
 export function gatewayUrl(centralId: string): string {
   if (!CENTRAL_ID_RE.test(centralId)) {
     throw new Error('gatewayUrl: centralId must be a UUID');

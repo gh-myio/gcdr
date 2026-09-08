@@ -22,6 +22,7 @@ import { workerConfig } from './orchestrator-devices/config';
 import { loadControl, heartbeat, type ControlState, type MonitorName } from './orchestrator-devices/control';
 import { withMonitorLock } from './orchestrator-devices/advisoryLock';
 import { runCentralsSweep } from './orchestrator-devices/centralsMonitor';
+import { runRulesSweep } from './orchestrator-devices/rulesMonitor';
 
 function log(level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>): void {
   const line = { t: new Date().toISOString(), svc: 'orchestrator-devices', level, msg, ...extra };
@@ -43,6 +44,9 @@ const monitors: Record<MonitorName, MonitorFn> = {
   os: async () => {
     log('info', 'os-monitor: Phase 3 (contract-blocked) — skipped');
   },
+  // Monitor D (RFC-0062 §11b): NO_CONSUMPTION daily-cap auto-mute/restore. SHADOW-only
+  // on this branch — computes proposals to the ledger, never mutates rule scope.
+  rules: (control) => runRulesSweep(control, log),
 };
 
 let stopping = false;
@@ -70,7 +74,7 @@ async function runTick(): Promise<void> {
       return;
     }
 
-    const order: MonitorName[] = ['centrals', 'devices']; // os is Phase 3
+    const order: MonitorName[] = ['centrals', 'devices', 'rules']; // os is Phase 3
     for (const name of order) {
       if (stopping) break;
       if (!control.monitors[name]) continue;

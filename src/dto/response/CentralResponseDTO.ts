@@ -7,6 +7,7 @@ export interface CentralSummaryDTO {
   name: string;
   displayName: string;
   serialNumber: string;
+  hardwareId?: string | null;
   type: string;
   status: string;
   connectionStatus: string;
@@ -26,9 +27,16 @@ export interface CentralDetailDTO {
   name: string;
   displayName: string;
   serialNumber: string;
+  hardwareId?: string | null;
   type: string;
   status: string;
   connectionStatus: string;
+  // RFC-0062 probe evidence (read-only)
+  monitoringEnabled?: boolean;
+  lastGatewayCheckAt?: string | null;
+  lastGatewaySuccessCheckAt?: string | null;
+  lastGatewayCheckLatencyMs?: number | null;
+  probeResult?: string | null;
   firmwareVersion: string;
   softwareVersion: string;
   lastUpdateAt?: string;
@@ -54,6 +62,7 @@ export function toCentralSummaryDTO(central: Central): CentralSummaryDTO {
     name: central.name,
     displayName: central.displayName,
     serialNumber: central.serialNumber,
+    hardwareId: central.hardwareId ?? null,
     type: central.type,
     status: central.status,
     connectionStatus: central.connectionStatus,
@@ -75,9 +84,15 @@ export function toCentralDetailDTO(central: Central): CentralDetailDTO {
     name: central.name,
     displayName: central.displayName,
     serialNumber: central.serialNumber,
+    hardwareId: central.hardwareId ?? null,
     type: central.type,
     status: central.status,
     connectionStatus: central.connectionStatus,
+    monitoringEnabled: central.monitoringEnabled,
+    lastGatewayCheckAt: central.lastGatewayCheckAt ?? null,
+    lastGatewaySuccessCheckAt: central.lastGatewaySuccessCheckAt ?? null,
+    lastGatewayCheckLatencyMs: central.lastGatewayCheckLatencyMs ?? null,
+    probeResult: central.probeResult ?? null,
     firmwareVersion: central.firmwareVersion,
     softwareVersion: central.softwareVersion,
     lastUpdateAt: central.lastUpdateAt,

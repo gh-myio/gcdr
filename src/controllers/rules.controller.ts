@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ruleService } from '../services/RuleService';
 import { alarmBundleService } from '../services/AlarmBundleService';
+import { customerService } from '../services/CustomerService';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import { CentralRepository } from '../repositories/CentralRepository';
 import {
@@ -724,6 +725,52 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
       // handler previously dropped them, so the no-consumption evaluator never
       // received any rule. Included only when present → byte-identical bundle
       // for customers without NC rules. NOT exposed on /simple (Node-RED).
+      ...(bundle.noConsumptionRules?.length ? { noConsumptionRules: bundle.noConsumptionRules } : {}),
+    }, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /ingestion/customers/:ingestionCustomerId/alarm-rules/bundle/to-verify-service
+ * Same as /customers/:customerId/alarm-rules/bundle/to-verify-service but keyed by the
+ * customer's INGESTION-system id (customers.ingestion_customer_id) instead of the GCDR
+ * internal customerId. Resolves ingestionCustomerId → internal customer, then returns the
+ * identical verify bundle. 404 when no customer maps to that ingestion id (in the tenant).
+ */
+export const getAlarmBundleVerifyByIngestionHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { domain, deviceType, includeDisabled } = req.query;
+    const centralId = req.headers['x-central-id'] as string | undefined;
+
+    // Strict UUID validation of the user-supplied path param (CodeQL
+    // js/user-controlled-bypass: a truthiness check on tainted input must not
+    // guard the lookup — validate the FORMAT and use the validated value).
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ingestionCustomerId = String(req.params.ingestionCustomerId ?? '');
+    if (!UUID_RE.test(ingestionCustomerId)) {
+      throw new ValidationError('ingestionCustomerId must be a UUID');
+    }
+
+    // Resolve the ingestion-system id → GCDR internal customer (throws NotFoundError → 404).
+    const customer = await customerService.getByIngestionCustomerId(tenantId, ingestionCustomerId);
+
+    const bundle = await alarmBundleService.verifyBundle({
+      tenantId,
+      customerId: customer.id,
+      centralId,
+      domain: domain as string | undefined,
+      deviceType: deviceType as string | undefined,
+      includeDisabled: includeDisabled === 'true',
+    });
+
+    // Identical response shape to /to-verify-service (byte-identical for the verify consumer).
+    sendSuccess(res, {
+      versionId: bundle.meta.version,
+      deviceIndex: bundle.deviceIndex,
+      rules: bundle.rules,
       ...(bundle.noConsumptionRules?.length ? { noConsumptionRules: bundle.noConsumptionRules } : {}),
     }, 200, requestId);
   } catch (err) {
