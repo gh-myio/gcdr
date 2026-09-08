@@ -93,11 +93,26 @@ export interface Central extends BaseEntity {
   name: string;
   displayName: string;
   serialNumber: string;
+  /**
+   * UUID of the physical hardware — used to build the tunnel/probe host
+   * ({id}.y.myio.com.br, RFC-0062). null ⇒ monitor falls back to `id`.
+   */
+  hardwareId?: string | null;
   type: CentralType;
 
   // Status
   status: EntityStatus;
   connectionStatus: ConnectionStatus;
+
+  // RFC-0062 probe evidence (read-only; written by the centrals-monitor worker
+  // and by the cockpit's manual recheck — never by the API):
+  // monitoringEnabled gates the worker probe; lastGatewayCheckAt = last ATTEMPT;
+  // lastGatewaySuccessCheckAt = last SUCCESSFUL probe; probeResult = OK/TIMEOUT/….
+  monitoringEnabled?: boolean;
+  lastGatewayCheckAt?: string | null;
+  lastGatewaySuccessCheckAt?: string | null;
+  lastGatewayCheckLatencyMs?: number | null;
+  probeResult?: string | null;
 
   // Version
   firmwareVersion: string;

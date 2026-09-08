@@ -161,9 +161,12 @@ The cutover (§9) makes this service the sole writer of the three status columns
 - **Scope gate.** A central enters the routine only if `centrals.monitoring_enabled = true`; a disabled central is skipped entirely (and its devices with it). Roll out gateway-by-gateway.
 - **Probe.** Each gateway is reachable at **our own** tunnel host (its UUID is the subdomain):
   ```
-  GET https://{central.id}.y.myio.com.br/v2/slaves
+  GET https://{central.hardware_id ?? central.id}.y.myio.com.br/v2/slaves
   e.g. https://295628b1-75c6-4854-8031-107cd9a2ab91.y.myio.com.br/v2/slaves
   ```
+  The subdomain is `centrals.hardware_id` when set (migration 0075 — for tunnels
+  provisioned under a hardware UUID that differs from the row id, e.g. after a
+  hardware swap), with fallback to `centrals.id` when NULL (the common case).
   These endpoints are **ours**, so the probe is an internal health check, not an unconsented external dependency. Interpretation of the result is **layered** (§5) — a `2xx` is *not* by itself "healthy".
 - **Interval — project default, per-gateway override.** Runs every `CENTRAL_CHECK_INTERVAL_SECONDS` (default **900 s / 15 min**); each central MAY override via `check_interval_seconds`. Each central is scheduled on its **own next-due time** with **jitter** (spread), so 1788 devices seeded at the same instant do not burst every 15 min (review finding: thundering herd).
 - **Persisted (evidence only, not canonical status):** `last_gateway_check_at`, `last_gateway_check_latency_ms` (also trends degradation), `probe_result`. The **canonical** `connection_status` is written by `devices-monitor` from the same payload (§2).
@@ -525,6 +528,7 @@ Two classes always written to the audit log:
 | `CENTRAL_CHECK_JITTER_PCT` | `20` | schedule spread to avoid thundering herd |
 | `CENTRAL_TUNNEL_HOST_TEMPLATE` / `CENTRAL_PROBE_PATH` | `https://{id}.y.myio.com.br` / `/v2/slaves` | our probe host + path |
 | `CENTRAL_PROBE_TIMEOUT_MS` | `5000` | per-attempt timeout |
+| `ORCH_DEVICES_OFFLINE_HARD_MIN` | `150` (2h30min) | cockpit stage-2 "hard OFFLINE": (last attempt − last success) ≥ this ⇒ OFFLINE; below it a failing central is the stage-1 alert; never-succeeded ⇒ UNKNOWN. Env-only (not editable in the cockpit) |
 | `CENTRAL_DEFAULT_RETRY_POLICY` / `CENTRAL_PROBE_MAX_TOTAL_MS` | `default` / `120000` | retry book + total wall-time cap |
 | `TELEMETRY_*` (Phase 2) | — | per §6 (window, granularity, concurrency caps, tick budget) |
 | `TELEMETRY_OFFLINE_AFTER` / `WATER_STALE_AFTER` | **24h / 72h** (**hypothesis**, validated in shadow) | arrival / change freshness |

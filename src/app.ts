@@ -693,18 +693,19 @@ if (require.main === module) {
     const baseUrl = `http://${HOST}:${PORT}`;
     // eslint-disable-next-line no-console -- startup banner
     console.log(`
-╔════════════════════════════════════════════════════════════╗
-║                    GCDR API Server                         ║
-╠════════════════════════════════════════════════════════════╣
-║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(42)}║
-║  Server:      ${baseUrl.padEnd(42)}║
-║  API:         ${(baseUrl + '/api/v1').padEnd(42)}║
-║  Health:      ${(baseUrl + '/health').padEnd(42)}║
-║  Docs:        ${(baseUrl + '/docs').padEnd(42)}║${isDev ? `
-║  DB Admin:    ${(baseUrl + '/admin/db').padEnd(42)}║
-║  Simulator:   ${(baseUrl + '/admin/simulator').padEnd(42)}║
-║  Monitor:     ${(baseUrl + '/admin/monitor').padEnd(42)}║` : ''}
-╚════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════╗
+║                       GCDR API Server                        ║
+╠══════════════════════════════════════════════════════════════╣
+║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(47)}║
+║  Server:      ${baseUrl.padEnd(47)}║
+║  API:         ${(baseUrl + '/api/v1').padEnd(47)}║
+║  Health:      ${(baseUrl + '/health').padEnd(47)}║
+║  Docs:        ${(baseUrl + '/docs').padEnd(47)}║${isDev ? `
+║  DB Admin:    ${(baseUrl + '/admin/db').padEnd(47)}║
+║  Simulator:   ${(baseUrl + '/admin/simulator').padEnd(47)}║
+║  Monitor:     ${(baseUrl + '/admin/monitor').padEnd(47)}║
+║  Orch.Dev.:   ${(baseUrl + '/admin/orchestrator-devices').padEnd(47)}║` : ''}
+╚══════════════════════════════════════════════════════════════╝
     `);
 
     // Boot gate: wait for the database before any subsystem touches it (the

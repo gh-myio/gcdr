@@ -40,6 +40,8 @@ type StatusHistoryInsert = typeof orchestratorDevicesStatusHistory.$inferInsert;
 
 interface CentralRow {
   id: string;
+  /** UUID of the physical hardware — probe host override; null ⇒ use `id`. */
+  hardwareId: string | null;
   tenantId: string;
   customerId: string;
   connectionStatus: string;
@@ -122,7 +124,9 @@ function deviceCheckRow(runId: string, centralId: string, d: DeviceRow, cls: Cla
 
 /** Probe one central, write its evidence, and classify it + its devices (shadow). */
 async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy: RetryPolicy, runId: string): Promise<CentralResult> {
-  const outcome = await probeGateway(gatewayUrl(c.id), policy, {
+  // Probe host id: hardware_id when set (tunnel provisioned under the hardware
+  // UUID), else the central's own id — RFC-0062 §5.
+  const outcome = await probeGateway(gatewayUrl(c.hardwareId ?? c.id), policy, {
     timeoutMs: workerConfig.probeTimeoutMs,
     maxTotalMs: workerConfig.probeMaxTotalMs,
     statusToken: workerConfig.statusToken,
@@ -271,7 +275,7 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
   const defaultPolicy = policies.get(workerConfig.defaultRetryPolicy) ?? policies.get('default') ?? { name: 'default', attempts: [{ delay_ms: 0 }] };
 
   const enabled = (await db.select({
-    id: centrals.id, tenantId: centrals.tenantId, customerId: centrals.customerId, connectionStatus: centrals.connectionStatus,
+    id: centrals.id, hardwareId: centrals.hardwareId, tenantId: centrals.tenantId, customerId: centrals.customerId, connectionStatus: centrals.connectionStatus,
     checkIntervalSeconds: centrals.checkIntervalSeconds, retryPolicy: centrals.retryPolicy,
     lastGatewayCheckAt: centrals.lastGatewayCheckAt,
     lastGatewaySuccessCheckAt: centrals.lastGatewaySuccessCheckAt,

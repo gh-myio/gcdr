@@ -54,6 +54,7 @@ export class CentralRepository implements ICentralRepository {
       name: data.name,
       displayName: data.displayName,
       serialNumber: data.serialNumber,
+      hardwareId: data.hardwareId ?? null,
       type: data.type,
       status: 'ACTIVE',
       connectionStatus: 'OFFLINE',
@@ -246,6 +247,8 @@ export class CentralRepository implements ICentralRepository {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.serialNumber !== undefined) updateData.serialNumber = data.serialNumber;
+    if (data.hardwareId !== undefined) updateData.hardwareId = data.hardwareId; // null clears (probe reverts to id)
+    if (data.monitoringEnabled !== undefined) updateData.monitoringEnabled = data.monitoringEnabled;
     if (data.firmwareVersion !== undefined) updateData.firmwareVersion = data.firmwareVersion;
     if (data.softwareVersion !== undefined) updateData.softwareVersion = data.softwareVersion;
     if (data.frequency !== undefined) updateData.frequency = data.frequency;
@@ -460,9 +463,15 @@ export class CentralRepository implements ICentralRepository {
       name: row.name,
       displayName: row.displayName,
       serialNumber: row.serialNumber,
+      hardwareId: row.hardwareId,
       type: row.type,
       status: row.status,
       connectionStatus: row.connectionStatus,
+      monitoringEnabled: row.monitoringEnabled,
+      lastGatewayCheckAt: row.lastGatewayCheckAt ? row.lastGatewayCheckAt.toISOString() : null,
+      lastGatewaySuccessCheckAt: row.lastGatewaySuccessCheckAt ? row.lastGatewaySuccessCheckAt.toISOString() : null,
+      lastGatewayCheckLatencyMs: row.lastGatewayCheckLatencyMs,
+      probeResult: row.probeResult,
       firmwareVersion: row.firmwareVersion,
       softwareVersion: row.softwareVersion,
       frequency: row.frequency,

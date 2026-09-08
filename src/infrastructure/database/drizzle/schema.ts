@@ -795,6 +795,9 @@ export const centrals = pgTable('centrals', {
   name: varchar('name', { length: 255 }).notNull(),
   displayName: varchar('display_name', { length: 255 }).notNull(),
   serialNumber: varchar('serial_number', { length: 100 }).notNull(),
+  // UUID of the physical hardware — builds the tunnel probe host
+  // ({id}.y.myio.com.br, RFC-0062 §5). NULL ⇒ probe falls back to `id`.
+  hardwareId: uuid('hardware_id'),
   type: centralTypeEnum('type').notNull(),
 
   // Status

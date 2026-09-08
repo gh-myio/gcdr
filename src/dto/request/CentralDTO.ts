@@ -64,6 +64,10 @@ export const CreateCentralSchema = z.object({
   name: z.string().min(1).max(255),
   displayName: z.string().min(1).max(255),
   serialNumber: z.string().min(1).max(100),
+  // UUID of the physical hardware — builds the tunnel/probe host
+  // ({id}.y.myio.com.br, RFC-0062). Omit/null ⇒ monitor falls back to the
+  // central's own id.
+  hardwareId: z.string().uuid().nullable().optional(),
   type: z.enum(['NODEHUB', 'GATEWAY', 'EDGE_CONTROLLER', 'VIRTUAL']),
   firmwareVersion: z.string().max(50).default('0.0.0'),
   softwareVersion: z.string().max(50).default('0.0.0'),
@@ -85,6 +89,13 @@ export const UpdateCentralSchema = z.object({
   // reconciliation (e.g. an ID mis-registered on import) — service enforces
   // per-tenant uniqueness. Physical hardware swaps still use POST /replace.
   serialNumber: z.string().min(1).max(100).optional(),
+  // hardwareId: UUID of the physical hardware (tunnel/probe host, RFC-0062).
+  // Explicit null clears it (probe reverts to the central's id).
+  hardwareId: z.string().uuid().nullable().optional(),
+  // RFC-0062 — per-gateway monitoring gate (the worker only probes centrals
+  // with this on). Toggleable from the centrals UI; the cockpit has its own
+  // audited toggle as well.
+  monitoringEnabled: z.boolean().optional(),
   type: z.enum(['NODEHUB', 'GATEWAY', 'EDGE_CONTROLLER', 'VIRTUAL']).optional(),
   firmwareVersion: z.string().max(50).optional(),
   softwareVersion: z.string().max(50).optional(),

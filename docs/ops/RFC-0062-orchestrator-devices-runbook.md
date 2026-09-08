@@ -88,8 +88,11 @@ behaviour with `UPDATE` statements, **no redeploy required**.
 
 ### The probe
 
-Per enabled central: `GET https://{central.id}.y.myio.com.br/v2/slaves`
-(**our** endpoint; `central.id` is the hardware UUID).
+Per enabled central: `GET https://{central.hardware_id ?? central.id}.y.myio.com.br/v2/slaves`
+(**our** endpoint). The subdomain is `centrals.hardware_id` when set — the UUID the
+tunnel was provisioned under, editable in the central's form — falling back to
+`centrals.id` when NULL (migration 0075). The cockpit's FORCE SYNC NOW recheck
+follows the same rule.
 
 | observation | verdict |
 |---|---|
@@ -113,7 +116,10 @@ Per enabled central: `GET https://{central.id}.y.myio.com.br/v2/slaves`
   healthcheck via `last_run_at` freshness, `restart: on-failure`).
 - Env example: `.env.dokploy.orchestrator-devices` — safety flags boot-default to SAFE;
   intervals/timeouts/retry; optional `ALARMS_API_URL` / `ALARMS_API_TOKEN`; sanity/debounce;
-  `CENTRAL_TUNNEL_HOST_TEMPLATE`. **`DATABASE_URL` comes from a Dokploy secret — never committed.**
+  `CENTRAL_TUNNEL_HOST_TEMPLATE`; `ORCH_DEVICES_OFFLINE_HARD_MIN` (default 150 = 2h30min —
+  cockpit stage-2 hard-OFFLINE threshold on last attempt − last success; env-only, the
+  cockpit displays but cannot change it; never-succeeded centrals show UNKNOWN).
+  **`DATABASE_URL` comes from a Dokploy secret — never committed.**
 - Healthcheck script: `dist/workers/orchestrator-devices.healthcheck.js` — exits `0` iff
   `MASTER.last_run_at` is fresh (`< HEALTHCHECK_MAX_STALE_MS`, default `180000`ms).
 
