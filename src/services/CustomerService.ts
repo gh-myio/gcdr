@@ -350,7 +350,7 @@ export class CustomerService {
   }
 
   async delete(tenantId: string, id: string, userId: string): Promise<void> {
-    const customer = await this.getById(tenantId, id);
+    await this.getById(tenantId, id); // existence check — throws NotFoundError
 
     // Check for children
     const children = await this.repository.getChildren(tenantId, id);

@@ -742,12 +742,16 @@ export const getAlarmBundleVerifyHandler = async (req: Request, res: Response, n
 export const getAlarmBundleVerifyByIngestionHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, requestId } = req.context;
-    const { ingestionCustomerId } = req.params;
     const { domain, deviceType, includeDisabled } = req.query;
     const centralId = req.headers['x-central-id'] as string | undefined;
 
-    if (!ingestionCustomerId) {
-      throw new ValidationError('ingestionCustomerId is required');
+    // Strict UUID validation of the user-supplied path param (CodeQL
+    // js/user-controlled-bypass: a truthiness check on tainted input must not
+    // guard the lookup — validate the FORMAT and use the validated value).
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ingestionCustomerId = String(req.params.ingestionCustomerId ?? '');
+    if (!UUID_RE.test(ingestionCustomerId)) {
+      throw new ValidationError('ingestionCustomerId must be a UUID');
     }
 
     // Resolve the ingestion-system id → GCDR internal customer (throws NotFoundError → 404).

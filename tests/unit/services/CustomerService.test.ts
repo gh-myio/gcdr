@@ -11,19 +11,6 @@ import { Device } from '../../../src/domain/entities/Device';
 import { Central } from '../../../src/domain/entities/Central';
 import { CreateCustomerDTO, UpdateCustomerDTO, ListCustomersParams } from '../../../src/dto/request/CustomerDTO';
 import { PaginatedResult } from '../../../src/shared/types';
-import { AppError } from '../../../src/shared/errors/AppError';
-
-// Helper to check error type by code
-const expectErrorWithCode = async (promise: Promise<unknown>, code: string) => {
-  await expect(promise).rejects.toThrow();
-  try {
-    await promise;
-  } catch (err) {
-    expect(err).toBeInstanceOf(AppError);
-    expect((err as AppError).code).toBe(code);
-  }
-};
-
 // CustomerService.delete() calls userService.clearDefaultCustomerForAll
 // (RFC: customer-default-customer cleanup). Stub it so this unit test
 // doesn't hit the real DB.
@@ -84,6 +71,7 @@ describe('CustomerService', () => {
       getById: jest.fn(),
       getByCode: jest.fn(),
       getByExternalId: jest.fn(),
+      getByIngestionCustomerId: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       list: jest.fn(),
