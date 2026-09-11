@@ -92,6 +92,21 @@ export const workerConfig = {
   alarmsReadToken: process.env.ALARMS_READ_API_KEY ?? process.env.ALARMS_API_TOKEN,
   // Localhost demo: JSON map deviceId->count to force auto-mute in mock mode, e.g. '{"<uuid>":3}'.
   rulesMockCounts: process.env.RULES_MOCK_COUNTS,
+
+  // ── canonical apply → bundle cache flush (Monitor D, RFC-0062 §11c) ─────────
+  // When the rules-monitor mutates rules.scope_entity_ids (auto-mute / restore) it
+  // must force the API to regenerate the NO_CONSUMPTION bundle, because the bundle
+  // cache is a PER-PROCESS in-memory Map (worker can't reach the API process's map).
+  // Best-effort: worker calls DELETE {bundleFlushApiUrl}/customers/{id}/alarm-rules/
+  // bundle/cache after commit (bundles:read key). A flush failure is LOGGED and NEVER
+  // undoes the committed mute/restore — the 300s cache TTL is the guaranteed backstop.
+  // Single-replica deployment (docker-compose.dokploy.yml: replicas=1) makes the
+  // targeted flush sufficient; a multi-replica API would need shared/versioned
+  // invalidation instead (documented limitation). Absent URL ⇒ TTL-only (no flush).
+  bundleFlushApiUrl: process.env.GCDR_API_URL, // API base incl /api/v1, e.g. https://<gcdr-host>/api/v1
+  bundleFlushApiKey: process.env.GCDR_BUNDLE_FLUSH_API_KEY, // bundles:read scope; never logged
+  bundleFlushTimeoutMs: intEnv('ORCH_DEVICES_BUNDLE_FLUSH_TIMEOUT_MS', 4_000),
+  bundleFlushRetries: intEnv('ORCH_DEVICES_BUNDLE_FLUSH_RETRIES', 2),
 } as const;
 
 export type WorkerConfig = typeof workerConfig;
