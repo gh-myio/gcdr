@@ -142,7 +142,7 @@ router.get('/api/divergence', async (_req: Request, res: Response) => {
 router.get('/api/centrals', async (_req: Request, res: Response) => {
   try {
     const centrals = (await db.execute(sql`
-      select c.id, c.name, c.hardware_id, c.connection_status, c.monitoring_enabled,
+      select c.id, c.name, c.hardware_id, c.status, c.connection_status, c.monitoring_enabled,
              c.last_gateway_check_at, c.last_gateway_success_check_at, c.last_gateway_check_latency_ms, c.probe_result,
              (select count(*)::int from devices d where d.central_id = c.id and d.deleted_at is null and d.status = 'ACTIVE' and d.slave_id is not null) as device_count,
              (select count(*)::int from devices d where d.central_id = c.id and d.deleted_at is null and d.status = 'ACTIVE' and d.slave_id is not null and d.connectivity_status = 'ONLINE') as device_online,
@@ -325,6 +325,57 @@ router.patch('/api/centrals/:id/monitoring', async (req: Request, res: Response)
   }
 });
 
+// ── Control: registry status toggle (Cadastro block of the CentralStatusCard) ─
+// Admin-password mirror of PATCH /api/v1/centrals/:id/status, so the cockpit
+// page (whose only credential is x-admin-password) can flip ACTIVE/INACTIVE
+// without shipping an API key to the browser. Same shape as the monitoring
+// toggle above: atomic prev+update, audit row. DELETED is NOT reachable here.
+router.patch('/api/centrals/:id/status', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const status = String(req.query.status);
+    if (status !== 'ACTIVE' && status !== 'INACTIVE') {
+      res.status(400).json({ error: "status must be 'ACTIVE' or 'INACTIVE'" }); return;
+    }
+    const rows = (await db.execute(sql`
+      with prev as (
+        select status as old_val, tenant_id, customer_id, name
+        from centrals where id = ${id} and status <> 'DELETED'
+      ), upd as (
+        update centrals set status = ${status}::entity_status, updated_at = now()
+        where id = ${id} and status <> 'DELETED' returning id
+      )
+      select prev.old_val, prev.tenant_id, prev.customer_id, prev.name from prev`)) as unknown as Rows;
+    if (!rows.length) { res.status(404).json({ error: 'central not found' }); return; }
+    const r = rows[0];
+    const ip = String((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+    await db.insert(auditLogs).values({
+      tenantId: String(r.tenant_id),
+      eventType: 'orchestrator_devices.central.status_changed',
+      eventCategory: 'ENTITY_CHANGE',
+      auditLevel: 'STANDARD',
+      description: `Central ${String(r.name)} status ${String(r.old_val)} → ${status} via cockpit`.slice(0, 500),
+      action: 'UPDATE',
+      entityType: 'central',
+      entityId: id,
+      customerId: r.customer_id ? String(r.customer_id) : null,
+      actorType: 'USER',
+      userEmail: 'cockpit-admin',
+      oldValues: { status: String(r.old_val) },
+      newValues: { status },
+      ipAddress: ip || null,
+      userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
+      httpMethod: 'PATCH',
+      httpPath: String(req.originalUrl || '').slice(0, 500),
+      statusCode: 200,
+      metadata: { source: 'orchestrator-devices-cockpit', auth: 'admin-password', panel: '/admin/orchestrator-devices' },
+    });
+    res.json({ ok: true, id, status });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── Control: force an immediate gateway probe (FORCE SYNC NOW) ────────────────
 // Single-attempt probe reusing the worker's gatewayClient. Writes ONLY the probe
 // EVIDENCE (last_gateway_check_*/probe_result) — never connection_status, so the
@@ -379,11 +430,31 @@ router.post('/api/centrals/:id/recheck', async (req: Request, res: Response) => 
   }
 });
 
+// ── myio-js-library loading ──────────────────────────────────────────────────
+// Default: exact CDN version + SRI (see the HTML comment at the marker). For
+// LOCAL testing of unreleased components (e.g. createCentralStatusCard), set
+// MYIO_JS_LIB_LOCAL to the absolute path of a UMD build (…/dist/myio-js-library.umd.min.js)
+// and the page loads it from this route instead (no SRI — local file, dev only).
+const MYIO_LIB_LOCAL_PATH = process.env.MYIO_JS_LIB_LOCAL || '';
+const MYIO_LIB_CDN_TAG =
+  '<script defer src="https://unpkg.com/myio-js-library@0.1.536/dist/myio-js-library.umd.min.js"\n' +
+  '        integrity="sha384-PjF5mfyW7o51EbRERBTBNet3V7vCOlzVvXajTbcD3zhfu7O/rxRhUqKLqmMT5NAp"\n' +
+  '        crossorigin="anonymous"></script>';
+const MYIO_LIB_LOCAL_TAG = '<script defer src="/admin/orchestrator-devices/lib/myio-js-library.umd.min.js"></script>';
+
+// Unauthenticated on purpose: a <script> tag cannot send x-admin-password, and the
+// file is a public library build. 404 when the env override is not configured.
+router.get('/lib/myio-js-library.umd.min.js', (_req: Request, res: Response) => {
+  if (!MYIO_LIB_LOCAL_PATH) { res.status(404).end(); return; }
+  res.type('application/javascript').sendFile(MYIO_LIB_LOCAL_PATH);
+});
+
 // ── The page ─────────────────────────────────────────────────────────────────
 router.get('/', (_req: Request, res: Response) => {
   res.type('html').send(PAGE_HTML
     .replace('__OFFLINE_GRACE_MIN__', String(workerConfig.offlineGraceMin))
-    .replace('__OFFLINE_HARD_MIN__', String(workerConfig.offlineHardMin)));
+    .replace('__OFFLINE_HARD_MIN__', String(workerConfig.offlineHardMin))
+    .replace('__MYIO_LIB_TAG__', MYIO_LIB_LOCAL_PATH ? MYIO_LIB_LOCAL_TAG : MYIO_LIB_CDN_TAG));
 });
 
 const PAGE_HTML = `<!doctype html>
@@ -399,9 +470,7 @@ const PAGE_HTML = `<!doctype html>
      do not match the hash the browser refuses the script and every use below degrades
      to native confirm()/alert() + fallback cards. To bump: change the version AND
      recompute integrity (curl … | openssl dgst -sha384 -binary | openssl base64 -A). -->
-<script defer src="https://unpkg.com/myio-js-library@0.1.535/dist/myio-js-library.umd.min.js"
-        integrity="sha384-ld3SCZg60n8f3mJtSsnkpW+rubzizJ+Mw39CGpv2PnZethv+EBjx5S6I/xtHSnqD"
-        crossorigin="anonymous"></script>
+__MYIO_LIB_TAG__
 <style>
   /* Light is the default; dark is opt-in via data-theme="dark" on <html>. */
   :root {
@@ -549,6 +618,14 @@ const PAGE_HTML = `<!doctype html>
   #filtersBtn.has { border-color:var(--accent); font-weight:700; }
   #filtersBtn .fic{ opacity:.85; }
   .grace-info { cursor:pointer; } .grace-info b { color:var(--accent); }
+  .card-help-btn { width:22px; height:22px; border-radius:50%; padding:0; font-weight:800; font-size:12px;
+    line-height:1; color:var(--accent); border:1px solid var(--accent); background:transparent; cursor:pointer; }
+  .card-help-btn:hover { background:var(--btn); }
+  .chelp table { border-collapse:collapse; width:100%; margin:6px 0 12px; font-size:12px; }
+  .chelp th, .chelp td { border:1px solid var(--border); padding:5px 8px; text-align:left; vertical-align:top; }
+  .chelp th { background:var(--th); }
+  .chelp .sw { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+  .chelp h4 { margin:12px 0 4px; } .chelp p { margin:6px 0; }
   .flt-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9997; }
   .flt-modal.hidden { display:none; }
   .flt-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; max-width:560px; width:92%; max-height:88vh; display:flex; flex-direction:column; }
@@ -719,6 +796,14 @@ const PAGE_HTML = `<!doctype html>
     <div class="flt-foot"><span class="mut"></span><div class="right"><button onclick="closeTimeline()" data-i18n="close">✕ close</button></div></div>
   </div>
 </div>
+
+<!-- "How to read the central card" guide — content injected per-language by cardHelpHTML() -->
+<div id="cardhelp-modal" class="flt-modal hidden" onclick="if(event.target===this)hideCardHelp()">
+  <div class="flt-box" style="max-width:885px">
+    <div class="flt-head"><span id="cardHelpTitle">Como ler o card da central</span><button onclick="hideCardHelp()" data-i18n="close">✕ close</button></div>
+    <div class="flt-body" id="cardHelpBody"></div>
+  </div>
+</div>
 <main>
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="dashboard" onclick="setTab('dashboard')"><span class="tico">📊</span><span data-i18n="tab_dashboard">Dashboard</span></button>
@@ -749,6 +834,7 @@ const PAGE_HTML = `<!doctype html>
         <span id="cCount" class="mut"></span>
         <span id="graceInfo" class="mut grace-info" onclick="openSettings()"></span>
         <span class="mut" data-i18n="filter_hint">click a KPI to filter · total = all</span>
+        <button id="cardHelpBtn" class="card-help-btn" onclick="showCardHelp()" title="?">?</button>
       </div>
       <div id="centralsGrid" class="cgrid"></div>
       <div class="pager" id="cPager"></div>
@@ -858,7 +944,60 @@ const PAGE_HTML = `<!doctype html>
   try{ applyTheme(localStorage.getItem('od-theme')||'light'); }catch(e){ applyTheme('light'); }
   function showHelp(){ $('help-modal').classList.remove('hidden'); }
   function hideHelp(){ $('help-modal').classList.add('hidden'); }
-  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideHelp(); closeFilters(); closeSettings(); closeTimeline(); } });
+  // ── "Como ler o card" guide (CENTRAIS tab "?") — content mirrors the library
+  // showcase README (§6 Guia visual) adapted to THIS cockpit's thresholds, which
+  // are interpolated live (tolerância/hard vindas do env) so the text never drifts
+  // from the real behavior.
+  function cardHelpHTML(){
+    var g=graceMin, h=fmtMin(OFFLINE_HARD_MIN);
+    if(lang==='pt-BR') return ''+
+      '<div class="chelp">'+
+      '<p>O card usa <b>dois eixos de cor independentes</b> — não confundir um com o outro:</p>'+
+      '<table><tr><th>Eixo</th><th>O que representa</th></tr>'+
+      '<tr><td><b>Borda do card</b></td><td><code>Status</code> (bloco <b>Cadastro</b>) — ciclo de vida do registro: <span class="sw" style="background:#16a34a"></span>ATIVO (verde, com brilho) · <span class="sw" style="background:#9ca3af"></span>INATIVO (cinza, flat)</td></tr>'+
+      '<tr><td><b>Header + badge</b></td><td><code>status de conexão</code> (bloco <b>Operação</b>) — saúde ao vivo derivada da evidência de probe</td></tr></table>'+
+      '<h4>Status de conexão</h4>'+
+      '<table><tr><th>Valor</th><th>Quando acontece</th></tr>'+
+      '<tr><td><span class="sw" style="background:#2563eb"></span><b>ONLINE</b></td><td>última tentativa foi sucesso (uma falha isolada dentro da tolerância de '+g+' min ainda conta como ONLINE)</td></tr>'+
+      '<tr><td><span class="sw" style="background:#d97706"></span><b>ATENÇÃO</b></td><td>falhando além da tolerância de '+g+' min desde o último sucesso, mas ainda abaixo do limite definitivo</td></tr>'+
+      '<tr><td><span class="sw" style="background:#dc2626"></span><b>OFFLINE '+h+'</b></td><td>(última tentativa − último sucesso) ≥ '+h+' (env ORCH_DEVICES_OFFLINE_HARD_MIN)</td></tr>'+
+      '<tr><td><span class="sw" style="background:#9ca3af"></span><b>DESCONHECIDO</b></td><td>nunca sincronizou (sem último sucesso) — nunca vira OFFLINE sem termos visto a central de pé</td></tr></table>'+
+      '<h4>Indicadores extras</h4>'+
+      '<table><tr><th>Indicador</th><th>Significado</th></tr>'+
+      '<tr><td>badge <b>“desatualizado”</b></td><td>monitoramento desligado — o estado mostrado é o último conhecido, <b>congelado</b> (não decai para OFFLINE só porque o tempo passou)</td></tr>'+
+      '<tr><td><b>⚠️ divergência</b></td><td>o status canônico gravado difere do que o worker proporia (atual → proposto)</td></tr>'+
+      '<tr><td>linha <b>devices</b></td><td>total · online · offline · desconhecidos (desconhecidos = cascata CENTRAL_UNREACHABLE, não é device caído)</td></tr></table>'+
+      '<h4>Ações</h4>'+
+      '<p>🔄 força um probe imediato (atualiza SÓ a evidência, nunca o status canônico). Os switches de <b>Monitoramento</b> e <b>Status</b> pedem confirmação no sentido destrutivo e são <b>auditados</b> (audit log via cockpit).</p>'+
+      '</div>';
+    return ''+
+      '<div class="chelp">'+
+      '<p>The card uses <b>two independent color axes</b> — do not confuse them:</p>'+
+      '<table><tr><th>Axis</th><th>What it represents</th></tr>'+
+      '<tr><td><b>Card border</b></td><td><code>Status</code> (<b>Registry</b> block) — lifecycle: <span class="sw" style="background:#16a34a"></span>ACTIVE (green, glow) · <span class="sw" style="background:#9ca3af"></span>INACTIVE (gray, flat)</td></tr>'+
+      '<tr><td><b>Header + badge</b></td><td><code>connection status</code> (<b>Operation</b> block) — live health derived from probe evidence</td></tr></table>'+
+      '<h4>Connection status</h4>'+
+      '<table><tr><th>Value</th><th>When</th></tr>'+
+      '<tr><td><span class="sw" style="background:#2563eb"></span><b>ONLINE</b></td><td>last attempt succeeded (an isolated failure within the '+g+'-min tolerance still reads ONLINE)</td></tr>'+
+      '<tr><td><span class="sw" style="background:#d97706"></span><b>WARNING</b></td><td>failing past the '+g+'-min tolerance since last success, below the hard threshold</td></tr>'+
+      '<tr><td><span class="sw" style="background:#dc2626"></span><b>OFFLINE '+h+'</b></td><td>(last attempt − last success) ≥ '+h+' (env ORCH_DEVICES_OFFLINE_HARD_MIN)</td></tr>'+
+      '<tr><td><span class="sw" style="background:#9ca3af"></span><b>UNKNOWN</b></td><td>never synced (no last success) — never promoted to OFFLINE without a success baseline</td></tr></table>'+
+      '<h4>Extra indicators</h4>'+
+      '<table><tr><th>Indicator</th><th>Meaning</th></tr>'+
+      '<tr><td><b>“stale”</b> badge</td><td>monitoring is OFF — shown state is the last known one, <b>frozen</b> (does not decay to OFFLINE as time passes)</td></tr>'+
+      '<tr><td><b>⚠️ divergence</b></td><td>stored canonical status differs from what the worker would write (current → proposed)</td></tr>'+
+      '<tr><td><b>devices</b> row</td><td>total · online · offline · unknown (unknown = CENTRAL_UNREACHABLE cascade, not device-down)</td></tr></table>'+
+      '<h4>Actions</h4>'+
+      '<p>🔄 forces an immediate probe (updates ONLY the evidence, never canonical status). The <b>Monitoring</b> and <b>Status</b> switches confirm on the destructive direction and are <b>audited</b>.</p>'+
+      '</div>';
+  }
+  function showCardHelp(){
+    var ttl=$('cardHelpTitle'); if(ttl) ttl.textContent=(lang==='pt-BR')?'Como ler o card da central':'How to read the central card';
+    var b=$('cardHelpBody'); if(b) b.innerHTML=cardHelpHTML();
+    $('cardhelp-modal').classList.remove('hidden');
+  }
+  function hideCardHelp(){ $('cardhelp-modal').classList.add('hidden'); }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideHelp(); hideCardHelp(); closeFilters(); closeSettings(); closeTimeline(); } });
   let pw = '';
   function setConnected(on){
     $('login-modal').classList.toggle('hidden', on);
@@ -1054,9 +1193,66 @@ const PAGE_HTML = `<!doctype html>
   function centralCard(c){ var st=effStatus(c); var k=statusCls(st);
     return '<div class="ccard '+k+'"><div class="cname" title="'+esc(c.name||c.id)+'">'+esc(c.name||c.id)+'</div><hr class="csep"><div class="cbody">'+centralBodyHtml(c)+'</div></div>';
   }
+  // RFC-0231 — params for the shared MyIOLibrary.createCentralStatusCard.
+  // The HOST stays the owner of the connectivity rule: we pass derivedConnectivity
+  // from effStatus() (our two-stage model) mapped onto the card's 4-state enum,
+  // with connectivityValue overrides so OFFLINE renders as "OFFLINE 2h30min".
+  function csCardParams(c){
+    var st=effStatus(c);
+    var conn = st==='OFFLINE_HARD' ? 'OFFLINE' : (st==='ONLINE'||st==='WARNING'||st==='UNKNOWN' ? st : 'UNKNOWN');
+    var pv=hasData(c)?probeVerdict(c):null;
+    var toneMap={ok:'ok',warn:'warn',bad:'bad',mut:'muted'};
+    var tot=c.device_count||0,on=c.device_online||0,off=c.device_offline||0;
+    var dv=cDivMap[c.id];
+    return {
+      id:c.id, name:(c.name||c.id),
+      derivedConnectivity:conn,
+      monitoringEnabled:!!c.monitoring_enabled,
+      lastAttemptAt:c.last_gateway_check_at||null,
+      lastSuccessAt:c.last_gateway_success_check_at||null,
+      probeVerdict:pv?{label:pv.label,tone:(toneMap[pv.cls]||'muted'),latencyMs:pv.ms}:null,
+      deviceCounts:{total:tot,online:on,offline:off,unknown:Math.max(0,tot-on-off)},
+      divergence:dv?{current:(dv.current||'?'),proposed:(dv.proposed||'?')}:null,
+      showDivergence:true,
+      showForceSync:!!c.monitoring_enabled,
+      entityStatus:(c.status==='INACTIVE')?'INACTIVE':'ACTIVE',
+      theme:(document.documentElement.getAttribute('data-theme')==='dark')?'dark':'light',
+      language:(lang==='pt-BR')?'pt':'en',
+      labels:{
+        connectivity:t('conn_status'), monitoring:t('monitoring'), forceSync:t('force_sync'),
+        lastAttempt:t('last_attempt'), lastSuccess:t('last_success'), connectionTest:t('probe'),
+        devices:t('devices'), divergence:t('div_one'),
+        connectivityValue:{ ONLINE:t('st_online'), WARNING:t('st_warning'), OFFLINE:statusLabel('OFFLINE_HARD'), UNKNOWN:t('st_unknown') }
+      },
+      // Auth/audit live in the cockpit API (x-admin-password): resolve keeps the
+      // card's optimistic state, reject reverts it with the error inline.
+      onMonitoringToggle:function(e){
+        return apiSend('centrals/'+encodeURIComponent(e.id)+'/monitoring?enabled='+e.next,'PATCH')
+          .then(function(){ var cc=allCentrals.find(function(x){return x.id===e.id;}); if(cc) cc.monitoring_enabled=e.next; });
+      },
+      onStatusToggle:function(e){
+        return apiSend('centrals/'+encodeURIComponent(e.id)+'/status?status='+encodeURIComponent(e.next),'PATCH')
+          .then(function(){ var cc=allCentrals.find(function(x){return x.id===e.id;}); if(cc) cc.status=e.next; });
+      },
+      onForceSync:function(e){
+        return apiSend('centrals/'+encodeURIComponent(e.id)+'/recheck','POST')
+          .then(function(){ return load(); }); // load() re-renders the grid with fresh evidence
+      }
+    };
+  }
   function renderCentralsGrid(el, items){
     var L=window.MyIOLibrary;
     if(!items.length){ el.innerHTML='<div class="soon">—</div>'; return; }
+    // Preferred path: the shared CentralStatusCard component (RFC-0231). Falls
+    // back to the legacy DivCard build while the pinned CDN version predates it.
+    if(L && typeof L.createCentralStatusCard==='function'){
+      el.innerHTML='';
+      items.forEach(function(c){
+        try{ L.createCentralStatusCard(Object.assign({container:el}, csCardParams(c))); }
+        catch(e){ el.insertAdjacentHTML('beforeend', centralCard(c)); }
+      });
+      return;
+    }
     if(L && typeof L.createDivCard==='function'){
       el.innerHTML='';
       items.forEach(function(c){
