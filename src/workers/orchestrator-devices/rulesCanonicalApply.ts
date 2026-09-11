@@ -33,7 +33,10 @@ import type { FlushTarget } from './bundleFlush';
 
 type Logger = (level: 'info' | 'warn' | 'error', msg: string, extra?: Record<string, unknown>) => void;
 
-const ACTOR = 'orchestrator-devices';
+// rules.updated_by is a uuid column (no FK), so the actor must be a valid UUID —
+// a plain label like 'orchestrator-devices' throws invalid-uuid. This fixed system
+// id marks the row as written by the orchestrator-devices Monitor D (RFC-0062).
+const ACTOR = '00000000-0000-0000-0000-0000000000d4';
 
 /** Local calendar day ('YYYY-MM-DD') for a timezone. Falls back to UTC on a bad tz. */
 function localDay(tz: string, nowMs: number): string {
