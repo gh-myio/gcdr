@@ -1,14 +1,23 @@
 // =============================================================================
 // orchestrator-devices — Monitor D: rules-monitor (NO_CONSUMPTION auto-mute/restore)
 //
-// SHADOW-ONLY on this branch: it COMPUTES proposed MUTE/RESTORE actions and records
-// them to the shadow ledger (orchestrator_devices_checks, monitor='rules') + logs a
-// summary. It does NOT mutate rules.scope_entity_ids and does NOT write the
-// orchestrator_rule_mutes ledger — canonical apply is a later batch (RFC-0062 item 5).
+// Every tick COMPUTES proposed MUTE/RESTORE actions and records them to the shadow
+// ledger (orchestrator_devices_checks, monitor='rules') for observability.
+//
+// CANONICAL APPLY (RFC-0062 item 5, DEVICE scope) runs ONLY when the write path is
+// enabled — canonicalWritesAllowed(flags) === (!shadowMode && canonicalWritesEnabled);
+// MASTER + monitor.rules are already gated in the worker tick. When enabled it mutates
+// rules.scope_entity_ids and writes the orchestrator_rule_mutes ledger transactionally
+// (see rulesCanonicalApply.ts), then best-effort flushes the API bundle cache. When the
+// gate is closed it stays SHADOW-ONLY (proposals recorded, no rule/ledger writes).
 //
 // The daily bucket count comes from ALARMS via a pluggable reader (mock on localhost,
 // http once ALARMS RFC-0035 ships). Fail-safe: a device whose count can't be read is
 // left UNKNOWN ⇒ NO CHANGE (never muted on missing data).
+//
+// NOTE on the shadow RESTORE preview: it is derived from currently-eligible rules and so
+// UNDER-counts restores for disabled/uncapped rules. The CANONICAL restore does not have
+// this gap — it queries the mute ledger independently (rulesCanonicalApply.applyRuleRestores).
 // =============================================================================
 
 import { and, eq, isNull } from 'drizzle-orm';
@@ -24,6 +33,9 @@ import type { ControlState } from './control';
 import { workerConfig } from './config';
 import { resolveDailyBucketCap, type DailyCap } from './rulesCap';
 import { decideRuleActions, type RuleAction } from './rulesDecision';
+import { canonicalWritesAllowed } from './control';
+import { applyRuleMutes, applyRuleRestores } from './rulesCanonicalApply';
+import { flushBundleCaches, type FlushTarget } from './bundleFlush';
 import {
   MockAlarmsReader,
   HttpAlarmsReader,
@@ -112,11 +124,15 @@ export async function computeRuleProposals(reader: AlarmsReader, nowMs: number):
   return out;
 }
 
-/** The per-tick sweep (registered as the `rules` monitor). Shadow-only. */
-export async function runRulesSweep(_control: ControlState, log: Logger): Promise<void> {
+/** The per-tick sweep (registered as the `rules` monitor). Records shadow proposals
+ *  every tick; performs the canonical apply only when the write gate is open. */
+export async function runRulesSweep(control: ControlState, log: Logger): Promise<void> {
+  const nowMs = Date.now();
+  const canonical = canonicalWritesAllowed(control.flags); // (!shadowMode && canonicalWritesEnabled)
   const reader = makeAlarmsReader();
-  const groups = await computeRuleProposals(reader, Date.now());
+  const groups = await computeRuleProposals(reader, nowMs);
 
+  // ── shadow ledger (always) — the observable proposal trail ──────────────────
   let wouldMute = 0, wouldRestore = 0, scanned = 0;
   const checkRows: CheckInsert[] = [];
   for (const g of groups) {
@@ -131,7 +147,7 @@ export async function runRulesSweep(_control: ControlState, log: Logger): Promis
         centralId: null,
         input: { todayCount: a.todayCount, cap: a.cap },
         computedState: a.action,
-        proposedWrite: { ruleId: a.ruleId, action: a.action, todayCount: a.todayCount, cap: a.cap, reason: a.reason, mode: 'shadow' },
+        proposedWrite: { ruleId: a.ruleId, action: a.action, todayCount: a.todayCount, cap: a.cap, reason: a.reason, mode: canonical ? 'canonical' : 'shadow' },
         causedTransition: false,
       });
     }
@@ -141,12 +157,32 @@ export async function runRulesSweep(_control: ControlState, log: Logger): Promis
   for (const row of checkRows) row.runId = run.id;
   if (checkRows.length > 0) await db.insert(orchestratorDevicesChecks).values(checkRows);
 
+  // ── canonical apply (gated) — real rule/ledger writes + bundle flush ────────
+  let muted = 0, restored = 0, applySkipped = 0, applyErrors = 0;
+  if (canonical) {
+    const muteRes = await applyRuleMutes(groups, nowMs, log);
+    const restoreRes = await applyRuleRestores(nowMs, log);
+    muted = muteRes.muted;
+    restored = restoreRes.restored;
+    applySkipped = muteRes.skipped + restoreRes.skipped;
+    applyErrors = muteRes.errors + restoreRes.errors;
+
+    // Best-effort cross-process cache flush — a failure here NEVER undoes the committed
+    // writes (the 300s TTL is the backstop). De-duped by customer inside the helper.
+    const targets: FlushTarget[] = [...muteRes.targets, ...restoreRes.targets];
+    if (targets.length > 0) await flushBundleCaches(targets, log);
+  }
+
   await db.update(orchestratorDevicesRuns).set({
     finishedAt: new Date(),
     scanned,
-    changed: wouldMute + wouldRestore,
-    notes: { reader: reader.kind, rules: groups.length, wouldMute, wouldRestore, mode: 'shadow (no rule writes on this branch)' },
+    changed: canonical ? muted + restored : wouldMute + wouldRestore,
+    notes: canonical
+      ? { reader: reader.kind, rules: groups.length, wouldMute, wouldRestore, muted, restored, skipped: applySkipped, errors: applyErrors, mode: 'canonical' }
+      : { reader: reader.kind, rules: groups.length, wouldMute, wouldRestore, mode: 'shadow' },
   }).where(eq(orchestratorDevicesRuns.id, run.id));
 
-  log('info', 'rules sweep done', { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, mode: 'shadow' });
+  log('info', 'rules sweep done', canonical
+    ? { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, muted, restored, skipped: applySkipped, errors: applyErrors, mode: 'canonical' }
+    : { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, mode: 'shadow' });
 }

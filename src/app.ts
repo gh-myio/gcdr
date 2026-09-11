@@ -247,6 +247,8 @@ const PERM_CUSTOMERS_READ = 'customers:read';
 const PERM_TEMPLATES_READ = 'templates:read';
 const PERM_CENTRALS_READ = 'centrals:read';
 const PERM_CENTRALS_WRITE = 'centrals:write';
+const PERM_GROUPS_READ = 'groups:read';
+const PERM_GROUPS_WRITE = 'groups:write';
 
 // -----------------------------------------------------------------------------
 // Authentication (public)
@@ -533,10 +535,13 @@ apiV1Router.use('/partners', authMiddleware, partnersController);
 apiV1Router.use('/groups/:groupId/dispatch', hybridAuthByMethod(PERM_CUSTOMERS_READ, SCOPE_CUSTOMERS_WRITE), groupDispatchController);
 
 // RFC-0024: Group channel targets (nested — must come before general /groups router)
-apiV1Router.use('/groups/:groupId/channels', authMiddleware, groupChannelsController);
+// hybridAuth: GET* accept JWT + partner/customer API Key with groups:read;
+// mutations (POST/PUT/PATCH/DELETE: create/update, members, channels) require
+// groups:write. Master key still bypasses via tryMasterApiKey.
+apiV1Router.use('/groups/:groupId/channels', hybridAuthByMethod(PERM_GROUPS_READ, PERM_GROUPS_WRITE), groupChannelsController);
 
 // Groups
-apiV1Router.use('/groups', authMiddleware, groupsController);
+apiV1Router.use('/groups', hybridAuthByMethod(PERM_GROUPS_READ, PERM_GROUPS_WRITE), groupsController);
 
 // Domains (metrics, operators, aggregations for rules)
 apiV1Router.use('/domains', authMiddleware, domainsController);

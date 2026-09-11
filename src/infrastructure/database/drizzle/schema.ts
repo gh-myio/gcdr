@@ -3101,6 +3101,7 @@ export const orchestratorRuleMutes = pgTable('orchestrator_rule_mutes', {
   maxDaily:   integer('max_daily').notNull(),                      // cap (buckets) at mute time
   reason:     varchar('reason', { length: 40 }),                   // e.g. DAILY_CAP
   mode:       varchar('mode', { length: 20 }),                     // shadow | canonical
+  timezone:   varchar('timezone', { length: 64 }),                 // tz local_day was computed in (null=derive/UTC for legacy rows)
   mutedAt:    timestamp('muted_at', { withTimezone: true }).notNull().defaultNow(),
   restoredAt: timestamp('restored_at', { withTimezone: true }),    // null while active; set on restore
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
