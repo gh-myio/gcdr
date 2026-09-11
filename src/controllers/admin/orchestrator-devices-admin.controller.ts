@@ -184,14 +184,45 @@ router.get('/api/rules/preview', async (_req: Request, res: Response) => {
       const rows = (await db.execute(sql`select id, name from devices where id in (${idList})`)) as unknown as Rows;
       for (const r of rows) names.set(String(r.id), String(r.name ?? ''));
     }
+    // Rule names (the proposals/ledger show names, not raw UUIDs).
+    const ruleNames = new Map<string, string>();
+    const ruleIds = Array.from(new Set(groups.map((g) => g.ruleId)));
+    if (ruleIds.length > 0) {
+      const rl = sql.join(ruleIds.map((id) => sql`${id}::uuid`), sql`, `);
+      const rows = (await db.execute(sql`select id, name from rules where id in (${rl})`)) as unknown as Rows;
+      for (const r of rows) ruleNames.set(String(r.id), String(r.name ?? ''));
+    }
+    // Per-rule overview: what the monitor is watching (scope/cap/checked) + counts.
+    const perRule = groups.map((g) => ({
+      ruleId: g.ruleId, ruleName: ruleNames.get(g.ruleId) || null,
+      cap: g.cap.buckets, scopeCount: g.scopeCount, countsChecked: g.countsChecked, timezone: g.timezone,
+      wouldMute: g.actions.filter((a) => a.action === 'MUTE').length,
+      wouldRestore: g.actions.filter((a) => a.action === 'RESTORE').length,
+    }));
     let wouldMute = 0, wouldRestore = 0;
     const outRows = groups.flatMap((g) => g.actions.map((a) => {
       if (a.action === 'MUTE') wouldMute += 1; else wouldRestore += 1;
-      return { ruleId: g.ruleId, customerId: g.customerId, timezone: g.timezone, today: g.today,
+      return { ruleId: g.ruleId, ruleName: ruleNames.get(g.ruleId) || null, customerId: g.customerId, timezone: g.timezone, today: g.today,
         deviceId: a.deviceId, deviceName: names.get(a.deviceId) || null,
         action: a.action, todayCount: a.todayCount, cap: a.cap, reason: a.reason };
     }));
-    res.json({ reader: reader.kind, summary: { rules: groups.length, wouldMute, wouldRestore }, rows: outRows });
+    // The REAL ledger — what the orchestrator actually did (active + recently restored).
+    const muteRows = (await db.execute(sql`
+      select m.rule_id, m.device_id, m.reason, m.mode, m.today_count, m.max_daily, m.local_day, m.muted_at, m.restored_at,
+             r.name as rule_name, d.name as device_name
+      from orchestrator_rule_mutes m
+      left join rules r on r.id = m.rule_id
+      left join devices d on d.id = m.device_id
+      order by m.muted_at desc limit 100`)) as unknown as Rows;
+    const mutes = muteRows.map((m) => ({
+      ruleId: String(m.rule_id), ruleName: (m.rule_name as string) || null,
+      deviceId: String(m.device_id), deviceName: (m.device_name as string) || null,
+      reason: m.reason, mode: m.mode, todayCount: m.today_count, maxDaily: m.max_daily,
+      localDay: m.local_day, mutedAt: m.muted_at, restoredAt: m.restored_at,
+      active: m.restored_at === null || m.restored_at === undefined,
+    }));
+    const activeMutes = mutes.filter((m) => m.active).length;
+    res.json({ reader: reader.kind, summary: { rules: groups.length, wouldMute, wouldRestore, activeMutes }, perRule, rows: outRows, mutes });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -229,6 +260,34 @@ router.get('/api/centrals/:id/timeline', async (req: Request, res: Response) => 
     }
     segments.push({ status: segStatus ?? 'UNKNOWN', start: new Date(segStart).toISOString(), end: new Date(now).toISOString(), durationMs: now - segStart });
     res.json({ id, days, transitions: rows, segments });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Latency history for the GatewayModal chart (📊, RFC-0231) — from the ledger ─
+// The cockpit can show a REAL latency trend (orchestrator_devices_checks.latency_ms)
+// because it has admin DB access — unlike the frontend /centrals, which needs a
+// still-pending GCDR API endpoint. The modal's source calls this with a [startTs,
+// endTs] epoch-ms range. A failed probe yields latencyMs=null ⇒ an OFFLINE gap.
+router.get('/api/centrals/:id/latency-history', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const fromTs = Number(req.query.fromTs);
+    const toTs = Number(req.query.toTs);
+    const from = Number.isFinite(fromTs) ? new Date(fromTs) : new Date(Date.now() - 7 * 86400000);
+    const to = Number.isFinite(toTs) ? new Date(toTs) : new Date();
+    const rows = (await db.execute(sql`
+      select created_at, latency_ms, coalesce((input->>'ok')::boolean, true) as ok
+      from orchestrator_devices_checks
+      where entity_type = 'central' and entity_id = ${id}
+        and created_at >= ${from} and created_at <= ${to}
+      order by created_at asc`)) as unknown as Rows;
+    const points = rows.map((r) => ({
+      ts: new Date(String(r.created_at)).toISOString(),
+      latencyMs: r.ok ? (r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms)) : null,
+    }));
+    res.json({ id, points });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -470,6 +529,10 @@ __MYIO_LIB_TAG__
     --input:#ffffff; --inbd:#cbd5e1; --btn:#e8eef4; --btnh:#dbe6f0;
     --code:#0f766e; --ok-bg:#dcfce7; --ok-fg:#15803d; --bad-bg:#fee2e2; --bad-fg:#b91c1c;
     --warn-bg:#fef3c7; --warn-fg:#92400e; --mode-shadow:#0369a1; --mode-canonical:#15803d; --mode-held:#b91c1c;
+    /* KPI status tiles — colored backgrounds, mirroring /centrals CentralKpiRow + the card badges. */
+    --kpi-on-bg:#3b82f6; --kpi-on-fg:#ffffff; --kpi-warn-bg:#fffbeb; --kpi-warn-fg:#92400e;
+    --kpi-offh-bg:#fff1f2; --kpi-offh-fg:#9f1239; --kpi-unk-bg:#f8fafc; --kpi-unk-fg:#475569;
+    --kpi-div-bg:#f5f3ff; --kpi-div-fg:#6d28d9;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -478,6 +541,9 @@ __MYIO_LIB_TAG__
     --input:#0b131b; --inbd:#2a3a4b; --btn:#16324a; --btnh:#1d4b6e;
     --code:#9fd0ff; --ok-bg:#0d3320; --ok-fg:#4ade80; --bad-bg:#3a1414; --bad-fg:#f87171;
     --warn-bg:#3a2c0c; --warn-fg:#fbbf24; --mode-shadow:#8fd6ff; --mode-canonical:#4ade80; --mode-held:#f87171;
+    --kpi-on-bg:#3b82f6; --kpi-on-fg:#ffffff; --kpi-warn-bg:#2a2113; --kpi-warn-fg:#fcd34d;
+    --kpi-offh-bg:#2a1420; --kpi-offh-fg:#fda4af; --kpi-unk-bg:#16233a; --kpi-unk-fg:#94a3b8;
+    --kpi-div-bg:#241a33; --kpi-div-fg:#c4b5fd;
     color-scheme: dark;
   }
   body { margin:0; font:13px/1.45 'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
@@ -582,7 +648,12 @@ __MYIO_LIB_TAG__
   .kpi { flex:1 1 110px; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:8px 16px; text-align:center; min-width:100px; cursor:pointer; }
   .kpi:hover { border-color:var(--accent); } .kpi.active { outline:2px solid var(--accent); outline-offset:-1px; }
   .kpi .n { font-size:18px; font-weight:800; } .kpi .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
-  .kpi.k-on .n{ color:var(--ok-fg); } .kpi.k-off .n{ color:#ea580c; } .kpi.k-unk .n{ color:var(--muted); }
+  /* Colored KPI status tiles (parity with /centrals). TOTAL keeps the plain --panel. */
+  .kpi.k-on{ background:var(--kpi-on-bg); border-color:transparent; } .kpi.k-on .n,.kpi.k-on .l{ color:var(--kpi-on-fg); }
+  .kpi.k-warn{ background:var(--kpi-warn-bg); border-color:transparent; } .kpi.k-warn .n,.kpi.k-warn .l{ color:var(--kpi-warn-fg); }
+  .kpi.k-offh{ background:var(--kpi-offh-bg); border-color:transparent; } .kpi.k-offh .n,.kpi.k-offh .l{ color:var(--kpi-offh-fg); }
+  .kpi.k-unk{ background:var(--kpi-unk-bg); border-color:transparent; } .kpi.k-unk .n,.kpi.k-unk .l{ color:var(--kpi-unk-fg); }
+  .kpi.k-div{ background:var(--kpi-div-bg); border-color:transparent; } .kpi.k-div .n,.kpi.k-div .l{ color:var(--kpi-div-fg); }
   .pager { display:flex; gap:10px; align-items:center; justify-content:center; margin-top:16px; }
   .pager button[disabled]{ opacity:.45; cursor:default; }
   .login-modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; justify-content:center; align-items:center; z-index:9999; }
@@ -603,9 +674,6 @@ __MYIO_LIB_TAG__
   .help-body ul { margin:6px 0; padding-left:18px; } .help-body li { margin:4px 0; }
   .help-tbl { width:100%; border-collapse:collapse; } .help-tbl td { border-bottom:1px solid var(--rowb); padding:5px 8px; vertical-align:top; }
   .help-tbl td:first-child { white-space:nowrap; color:var(--accent); width:200px; }
-  .kpi.k-warn .n{ color:#d97706; }
-  .kpi.k-offh .n{ color:var(--bad-fg); }
-  .kpi.k-div .n{ color:#7c3aed; }
   #filtersBtn.has { border-color:var(--accent); font-weight:700; }
   #filtersBtn .fic{ opacity:.85; }
   .grace-info { cursor:pointer; } .grace-info b { color:var(--accent); }
@@ -795,6 +863,14 @@ __MYIO_LIB_TAG__
     <div class="flt-body" id="cardHelpBody"></div>
   </div>
 </div>
+
+<!-- "About the Rules tab" guide — content injected per-language by rulesHelpHTML() -->
+<div id="ruleshelp-modal" class="flt-modal hidden" onclick="if(event.target===this)hideRulesHelp()">
+  <div class="flt-box" style="max-width:885px">
+    <div class="flt-head"><span id="rulesHelpTitle">Sobre a tab Regras</span><button onclick="hideRulesHelp()" data-i18n="close">✕ close</button></div>
+    <div class="flt-body" id="rulesHelpBody"></div>
+  </div>
+</div>
 <main>
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="dashboard" onclick="setTab('dashboard')"><span class="tico">📊</span><span data-i18n="tab_dashboard">Dashboard</span></button>
@@ -840,10 +916,16 @@ __MYIO_LIB_TAG__
   </div>
 
   <div class="tabpanel" id="tab-rules">
-    <section><h2 data-i18n="tab_rules">Rules</h2>
+    <section><h2 data-i18n="tab_rules" style="display:inline-block;margin-right:8px">Rules</h2>
+      <button id="rulesHelpBtn" class="card-help-btn" onclick="showRulesHelp()" title="?" style="vertical-align:middle">?</button>
       <div class="mut" data-i18n="rules_hint" style="margin-bottom:10px">NO_CONSUMPTION daily-cap auto-mute — SHADOW preview (nothing is written to rules yet).</div>
       <div id="rulesSummary" style="margin-bottom:10px"></div>
+      <div class="ind-title" data-i18n="rules_overview" style="margin-top:6px">Rules (NO_CONSUMPTION)</div>
+      <div class="wrap"><table id="rulesOverview"></table></div>
+      <div class="ind-title" data-i18n="rules_proposed" style="margin-top:16px">Proposed actions (shadow)</div>
       <div class="wrap"><table id="rulesTbl"></table></div>
+      <div class="ind-title" data-i18n="rules_ledger" style="margin-top:16px">Applied mutes (ledger)</div>
+      <div class="wrap"><table id="rulesMutes"></table></div>
     </section>
   </div>
 
@@ -874,7 +956,7 @@ __MYIO_LIB_TAG__
   // ── i18n (in-page): UI labels/columns/Help translated; enums/states/kinds stay English. ──
   const HELP = {
     'en':
-      '<p>Read-only view of the RFC-0062 worker (Phase 1). It <b>only reads</b> — all flips (enable a gateway, turn on canonical writes / incidents) happen in the DB control table or via the runbook (<code>docs/ops/RFC-0062-orchestrator-devices-runbook.md</code>). Control buttons are Phase 2B.</p>'+
+      '<p>Read-only view of the orchestrator-devices worker (Phase 1). It <b>only reads</b> — all flips (enable a gateway, turn on canonical writes / incidents) happen in the DB control table or via the operations runbook. Control buttons are Phase 2B.</p>'+
       '<h3>Sections</h3><ul>'+
       '<li><b>Summary</b> — worker state: MASTER on/off, heartbeat freshness (healthy = a recent tick), the live FLAGS, and how many gateways are enabled.</li>'+
       '<li><b>Recent runs</b> — one row per scan. <b>mode</b>: <span class="mode-shadow">shadow</span> (computes proposals, writes nothing canonical) · <span class="mode-canonical">canonical</span> (writes status) · <span class="mode-held">held</span> (sanity gate blocked the write). <b>applied/audited</b> = canonical writes/audit rows. <b>incidents</b> = candidates (posted/dry/disabled).</li>'+
@@ -892,7 +974,7 @@ __MYIO_LIB_TAG__
       '<tr><td>unknown_reason</td><td><code>AWAITING_FIRST_SCAN</code> · <code>NEVER_OBSERVED</code> · <code>SCAN_FAILED</code> · <code>CENTRAL_UNREACHABLE</code> (parent central down — cascade) · <code>AUTH_ERROR</code> · <code>CONFIG_ERROR</code></td></tr>'+
       '</table><p class="mut">Probe: genuine down (timeout/conn/5xx) ⇒ central OFFLINE + devices UNKNOWN/CENTRAL_UNREACHABLE. 401/403 ⇒ AUTH_ERROR. NXDOMAIN/4xx ⇒ CONFIG_ERROR. Password is <code>DB_ADMIN_PASSWORD</code>.</p>',
     'pt-BR':
-      '<p>Visão somente leitura do worker do RFC-0062 (Phase 1). Ela <b>só lê</b> — todas as mudanças (habilitar um gateway, ligar escrita canônica / incidentes) são feitas na tabela de controle do banco ou pelo runbook (<code>docs/ops/RFC-0062-orchestrator-devices-runbook.md</code>). Botões de controle são Phase 2B.</p>'+
+      '<p>Visão somente leitura do worker orchestrator-devices (Phase 1). Ela <b>só lê</b> — todas as mudanças (habilitar um gateway, ligar escrita canônica / incidentes) são feitas na tabela de controle do banco ou pelo runbook de operações. Botões de controle são Phase 2B.</p>'+
       '<h3>Seções</h3><ul>'+
       '<li><b>Resumo</b> — estado do worker: MASTER on/off, frescor do heartbeat (saudável = tick recente), as FLAGS ao vivo, e quantos gateways estão habilitados.</li>'+
       '<li><b>Execuções recentes</b> — uma linha por scan. <b>modo</b>: <span class="mode-shadow">shadow</span> (só calcula, não escreve canônico) · <span class="mode-canonical">canonical</span> (escreve status) · <span class="mode-held">held</span> (o sanity gate bloqueou). <b>applied/audited</b> = escritas/linhas de auditoria. <b>incidents</b> = candidatos (posted/dry/disabled).</li>'+
@@ -911,8 +993,8 @@ __MYIO_LIB_TAG__
       '</table><p class="mut">Probe: queda genuína (timeout/conn/5xx) ⇒ central OFFLINE + devices UNKNOWN/CENTRAL_UNREACHABLE. 401/403 ⇒ AUTH_ERROR. NXDOMAIN/4xx ⇒ CONFIG_ERROR. A senha é <code>DB_ADMIN_PASSWORD</code>.</p>',
   };
   const I18N = {
-    'en': {ro:'CONTROLS · admin password',connected:'connected',logout:'Logout',auto:'auto',auto_in:'refresh in {s}s',fetch_err:'Cockpit server unreachable — retrying',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE MODE',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'connectivity test',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices',include_history:'include history',recheck_now:'Recheck now',enable_canonical:'Enable canonical',last_observed:'last observed',phase2b:'Phase 2B — coming',tab_dashboard:'Dashboard',tab_centrals:'Centrals',tab_devices:'Devices',tab_os:'Work orders',tab_scans:'Scans',soon:'Coming soon',monitoring:'monitoring',last_sync:'last sync',ph_search:'search name',show_all:'show all',kpi_total:'total',page:'page',devices_hint:'Device states from the latest scan (Phase 2 telemetry pending)',filter_hint:'click a KPI to filter · total = all',no_data_off:'monitoring off · no probe data yet',confirm_mon_on:'Enable monitoring for "{name}"? The worker will start probing this gateway. This action is audited.',confirm_mon_off:'Disable monitoring for "{name}"? The worker will stop probing this gateway. This action is audited.',toggle_err:'Failed to change monitoring:',mon_on_title:'Enable monitoring',mon_off_title:'Disable monitoring',btn_cancel:'Cancel',btn_on:'Enable',btn_off:'Disable',kpi_card_title:'Status indicators',last_syncs:'Last syncs',sync_summary:'Sync summary',dash_ind_centrals:'Central status indicators',probe_ok:'Responding',probe_ok_slow:'Responding (slow)',probe_timeout:'No response',probe_conn:'No connection',probe_http:'Server error',probe_parse:'Bad response',probe_auth:'Auth error',probe_config:'Config error',probe_never:'Never tested',force_sync:'Refresh evidence',confirm_sync:'Run a manual probe for "{name}"? It updates ONLY the last check / probe result — it does NOT recompute the ledger, divergence or canonical status. Audited.',sync_done:'Evidence updated: {result}. Wait for the next sweep to refresh proposed_write / divergence.',sync_err:'Recheck failed:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'UNKNOWN',st_warning:'WARNING',st_offline_hard:'OFFLINE {d}',conn_status:'connection status',hard_lbl:'hard OFFLINE',hard_hint:'Stage-2 OFFLINE: (last attempt − last success) ≥ {d}. Env ORCH_DEVICES_OFFLINE_HARD_MIN — not editable here. A central that NEVER succeeded shows UNKNOWN.',last_attempt:'last attempt',last_success:'last success',div_help:'Stored status (canonical) differs from what the worker would write (proposed)',mon_card_title:'Monitoring',mon_all_on:'Enable all',mon_all_off:'Disable all',confirm_all_on:'Enable monitoring on ALL centrals? The worker will start probing every gateway. This action is audited.',confirm_all_off:'Disable monitoring on ALL centrals? The worker will stop probing every gateway. This action is audited.',bulk_done:'{n} central(s) updated',devices_list:'Devices',loading:'Loading',filters_btn:'Filters',filters_title:'Filters & sorting',filters_active:'{n} active',settings_title:'Settings',f_sort:'Sort by',sort_name_asc:'Name A→Z',sort_name_desc:'Name Z→A',sort_offline_desc:'Offline longest first',sort_offline_asc:'Offline shortest first',sort_sync_desc:'Last sync: newest',sort_sync_asc:'Last sync: oldest',sort_dev_desc:'Most devices',sort_dev_asc:'Fewest devices',f_scope:'Scope',scope_monitored:'Monitored',scope_all:'All',scope_unmonitored:'Not monitored',f_name:'Name contains',f_name_ph:'name or UUID (ignore case)',f_status:'Status',f_lastsync:'Last sync',ls_any:'Any',ls_1h:'Within 1h',ls_24h:'Within 24h',ls_over24h:'Over 24h ago',ls_never:'Never synced',ls_before:'Before…',ls_after:'After…',ls_between:'Between…',f_devices:'Devices (min–max)',f_divergent:'Only with divergence',f_apply:'Apply',f_clear:'Clear',f_grace:'Attention tolerance window (min)',f_grace_hint:'Display-only override stored in this browser. The worker keeps using its ORCH_DEVICES_OFFLINE_GRACE_MIN env (default {d} min). Changes how this cockpit derives ONLINE/WARNING/OFFLINE.',f_save:'Save',f_reset_default:'Reset to default',uuid:'UUID',grace_lbl:'ATTENTION tolerance',timeline:'Timeline',timeline_title:'Connectivity timeline',tl_range:'Range',tl_1d:'Last 24h',tl_7d:'Last 7 days',tl_30d:'Last 30 days',tl_90d:'Last 90 days',tl_no_data:'No transitions recorded in this window.',tl_shadow_note:'In shadow mode this reflects the proposed state; canonical once live.',tab_rules:'Rules',rules_hint:'NO_CONSUMPTION daily-cap auto-mute — SHADOW preview (nothing is written to rules yet).',rules_reader:'reader',rules_would_mute:'would mute',rules_would_restore:'would restore',rules_none:'No proposed mutes/restores right now.',col_rule:'rule',col_device:'device',col_action:'action',col_countcap:'count / cap'},
-    'pt-BR': {ro:'CONTROLES · senha admin',connected:'conectado',logout:'Sair',auto:'auto',auto_in:'atualiza em {s}s',fetch_err:'Servidor do cockpit indisponível — tentando de novo',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'teste de conexão',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices',include_history:'incluir histórico',recheck_now:'Rechecar agora',enable_canonical:'Ligar canonical',last_observed:'visto por último',phase2b:'Phase 2B — em breve',tab_dashboard:'Dashboard',tab_centrals:'Centrais',tab_devices:'Dispositivos',tab_os:'Ordem de serviço',tab_scans:'Varreduras',soon:'Em breve',monitoring:'monitoramento',last_sync:'último sync',ph_search:'buscar nome',show_all:'mostrar todas',kpi_total:'total',page:'página',devices_hint:'Estados dos devices do último sweep (telemetria Phase 2 pendente)',filter_hint:'clique num KPI para filtrar · total = todas',no_data_off:'monitoramento desligado · sem dados de sondagem ainda',confirm_mon_on:'Ligar monitoramento de "{name}"? O worker passará a sondar esse gateway. Esta ação é auditada.',confirm_mon_off:'Desligar monitoramento de "{name}"? O worker deixará de sondar esse gateway. Esta ação é auditada.',toggle_err:'Falha ao alterar monitoramento:',mon_on_title:'Ligar monitoramento',mon_off_title:'Desligar monitoramento',btn_cancel:'Cancelar',btn_on:'Ligar',btn_off:'Desligar',kpi_card_title:'Indicadores de Status',last_syncs:'Últimos Syncs',sync_summary:'Resumo do Sync',dash_ind_centrals:'Indicadores de Status das Centrais',probe_ok:'Respondendo',probe_ok_slow:'Respondendo (lento)',probe_timeout:'Sem resposta',probe_conn:'Sem conexão',probe_http:'Erro no servidor',probe_parse:'Resposta inválida',probe_auth:'Erro de autenticação',probe_config:'Erro de configuração',probe_never:'Nunca testado',force_sync:'Atualizar evidência',confirm_sync:'Executar um probe manual em "{name}"? Atualiza APENAS a última verificação / resultado do probe — NÃO recalcula ledger, divergência nem status canônico. Auditado.',sync_done:'Evidência atualizada: {result}. Aguarde o próximo sweep para atualizar o proposed_write / divergência.',sync_err:'Falha ao rechecar:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'DESCONHECIDO',st_warning:'ATENÇÃO',st_offline_hard:'OFFLINE {d}',conn_status:'status de conexão',hard_lbl:'OFFLINE definitivo',hard_hint:'OFFLINE estágio 2: (última tentativa − último sucesso) ≥ {d}. Vem do env ORCH_DEVICES_OFFLINE_HARD_MIN — não editável aqui. Central que NUNCA teve sucesso aparece como DESCONHECIDO.',last_attempt:'última tentativa',last_success:'último sucesso',div_help:'O status gravado (canônico) difere do que o worker gravaria (proposto)',mon_card_title:'Monitoramento',mon_all_on:'Ativar todos',mon_all_off:'Desativar todos',confirm_all_on:'Ativar monitoramento em TODAS as centrais? O worker passará a sondar todos os gateways. Esta ação é auditada.',confirm_all_off:'Desativar monitoramento em TODAS as centrais? O worker deixará de sondar todos os gateways. Esta ação é auditada.',bulk_done:'{n} central(is) atualizada(s)',devices_list:'Dispositivos',loading:'Carregando',filters_btn:'Filtros',filters_title:'Filtros e ordenação',filters_active:'{n} ativo(s)',settings_title:'Configurações',f_sort:'Ordenar por',sort_name_asc:'Nome A→Z',sort_name_desc:'Nome Z→A',sort_offline_desc:'Offline há mais tempo',sort_offline_asc:'Offline há menos tempo',sort_sync_desc:'Último sync: mais recente',sort_sync_asc:'Último sync: mais antigo',sort_dev_desc:'Mais dispositivos',sort_dev_asc:'Menos dispositivos',f_scope:'Escopo',scope_monitored:'Monitoradas',scope_all:'Todas',scope_unmonitored:'Não monitoradas',f_name:'Nome contém',f_name_ph:'nome ou UUID (ignora maiúsc.)',f_status:'Status',f_lastsync:'Último sync',ls_any:'Qualquer',ls_1h:'Na última 1h',ls_24h:'Nas últimas 24h',ls_over24h:'Há mais de 24h',ls_never:'Nunca sincronizou',ls_before:'Antes de…',ls_after:'Depois de…',ls_between:'Entre…',f_devices:'Dispositivos (mín–máx)',f_divergent:'Só com divergência',f_apply:'Aplicar',f_clear:'Limpar',f_grace:'Tolerância p/ ATENÇÃO (min)',f_grace_hint:'Override apenas de exibição, salvo neste navegador. O worker continua usando o env ORCH_DEVICES_OFFLINE_GRACE_MIN (default {d} min). Muda como este cockpit deriva ONLINE/ATENÇÃO/OFFLINE.',f_save:'Salvar',f_reset_default:'Voltar ao padrão',uuid:'UUID',grace_lbl:'tolerância p/ ATENÇÃO',timeline:'Timeline',timeline_title:'Timeline de conectividade',tl_range:'Período',tl_1d:'Últimas 24h',tl_7d:'Últimos 7 dias',tl_30d:'Últimos 30 dias',tl_90d:'Últimos 90 dias',tl_no_data:'Sem transições registradas nesse período.',tl_shadow_note:'Em shadow, reflete o estado proposto; canônico quando ativo.',tab_rules:'Regras',rules_hint:'Auto-mute por limite diário de NO_CONSUMPTION — prévia SHADOW (nada é escrito nas regras ainda).',rules_reader:'leitor',rules_would_mute:'mutaria',rules_would_restore:'restauraria',rules_none:'Sem mutes/restaurações propostos agora.',col_rule:'regra',col_device:'device',col_action:'ação',col_countcap:'contagem / cap'},
+    'en': {ro:'CONTROLS · admin password',connected:'connected',logout:'Logout',auto:'auto',auto_in:'refresh in {s}s',fetch_err:'Cockpit server unreachable — retrying',help:'? Help',dark:'dark',light:'light',login_sub:'Enter the admin password to view the cockpit.',login_ph:'Password',login_err:'Invalid password. Try again.',unlock:'Unlock',help_title:'orchestrator-devices — cockpit help',close:'✕ close',summary:'Worker summary',runs:'Recent runs',divergence:'Divergence — canonical vs proposed (latest run)',checks:'Checks (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'state (e.g. OFFLINE)',filter:'Filter',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitors',lbl_gateways:'Enabled gateways',val_healthy:'healthy',val_stale:'stale',div_empty:'no divergence in the latest run — canonical matches proposed',yes:'yes',no:'no',col_started:'started',col_monitor:'monitor',col_mode:'mode',col_scanned:'scanned',col_changed:'changed',col_failures:'failures',col_applied:'applied',col_audited:'audited',col_incidents:'incidents',col_type:'type',col_name:'name',col_current:'current',col_proposed:'proposed',col_current_health:'current_health',col_proposed_health:'proposed_health',col_created:'created',col_state:'state',col_reason:'reason',col_transition:'transition',col_latency:'latency',col_signal:'signal',latest:'Latest scan',divergence_h:'Divergence',safe_idle:'SAFE MODE',worker:'Worker',last_tick:'last tick',gateways_enabled:'gateway(s) enabled',no_runs:'no runs yet',no_div:'no divergence — canonical matches proposed',div_one:'divergence',probe:'connectivity test',suppressed:'devices suppressed as',canon_writes:'canonical writes',inc_candidates:'incident candidates',devices:'devices',more:'show more',less:'show less',grp_hint:'click a row to expand its devices',include_history:'include history',recheck_now:'Recheck now',enable_canonical:'Enable canonical',last_observed:'last observed',phase2b:'Phase 2B — coming',tab_dashboard:'Dashboard',tab_centrals:'Centrals',tab_devices:'Devices',tab_os:'Work orders',tab_scans:'Scans',soon:'Coming soon',monitoring:'monitoring',last_sync:'last sync',ph_search:'search name',show_all:'show all',kpi_total:'total',page:'page',devices_hint:'Device states from the latest scan (Phase 2 telemetry pending)',filter_hint:'click a KPI to filter · total = all',no_data_off:'monitoring off · no probe data yet',confirm_mon_on:'Enable monitoring for "{name}"? The worker will start probing this gateway. This action is audited.',confirm_mon_off:'Disable monitoring for "{name}"? The worker will stop probing this gateway. This action is audited.',toggle_err:'Failed to change monitoring:',mon_on_title:'Enable monitoring',mon_off_title:'Disable monitoring',btn_cancel:'Cancel',btn_on:'Enable',btn_off:'Disable',kpi_card_title:'Status indicators',last_syncs:'Last syncs',sync_summary:'Sync summary',dash_ind_centrals:'Central status indicators',probe_ok:'Responding',probe_ok_slow:'Responding (slow)',probe_timeout:'No response',probe_conn:'No connection',probe_http:'Server error',probe_parse:'Bad response',probe_auth:'Auth error',probe_config:'Config error',probe_never:'Never tested',force_sync:'Refresh evidence',confirm_sync:'Run a manual probe for "{name}"? It updates ONLY the last check / probe result — it does NOT recompute the ledger, divergence or canonical status. Audited.',sync_done:'Evidence updated: {result}. Wait for the next sweep to refresh proposed_write / divergence.',sync_err:'Recheck failed:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'UNKNOWN',st_warning:'WARNING',st_offline_hard:'OFFLINE {d}',conn_status:'connection status',hard_lbl:'hard OFFLINE',hard_hint:'Stage-2 OFFLINE: (last attempt − last success) ≥ {d}. Env ORCH_DEVICES_OFFLINE_HARD_MIN — not editable here. A central that NEVER succeeded shows UNKNOWN.',last_attempt:'last attempt',last_success:'last success',div_help:'Stored status (canonical) differs from what the worker would write (proposed)',mon_card_title:'Monitoring',mon_all_on:'Enable all',mon_all_off:'Disable all',confirm_all_on:'Enable monitoring on ALL centrals? The worker will start probing every gateway. This action is audited.',confirm_all_off:'Disable monitoring on ALL centrals? The worker will stop probing every gateway. This action is audited.',bulk_done:'{n} central(s) updated',devices_list:'Devices',loading:'Loading',filters_btn:'Filters',filters_title:'Filters & sorting',filters_active:'{n} active',settings_title:'Settings',f_sort:'Sort by',sort_name_asc:'Name A→Z',sort_name_desc:'Name Z→A',sort_offline_desc:'Offline longest first',sort_offline_asc:'Offline shortest first',sort_sync_desc:'Last sync: newest',sort_sync_asc:'Last sync: oldest',sort_dev_desc:'Most devices',sort_dev_asc:'Fewest devices',f_scope:'Scope',scope_monitored:'Monitored',scope_all:'All',scope_unmonitored:'Not monitored',f_name:'Name contains',f_name_ph:'name or UUID (ignore case)',f_status:'Status',f_lastsync:'Last sync',ls_any:'Any',ls_1h:'Within 1h',ls_24h:'Within 24h',ls_over24h:'Over 24h ago',ls_never:'Never synced',ls_before:'Before…',ls_after:'After…',ls_between:'Between…',f_devices:'Devices (min–max)',f_divergent:'Only with divergence',f_apply:'Apply',f_clear:'Clear',f_grace:'Attention tolerance window (min)',f_grace_hint:'Display-only override stored in this browser. The worker keeps using its ORCH_DEVICES_OFFLINE_GRACE_MIN env (default {d} min). Changes how this cockpit derives ONLINE/WARNING/OFFLINE.',f_save:'Save',f_reset_default:'Reset to default',uuid:'UUID',grace_lbl:'ATTENTION tolerance',timeline:'Timeline',timeline_title:'Connectivity timeline',tl_range:'Range',tl_1d:'Last 24h',tl_7d:'Last 7 days',tl_30d:'Last 30 days',tl_90d:'Last 90 days',tl_no_data:'No transitions recorded in this window.',tl_shadow_note:'In shadow mode this reflects the proposed state; canonical once live.',tab_rules:'Rules',rules_hint:'NO_CONSUMPTION daily-cap auto-mute — SHADOW preview (nothing is written to rules yet).',rules_reader:'reader',rules_would_mute:'would mute',rules_would_restore:'would restore',rules_none:'No proposed mutes/restores right now.',col_rule:'rule',col_device:'device',col_action:'action',col_countcap:'count / cap',rules_overview:'Rules (NO_CONSUMPTION)',rules_proposed:'Proposed actions (shadow)',rules_ledger:'Applied mutes (ledger)',rules_active_mutes:'active mutes',rules_none_rules:'No NO_CONSUMPTION rules with a daily cap.',col_cap:'cap',col_scope:'scope',col_checked:'checked',col_status:'status',col_mode:'mode',col_muted:'muted',col_restored:'restored',mute_active:'MUTED',mute_restored:'restored',mute_none:'No mutes recorded yet.'},
+    'pt-BR': {ro:'CONTROLES · senha admin',connected:'conectado',logout:'Sair',auto:'auto',auto_in:'atualiza em {s}s',fetch_err:'Servidor do cockpit indisponível — tentando de novo',help:'? Ajuda',dark:'escuro',light:'claro',login_sub:'Digite a senha de admin para ver o cockpit.',login_ph:'Senha',login_err:'Senha inválida. Tente de novo.',unlock:'Entrar',help_title:'orchestrator-devices — ajuda do cockpit',close:'✕ fechar',summary:'Resumo do worker',runs:'Execuções recentes',divergence:'Divergência — canônico vs proposto (última execução)',checks:'Verificações (shadow ledger)',ph_central:'centralId (uuid)',ph_customer:'customerId (uuid)',ph_reason:'unknown_reason',ph_state:'estado (ex.: OFFLINE)',filter:'Filtrar',lbl_heartbeat:'Heartbeat',lbl_monitors:'Monitores',lbl_gateways:'Gateways habilitados',val_healthy:'saudável',val_stale:'defasado',div_empty:'sem divergência na última execução — canônico bate com o proposto',yes:'sim',no:'não',col_started:'início',col_monitor:'monitor',col_mode:'modo',col_scanned:'varridos',col_changed:'mudados',col_failures:'falhas',col_applied:'aplicados',col_audited:'auditados',col_incidents:'incidentes',col_type:'tipo',col_name:'nome',col_current:'atual',col_proposed:'proposto',col_current_health:'saúde atual',col_proposed_health:'saúde proposta',col_created:'criado',col_state:'estado',col_reason:'motivo',col_transition:'transição',col_latency:'latência',col_signal:'sinal',latest:'Última varredura',divergence_h:'Divergência',safe_idle:'MODO SEGURO',worker:'Worker',last_tick:'último tick',gateways_enabled:'gateway(s) habilitado(s)',no_runs:'sem execuções ainda',no_div:'sem divergência — canônico bate com o proposto',div_one:'divergência',probe:'teste de conexão',suppressed:'devices suprimidos como',canon_writes:'escritas canônicas',inc_candidates:'candidatos a incidente',devices:'devices',more:'ver mais',less:'ver menos',grp_hint:'clique numa linha para expandir os devices',include_history:'incluir histórico',recheck_now:'Rechecar agora',enable_canonical:'Ligar canonical',last_observed:'visto por último',phase2b:'Phase 2B — em breve',tab_dashboard:'Dashboard',tab_centrals:'Centrais',tab_devices:'Dispositivos',tab_os:'Ordem de serviço',tab_scans:'Varreduras',soon:'Em breve',monitoring:'monitoramento',last_sync:'último sync',ph_search:'buscar nome',show_all:'mostrar todas',kpi_total:'total',page:'página',devices_hint:'Estados dos devices do último sweep (telemetria Phase 2 pendente)',filter_hint:'clique num KPI para filtrar · total = todas',no_data_off:'monitoramento desligado · sem dados de sondagem ainda',confirm_mon_on:'Ligar monitoramento de "{name}"? O worker passará a sondar esse gateway. Esta ação é auditada.',confirm_mon_off:'Desligar monitoramento de "{name}"? O worker deixará de sondar esse gateway. Esta ação é auditada.',toggle_err:'Falha ao alterar monitoramento:',mon_on_title:'Ligar monitoramento',mon_off_title:'Desligar monitoramento',btn_cancel:'Cancelar',btn_on:'Ligar',btn_off:'Desligar',kpi_card_title:'Indicadores de Status',last_syncs:'Últimos Syncs',sync_summary:'Resumo do Sync',dash_ind_centrals:'Indicadores de Status das Centrais',probe_ok:'Respondendo',probe_ok_slow:'Respondendo (lento)',probe_timeout:'Sem resposta',probe_conn:'Sem conexão',probe_http:'Erro no servidor',probe_parse:'Resposta inválida',probe_auth:'Erro de autenticação',probe_config:'Erro de configuração',probe_never:'Nunca testado',force_sync:'Atualizar evidência',confirm_sync:'Executar um probe manual em "{name}"? Atualiza APENAS a última verificação / resultado do probe — NÃO recalcula ledger, divergência nem status canônico. Auditado.',sync_done:'Evidência atualizada: {result}. Aguarde o próximo sweep para atualizar o proposed_write / divergência.',sync_err:'Falha ao rechecar:',st_online:'ONLINE',st_offline:'OFFLINE',st_unknown:'DESCONHECIDO',st_warning:'ATENÇÃO',st_offline_hard:'OFFLINE {d}',conn_status:'status de conexão',hard_lbl:'OFFLINE definitivo',hard_hint:'OFFLINE estágio 2: (última tentativa − último sucesso) ≥ {d}. Vem do env ORCH_DEVICES_OFFLINE_HARD_MIN — não editável aqui. Central que NUNCA teve sucesso aparece como DESCONHECIDO.',last_attempt:'última tentativa',last_success:'último sucesso',div_help:'O status gravado (canônico) difere do que o worker gravaria (proposto)',mon_card_title:'Monitoramento',mon_all_on:'Ativar todos',mon_all_off:'Desativar todos',confirm_all_on:'Ativar monitoramento em TODAS as centrais? O worker passará a sondar todos os gateways. Esta ação é auditada.',confirm_all_off:'Desativar monitoramento em TODAS as centrais? O worker deixará de sondar todos os gateways. Esta ação é auditada.',bulk_done:'{n} central(is) atualizada(s)',devices_list:'Dispositivos',loading:'Carregando',filters_btn:'Filtros',filters_title:'Filtros e ordenação',filters_active:'{n} ativo(s)',settings_title:'Configurações',f_sort:'Ordenar por',sort_name_asc:'Nome A→Z',sort_name_desc:'Nome Z→A',sort_offline_desc:'Offline há mais tempo',sort_offline_asc:'Offline há menos tempo',sort_sync_desc:'Último sync: mais recente',sort_sync_asc:'Último sync: mais antigo',sort_dev_desc:'Mais dispositivos',sort_dev_asc:'Menos dispositivos',f_scope:'Escopo',scope_monitored:'Monitoradas',scope_all:'Todas',scope_unmonitored:'Não monitoradas',f_name:'Nome contém',f_name_ph:'nome ou UUID (ignora maiúsc.)',f_status:'Status',f_lastsync:'Último sync',ls_any:'Qualquer',ls_1h:'Na última 1h',ls_24h:'Nas últimas 24h',ls_over24h:'Há mais de 24h',ls_never:'Nunca sincronizou',ls_before:'Antes de…',ls_after:'Depois de…',ls_between:'Entre…',f_devices:'Dispositivos (mín–máx)',f_divergent:'Só com divergência',f_apply:'Aplicar',f_clear:'Limpar',f_grace:'Tolerância p/ ATENÇÃO (min)',f_grace_hint:'Override apenas de exibição, salvo neste navegador. O worker continua usando o env ORCH_DEVICES_OFFLINE_GRACE_MIN (default {d} min). Muda como este cockpit deriva ONLINE/ATENÇÃO/OFFLINE.',f_save:'Salvar',f_reset_default:'Voltar ao padrão',uuid:'UUID',grace_lbl:'tolerância p/ ATENÇÃO',timeline:'Timeline',timeline_title:'Timeline de conectividade',tl_range:'Período',tl_1d:'Últimas 24h',tl_7d:'Últimos 7 dias',tl_30d:'Últimos 30 dias',tl_90d:'Últimos 90 dias',tl_no_data:'Sem transições registradas nesse período.',tl_shadow_note:'Em shadow, reflete o estado proposto; canônico quando ativo.',tab_rules:'Regras',rules_hint:'Auto-mute por limite diário de NO_CONSUMPTION — prévia SHADOW (nada é escrito nas regras ainda).',rules_reader:'leitor',rules_would_mute:'mutaria',rules_would_restore:'restauraria',rules_none:'Sem mutes/restaurações propostos agora.',col_rule:'regra',col_device:'device',col_action:'ação',col_countcap:'contagem / cap',rules_overview:'Regras (NO_CONSUMPTION)',rules_proposed:'Ações propostas (shadow)',rules_ledger:'Mutes aplicados (ledger)',rules_active_mutes:'mutes ativos',rules_none_rules:'Nenhuma regra NO_CONSUMPTION com cap diário.',col_cap:'cap',col_scope:'escopo',col_checked:'checados',col_status:'status',col_mode:'modo',col_muted:'mutado',col_restored:'restaurado',mute_active:'MUTADO',mute_restored:'restaurado',mute_none:'Nenhum mute registrado ainda.'},
   };
   let lang = 'en';
   try { lang = localStorage.getItem('od-lang') || (((navigator.language||'').toLowerCase().indexOf('pt')===0) ? 'pt-BR' : 'en'); } catch(e){}
@@ -988,7 +1070,59 @@ __MYIO_LIB_TAG__
     $('cardhelp-modal').classList.remove('hidden');
   }
   function hideCardHelp(){ $('cardhelp-modal').classList.add('hidden'); }
-  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideHelp(); hideCardHelp(); closeFilters(); closeSettings(); closeTimeline(); } });
+  function rulesHelpHTML(){
+    if(lang==='pt-BR') return ''+
+      '<div class="chelp">'+
+      '<h4>O que é</h4>'+
+      '<p>O Monitor D silencia automaticamente o alarme <b>NO_CONSUMPTION</b> ("sem consumo") de um device que já atingiu o limite diário de buckets, removendo-o do escopo da regra até a virada do dia local — e o devolve automaticamente no dia seguinte.</p>'+
+      '<h4>De onde vêm as contagens</h4>'+
+      '<p>Do ALARMS (<code>POST /incidents/counts/daily</code>). O <b>leitor</b> no resumo mostra <code>http</code> (real) ou <code>mock</code> (localhost).</p>'+
+      '<h4>Shadow × Canonical</h4>'+
+      '<p>Em <b>shadow</b> o worker só <i>propõe</i> (nada é escrito nas regras). Em <b>canonical</b> ele <i>aplica</i>: remove o device de <code>scope_entity_ids</code> (com bump de versão) e grava uma linha no ledger <code>orchestrator_rule_mutes</code>.</p>'+
+      '<h4>As três tabelas</h4>'+
+      '<table><tr><th>Seção</th><th>O que mostra</th></tr>'+
+      '<tr><td><b>Regras (NO_CONSUMPTION)</b></td><td><b>cap</b> (limite/dia), <b>escopo</b> (devices na regra), <b>checados</b> (contagens obtidas do ALARMS) e quantas <b>mutaria/restauraria</b> agora.</td></tr>'+
+      '<tr><td><b>Ações propostas (shadow)</b></td><td>O que <i>aconteceria</i> neste instante: MUTE (device sobre o cap) ou RESTORE (virada do dia).</td></tr>'+
+      '<tr><td><b>Mutes aplicados (ledger)</b></td><td>O histórico <i>real</i> (o que o orquestrador fez): <b>MUTADO</b> (ativo) ou <b>restaurado</b>, com contagem/cap, motivo, modo e quando.</td></tr>'+
+      '</table>'+
+      '<h4>Motivos</h4>'+
+      '<table><tr><th>Motivo</th><th>Significado</th></tr>'+
+      '<tr><td><code>DAILY_CAP</code></td><td>Bateu o limite diário → device sai do escopo (MUTE).</td></tr>'+
+      '<tr><td><code>DAY_ROLLOVER</code></td><td>Virou o dia local → device volta ao escopo, uma única vez (RESTORE).</td></tr>'+
+      '<tr><td><code>SUPERSEDED_MANUAL</code></td><td>Um humano editou o escopo/regra → a restauração é cancelada sem re-adicionar.</td></tr>'+
+      '<tr><td><code>RULE_GONE</code></td><td>A regra foi deletada → pendência encerrada.</td></tr>'+
+      '</table>'+
+      '</div>';
+    return ''+
+      '<div class="chelp">'+
+      '<h4>What it is</h4>'+
+      '<p>Monitor D auto-mutes the <b>NO_CONSUMPTION</b> alarm for a device that has hit its daily bucket cap, removing it from the rule scope until the local-day rollover — and adds it back automatically the next day.</p>'+
+      '<h4>Where counts come from</h4>'+
+      '<p>ALARMS (<code>POST /incidents/counts/daily</code>). The <b>reader</b> in the summary shows <code>http</code> (live) or <code>mock</code> (localhost).</p>'+
+      '<h4>Shadow vs Canonical</h4>'+
+      '<p>In <b>shadow</b> the worker only <i>proposes</i> (nothing is written). In <b>canonical</b> it <i>applies</i>: removes the device from <code>scope_entity_ids</code> (version bump) and writes a row to the <code>orchestrator_rule_mutes</code> ledger.</p>'+
+      '<h4>The three tables</h4>'+
+      '<table><tr><th>Section</th><th>What it shows</th></tr>'+
+      '<tr><td><b>Rules (NO_CONSUMPTION)</b></td><td><b>cap</b> (per-day limit), <b>scope</b> (devices in the rule), <b>checked</b> (counts fetched from ALARMS) and how many it <b>would mute/restore</b> now.</td></tr>'+
+      '<tr><td><b>Proposed actions (shadow)</b></td><td>What <i>would</i> happen right now: MUTE (device over cap) or RESTORE (day rollover).</td></tr>'+
+      '<tr><td><b>Applied mutes (ledger)</b></td><td>The <i>real</i> history (what the orchestrator did): <b>MUTED</b> (active) or <b>restored</b>, with count/cap, reason, mode and when.</td></tr>'+
+      '</table>'+
+      '<h4>Reasons</h4>'+
+      '<table><tr><th>Reason</th><th>Meaning</th></tr>'+
+      '<tr><td><code>DAILY_CAP</code></td><td>Hit the daily limit → device leaves the scope (MUTE).</td></tr>'+
+      '<tr><td><code>DAY_ROLLOVER</code></td><td>Local day rolled over → device returns to scope, once (RESTORE).</td></tr>'+
+      '<tr><td><code>SUPERSEDED_MANUAL</code></td><td>A human edited the scope/rule → the restore is cancelled without re-adding.</td></tr>'+
+      '<tr><td><code>RULE_GONE</code></td><td>The rule was deleted → pendency closed.</td></tr>'+
+      '</table>'+
+      '</div>';
+  }
+  function showRulesHelp(){
+    var ttl=$('rulesHelpTitle'); if(ttl) ttl.textContent=(lang==='pt-BR')?'Sobre a tab Regras':'About the Rules tab';
+    var b=$('rulesHelpBody'); if(b) b.innerHTML=rulesHelpHTML();
+    $('ruleshelp-modal').classList.remove('hidden');
+  }
+  function hideRulesHelp(){ $('ruleshelp-modal').classList.add('hidden'); }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ hideHelp(); hideCardHelp(); hideRulesHelp(); closeFilters(); closeSettings(); closeTimeline(); } });
   let pw = '';
   function setConnected(on){
     $('login-modal').classList.toggle('hidden', on);
@@ -1197,6 +1331,26 @@ __MYIO_LIB_TAG__
     var dv=cDivMap[c.id];
     return {
       id:c.id, name:(c.name||c.id),
+      scale:0.85,
+      confirmStatusActivate:true,
+      // Header (i) tooltip: UUID + Hardware ID (parity with /centrals).
+      titleTooltipHtml:'<div><b>UUID</b>: '+c.id+'</div>'+(c.hardware_id?('<div><b>Hardware ID</b>: '+c.hardware_id+'</div>'):''),
+      // 📊 dashboard → GatewayModal latency chart, fed REAL points from the ledger
+      // (cockpit-only advantage: admin DB access). No settings modal here on purpose
+      // — editing name/thresholds is a /centrals concern, not an ops cockpit one.
+      onOpenDashboard:function(e){
+        var L=window.MyIOLibrary;
+        if(!L || typeof L.openGatewayModal!=='function') return;
+        L.openGatewayModal({
+          id:e.id, name:(c.name||c.id),
+          theme:(document.documentElement.getAttribute('data-theme')==='dark')?'dark':'light',
+          language:(lang==='pt-BR')?'pt':'en',
+          source:{ onFetchLatencyHistory:function(p){
+            return api('centrals/'+encodeURIComponent(e.id)+'/latency-history?fromTs='+p.startTs+'&toTs='+p.endTs)
+              .then(function(r){ return r.points||[]; });
+          } }
+        });
+      },
       derivedConnectivity:conn,
       monitoringEnabled:!!c.monitoring_enabled,
       lastAttemptAt:c.last_gateway_check_at||null,
@@ -1674,17 +1828,36 @@ __MYIO_LIB_TAG__
     var sum=$('rulesSummary');
     try{
       var r=await api('rules/preview');
-      var s=r.summary||{rules:0,wouldMute:0,wouldRestore:0};
-      if(sum) sum.innerHTML='<span class="mut">'+t('rules_reader')+': <b>'+esc(r.reader||'?')+'</b> · '+t('col_rule')+'s: <b>'+s.rules+'</b> · '+t('rules_would_mute')+': <b>'+s.wouldMute+'</b> · '+t('rules_would_restore')+': <b>'+s.wouldRestore+'</b></span>';
-      var bd=$('badge-rules'); if(bd) bd.textContent=((s.wouldMute||0)+(s.wouldRestore||0))||'';
+      var s=r.summary||{rules:0,wouldMute:0,wouldRestore:0,activeMutes:0};
+      if(sum) sum.innerHTML='<span class="mut">'+t('rules_reader')+': <b>'+esc(r.reader||'?')+'</b> · '+t('col_rule')+'s: <b>'+s.rules+'</b> · '+t('rules_would_mute')+': <b>'+s.wouldMute+'</b> · '+t('rules_would_restore')+': <b>'+s.wouldRestore+'</b> · '+t('rules_active_mutes')+': <b>'+(s.activeMutes||0)+'</b></span>';
+      var bd=$('badge-rules'); if(bd) bd.textContent=((s.wouldMute||0)+(s.wouldRestore||0)+(s.activeMutes||0))||'';
+      var rname=function(x){ return '<span title="'+esc(x.ruleId)+'">'+esc(x.ruleName||(String(x.ruleId||'').slice(0,8)+'…'))+'</span>'; };
+      // 1) per-rule overview
+      var ov=$('rulesOverview'), per=r.perRule||[];
+      if(ov) ov.innerHTML = per.length
+        ? '<tr><th>'+t('col_rule')+'</th><th>'+t('col_cap')+'</th><th>'+t('col_scope')+'</th><th>'+t('col_checked')+'</th><th>'+t('rules_would_mute')+'</th><th>'+t('rules_would_restore')+'</th></tr>'+
+          per.map(function(p){ return '<tr><td>'+rname(p)+'</td><td>'+(p.cap==null?'∞':p.cap)+'</td><td>'+(p.scopeCount||0)+'</td><td>'+(p.countsChecked||0)+'</td><td>'+(p.wouldMute?chip(String(p.wouldMute),'bad'):'0')+'</td><td>'+(p.wouldRestore?chip(String(p.wouldRestore),'ok'):'0')+'</td></tr>'; }).join('')
+        : '<tr><td class="mut">'+t('rules_none_rules')+'</td></tr>';
+      // 2) proposed actions (shadow)
       var rows=r.rows||[];
-      if(!rows.length){ el.innerHTML='<tr><td class="mut">'+t('rules_none')+'</td></tr>'; return; }
-      el.innerHTML='<tr><th>'+t('col_action')+'</th><th>'+t('col_device')+'</th><th>'+t('col_countcap')+'</th><th>'+t('col_reason')+'</th><th>'+t('col_rule')+'</th></tr>'+
-        rows.map(function(x){
-          var act=(x.action==='MUTE')?chip(t('rules_would_mute'),'bad'):chip(t('rules_would_restore'),'ok');
-          var cc=(x.todayCount==null?'—':x.todayCount)+' / '+(x.cap==null?'—':x.cap);
-          return '<tr><td>'+act+'</td><td title="'+esc(x.deviceId)+'">'+esc(x.deviceName||x.deviceId)+'</td><td>'+cc+'</td><td class="mut">'+esc(x.reason||'')+'</td><td class="mut" title="'+esc(x.ruleId)+'">'+esc(String(x.ruleId||'').slice(0,8))+'…</td></tr>';
-        }).join('');
+      el.innerHTML = rows.length
+        ? '<tr><th>'+t('col_action')+'</th><th>'+t('col_device')+'</th><th>'+t('col_countcap')+'</th><th>'+t('col_reason')+'</th><th>'+t('col_rule')+'</th></tr>'+
+          rows.map(function(x){
+            var act=(x.action==='MUTE')?chip(t('rules_would_mute'),'bad'):chip(t('rules_would_restore'),'ok');
+            var cc=(x.todayCount==null?'—':x.todayCount)+' / '+(x.cap==null?'—':x.cap);
+            return '<tr><td>'+act+'</td><td title="'+esc(x.deviceId)+'">'+esc(x.deviceName||x.deviceId)+'</td><td>'+cc+'</td><td class="mut">'+esc(x.reason||'')+'</td><td class="mut">'+rname(x)+'</td></tr>';
+          }).join('')
+        : '<tr><td class="mut">'+t('rules_none')+'</td></tr>';
+      // 3) applied-mutes ledger (the REAL state)
+      var lg=$('rulesMutes'), mutes=r.mutes||[];
+      if(lg) lg.innerHTML = mutes.length
+        ? '<tr><th>'+t('col_status')+'</th><th>'+t('col_device')+'</th><th>'+t('col_rule')+'</th><th>'+t('col_countcap')+'</th><th>'+t('col_reason')+'</th><th>'+t('col_mode')+'</th><th>'+t('col_muted')+'</th><th>'+t('col_restored')+'</th></tr>'+
+          mutes.map(function(m){
+            var stat=m.active?chip(t('mute_active'),'bad'):chip(t('mute_restored'),'ok');
+            var cc=(m.todayCount==null?'—':m.todayCount)+' / '+(m.maxDaily==null?'—':m.maxDaily);
+            return '<tr><td>'+stat+'</td><td title="'+esc(m.deviceId)+'">'+esc(m.deviceName||m.deviceId)+'</td><td class="mut">'+rname(m)+'</td><td>'+cc+'</td><td class="mut">'+esc(m.reason||'')+'</td><td class="mut">'+esc(m.mode||'')+'</td><td class="mut">'+ago(m.mutedAt)+'</td><td class="mut">'+ago(m.restoredAt)+'</td></tr>';
+          }).join('')
+        : '<tr><td class="mut">'+t('mute_none')+'</td></tr>';
     }catch(e){ el.innerHTML='<tr><td class="mut">'+t('fetch_err')+'</td></tr>'; }
   }
   async function loadChecks(){
