@@ -22,6 +22,7 @@ export type ApiKeyScope =
   | 'assets:read'       // Read assets
   | 'assets:write'      // Write assets (RFC-0016)
   | 'groups:read'       // Read groups
+  | 'groups:write'      // Create/update groups + manage members/channels
   | 'simulator:read'    // Read simulator bundles (RFC-0010)
   | 'simulator:write'   // Start/stop simulations (RFC-0010)
   | 'simulator:admin'   // Manage all tenant simulations (RFC-0010)
