@@ -431,30 +431,21 @@ router.post('/api/centrals/:id/recheck', async (req: Request, res: Response) => 
 });
 
 // ── myio-js-library loading ──────────────────────────────────────────────────
-// Default: exact CDN version + SRI (see the HTML comment at the marker). For
-// LOCAL testing of unreleased components (e.g. createCentralStatusCard), set
-// MYIO_JS_LIB_LOCAL to the absolute path of a UMD build (…/dist/myio-js-library.umd.min.js)
-// and the page loads it from this route instead (no SRI — local file, dev only).
-const MYIO_LIB_LOCAL_PATH = process.env.MYIO_JS_LIB_LOCAL || '';
+// Loaded from the CDN at an exact version + SRI (see the HTML comment at the
+// marker). The card lives in the published package now (myio-js-library@0.1.536),
+// so there is no local-dist override route — the page always loads the pinned CDN
+// build, and a tampered file is refused by SRI.
 const MYIO_LIB_CDN_TAG =
   '<script defer src="https://unpkg.com/myio-js-library@0.1.536/dist/myio-js-library.umd.min.js"\n' +
   '        integrity="sha384-PjF5mfyW7o51EbRERBTBNet3V7vCOlzVvXajTbcD3zhfu7O/rxRhUqKLqmMT5NAp"\n' +
   '        crossorigin="anonymous"></script>';
-const MYIO_LIB_LOCAL_TAG = '<script defer src="/admin/orchestrator-devices/lib/myio-js-library.umd.min.js"></script>';
-
-// Unauthenticated on purpose: a <script> tag cannot send x-admin-password, and the
-// file is a public library build. 404 when the env override is not configured.
-router.get('/lib/myio-js-library.umd.min.js', (_req: Request, res: Response) => {
-  if (!MYIO_LIB_LOCAL_PATH) { res.status(404).end(); return; }
-  res.type('application/javascript').sendFile(MYIO_LIB_LOCAL_PATH);
-});
 
 // ── The page ─────────────────────────────────────────────────────────────────
 router.get('/', (_req: Request, res: Response) => {
   res.type('html').send(PAGE_HTML
     .replace('__OFFLINE_GRACE_MIN__', String(workerConfig.offlineGraceMin))
     .replace('__OFFLINE_HARD_MIN__', String(workerConfig.offlineHardMin))
-    .replace('__MYIO_LIB_TAG__', MYIO_LIB_LOCAL_PATH ? MYIO_LIB_LOCAL_TAG : MYIO_LIB_CDN_TAG));
+    .replace('__MYIO_LIB_TAG__', MYIO_LIB_CDN_TAG));
 });
 
 const PAGE_HTML = `<!doctype html>
