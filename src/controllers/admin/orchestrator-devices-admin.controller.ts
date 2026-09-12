@@ -280,7 +280,7 @@ router.get('/api/centrals/:id/latency-history', async (req: Request, res: Respon
     const rows = (await db.execute(sql`
       select created_at, latency_ms, coalesce((input->>'ok')::boolean, true) as ok
       from orchestrator_devices_checks
-      where entity_type = 'central' and entity_id = ${id}
+      where entity_type = 'central' and entity_id = ${id}::uuid
         and created_at >= ${from} and created_at <= ${to}
       order by created_at asc`)) as unknown as Rows;
     const points = rows.map((r) => ({
