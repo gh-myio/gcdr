@@ -708,6 +708,76 @@ async function appendSpecInserts(spec: ExportSpec, lines: string[]): Promise<voi
   lines.push('');
 }
 
+/** Tables excluded from the whole-DB ("all customers") export — logs, audit,
+ *  worker ledgers, caches, ephemeral/runtime state and regenerable history.
+ *  Everything else (all customers + global tables) is exported wholesale. */
+const SEED_EXPORT_BLOCKLIST = new Set<string>([
+  'audit_logs', 'email_ingestion_log',
+  'orchestrator_devices_runs', 'orchestrator_devices_checks',
+  'orchestrator_devices_status_history', 'orchestrator_rule_mutes',
+  'orchestrator_devices_control', 'orchestrator_retry_policies', 'orchestrator_freshness_policies',
+  'user_bundle_cache', 'verification_tokens', 'simulator_sessions', 'simulator_events',
+  'inv_external_push_outbox', 'inv_external_sync_state',
+  'alarm_bundle_versions', 'consumption_goal_history', 'customer_tariff_history',
+  'wiki_page_revisions', 'device_sync_jobs', 'central_restore_jobs',
+]);
+
+/**
+ * Whole-DB seed (ALL customers + global tables): every base table EXCEPT
+ * SEED_EXPORT_BLOCKLIST, dumped wholesale. FK order is sidestepped by disabling
+ * replication-role triggers for the replay (needs a superuser / replication role
+ * at restore time), and every INSERT is `ON CONFLICT DO NOTHING`, so a re-run is a
+ * no-op. GENERATED ALWAYS columns are excluded (they cannot be inserted).
+ */
+async function generateWholeDbSeedExport(): Promise<string> {
+  const tblRows = await db.execute(sql.raw(`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema='public' AND table_type='BASE TABLE'
+    ORDER BY table_name`));
+  const tables = (Array.isArray(tblRows) ? (tblRows as unknown as Array<{ table_name: string }>) : [])
+    .map((r) => r.table_name)
+    .filter((t) => !SEED_EXPORT_BLOCKLIST.has(t));
+
+  await loadColTypes(tables);
+
+  const lines: string[] = [];
+  lines.push(`-- =============================================================================`);
+  lines.push(`-- GCDR Whole-DB Seed Export (ALL customers + global tables)`);
+  lines.push(`-- Generated: ${new Date().toISOString()}`);
+  lines.push(`-- Tables: ${tables.length} (excluded ${SEED_EXPORT_BLOCKLIST.size} log/audit/ledger tables)`);
+  lines.push(`-- Excluded: ${[...SEED_EXPORT_BLOCKLIST].sort().join(', ')}`);
+  lines.push(`-- Replay as a superuser/replication role: session_replication_role=replica`);
+  lines.push(`-- disables FK triggers, so table order does not matter and re-runs are no-ops.`);
+  lines.push(`-- =============================================================================`);
+  lines.push('');
+  lines.push('SET session_replication_role = replica;');
+  lines.push('');
+
+  for (const t of tables) {
+    // Insertable columns only — skip GENERATED ALWAYS (e.g. consumption_goal_hours
+    // .device_key, inv_items.normalized_name), which cannot be written.
+    const colRows = await db.execute(sql.raw(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='${t.replace(/'/g, "''")}'
+        AND is_generated <> 'ALWAYS'
+      ORDER BY ordinal_position`));
+    const cols = (Array.isArray(colRows) ? (colRows as unknown as Array<{ column_name: string }>) : []).map((c) => c.column_name);
+    if (cols.length === 0) continue;
+    const colSel = cols.map((c) => `"${c}"`).join(', ');
+    const rows = await db.execute(sql.raw(`SELECT ${colSel} FROM ${t}`));
+    const arr = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+    if (arr.length === 0) continue;
+    lines.push(`-- ----- ${t} (${arr.length}) -----`);
+    for (const row of arr) lines.push(buildInsert(t, row));
+    lines.push('');
+  }
+
+  lines.push('SET session_replication_role = DEFAULT;');
+  lines.push('');
+  lines.push(`-- Export complete: ${new Date().toISOString()}`);
+  return lines.join('\n');
+}
+
 /** Generate a SQL seed script for a specific customer (and optional descendants) */
 async function generateSeedExport(
   customerId: string,
@@ -824,28 +894,39 @@ router.get('/api/seed-export/customers', async (req: Request, res: Response) => 
 
 // POST /api/seed-export — generate and download seed SQL for a customer
 router.post('/api/seed-export', async (req: Request, res: Response) => {
-  const { customerId, includeDescendants, tables } = req.body;
+  const { customerId, includeDescendants, tables, allCustomers: allCustomersFlag } = req.body;
 
-  if (!customerId || typeof customerId !== 'string') {
-    return res.status(400).json({ error: 'customerId is required' });
-  }
+  // "All customers": the sentinel value from the dropdown OR an explicit flag.
+  const allCustomers = customerId === '__ALL__' || Boolean(allCustomersFlag);
 
-  // Validate UUID
-  if (!/^[0-9a-f-]{36}$/i.test(customerId)) {
-    return res.status(400).json({ error: 'customerId must be a valid UUID' });
+  if (!allCustomers) {
+    if (!customerId || typeof customerId !== 'string') {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
+    // Validate UUID
+    if (!/^[0-9a-f-]{36}$/i.test(customerId)) {
+      return res.status(400).json({ error: 'customerId must be a valid UUID' });
+    }
   }
 
   try {
-    const sqlContent = await generateSeedExport(customerId, {
-      includeDescendants: Boolean(includeDescendants),
-      includeTables: Array.isArray(tables) && tables.length > 0 ? tables : undefined,
-    });
+    // "All customers" = whole-DB export (every table minus the log/audit blocklist);
+    // the per-table checkboxes / descendants toggle don't apply in that mode.
+    const sqlContent = allCustomers
+      ? await generateWholeDbSeedExport()
+      : await generateSeedExport(customerId, {
+          includeDescendants: Boolean(includeDescendants),
+          includeTables: Array.isArray(tables) && tables.length > 0 ? tables : undefined,
+        });
 
-    // Get customer name for filename
-    const nameRows = await db.execute(sql`SELECT name FROM customers WHERE id = ${customerId}`);
-    const customerName = Array.isArray(nameRows) && nameRows[0]
-      ? String((nameRows[0] as { name: unknown }).name).toLowerCase().replace(/[^a-z0-9]/g, '-')
-      : customerId.substring(0, 8);
+    // Filename: "all-customers" or the customer's slug.
+    let customerName = 'all-customers';
+    if (!allCustomers) {
+      const nameRows = await db.execute(sql`SELECT name FROM customers WHERE id = ${customerId}`);
+      customerName = Array.isArray(nameRows) && nameRows[0]
+        ? String((nameRows[0] as { name: unknown }).name).toLowerCase().replace(/[^a-z0-9]/g, '-')
+        : customerId.substring(0, 8);
+    }
 
     const filename = `seed-export-${customerName}-${new Date().toISOString().slice(0, 10)}.sql`;
 
@@ -2478,6 +2559,7 @@ function getHtmlPage(): string {
         const data = await res.json();
         seedCustomers = data.customers || [];
         sel.innerHTML = '<option value="">-- select a customer --</option>' +
+          '<option value="__ALL__">&#127760; TODOS os customers (banco inteiro — cadastros)</option>' +
           seedCustomers.map(c => \`<option value="\${c.id}">\${c.hierarchy || c.name} (\${c.type}) \${c.status !== 'ACTIVE' ? '['+c.status+']' : ''}</option>\`).join('');
         sel.onchange = () => { if (sel.value) inp.value = sel.value; };
       } catch (err) {
