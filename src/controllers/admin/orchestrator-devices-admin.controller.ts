@@ -646,7 +646,7 @@ __MYIO_LIB_TAG__
   .strip-detail { font-size:12px; }
   .kpis { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
   .kpi { flex:1 1 110px; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:8px 16px; text-align:center; min-width:100px; cursor:pointer; }
-  .kpi:hover { border-color:var(--accent); } .kpi.active { outline:2px solid var(--accent); outline-offset:-1px; }
+  .kpi:hover { border-color:var(--accent); } .kpi.active { outline:2px solid #22c55e; outline-offset:-1px; }
   .kpi .n { font-size:18px; font-weight:800; } .kpi .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
   /* Colored KPI status tiles (parity with /centrals). TOTAL keeps the plain --panel. */
   .kpi.k-on{ background:var(--kpi-on-bg); border-color:transparent; } .kpi.k-on .n,.kpi.k-on .l{ color:var(--kpi-on-fg); }
@@ -1041,7 +1041,7 @@ __MYIO_LIB_TAG__
       '<tr><td><b>⚠️ divergência</b></td><td>o status canônico gravado difere do que o worker proporia (atual → proposto)</td></tr>'+
       '<tr><td>linha <b>devices</b></td><td>total · online · offline · desconhecidos (desconhecidos = cascata CENTRAL_UNREACHABLE, não é device caído)</td></tr></table>'+
       '<h4>Ações</h4>'+
-      '<p>🔄 força um probe imediato (atualiza SÓ a evidência, nunca o status canônico). Os switches de <b>Monitoramento</b> e <b>Status</b> pedem confirmação no sentido destrutivo e são <b>auditados</b> (audit log via cockpit).</p>'+
+      '<p>📊 abre o gráfico de latência da central (histórico de conectividade). 🔄 força um probe imediato — atualiza SÓ a evidência de conexão, nunca o status canônico. Os switches de <b>Monitoramento</b> e <b>Status</b> pedem confirmação no sentido destrutivo e são <b>auditados</b> (audit log via cockpit).</p>'+
       '</div>';
     return ''+
       '<div class="chelp">'+
@@ -1061,7 +1061,7 @@ __MYIO_LIB_TAG__
       '<tr><td><b>⚠️ divergence</b></td><td>stored canonical status differs from what the worker would write (current → proposed)</td></tr>'+
       '<tr><td><b>devices</b> row</td><td>total · online · offline · unknown (unknown = CENTRAL_UNREACHABLE cascade, not device-down)</td></tr></table>'+
       '<h4>Actions</h4>'+
-      '<p>🔄 forces an immediate probe (updates ONLY the evidence, never canonical status). The <b>Monitoring</b> and <b>Status</b> switches confirm on the destructive direction and are <b>audited</b>.</p>'+
+      '<p>📊 opens the central&apos;s latency chart (connectivity history). 🔄 forces an immediate probe — updates ONLY the connection evidence, never canonical status. The <b>Monitoring</b> and <b>Status</b> switches confirm on the destructive direction and are <b>audited</b>.</p>'+
       '</div>';
   }
   function showCardHelp(){
