@@ -1220,8 +1220,13 @@ __MYIO_LIB_TAG__
     var okAt=c.last_gateway_success_check_at?new Date(c.last_gateway_success_check_at).getTime():null;
     if(okAt==null) return 'UNKNOWN'; // never succeeded — unknown, not offline
     var tryAt=c.last_gateway_check_at?new Date(c.last_gateway_check_at).getTime():Date.now();
-    if(tryAt-okAt>=OFFLINE_HARD_MS) return 'OFFLINE_HARD';
-    return (Date.now()-okAt)>=OFFLINE_GRACE_MS ? 'WARNING' : 'ONLINE';
+    // Single clock: (last attempt − last success) for BOTH boundaries. [grace,
+    // hard) = WARNING, ≥ hard = OFFLINE_HARD, < grace = ONLINE (blip). Using
+    // lastAttempt — not now — a central does not decay while the worker is not
+    // probing it (keeping "last attempt" fresh is the CENTRALS monitor's job).
+    var failSpan=tryAt-okAt;
+    if(failSpan>=OFFLINE_HARD_MS) return 'OFFLINE_HARD';
+    return failSpan>=OFFLINE_GRACE_MS ? 'WARNING' : 'ONLINE';
   }
   function statusLabel(st){ return st==='ONLINE'?t('st_online'):st==='OFFLINE'?t('st_offline'):st==='OFFLINE_HARD'?t('st_offline_hard').replace('{d}',fmtMin(OFFLINE_HARD_MIN)):st==='WARNING'?t('st_warning'):t('st_unknown'); }
   function hasData(c){ return !!(c.monitoring_enabled || c.last_gateway_check_at || c.probe_result); }

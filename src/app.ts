@@ -117,6 +117,7 @@ import { simulatorAdminController } from './controllers/admin/simulator-admin.co
 import { singleDashboardController } from './controllers/single-dashboard.controller';
 import { userAdminController } from './controllers/admin/user-admin.controller';
 import { orchestratorDevicesAdminController } from './controllers/admin/orchestrator-devices-admin.controller';
+import orchestratorControlController from './controllers/orchestrator-control.controller';
 
 import { centralAuthMiddleware } from './middleware/centralAuth';
 import { centralPreKeyAuth, startLockoutJanitor } from './middleware/centralPreKeyAuth';
@@ -487,6 +488,11 @@ apiV1Router.get('/centrals/serial/next', centralSerialNextHandler);
 // mutations (POST/PUT/PATCH/DELETE: commands, enroll, mqtt, backup/restore) require
 // centrals:write, which the alarms read-only key does not hold.
 apiV1Router.use('/centrals', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRALS_WRITE), centralsController);
+
+// Orchestrator-devices worker control (RFC-0062 §7): read/toggle the monitor
+// scopes (CENTRALS/DEVICES/OS/RULES/MASTER + FLAGS) from the /centrals settings
+// modal. Gated by the same centrals scopes; every change is audited.
+apiV1Router.use('/orchestrator-devices/control', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRALS_WRITE), orchestratorControlController);
 
 // Zero-touch enrollment (Slice 1.5). PUBLIC and mounted BEFORE the
 // centralAuthMiddleware /central-agent mount: a freshly-flashed central has no
