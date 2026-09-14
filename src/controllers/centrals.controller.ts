@@ -30,6 +30,10 @@ import {
 } from '../dto/request/CustomerIntegrationDTO';
 import { sendSuccess, sendCreated, sendNoContent, logEvent } from '../middleware';
 import { ValidationError, NotFoundError } from '../shared/errors/AppError';
+import { sql } from 'drizzle-orm';
+import { db } from '../infrastructure/database/drizzle/db';
+import { probeGateway } from '../workers/orchestrator-devices/gatewayClient';
+import { workerConfig, gatewayUrl } from '../workers/orchestrator-devices/config';
 import { EventType, ActorType } from '../shared/types';
 import { customerApiKeyService } from '../services/CustomerApiKeyService';
 import { defaultTenantId } from '../services/CentralInitialKeyService';
@@ -204,6 +208,53 @@ router.patch('/:id/status',
       const data = UpdateCentralStatusSchema.parse(req.body);
       const central = await centralRepository.updateStatus(tenantId, id, data.status, userId);
       sendSuccess(res, central, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /centrals/:id/recheck
+ * Manual gateway probe (evidence refresh only) — JWT + centrals:write. Mirrors the
+ * orchestrator-devices cockpit recheck: probes the gateway NOW and refreshes
+ * last_gateway_check_* / probe_result so the card's connectivity updates without
+ * waiting for the worker sweep. Does NOT recompute the shadow ledger / divergence /
+ * canonical status. Same host rule as the worker (hardware_id overrides the subdomain).
+ */
+router.post('/:id/recheck',
+  logEvent({
+    eventType: EventType.CENTRAL_MANUAL_RECHECK,
+    description: (req) => `Manual gateway recheck for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      const { id } = req.params;
+      if (!id) throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+
+      const rows = (await db.execute(sql`
+        select id, name, hardware_id from centrals
+        where id = ${id}::uuid and tenant_id = ${tenantId}::uuid and status <> 'DELETED'`)) as unknown as Array<Record<string, unknown>>;
+      if (!Array.isArray(rows) || rows.length === 0) throw new NotFoundError('Central not found');
+      const c = rows[0];
+
+      const policy = { name: 'manual-recheck', attempts: [{ delay_ms: 0, timeout_ms: workerConfig.probeTimeoutMs }] };
+      const opts = { timeoutMs: workerConfig.probeTimeoutMs, maxTotalMs: workerConfig.probeTimeoutMs, statusToken: workerConfig.statusToken };
+      const outcome = await probeGateway(gatewayUrl(c.hardware_id ? String(c.hardware_id) : id), policy, opts);
+      const probeResult = outcome.ok ? 'OK' : outcome.kind;
+      const latencyMs = outcome.latencyMs ?? null;
+
+      if (outcome.ok) {
+        await db.execute(sql`update centrals set last_gateway_check_at = now(), last_gateway_success_check_at = now(),
+          last_gateway_check_latency_ms = ${latencyMs}, probe_result = ${probeResult}, updated_at = now() where id = ${id}::uuid`);
+      } else {
+        await db.execute(sql`update centrals set last_gateway_check_at = now(),
+          last_gateway_check_latency_ms = ${latencyMs}, probe_result = ${probeResult}, updated_at = now() where id = ${id}::uuid`);
+      }
+
+      sendSuccess(res, { id, probeResult, latencyMs, reachable: outcome.ok }, 200, requestId);
     } catch (err) {
       next(err);
     }
