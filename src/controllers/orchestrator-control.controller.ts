@@ -81,6 +81,67 @@ router.get('/', async (_req: Request, res: Response) => {
  * Upserts the row (so an unseeded scope like RULES can be materialized), captures
  * prev→new, and writes one audit row under the actor's tenant.
  */
+type PatchBody = { enabled?: unknown; config?: unknown };
+type ParsedPatch =
+  | { ok: false; error: string }
+  | { ok: true; hasEnabled: boolean; hasConfig: boolean };
+
+/** Validate the PATCH body against the scope (extracted to keep the handler
+ *  flat — see sonarjs/cognitive-complexity). */
+function parsePatchBody(scope: string, body: PatchBody): ParsedPatch {
+  const hasEnabled = typeof body.enabled === 'boolean';
+  const hasConfig = typeof body.config === 'object' && body.config !== null && !Array.isArray(body.config);
+  if (!hasEnabled && !hasConfig) {
+    return { ok: false, error: 'nothing to update: provide `enabled` (boolean) and/or `config` (object)' };
+  }
+  if (hasConfig && scope !== 'FLAGS') {
+    return { ok: false, error: '`config` can only be set on the FLAGS scope' };
+  }
+  return { ok: true, hasEnabled, hasConfig };
+}
+
+interface ControlChange {
+  scope: string;
+  hasConfig: boolean;
+  configKeys: string[];
+  nextEnabled: boolean;
+  prevEnabled: boolean | null;
+  prevConfig: Record<string, unknown>;
+  nextConfig: Record<string, unknown>;
+}
+
+/** One audit row per control change (old→new) under the actor's tenant. */
+async function writeControlAudit(req: Request, c: ControlChange): Promise<void> {
+  const { tenantId, userId, requestId } = req.context;
+  const description = c.hasConfig
+    ? `Orchestrator-devices FLAGS updated (${c.configKeys.join(', ')}) via /centrals`.slice(0, 500)
+    : `Orchestrator-devices monitor ${c.scope} ${c.nextEnabled ? 'ENABLED' : 'DISABLED'} via /centrals`.slice(0, 500);
+  await db.insert(auditLogs).values({
+    tenantId,
+    eventType: c.hasConfig
+      ? 'orchestrator_devices.control.flags_update'
+      : 'orchestrator_devices.control.scope_toggle',
+    eventCategory: 'ENTITY_CHANGE',
+    auditLevel: 'STANDARD',
+    description,
+    action: 'UPDATE',
+    entityType: 'orchestrator_devices_control',
+    entityId: null,
+    userId: userId ?? null,
+    userEmail: req.user?.email ?? null,
+    actorType: 'USER',
+    oldValues: { enabled: c.prevEnabled, config: c.hasConfig ? c.prevConfig : undefined },
+    newValues: { enabled: c.nextEnabled, config: c.hasConfig ? c.nextConfig : undefined },
+    requestId: requestId ?? null,
+    ipAddress: clientIp(req) || null,
+    userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
+    httpMethod: 'PATCH',
+    httpPath: String(req.originalUrl || '').slice(0, 500),
+    statusCode: 200,
+    metadata: { source: 'centrals-settings', scope: c.scope },
+  });
+}
+
 router.patch('/:scope', async (req: Request, res: Response) => {
   try {
     const scope = String(req.params.scope || '').toUpperCase();
@@ -89,20 +150,14 @@ router.patch('/:scope', async (req: Request, res: Response) => {
       return;
     }
 
-    const body = (req.body ?? {}) as { enabled?: unknown; config?: unknown };
-    const hasEnabled = typeof body.enabled === 'boolean';
-    const hasConfig = body.config != null && typeof body.config === 'object' && !Array.isArray(body.config);
-    if (!hasEnabled && !hasConfig) {
-      res.status(400).json({ error: 'nothing to update: provide `enabled` (boolean) and/or `config` (object)' });
+    const body = (req.body ?? {}) as PatchBody;
+    const parsed = parsePatchBody(scope, body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
-    if (hasConfig && scope !== 'FLAGS') {
-      res.status(400).json({ error: '`config` can only be set on the FLAGS scope' });
-      return;
-    }
-
-    const { tenantId, userId, requestId } = req.context;
-    const actorEmail = req.user?.email ?? null;
+    const { hasEnabled, hasConfig } = parsed;
+    const { userId } = req.context;
 
     // Read prev (for the audit old→new + config merge base).
     const prevRows = (await db.execute(sql`
@@ -129,31 +184,14 @@ router.patch('/:scope', async (req: Request, res: Response) => {
         updated_at = now(),
         updated_by = excluded.updated_by`);
 
-    await db.insert(auditLogs).values({
-      tenantId,
-      eventType: hasConfig
-        ? 'orchestrator_devices.control.flags_update'
-        : 'orchestrator_devices.control.scope_toggle',
-      eventCategory: 'ENTITY_CHANGE',
-      auditLevel: 'STANDARD',
-      description: hasConfig
-        ? `Orchestrator-devices FLAGS updated (${Object.keys(body.config as object).join(', ')}) via /centrals`.slice(0, 500)
-        : `Orchestrator-devices monitor ${scope} ${nextEnabled ? 'ENABLED' : 'DISABLED'} via /centrals`.slice(0, 500),
-      action: 'UPDATE',
-      entityType: 'orchestrator_devices_control',
-      entityId: null,
-      userId: userId ?? null,
-      userEmail: actorEmail,
-      actorType: 'USER',
-      oldValues: { enabled: prevEnabled, config: hasConfig ? prevConfig : undefined },
-      newValues: { enabled: nextEnabled, config: hasConfig ? nextConfig : undefined },
-      requestId: requestId ?? null,
-      ipAddress: clientIp(req) || null,
-      userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
-      httpMethod: 'PATCH',
-      httpPath: String(req.originalUrl || '').slice(0, 500),
-      statusCode: 200,
-      metadata: { source: 'centrals-settings', scope },
+    await writeControlAudit(req, {
+      scope,
+      hasConfig,
+      configKeys: hasConfig ? Object.keys(body.config as object) : [],
+      nextEnabled,
+      prevEnabled,
+      prevConfig,
+      nextConfig,
     });
 
     res.json({ scope, enabled: nextEnabled, config: nextConfig });
