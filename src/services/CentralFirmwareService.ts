@@ -9,7 +9,7 @@ import {
   refusalsFor,
   newestFor,
 } from './MenderService';
-import { ValidationError, NotFoundError } from '../shared/errors/AppError';
+import { ValidationError, NotFoundError, UnprocessableError } from '../shared/errors/AppError';
 
 /**
  * What gcdr shows and does about a central's firmware.
@@ -87,7 +87,20 @@ export function boardsForCentral(
 
   const mac = menderMacOf(central);
   if (mac) {
-    const byMac = devices.filter((d) => d.mac === mac);
+    // THE BOARD'S OWN WORD BEATS THE TYPED ADDRESS.
+    //
+    // config.menderMac is filled by reconciliation -- by a person or a script,
+    // from a cadastre that can be stale. If it points at a board that publishes
+    // a DIFFERENT central_uuid, the board is right and the record is wrong, and
+    // matching it anyway is precisely the failure this module exists to prevent:
+    // a deploy aimed at somebody else's site, with both screens looking correct.
+    //
+    // A board that publishes no central_uuid at all -- 227 of 232 on 2026-09-15
+    // -- cannot contradict anything, so it is accepted. Only a board that names
+    // another central is excluded.
+    const byMac = devices.filter(
+      (d) => d.mac === mac && (!d.centralUuid || d.centralUuid === central.id),
+    );
     if (byMac.length > 0) return { matched: byMac, via: 'mac' };
   }
   return { matched: [], via: null };
@@ -183,12 +196,14 @@ export class CentralFirmwareService {
       throw new ValidationError(`o artifact ${artifactName} não existe ou não serve esta placa`);
     }
     if (state.refusals.length > 0) {
-      // 422 rather than 400: the request is well formed, the situation is not.
-      const err = new ValidationError(
+      // 422, not 400: the request is well formed and the situation is not. A
+      // client that keys off the status can offer a retry for this and must not
+      // for a malformed request -- and every refusal travels in `reasons`, so
+      // the screen shows all of them rather than one joined sentence.
+      throw new UnprocessableError(
         `atualização recusada: ${state.refusals.map((r) => r.message).join(' | ')}`,
+        state.refusals,
       );
-      (err as unknown as { details?: unknown }).details = state.refusals;
-      throw err;
     }
 
     const name = `gcdr ${state.centralName} -> ${artifactName} (${requestedBy})`;

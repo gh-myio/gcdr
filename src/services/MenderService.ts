@@ -61,10 +61,49 @@ export interface FirmwareRefusal {
 }
 
 export interface DeploymentInFlight {
+  /** The DEPLOYMENT's id -- what abort and statistics take. Not the id of the
+   *  per-device row, which is a different value on the same object. */
   id: string;
   artifactName: string;
+  /** The deployment's own status: pending | inprogress | finished. */
   status: string;
+  /** What THIS board is doing: pending, downloading, installing, rebooting,
+   *  success, failure... This is the one worth showing an operator. */
+  deviceStatus: string;
   created: string | null;
+}
+
+/**
+ * Per-device statuses that mean this board is finished with the deployment.
+ *
+ * Taken from Mender's own `statistics.status` object, which enumerates every
+ * value it counts -- read off a real finished deployment on 2026-09-15 rather
+ * than from documentation:
+ *
+ *   aborted, already-installed, artifact_too_big, decommissioned, downloading,
+ *   failure, incompatible_tier, noartifact, pause_before_committing,
+ *   pause_before_installing, pause_before_rebooting, pending, rebooting, success
+ *
+ * Listing the TERMINAL ones and treating everything else as active is the safe
+ * direction. An allow-list of active statuses fails open: a value Mender adds
+ * later would read as "nothing running" and let a second deployment be created
+ * on a board that is mid-install. This way an unknown status reads as busy,
+ * which at worst delays an update and at best prevents an overlap.
+ */
+const TERMINAL_DEVICE_STATUSES = new Set([
+  'success',
+  'failure',
+  'aborted',
+  'already-installed',
+  'noartifact',
+  'decommissioned',
+  'artifact_too_big',
+  'incompatible_tier',
+]);
+
+export function isDeviceBusy(deviceStatus: string | null | undefined): boolean {
+  if (!deviceStatus) return false;
+  return !TERMINAL_DEVICE_STATUSES.has(String(deviceStatus));
 }
 
 export interface FirmwareView {
@@ -230,27 +269,6 @@ export function newestFor(deviceType: string | null, artifacts: MenderArtifact[]
   return usable[0] || null;
 }
 
-/**
- * The UUID of the central a board serves.
- *
- * Two steps, and the second one exists because of the fleet. Images from rc14.1.x
- * publish `central_uuid` in their own inventory, which is exact and needs nothing
- * else -- but on 2026-09-15 only 4 of 151 boards did that. The other 227 are
- * resolved through their mac, which the caller looks up in gcdr's own records.
- *
- * When the fleet has moved on, step two stops being reached and this function is
- * the only thing that has to change.
- */
-export function resolveCentralUuid(
-  device: Pick<MenderDevice, 'centralUuid' | 'mac'>,
-  macToUuid: Map<string, string>,
-): { uuid: string | null; via: 'inventory' | 'mac' | null } {
-  if (device.centralUuid) return { uuid: device.centralUuid, via: 'inventory' };
-  const byMac = macToUuid.get(device.mac.toLowerCase());
-  if (byMac) return { uuid: byMac, via: 'mac' };
-  return { uuid: null, via: null };
-}
-
 /* ===================================================================
  * The HTTP. Injectable so the tests above never open a socket.
  * =================================================================== */
@@ -365,11 +383,26 @@ interface RawArtifact {
   modified?: string;
   signed?: boolean;
 }
-interface RawDeployment {
+/**
+ * One row of `/deployments/deployments/devices/{id}`.
+ *
+ * NOT flat. The per-device endpoint answers a nested object, and reading
+ * `status` or `artifact_name` off the top level gives undefined every time --
+ * which is what the first version of this file did, so DEPLOYMENT_IN_FLIGHT
+ * never fired and abort() was handed the row's id instead of the deployment's.
+ * Verified against a real finished deployment on 2026-09-15.
+ */
+interface RawDeviceDeployment {
+  /** The per-device row's own id. Deliberately unused: aborting or asking for
+   *  statistics with it addresses nothing. */
   id: string;
-  artifact_name?: string;
-  status?: string;
-  created?: string;
+  device?: { status?: string };
+  deployment?: {
+    id: string;
+    artifact_name?: string;
+    status?: string;
+    created?: string;
+  };
 }
 
 function str(v: unknown): string | null {
@@ -411,34 +444,58 @@ export function artifactFromRaw(raw: RawArtifact): MenderArtifact {
 export class MenderService {
   constructor(private readonly http: MenderHttp = new FetchMenderHttp()) {}
 
+  /**
+   * Every page, not the first 500.
+   *
+   * A single `per_page=500` silently truncates the day the fleet passes 500
+   * boards -- 232 on 2026-09-15, so it is a matter of when. Truncation mostly
+   * fails safe (a missing board answers DEVICE_NOT_FOUND) but it can also hide
+   * one half of an HA pair, and that fails the other way: the pair refusal would
+   * not fire for a site that has one.
+   *
+   * MAX_PAGES is a hard stop so a server that never stops answering full pages
+   * cannot spin here forever.
+   */
+  private async listAll<T>(path: string, perPage = 500): Promise<T[]> {
+    const MAX_PAGES = 40;
+    const out: T[] = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const sep = path.includes('?') ? '&' : '?';
+      const batch = await this.http.get<T[]>(`${path}${sep}per_page=${perPage}&page=${page}`);
+      const rows = batch || [];
+      out.push(...rows);
+      if (rows.length < perPage) return out;
+    }
+    return out;
+  }
+
   async listArtifacts(): Promise<MenderArtifact[]> {
-    const raw = await this.http.get<RawArtifact[]>('/v1/deployments/artifacts?per_page=500');
-    return (raw || []).map(artifactFromRaw);
+    const raw = await this.listAll<RawArtifact>('/v1/deployments/artifacts');
+    return raw.map(artifactFromRaw);
   }
 
   async listDevices(): Promise<MenderDevice[]> {
-    const raw = await this.http.get<RawInventoryDevice[]>('/v1/inventory/devices?per_page=500');
-    return (raw || []).map(deviceFromInventory);
-  }
-
-  /** Every board serving this central. More than one means an HA pair. */
-  async devicesForCentral(centralUuid: string, macs: string[]): Promise<MenderDevice[]> {
-    const wanted = new Set(macs.map((m) => m.toLowerCase()));
-    const all = await this.listDevices();
-    return all.filter((d) => d.centralUuid === centralUuid || wanted.has(d.mac));
+    const raw = await this.listAll<RawInventoryDevice>('/v1/inventory/devices');
+    return raw.map(deviceFromInventory);
   }
 
   async inFlightFor(deviceId: string): Promise<DeploymentInFlight | null> {
-    const raw = await this.http.get<RawDeployment[]>(
+    const raw = await this.http.get<RawDeviceDeployment[]>(
       `/v1/deployments/deployments/devices/${encodeURIComponent(deviceId)}?per_page=20`,
-    ).catch(() => [] as RawDeployment[]);
-    const live = (raw || []).find((d) => ['pending', 'inprogress'].includes(String(d.status)));
-    if (!live) return null;
+    ).catch(() => [] as RawDeviceDeployment[]);
+
+    // The DEVICE's status decides, not the deployment's. A deployment can be
+    // `inprogress' for a fleet while this particular board has already
+    // succeeded, and it can be `pending' while this board is downloading.
+    const live = (raw || []).find((d) => isDeviceBusy(d.device?.status));
+    if (!live || !live.deployment?.id) return null;
+
     return {
-      id: live.id,
-      artifactName: live.artifact_name || '',
-      status: String(live.status),
-      created: live.created || null,
+      id: live.deployment.id,
+      artifactName: live.deployment.artifact_name || '',
+      status: String(live.deployment.status || ''),
+      deviceStatus: String(live.device?.status || ''),
+      created: live.deployment.created || null,
     };
   }
 

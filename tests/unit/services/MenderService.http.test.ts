@@ -66,7 +66,7 @@ describe('the request it actually sends', () => {
     const { calls } = stubFetch([{ status: 200, body: [] }]);
     await new MenderService().listArtifacts();
 
-    expect(calls[0].url).toBe('https://mender.test/api/management/v1/deployments/artifacts?per_page=500');
+    expect(calls[0].url).toBe('https://mender.test/api/management/v1/deployments/artifacts?per_page=500&page=1');
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
   });
 

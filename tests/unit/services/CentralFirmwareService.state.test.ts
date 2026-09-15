@@ -5,7 +5,7 @@ jest.mock('../../../src/services/CentralService', () => ({
 
 import { CentralFirmwareService } from '../../../src/services/CentralFirmwareService';
 import { MenderService, MenderDevice, MenderArtifact } from '../../../src/services/MenderService';
-import { ValidationError, NotFoundError } from '../../../src/shared/errors/AppError';
+import { ValidationError, NotFoundError, UnprocessableError } from '../../../src/shared/errors/AppError';
 
 /**
  * The orchestration: what the screen is told, and what deploy() refuses.
@@ -149,7 +149,7 @@ describe('deploy() — the refusals decided again', () => {
     ]);
     await expect(
       new CentralFirmwareService(mender).deploy(TENANT, CENTRAL, 'rc14.1.3', 'ana'),
-    ).rejects.toThrow(ValidationError);
+    ).rejects.toThrow(UnprocessableError);
     expect(mender.deploy).not.toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe('deploy() — the refusals decided again', () => {
   it('refuses a deployment that started while the screen was open', async () => {
     const mender = fakeMender(
       [device()],
-      { id: 'dep-9', artifactName: 'rc14.1.3', status: 'inprogress', created: null },
+      { id: 'dep-9', artifactName: 'rc14.1.3', status: 'inprogress', deviceStatus: 'downloading', created: null },
     );
     await expect(
       new CentralFirmwareService(mender).deploy(TENANT, CENTRAL, 'rc14.1.3', 'ana'),
@@ -181,8 +181,11 @@ describe('deploy() — the refusals decided again', () => {
       .deploy(TENANT, CENTRAL, 'rc14.1.3', 'ana')
       .then(() => null, (e: unknown) => e);
 
-    expect(err).toBeInstanceOf(ValidationError);
-    const details = (err as { details?: Array<{ code: string }> }).details;
+    // 422, and every refusal travels in `reasons' so the screen shows all of
+    // them rather than one joined sentence.
+    expect(err).toBeInstanceOf(UnprocessableError);
+    expect((err as UnprocessableError).statusCode).toBe(422);
+    const details = (err as UnprocessableError).reasons;
     expect(details?.map((d) => d.code)).toEqual(
       expect.arrayContaining(['DEVICE_PENDING', 'NO_INVENTORY']),
     );
@@ -228,14 +231,14 @@ describe('deploymentStatus() and abort()', () => {
   });
 
   it('returns Mender own statistics for the one that is', async () => {
-    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc14.1.3', status: 'pending', created: null });
+    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc14.1.3', status: 'pending', deviceStatus: 'pending', created: null });
     const r = await new CentralFirmwareService(mender).deploymentStatus(TENANT, CENTRAL);
     expect(r.inFlight?.id).toBe('dep-9');
     expect(r.statistics).toEqual({ pending: 1 });
   });
 
   it('still answers when the statistics call fails', async () => {
-    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc', status: 'pending', created: null });
+    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc', status: 'pending', deviceStatus: 'pending', created: null });
     (mender.statistics as jest.Mock).mockRejectedValue(new Error('boom'));
     const r = await new CentralFirmwareService(mender).deploymentStatus(TENANT, CENTRAL);
     expect(r.inFlight?.id).toBe('dep-9');
@@ -243,7 +246,7 @@ describe('deploymentStatus() and abort()', () => {
   });
 
   it('aborts the deployment in flight', async () => {
-    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc', status: 'pending', created: null });
+    const mender = fakeMender([device()], { id: 'dep-9', artifactName: 'rc', status: 'pending', deviceStatus: 'pending', created: null });
     await new CentralFirmwareService(mender).abort(TENANT, CENTRAL);
     expect(mender.abort).toHaveBeenCalledWith('dep-9');
   });

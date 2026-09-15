@@ -108,6 +108,59 @@ describe('boardsForCentral — the two ways in', () => {
     const devices = [dev({ id: 'a', centralUuid: 'd2031a0c-0000-0000-0000-000000000000' })];
     expect(boardsForCentral({ id: CENTRAL, name: 'x' }, devices).matched).toEqual([]);
   });
+
+  it('refuses a recorded mac that points at another central board', () => {
+    // The failure this module exists to prevent, arriving through the back door.
+    // config.menderMac is filled by reconciliation -- by a person or a script,
+    // from a cadastre that can be stale. If it names a board that publishes a
+    // DIFFERENT central_uuid, the board is right and the record is wrong; taking
+    // the record's word aims a deploy at somebody else's site while both screens
+    // look correct.
+    const otherSite = dev({
+      id: 'belongs-to-someone-else',
+      mac: '02:42:87:3d:3f:8f',
+      centralUuid: '99999999-9999-9999-9999-999999999999',
+    });
+    const r = boardsForCentral(
+      { id: CENTRAL, name: 'central com cadastro velho', config: { menderMac: '0242873d3f8f' } },
+      [otherSite],
+    );
+    expect(r.matched).toEqual([]);
+    expect(r.via).toBeNull();
+  });
+
+  it('still accepts a mac-matched board that claims nothing', () => {
+    // 227 of 232 boards on 2026-09-15 publish no central_uuid at all. A board
+    // that says nothing cannot contradict the record, so it is accepted --
+    // otherwise the mac path would stop working for almost the whole fleet.
+    const quiet = dev({ id: 'fleet-board', mac: '02:42:87:3d:3f:8f', centralUuid: null });
+    const r = boardsForCentral(
+      { id: CENTRAL, name: 'x', config: { menderMac: '0242873d3f8f' } },
+      [quiet],
+    );
+    expect(r.matched.map((d) => d.id)).toEqual(['fleet-board']);
+    expect(r.via).toBe('mac');
+  });
+
+  it('accepts a mac-matched board that agrees with the record', () => {
+    const agrees = dev({ id: 'ok', mac: '02:42:87:3d:3f:8f', centralUuid: CENTRAL });
+    // Matched by uuid first, in fact -- but either way it must not be excluded.
+    const r = boardsForCentral(
+      { id: CENTRAL, name: 'x', config: { menderMac: '0242873d3f8f' } },
+      [agrees],
+    );
+    expect(r.matched.map((d) => d.id)).toEqual(['ok']);
+  });
+
+  it('keeps the honest board and drops the impostor when both share a mac', () => {
+    const impostor = dev({ id: 'impostor', mac: '02:42:87:3d:3f:8f', centralUuid: 'another-site' });
+    const ours = dev({ id: 'ours', mac: '02:42:87:3d:3f:8f', centralUuid: null });
+    const r = boardsForCentral(
+      { id: CENTRAL, name: 'x', config: { menderMac: '0242873d3f8f' } },
+      [impostor, ours],
+    );
+    expect(r.matched.map((d) => d.id)).toEqual(['ours']);
+  });
 });
 
 describe('boardsForCentral — an HA pair is two boards under one uuid', () => {

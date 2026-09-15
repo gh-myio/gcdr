@@ -2,6 +2,7 @@ import {
   MenderService,
   MenderHttp,
   idFromLocation,
+  isDeviceBusy,
 } from '../../../src/services/MenderService';
 
 /**
@@ -141,36 +142,112 @@ describe('MenderService — reading', () => {
     expect(d.haRole).toBe('primary');
   });
 
-  it('finds every board serving a central, by uuid or by mac', async () => {
-    const http = new FakeHttp({
-      '/v1/inventory/devices': [
-        { id: 'a', attributes: [{ name: 'mac', value: 'aa:aa:aa:aa:aa:aa' }, { name: 'central_uuid', value: 'C' }] },
-        { id: 'b', attributes: [{ name: 'mac', value: 'bb:bb:bb:bb:bb:bb' }] },
-        { id: 'c', attributes: [{ name: 'mac', value: 'cc:cc:cc:cc:cc:cc' }] },
-      ],
-    });
-    const found = await new MenderService(http).devicesForCentral('C', ['BB:BB:BB:BB:BB:BB']);
-    expect(found.map((d) => d.id).sort()).toEqual(['a', 'b']);
+  it('pages until a short page, so a fleet past 500 is not silently truncated', async () => {
+    // 232 boards on 2026-09-15, so the cliff is a matter of when. A truncated
+    // listing mostly fails safe -- a missing board answers DEVICE_NOT_FOUND --
+    // but it can also hide one half of an HA pair, and that fails the other way.
+    const page1 = Array.from({ length: 500 }, (_, i) => ({ id: `d${i}`, attributes: [] }));
+    const page2 = [{ id: 'last', attributes: [] }];
+    let call = 0;
+    const http: MenderHttp = {
+      get: async <T>(path: string) => {
+        call += 1;
+        expect(path).toContain(`page=${call}`);
+        return (call === 1 ? page1 : page2) as T;
+      },
+      post: async <T>() => undefined as unknown as T,
+      put: async <T>() => undefined as unknown as T,
+      create: async () => '',
+    };
+    const all = await new MenderService(http).listDevices();
+    expect(all).toHaveLength(501);
+    expect(call).toBe(2);
+  });
+
+  it('stops after one page when the first is short', async () => {
+    const http = new FakeHttp({ '/v1/inventory/devices': [{ id: 'a', attributes: [] }] });
+    await new MenderService(http).listDevices();
+    expect(http.calls).toHaveLength(1);
   });
 });
 
 describe('MenderService.inFlightFor — one at a time', () => {
-  it('finds a pending or in-progress deployment', async () => {
+  /**
+   * The rows this endpoint really answers with, read off a finished deployment
+   * on hosted.mender on 2026-09-15. They are NOT flat: `status' and
+   * `artifact_name' live one level down, and the row's own `id' is not the
+   * deployment's.
+   */
+  const row = (deviceStatus: string, over: Record<string, unknown> = {}) => ({
+    id: 'row-id-not-the-deployment',
+    device: { status: deviceStatus },
+    deployment: {
+      id: 'a6f34728-85c1-403a-b2d9-0f577dbc1491',
+      artifact_name: 'rc14.1.3',
+      status: 'inprogress',
+      created: '2026-09-15T18:39:19Z',
+      ...over,
+    },
+  });
+
+  it('reads the DEPLOYMENT id, not the row id', async () => {
+    // abort() and statistics() take the deployment's id. Handing them the row's
+    // addresses nothing, and the error would read as "no deployment running".
+    const http = new FakeHttp({ '/v1/deployments/deployments/devices/': [row('downloading')] });
+    const r = await new MenderService(http).inFlightFor('dev-1');
+    expect(r!.id).toBe('a6f34728-85c1-403a-b2d9-0f577dbc1491');
+    expect(r!.artifactName).toBe('rc14.1.3');
+    expect(r!.deviceStatus).toBe('downloading');
+  });
+
+  it.each(['pending', 'downloading', 'installing', 'rebooting',
+    'pause_before_installing', 'pause_before_committing', 'pause_before_rebooting'])(
+    'sees a board that is %s as busy', async (deviceStatus) => {
+      // The first version allowed only `pending' and `inprogress' -- and
+      // `inprogress' is a DEPLOYMENT status that never appears per device. A
+      // board mid-download was therefore invisible, and a second, overlapping
+      // deployment could be created on it.
+      const http = new FakeHttp({ '/v1/deployments/deployments/devices/': [row(deviceStatus)] });
+      expect(await new MenderService(http).inFlightFor('dev-1')).not.toBeNull();
+    },
+  );
+
+  it.each(['success', 'failure', 'aborted', 'already-installed', 'noartifact',
+    'decommissioned', 'artifact_too_big', 'incompatible_tier'])(
+    'sees a board that is %s as done', async (deviceStatus) => {
+      const http = new FakeHttp({ '/v1/deployments/deployments/devices/': [row(deviceStatus)] });
+      expect(await new MenderService(http).inFlightFor('dev-1')).toBeNull();
+    },
+  );
+
+  it('treats a status it has never seen as busy, not as done', async () => {
+    // The safe direction. An allow-list of active statuses fails open: a value
+    // Mender adds later would read as "nothing running" and let a second
+    // deployment start on a board that is mid-install.
+    const http = new FakeHttp({ '/v1/deployments/deployments/devices/': [row('some-new-mender-state')] });
+    expect(await new MenderService(http).inFlightFor('dev-1')).not.toBeNull();
+  });
+
+  it('picks the busy row out of a history of finished ones', async () => {
     const http = new FakeHttp({
       '/v1/deployments/deployments/devices/': [
-        { id: 'old', status: 'finished', artifact_name: 'rc14.1.1' },
-        { id: 'live', status: 'inprogress', artifact_name: 'rc14.1.3', created: '2026-09-15T18:39:19Z' },
+        row('success', { id: 'old-1' }),
+        row('failure', { id: 'old-2' }),
+        row('installing', { id: 'the-live-one' }),
       ],
     });
     const r = await new MenderService(http).inFlightFor('dev-1');
-    expect(r).toEqual({
-      id: 'live', artifactName: 'rc14.1.3', status: 'inprogress', created: '2026-09-15T18:39:19Z',
-    });
+    expect(r!.id).toBe('the-live-one');
   });
 
-  it('answers null when every deployment is over', async () => {
+  it('answers null for a board with no deployment history at all', async () => {
+    const http = new FakeHttp({ '/v1/deployments/deployments/devices/': [] });
+    expect(await new MenderService(http).inFlightFor('dev-1')).toBeNull();
+  });
+
+  it('answers null when a row carries no deployment to point at', async () => {
     const http = new FakeHttp({
-      '/v1/deployments/deployments/devices/': [{ id: 'old', status: 'finished' }],
+      '/v1/deployments/deployments/devices/': [{ id: 'x', device: { status: 'downloading' } }],
     });
     expect(await new MenderService(http).inFlightFor('dev-1')).toBeNull();
   });
@@ -180,6 +257,21 @@ describe('MenderService.inFlightFor — one at a time', () => {
     // card, but a 500 on the whole page is worse than both.
     const http = new FakeHttp({});
     expect(await new MenderService(http).inFlightFor('dev-1')).toBeNull();
+  });
+});
+
+describe('isDeviceBusy — the direction of the check', () => {
+  it('is false only for the statuses Mender counts as terminal', () => {
+    expect(isDeviceBusy('success')).toBe(false);
+    expect(isDeviceBusy('aborted')).toBe(false);
+    expect(isDeviceBusy('downloading')).toBe(true);
+    expect(isDeviceBusy('rebooting')).toBe(true);
+  });
+
+  it('is false for nothing at all, which is not a deployment', () => {
+    expect(isDeviceBusy(null)).toBe(false);
+    expect(isDeviceBusy(undefined)).toBe(false);
+    expect(isDeviceBusy('')).toBe(false);
   });
 });
 

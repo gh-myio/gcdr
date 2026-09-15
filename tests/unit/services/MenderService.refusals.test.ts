@@ -1,7 +1,6 @@
 import {
   refusalsFor,
   newestFor,
-  resolveCentralUuid,
   deviceFromInventory,
   artifactFromRaw,
   MenderDevice,
@@ -124,7 +123,8 @@ describe('refusalsFor — work nobody needs done', () => {
 
   it('refuses a second deployment while one is in flight', () => {
     const r = refusalsFor(device(), artifact(), [], {
-      id: 'dep-1', artifactName: 'rc14.1.1', status: 'inprogress', created: null,
+      id: 'dep-1', artifactName: 'rc14.1.1', status: 'inprogress',
+      deviceStatus: 'downloading', created: null,
     });
     expect(codes(r)).toContain('DEPLOYMENT_IN_FLIGHT');
     expect(r.find((x) => x.code === 'DEPLOYMENT_IN_FLIGHT')!.message).toContain('rc14.1.1');
@@ -237,26 +237,6 @@ describe('newestFor — ordering', () => {
 
   it('offers nothing when no artifact fits', () => {
     expect(newestFor('some-other-board', list)).toBeNull();
-  });
-});
-
-describe('resolveCentralUuid — the two steps', () => {
-  const macs = new Map([['02:42:2e:7a:14:18', 'aab91440-3bb4-4b04-aeb4-6533c93afb57']]);
-
-  it('believes the board when it publishes its own central_uuid', () => {
-    const r = resolveCentralUuid({ centralUuid: 'd2031a0c', mac: '02:42:ae:07:43:52' }, macs);
-    expect(r).toEqual({ uuid: 'd2031a0c', via: 'inventory' });
-  });
-
-  it('falls back to the mac for the fleet, which does not publish it', () => {
-    // 227 of 232 boards on 2026-09-15 were resolved this way.
-    const r = resolveCentralUuid({ centralUuid: null, mac: '02:42:2E:7A:14:18' }, macs);
-    expect(r).toEqual({ uuid: 'aab91440-3bb4-4b04-aeb4-6533c93afb57', via: 'mac' });
-  });
-
-  it('gives up honestly when neither works', () => {
-    expect(resolveCentralUuid({ centralUuid: null, mac: '00:00:00:00:00:00' }, macs))
-      .toEqual({ uuid: null, via: null });
   });
 });
 
