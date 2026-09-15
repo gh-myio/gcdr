@@ -177,6 +177,53 @@ export class RuleRepository implements IRuleRepository {
     };
   }
 
+  /**
+   * Rule statistics for the dashboard, aggregated in SQL (one grouped scan per
+   * dimension) instead of loading up to 1,000 full rows — including heavy JSONB
+   * config — and counting them in JS. `recentlyTriggered24h` compares each
+   * rule's `last_triggered_at` to now-24h.
+   *
+   * NOTE: postgres-js cannot bind JS `Date` params, so the threshold is bound as
+   * an ISO string cast to `::timestamptz`.
+   */
+  async getStatistics(tenantId: string): Promise<{
+    total: number;
+    byType: Record<string, number>;
+    byPriority: Record<string, number>;
+    enabled: number;
+    recentlyTriggered24h: number;
+  }> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const base = eq(rules.tenantId, tenantId);
+
+    const [totals, typeRows, priorityRows] = await Promise.all([
+      db
+        .select({
+          total: sql<number>`count(*)::int`,
+          enabled: sql<number>`count(*) filter (where ${rules.enabled})::int`,
+          recentlyTriggered24h: sql<number>`count(*) filter (where ${rules.lastTriggeredAt} > ${oneDayAgo}::timestamptz)::int`,
+        })
+        .from(rules)
+        .where(base),
+      db.select({ key: rules.type, count: sql<number>`count(*)::int` }).from(rules).where(base).groupBy(rules.type),
+      db.select({ key: rules.priority, count: sql<number>`count(*)::int` }).from(rules).where(base).groupBy(rules.priority),
+    ]);
+
+    const toMap = (rows: Array<{ key: string | null; count: number }>): Record<string, number> => {
+      const m: Record<string, number> = {};
+      for (const r of rows) if (r.key !== null) m[r.key] = Number(r.count);
+      return m;
+    };
+    const t = totals[0];
+    return {
+      total: Number(t?.total ?? 0),
+      byType: toMap(typeRows),
+      byPriority: toMap(priorityRows),
+      enabled: Number(t?.enabled ?? 0),
+      recentlyTriggered24h: Number(t?.recentlyTriggered24h ?? 0),
+    };
+  }
+
   async listWithFilters(tenantId: string, params: ListRulesParams): Promise<PaginatedResult<Rule>> {
     const limit = params.limit || 20;
     const offset = params.cursor ? parseInt(params.cursor, 10) : 0;

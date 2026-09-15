@@ -246,6 +246,73 @@ export class AuditLogRepository implements IAuditLogRepository {
     };
   }
 
+  /**
+   * Dashboard audit summary for all four windows (24h/72h/week/month) in a
+   * single scan per metric instead of 12 separate queries. The windows are
+   * nested (24h ⊂ 72h ⊂ week ⊂ month), so we bound one scan to the widest
+   * (month) window and bucket the sub-windows with `count(*) FILTER (...)`.
+   * Three scans total (totals · by-category · by-action), each over the month
+   * window, replacing the old 4×3 = 12 overlapping scans of `audit_logs`.
+   *
+   * NOTE: postgres-js cannot bind JS `Date` params (ERR_INVALID_ARG_TYPE), so
+   * timestamps are bound as ISO strings cast to `::timestamptz`.
+   */
+  async getDashboardAuditSummary(
+    tenantId: string,
+    now: Date,
+  ): Promise<{
+    last24h: { total: number; byCategory: Record<string, number>; byAction: Record<string, number> };
+    last72h: { total: number; byCategory: Record<string, number>; byAction: Record<string, number> };
+    lastWeek: { total: number; byCategory: Record<string, number>; byAction: Record<string, number> };
+    lastMonth: { total: number; byCategory: Record<string, number>; byAction: Record<string, number> };
+  }> {
+    const iso = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
+    const from24 = iso(24);
+    const from72 = iso(72);
+    const fromWeek = iso(168);
+    const fromMonth = iso(720);
+    const to = now.toISOString();
+
+    // One scan bounded to the month window; sub-windows via FILTER.
+    const base = and(
+      eq(auditLogs.tenantId, tenantId),
+      gte(auditLogs.createdAt, sql`${fromMonth}::timestamptz`),
+      lte(auditLogs.createdAt, sql`${to}::timestamptz`),
+    );
+    const cnt = (fromIso: string) =>
+      sql<number>`count(*) filter (where ${auditLogs.createdAt} >= ${fromIso}::timestamptz)::int`;
+    const buckets = {
+      c24: cnt(from24),
+      c72: cnt(from72),
+      cWeek: cnt(fromWeek),
+      cMonth: sql<number>`count(*)::int`,
+    };
+
+    const [totalsRows, categoryRows, actionRows] = await Promise.all([
+      db.select(buckets).from(auditLogs).where(base),
+      db.select({ key: auditLogs.eventCategory, ...buckets }).from(auditLogs).where(base).groupBy(auditLogs.eventCategory),
+      db.select({ key: auditLogs.action, ...buckets }).from(auditLogs).where(base).groupBy(auditLogs.action),
+    ]);
+
+    type Win = 'c24' | 'c72' | 'cWeek' | 'cMonth';
+    const mapFor = (rows: Array<{ key: string | null } & Record<Win, number>>, win: Win): Record<string, number> => {
+      const m: Record<string, number> = {};
+      for (const r of rows) {
+        const v = Number(r[win]);
+        if (r.key !== null && v > 0) m[r.key] = v;
+      }
+      return m;
+    };
+    const t = totalsRows[0];
+    const build = (win: Win) => ({
+      total: Number(t?.[win] ?? 0),
+      byCategory: mapFor(categoryRows, win),
+      byAction: mapFor(actionRows, win),
+    });
+
+    return { last24h: build('c24'), last72h: build('c72'), lastWeek: build('cWeek'), lastMonth: build('cMonth') };
+  }
+
   async deleteExpired(level: AuditLevel, beforeDate: Date): Promise<number> {
     const result = await db
       .delete(auditLogs)

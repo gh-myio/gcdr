@@ -534,6 +534,11 @@ export const devices = pgTable('devices', {
   // POST /api/v1/wo/install when the field client passes addr_low/high
   // from the QR payload but no explicit device_id.
   woAddrIdx: index('idx_devices_wo_addr').on(table.tenantId, table.woAddrLow, table.woAddrHigh),
+  // Dashboard connectivity roll-up: filter tenant_id + deleted_at IS NULL, group
+  // by connectivity_status (migration 0078). Partial to exclude soft-deleted.
+  tenantConnectivityActiveIdx: index('devices_tenant_connectivity_active_idx')
+    .on(table.tenantId, table.connectivityStatus)
+    .where(sql`${table.deletedAt} IS NULL`),
 }));
 
 // =============================================================================
@@ -1278,6 +1283,10 @@ export const auditLogs = pgTable('audit_logs', {
   tenantCategoryIdx: index('audit_logs_tenant_category_idx').on(table.tenantId, table.eventCategory),
   tenantActionIdx: index('audit_logs_tenant_action_idx').on(table.tenantId, table.action),
   tenantLevelIdx: index('audit_logs_tenant_level_idx').on(table.tenantId, table.auditLevel),
+  // Dashboard summary: GROUP BY event_category / action over a created_at range
+  // (migration 0078). Covering composites so the grouped scans stay on-index.
+  tenantCreatedCategoryIdx: index('audit_logs_tenant_created_category_idx').on(table.tenantId, table.createdAt, table.eventCategory),
+  tenantCreatedActionIdx: index('audit_logs_tenant_created_action_idx').on(table.tenantId, table.createdAt, table.action),
 }));
 
 // =============================================================================

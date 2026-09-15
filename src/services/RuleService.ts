@@ -5,7 +5,7 @@ import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
 import { PaginatedResult } from '../shared/types';
-import { NotFoundError, ValidationError, ConflictError } from '../shared/errors/AppError';
+import { NotFoundError, ValidationError } from '../shared/errors/AppError';
 import { alarmBundleService } from './AlarmBundleService';
 
 export interface RuleEvaluationResult {
@@ -139,7 +139,7 @@ export class RuleService {
     return rule;
   }
 
-  async toggle(tenantId: string, id: string, enabled: boolean, userId: string, reason?: string): Promise<Rule> {
+  async toggle(tenantId: string, id: string, enabled: boolean, userId: string, _reason?: string): Promise<Rule> {
     const rule = await this.getById(tenantId, id);
 
     if (rule.enabled === enabled) {
@@ -208,9 +208,12 @@ export class RuleService {
   }
 
   async getStatistics(tenantId: string): Promise<RuleStatistics> {
-    const rules = await this.repository.getEnabledRules(tenantId);
-    const allRules = (await this.repository.list(tenantId, { limit: 1000 })).items;
+    // Aggregated in SQL (see RuleRepository.getStatistics) — one grouped scan
+    // per dimension instead of loading up to 1,000 full rows and counting in JS.
+    const stats = await this.repository.getStatistics(tenantId);
 
+    // Zero-fill every known bucket so the payload shape stays stable even when a
+    // type/priority has no rules.
     const byType: Record<RuleType, number> = {
       ALARM_THRESHOLD: 0,
       SLA: 0,
@@ -219,38 +222,26 @@ export class RuleService {
       DEVICE_OFFLINE: 0,
       NO_CONSUMPTION: 0,
     };
-
     const byPriority: Record<string, number> = {
       LOW: 0,
       MEDIUM: 0,
       HIGH: 0,
       CRITICAL: 0,
     };
-
-    let enabledCount = 0;
-    let recentlyTriggered = 0;
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    for (const rule of allRules) {
-      byType[rule.type]++;
-      byPriority[rule.priority]++;
-
-      if (rule.enabled) {
-        enabledCount++;
-      }
-
-      if (rule.lastTriggeredAt && rule.lastTriggeredAt > oneDayAgo) {
-        recentlyTriggered++;
-      }
+    for (const [k, v] of Object.entries(stats.byType)) {
+      if (k in byType) byType[k as RuleType] = v;
+    }
+    for (const [k, v] of Object.entries(stats.byPriority)) {
+      byPriority[k] = v;
     }
 
     return {
-      totalRules: allRules.length,
+      totalRules: stats.total,
       byType,
       byPriority,
-      enabledCount,
-      disabledCount: allRules.length - enabledCount,
-      recentlyTriggered,
+      enabledCount: stats.enabled,
+      disabledCount: stats.total - stats.enabled,
+      recentlyTriggered: stats.recentlyTriggered24h,
     };
   }
 
@@ -320,7 +311,7 @@ export class RuleService {
     }
   }
 
-  private async getInheritedRules(tenantId: string, scopeType: string, entityId: string): Promise<Rule[]> {
+  private async getInheritedRules(_tenantId: string, _scopeType: string, _entityId: string): Promise<Rule[]> {
     // Simplified implementation - returns empty array
     // Full implementation would:
     // 1. Get parent entity based on scopeType (e.g., for DEVICE, get its ASSET parent)
