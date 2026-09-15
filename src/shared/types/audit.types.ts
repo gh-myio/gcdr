@@ -121,6 +121,12 @@ export enum EventType {
   CENTRAL_COMMAND_ISSUED = 'CENTRAL_COMMAND_ISSUED',
   CENTRAL_COMMAND_COMPLETED = 'CENTRAL_COMMAND_COMPLETED',
   CENTRAL_COMMAND_FAILED = 'CENTRAL_COMMAND_FAILED',
+  // Firmware, which is NOT a central command: it creates a deployment in Mender
+  // and the board finds it on its own poll. Audited separately for that reason --
+  // a reader looking for "who updated this site" should not have to know that the
+  // answer is filed under commands.
+  CENTRAL_FIRMWARE_DEPLOY_REQUESTED = 'CENTRAL_FIRMWARE_DEPLOY_REQUESTED',
+  CENTRAL_FIRMWARE_DEPLOY_ABORTED = 'CENTRAL_FIRMWARE_DEPLOY_ABORTED',
   // RFC-0056: Central API Key Bootstrap. Deliberately named WITHOUT an
   // "API_KEY"/"SECRET"/"CREDENTIAL" substring — CodeQL's clear-text-logging
   // query flags enum members matching those name patterns as a sensitive
