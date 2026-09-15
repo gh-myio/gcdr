@@ -281,15 +281,22 @@ router.get('/api/centrals/:id/latency-history', async (req: Request, res: Respon
       select created_at, latency_ms, coalesce((input->>'ok')::boolean, true) as ok
       from orchestrator_devices_checks
       where entity_type = 'central' and entity_id = ${id}::uuid
-        and created_at >= ${from} and created_at <= ${to}
+        and created_at >= ${from.toISOString()}::timestamptz and created_at <= ${to.toISOString()}::timestamptz
       order by created_at asc`)) as unknown as Rows;
-    const points = rows.map((r) => ({
-      ts: new Date(String(r.created_at)).toISOString(),
-      latencyMs: r.ok ? (r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms)) : null,
-    }));
+    const points = rows.map((r) => {
+      const raw = r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms);
+      // Drop a failed probe or a bogus latency (< 0, container clock drift) → gap.
+      const latencyMs = r.ok && raw !== null && raw >= 0 ? raw : null;
+      return { ts: new Date(String(r.created_at)).toISOString(), latencyMs };
+    });
     res.json({ id, points });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    const cause = (err as { cause?: unknown }).cause;
+    res.status(500).json({
+      error: err instanceof Error ? err.message : String(err),
+      cause: cause instanceof Error ? cause.message : cause ? String(cause) : undefined,
+      code: (cause as { code?: string })?.code,
+    });
   }
 });
 
@@ -502,8 +509,8 @@ const MYIO_LIB_CDN_TAG =
 // ── The page ─────────────────────────────────────────────────────────────────
 router.get('/', (_req: Request, res: Response) => {
   res.type('html').send(PAGE_HTML
-    .replace('__OFFLINE_GRACE_MIN__', String(workerConfig.offlineGraceMin))
-    .replace('__OFFLINE_HARD_MIN__', String(workerConfig.offlineHardMin))
+    .replace('__OFFLINE_GRACE_MIN__', String(workerConfig.warningMin))
+    .replace('__OFFLINE_HARD_MIN__', String(workerConfig.offlineMin))
     .replace('__MYIO_LIB_TAG__', MYIO_LIB_CDN_TAG));
 });
 
@@ -1350,6 +1357,10 @@ __MYIO_LIB_TAG__
           id:e.id, name:(c.name||c.id),
           theme:(document.documentElement.getAttribute('data-theme')==='dark')?'dark':'light',
           language:(lang==='pt-BR')?'pt':'en',
+          // "Latência atual" + veredito SLA (mesmo alvo do /centrals: 3000ms).
+          // Latência < 0 (clock drift do container) é inválida → não exibe.
+          currentLatencyMs:(c.last_gateway_check_latency_ms!=null && c.last_gateway_check_latency_ms>=0)?c.last_gateway_check_latency_ms:null,
+          targetLatencyMs:3000,
           source:{ onFetchLatencyHistory:function(p){
             return api('centrals/'+encodeURIComponent(e.id)+'/latency-history?fromTs='+p.startTs+'&toTs='+p.endTs)
               .then(function(r){ return r.points||[]; });

@@ -492,7 +492,7 @@ apiV1Router.use('/centrals', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRAL
 // Orchestrator-devices worker control (RFC-0062 §7): read/toggle the monitor
 // scopes (CENTRALS/DEVICES/OS/RULES/MASTER + FLAGS) from the /centrals settings
 // modal. Gated by the same centrals scopes; every change is audited.
-apiV1Router.use('/orchestrator-devices/control', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRALS_WRITE), orchestratorControlController);
+apiV1Router.use('/orchestrator-devices', hybridAuthByMethod(PERM_CENTRALS_READ, PERM_CENTRALS_WRITE), orchestratorControlController);
 
 // Zero-touch enrollment (Slice 1.5). PUBLIC and mounted BEFORE the
 // centralAuthMiddleware /central-agent mount: a freshly-flashed central has no

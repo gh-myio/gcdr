@@ -36,17 +36,18 @@ export const workerConfig = {
   probeMaxTotalMs: intEnv('CENTRAL_PROBE_MAX_TOTAL_MS', 120_000),
   statusToken: process.env.CLOUD_STATUS_TOKEN, // optional X-Status-Token (reused from PR #19 wiring)
 
-  // Grace window (§5): after a probe starts failing, a central is held in DEGRADED
-  // (warning) and only proposed OFFLINE once it has had NO successful sync for this
-  // many minutes. Default 5. The cockpit reads the same value to derive its display.
-  offlineGraceMin: intEnv('ORCH_DEVICES_OFFLINE_GRACE_MIN', 5),
+  // WARNING window (§5): once a probe starts failing, a central stays ONLINE (blip
+  // tolerance) until it has had NO successful sync for this many minutes, then it is
+  // proposed DEGRADED (WARNING / ATENÇÃO). Default 5. Renamed from
+  // ORCH_DEVICES_OFFLINE_GRACE_MIN — the old name is still read as a fallback.
+  warningMin: intEnv('ORCH_DEVICES_CENTRAL_WARNING_MIN', intEnv('ORCH_DEVICES_OFFLINE_GRACE_MIN', 5)),
 
-  // Hard-OFFLINE threshold (cockpit stage 2): a central is only shown as truly
-  // OFFLINE once (last_gateway_check_at − last_gateway_success_check_at) reaches
-  // this many minutes; below it a failing central is the stage-1 alert. A central
-  // that NEVER succeeded shows UNKNOWN (no evidence it was ever reachable).
-  // Env-only by design — the cockpit displays it but cannot change it.
-  offlineHardMin: intEnv('ORCH_DEVICES_OFFLINE_HARD_MIN', 150),
+  // OFFLINE threshold (§5 stage 2): a central is only proposed OFFLINE — and a
+  // CENTRAL_OFFLINE incident opened — once it has had NO successful sync for this many
+  // minutes (default 150 = 2h30min); between the warning and offline windows it is
+  // DEGRADED. A central that NEVER succeeded is already past both. Renamed from
+  // ORCH_DEVICES_OFFLINE_HARD_MIN — the old name is still read as a fallback.
+  offlineMin: intEnv('ORCH_DEVICES_CENTRAL_OFFLINE_MIN', intEnv('ORCH_DEVICES_OFFLINE_HARD_MIN', 150)),
 
   // Scheduling (§3): project-default cadence + jitter to avoid a thundering herd.
   checkIntervalSeconds: intEnv('CENTRAL_CHECK_INTERVAL_SECONDS', 900),

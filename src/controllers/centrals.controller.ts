@@ -262,6 +262,51 @@ router.post('/:id/recheck',
 );
 
 /**
+ * GET /centrals/:id/latency-history?days=7
+ * Per-check gateway latency points from the orchestrator-devices ledger, for the
+ * shared card's chart modal (RFC-0231). JWT + centrals:read. Mirrors the cockpit
+ * query but binds the window as ISO strings — postgres-js cannot serialize a JS
+ * Date param (ERR_INVALID_ARG_TYPE), so `${date}` must be `${iso}::timestamptz`.
+ * Returns [{ ts, latencyMs }] (latencyMs null on a failed probe / gap).
+ */
+router.get('/:id/latency-history', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const { id } = req.params;
+    if (!id) throw new ValidationError(ERR_CENTRAL_ID_REQUIRED);
+    // Window: the card modal sends fromTs/toTs (epoch ms); fall back to ?days=N.
+    const fromTsQ = Number(req.query.fromTs);
+    const toTsQ = Number(req.query.toTs);
+    const days = Math.min(Math.max(Math.floor(Number(req.query.days)) || 7, 1), 90);
+    const to = Number.isFinite(toTsQ) ? new Date(toTsQ) : new Date();
+    const from = Number.isFinite(fromTsQ) ? new Date(fromTsQ) : new Date(to.getTime() - days * 86_400_000);
+
+    // Only expose a central the caller's tenant can see (no cross-tenant reads).
+    const found = (await db.execute(sql`
+      select 1 from centrals
+      where id = ${id}::uuid and tenant_id = ${tenantId}::uuid and status <> 'DELETED'`)) as unknown as Array<Record<string, unknown>>;
+    if (!Array.isArray(found) || found.length === 0) throw new NotFoundError('Central not found');
+
+    const rows = (await db.execute(sql`
+      select created_at, latency_ms, coalesce((input->>'ok')::boolean, true) as ok
+      from orchestrator_devices_checks
+      where entity_type = 'central' and entity_id = ${id}::uuid
+        and created_at >= ${from.toISOString()}::timestamptz and created_at <= ${to.toISOString()}::timestamptz
+      order by created_at asc`)) as unknown as Array<Record<string, unknown>>;
+    const points = rows.map((r) => {
+      const raw = r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms);
+      // A failed probe, or a bogus latency (< 0, e.g. container clock drift) is a
+      // gap — null — never a value that would poison avg/min/max in the chart.
+      const latencyMs = r.ok && raw !== null && raw >= 0 ? raw : null;
+      return { ts: new Date(String(r.created_at)).toISOString(), latencyMs };
+    });
+    sendSuccess(res, points, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /centrals/:id/enroll-token
  * Issue a one-time enroll token for zero-touch provisioning (Slice 1.5). Stores
  * only sha256(token) + a 24h expiry on the central; returns the PLAINTEXT token
