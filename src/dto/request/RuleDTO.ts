@@ -211,6 +211,10 @@ const RuleScopeSchema = z.object({
 });
 
 // Create Rule DTO
+export const OfflineConfigSchema = z.object({
+  offlineMinutes: z.number().int().min(1),
+});
+
 export const CreateRuleSchema = z.object({
   customerId: z.string().min(1),
   name: z.string().min(1).max(255),
@@ -223,6 +227,7 @@ export const CreateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   noConsumptionConfig: NoConsumptionConfigSchema.optional(),
+  offlineConfig: OfflineConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),
@@ -244,7 +249,11 @@ export const CreateRuleSchema = z.object({
       case 'MAINTENANCE_WINDOW':
         return !!data.maintenanceConfig;
       case 'DEVICE_OFFLINE':
-        return !!data.alarmConfig; // alarmConfig carries schedule + centralId
+        // New offline rules carry offlineConfig ({offlineMinutes}); legacy ones
+        // used alarmConfig (schedule + centralId) — accept either.
+        return !!data.offlineConfig || !!data.alarmConfig;
+      case 'CENTRAL_OFFLINE':
+        return !!data.offlineConfig;
       case 'NO_CONSUMPTION':
         return !!data.noConsumptionConfig;
       default:
@@ -267,6 +276,7 @@ export const UpdateRuleSchema = z.object({
   escalationConfig: EscalationConfigSchema.optional(),
   maintenanceConfig: MaintenanceWindowConfigSchema.optional(),
   noConsumptionConfig: NoConsumptionConfigSchema.optional(),
+  offlineConfig: OfflineConfigSchema.optional(),
   notificationChannels: z.array(NotificationChannelSchema).optional(),
   notifications: RuleNotificationsSchema.optional(),
   scopeEntityOverrides: z.record(z.string().uuid(), RuleValueOverrideSchema).optional(),

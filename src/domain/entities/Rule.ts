@@ -164,6 +164,13 @@ export interface NoConsumptionConfig {
   maxDailyBucketsPerDay?: number;
 }
 
+// Connectivity-offline Configuration (DEVICE_OFFLINE / CENTRAL_OFFLINE). The
+// condition is status-based ("OFFLINE"), not a numeric threshold: fire once the
+// device/central has been offline for at least `offlineMinutes`.
+export interface OfflineConfig {
+  offlineMinutes: number; // minutes offline before the rule fires
+}
+
 // Alarm lifecycle actions (RFC-0024)
 export type AlarmAction = 'OPEN' | 'ACK' | 'ESCALATE' | 'SNOOZE' | 'CLOSE' | 'STATE_HISTORY';
 
@@ -267,6 +274,7 @@ export interface Rule extends BaseEntity {
   escalationConfig?: EscalationConfig;
   maintenanceConfig?: MaintenanceWindowConfig;
   noConsumptionConfig?: NoConsumptionConfig;
+  offlineConfig?: OfflineConfig;
 
   // Notification settings — delivery channels (webhook/SMS config)
   notificationChannels?: NotificationChannel[];

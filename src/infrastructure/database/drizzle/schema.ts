@@ -716,6 +716,7 @@ export const rules = pgTable('rules', {
   escalationConfig: jsonb('escalation_config'),
   maintenanceConfig: jsonb('maintenance_config'),
   noConsumptionConfig: jsonb('no_consumption_config'),  // RFC-0055
+  offlineConfig: jsonb('offline_config'),  // DEVICE_OFFLINE / CENTRAL_OFFLINE: { offlineMinutes }
 
   // Notification settings
   notificationChannels: jsonb('notification_channels').notNull().default([]),
