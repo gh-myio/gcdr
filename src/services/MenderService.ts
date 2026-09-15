@@ -176,6 +176,29 @@ export function refusalsFor(
   // publish the same `central_uuid` in their Mender inventory, because the site
   // identity travels with the role. So two boards answering to one central IS the
   // pair, and `ha_role` from the same inventory says which is which.
+  // A board that says it is half a pair, whose other half we cannot see.
+  //
+  // Found by validating against the real fleet on 2026-09-15: a bench board
+  // published ha_role=primary and ha_slot=a -- and 10.99.0.1/30, the slot-a
+  // address of the HA crossover cable -- while no second board answered to its
+  // central_uuid. The pair rule above is written around "two boards under one
+  // uuid", so it saw nothing and allowed the update.
+  //
+  // `ha_role' is only published by a board that has a role file, which only a
+  // board that is half a pair has. So its presence is the board's own word that
+  // a site depends on it, and the absence of a peer means we cannot tell whether
+  // that site keeps a central while this one reboots. Not knowing is not the
+  // same as being safe, and this is the one place where the difference costs a
+  // site rather than a retry.
+  if (peers.length === 0 && device.haRole) {
+    out.push({
+      code: 'HA_PEER_UNKNOWN',
+      message: `a placa se declara ${device.haRole} de um par (slot ${device.haSlot || '?'}),`
+        + ' mas a outra metade não aparece no Mender.'
+        + ' Registre e aceite o peer antes de atualizar, ou confirme que esta placa não é mais metade de um par.',
+    });
+  }
+
   if (peers.length > 0) {
     const peer = peers[0];
     out.push({

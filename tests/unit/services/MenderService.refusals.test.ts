@@ -169,7 +169,34 @@ describe('refusalsFor — the HA pair, which is the expensive one', () => {
   });
 
   it('says nothing about pairs when the central is served by one board', () => {
+    // A board with no ha_role has no role file, which means it is not half of a
+    // pair at all. Nothing to say.
     expect(codes(refusalsFor(device(), artifact(), []))).toEqual([]);
+  });
+
+  it('refuses a board that claims a role while its other half is nowhere', () => {
+    // Found by validating against the real fleet: a board published
+    // ha_role=primary, ha_slot=a and the slot-a crossover address, and no second
+    // board answered to its central_uuid. The pair rule is written around two
+    // boards under one uuid, so it saw nothing and allowed the update.
+    //
+    // ha_role is only published by a board that has a role file, so its presence
+    // is the board's own word that a site depends on it. Not being able to see
+    // the peer is not the same as there not being one.
+    const r = refusalsFor(device({ haRole: 'primary', haSlot: 'a' }), artifact(), []);
+    expect(codes(r)).toContain('HA_PEER_UNKNOWN');
+    const m = r.find((x) => x.code === 'HA_PEER_UNKNOWN')!.message;
+    expect(m).toContain('primary');
+    expect(m).toContain('slot a');
+  });
+
+  it('does not add the unknown-peer refusal once the peer IS visible', () => {
+    // Otherwise a healthy pair would collect both refusals and read as twice as
+    // broken as it is.
+    const peer = device({ id: 'peer', haRole: 'standby' });
+    const r = refusalsFor(device({ haRole: 'primary' }), artifact(), [peer]);
+    expect(codes(r)).toContain('HA_PAIR');
+    expect(codes(r)).not.toContain('HA_PEER_UNKNOWN');
   });
 });
 
