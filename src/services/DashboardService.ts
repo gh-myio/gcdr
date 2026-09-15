@@ -38,26 +38,29 @@ export interface DashboardSummary {
 }
 
 class DashboardService {
+  // A dashboard summary tolerates slight staleness, so cache it briefly per
+  // tenant to spare the DB the full aggregation on every poll/refresh.
+  private readonly cache = new Map<string, { at: number; data: DashboardSummary }>();
+  private readonly cacheTtlMs = 30_000;
+
   async getSummary(tenantId: string): Promise<DashboardSummary> {
+    const cached = this.cache.get(tenantId);
+    if (cached && Date.now() - cached.at < this.cacheTtlMs) {
+      return cached.data;
+    }
+
     const now = new Date();
 
-    const periodFrom = (hours: number) =>
-      new Date(now.getTime() - hours * 60 * 60 * 1000);
-
-    const [ruleStats, auditPeriods, deviceCounts] = await Promise.all([
+    const [ruleStats, audit, deviceCounts] = await Promise.all([
       ruleService.getStatistics(tenantId),
-      Promise.all([
-        auditLogRepository.getAuditPeriodSummary(tenantId, periodFrom(24), now),
-        auditLogRepository.getAuditPeriodSummary(tenantId, periodFrom(72), now),
-        auditLogRepository.getAuditPeriodSummary(tenantId, periodFrom(168), now),
-        auditLogRepository.getAuditPeriodSummary(tenantId, periodFrom(720), now),
-      ]),
+      // All four windows (24h/72h/week/month) in one scan per metric.
+      auditLogRepository.getDashboardAuditSummary(tenantId, now),
       deviceRepository.countByConnectivityStatus(tenantId),
     ]);
 
-    const [last24h, last72h, lastWeek, lastMonth] = auditPeriods;
+    const { last24h, last72h, lastWeek, lastMonth } = audit;
 
-    return {
+    const summary: DashboardSummary = {
       rules: {
         total: ruleStats.totalRules,
         byType: ruleStats.byType as unknown as Record<string, number>,
@@ -89,6 +92,9 @@ class DashboardService {
       },
       generatedAt: now.toISOString(),
     };
+
+    this.cache.set(tenantId, { at: Date.now(), data: summary });
+    return summary;
   }
 }
 
