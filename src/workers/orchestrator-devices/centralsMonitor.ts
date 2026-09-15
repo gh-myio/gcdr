@@ -30,6 +30,7 @@ import { classifyDevice, isDeviceTransition, type Classification } from './ladde
 import { evaluateSanityGate } from './sanityGate';
 import { canonicalWritesAllowed, type ControlState } from './control';
 import { centralVerdict, nextTimelineStatus, type TimelineStatus } from './verdict';
+import { reconcileCentralEpisodes, type EpisodeSignal } from './centralEpisodes';
 import { mapWithConcurrency } from './concurrency';
 import { applyCanonical, shouldApplyCanonical, type Transition } from './canonicalApply';
 import { buildCandidatePayload, debounceForCandidate, emitCandidate, type DownCandidate } from './incidents';
@@ -67,7 +68,8 @@ interface TimelineSignal {
   customerId: string;
   reachable: boolean;
   genuineDown: boolean;
-  pastGrace: boolean;
+  pastWarning: boolean;
+  pastOffline: boolean;
   probeResult: string;
 }
 interface CentralResult {
@@ -79,6 +81,7 @@ interface CentralResult {
   failed: boolean;
   deviceTotal: number;
   deviceFlipsToDown: number;
+  episodeSignal: EpisodeSignal;
   timelineSignal: TimelineSignal;
 }
 
@@ -132,7 +135,7 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
     statusToken: workerConfig.statusToken,
   });
   const now = new Date();
-  const verdict = centralVerdict(outcome, c.connectionStatus, c.lastGatewaySuccessCheckAt, workerConfig.offlineGraceMin * 60_000, now.getTime());
+  const verdict = centralVerdict(outcome, c.connectionStatus, c.lastGatewaySuccessCheckAt, workerConfig.warningMin * 60_000, workerConfig.offlineMin * 60_000, now.getTime());
 
   // ── Evidence (item 4) — ALWAYS written (not canonical status). last_gateway_check_at
   //    is the last ATTEMPT; last_gateway_success_check_at is stamped ONLY on success. ──
@@ -148,11 +151,18 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   const downCandidates: DownCandidate[] = [];
   let changed = 0, skipped = 0, deviceFlipsToDown = 0;
 
-  // ── Incident candidate (item 8): only a GENUINE down opens CENTRAL_OFFLINE;
-  //    AUTH_ERROR/CONFIG_ERROR never do. Debounce + emission decided by the caller. ──
-  if (verdict.genuineDown && verdict.pastGrace) {
-    downCandidates.push({ kind: 'CENTRAL_OFFLINE', entityType: 'central', entityId: c.id, tenantId: c.tenantId, customerId: c.customerId, centralId: c.id, causingSignal: `probe:${verdict.probeResult}` });
-  }
+  // ── CENTRAL_OFFLINE is emitted via the episode contract (RFC-0036,
+  //    /incidents/episodes) — NOT the NO_CONSUMPTION /candidates path — driven by
+  //    the per-central signal below and reconciled by reconcileCentralEpisodes.
+  //    Only a GENUINE down PAST THE OFFLINE window opens it; the [warning, offline)
+  //    band is DEGRADED-only (a future CENTRAL_WARNING stage). `downCandidates`
+  //    now carries DEVICE_OFFLINE only. ──
+  const episodeSignal: EpisodeSignal = {
+    centralId: c.id, tenantId: c.tenantId, customerId: c.customerId ?? null,
+    pastOffline: verdict.genuineDown && verdict.pastOffline,
+    online: outcome.ok,
+    lastSuccessAt: c.lastGatewaySuccessCheckAt ?? null,
+  };
 
   // ── Central status classification (item 5) → shadow ledger + transition. ──
   const centralTransition = verdict.proposedStatus !== c.connectionStatus;
@@ -185,7 +195,8 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   deviceFlipsToDown += dev.deviceFlipsToDown;
 
   return { checkRows, transitions, downCandidates, changed, skipped, failed: !outcome.ok, deviceTotal: centralDevices.length, deviceFlipsToDown,
-    timelineSignal: { centralId: c.id, tenantId: c.tenantId, customerId: c.customerId, reachable: verdict.reachable, genuineDown: verdict.genuineDown, pastGrace: verdict.pastGrace, probeResult: verdict.probeResult } };
+    episodeSignal,
+    timelineSignal: { centralId: c.id, tenantId: c.tenantId, customerId: c.customerId, reachable: verdict.reachable, genuineDown: verdict.genuineDown, pastWarning: verdict.pastWarning, pastOffline: verdict.pastOffline, probeResult: verdict.probeResult } };
 }
 
 interface DeviceLoopResult {
@@ -394,12 +405,31 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     log('warn', 'timeline history write failed (sweep continues)', { error: timelineError });
   }
 
-  // ── Incidents (item 8) — sanity held blocks emission too. ──
+  // ── Incidents (item 8) — sanity held blocks emission too. `downCandidates` is
+  //    DEVICE_OFFLINE only now; CENTRAL_OFFLINE goes through the episode path below. ──
   const inc = (!sanity.held && downCandidates.length > 0)
     ? await emitIncidents(downCandidates, control, log)
     : { posted: 0, dryRun: 0, disabled: 0, debounced: 0, failed: 0 };
 
   const incidents = { candidates: downCandidates.length, ...inc };
+
+  // ── CENTRAL_OFFLINE episodes (RFC-0036, /incidents/episodes) — reconcile the
+  //    durable per-central open/recover intent. Gated by the incident-emission
+  //    flag AND a configured ALARMS URL; failed recovers are retried on later
+  //    ticks so an episode never stays open after the central is back online. ──
+  const episodeResult = !sanity.held
+    ? await reconcileCentralEpisodes(
+        results.map((r) => r.episodeSignal),
+        {
+          emissionEnabled: control.flags.incidentEmissionEnabled,
+          apiUrl: workerConfig.alarmsApiUrl,
+          apiToken: workerConfig.alarmsApiToken,
+          source: 'gcdr-orchestrator-devices',
+          severity: 'HIGH',
+        },
+        log,
+      )
+    : { opened: 0, reposted: 0, recovered: 0, failed: 0, skipped: 0 };
 
   await db.update(orchestratorDevicesRuns).set({
     finishedAt: new Date(), scanned, changed, skipped, failures,
@@ -408,13 +438,14 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
       deviceTotal, deviceFlipsToDown,
       sanity: { held: sanity.held, flippedPct: Number(sanity.flippedPct.toFixed(1)), reason: sanity.reason ?? null },
       incidents,
+      centralEpisodes: episodeResult,
       timeline: { inserted: timelineInserted, failed: timelineFailed, ...(timelineError ? { error: timelineError } : {}) },
     },
   }).where(eq(orchestratorDevicesRuns.id, runId));
 
   log('info', 'centrals sweep done', {
     due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
-    mode, applied, audited, sanityHeld: sanity.held, incidents,
+    mode, applied, audited, sanityHeld: sanity.held, incidents, centralEpisodes: episodeResult,
     timeline: { inserted: timelineInserted, failed: timelineFailed },
   });
 

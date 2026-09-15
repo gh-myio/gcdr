@@ -38,7 +38,7 @@ function clientIp(req: Request): string {
  * GET /orchestrator-devices/control
  * Full scope table + a derived summary mirroring control.ts:loadControl.
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/control', async (_req: Request, res: Response) => {
   try {
     const rows = (await db.execute(sql`
       select scope, enabled, config, last_run_at, updated_at, updated_by
@@ -142,7 +142,7 @@ async function writeControlAudit(req: Request, c: ControlChange): Promise<void> 
   });
 }
 
-router.patch('/:scope', async (req: Request, res: Response) => {
+router.patch('/control/:scope', async (req: Request, res: Response) => {
   try {
     const scope = String(req.params.scope || '').toUpperCase();
     if (!ALL_SCOPES.has(scope)) {
@@ -195,6 +195,119 @@ router.patch('/:scope', async (req: Request, res: Response) => {
     });
 
     res.json({ scope, enabled: nextEnabled, config: nextConfig });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * GET /orchestrator-devices/runs?limit=25
+ * Recent monitor sweeps (Varreduras tab) — the run ledger with its notes
+ * (mode/applied/incidents/centralEpisodes/timeline). JWT centrals:read.
+ */
+router.get('/runs', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 2000);
+    const fromTsQ = Number(req.query.fromTs);
+    const toTsQ = Number(req.query.toTs);
+    const from = Number.isFinite(fromTsQ) ? new Date(fromTsQ).toISOString() : null;
+    const to = Number.isFinite(toTsQ) ? new Date(toTsQ).toISOString() : null;
+    const runs = (await db.execute(sql`
+      select id, monitor, started_at, finished_at, scanned, changed, skipped, deferred, failures, notes
+      from orchestrator_devices_runs
+      where (${from}::timestamptz is null or started_at >= ${from}::timestamptz)
+        and (${to}::timestamptz is null or started_at <= ${to}::timestamptz)
+      order by started_at desc limit ${limit}`)) as unknown as Row[];
+    res.json({ runs });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * GET /orchestrator-devices/divergence
+ * Where the stored canonical status differs from what the last sweep proposed
+ * (shadow ledger). Centrals + devices. JWT centrals:read.
+ */
+router.get('/divergence', async (_req: Request, res: Response) => {
+  try {
+    const centrals = (await db.execute(sql`
+      select c.id, c.name, c.connection_status as current, k.proposed_write->>'connectionStatus' as proposed
+      from orchestrator_devices_checks k join centrals c on c.id = k.entity_id
+      where k.entity_type = 'central'
+        and k.run_id = (select id from orchestrator_devices_runs where monitor='centrals' order by started_at desc limit 1)
+        and c.connection_status::text is distinct from k.proposed_write->>'connectionStatus'
+      limit 200`)) as unknown as Row[];
+    const devices = (await db.execute(sql`
+      select d.id, d.name, d.connectivity_status as current, k.proposed_write->>'connectivityStatus' as proposed,
+             d.health_status as current_health, k.proposed_write->>'healthStatus' as proposed_health
+      from orchestrator_devices_checks k join devices d on d.id = k.entity_id
+      where k.entity_type = 'device'
+        and k.run_id = (select id from orchestrator_devices_runs where monitor='centrals' order by started_at desc limit 1)
+        and (d.connectivity_status::text is distinct from k.proposed_write->>'connectivityStatus'
+             or d.health_status::text is distinct from k.proposed_write->>'healthStatus')
+      limit 500`)) as unknown as Row[];
+    res.json({ centrals, devices });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * GET /orchestrator-devices/rule-mutes?limit=100
+ * The NO_CONSUMPTION auto-mute ledger (Regras tab) — what the worker actually
+ * muted/restored (active + recently restored). JWT centrals:read.
+ */
+router.get('/rule-mutes', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+    const rows = (await db.execute(sql`
+      select m.rule_id, m.device_id, m.reason, m.mode, m.today_count, m.max_daily, m.local_day, m.muted_at, m.restored_at,
+             r.name as rule_name, d.name as device_name
+      from orchestrator_rule_mutes m
+      left join rules r on r.id = m.rule_id
+      left join devices d on d.id = m.device_id
+      order by m.muted_at desc limit ${limit}`)) as unknown as Row[];
+    const mutes = rows.map((m) => ({
+      ruleId: String(m.rule_id), ruleName: (m.rule_name as string) || null,
+      deviceId: String(m.device_id), deviceName: (m.device_name as string) || null,
+      reason: m.reason, mode: m.mode, todayCount: m.today_count, maxDaily: m.max_daily,
+      localDay: m.local_day, mutedAt: m.muted_at, restoredAt: m.restored_at,
+      active: m.restored_at === null || m.restored_at === undefined,
+    }));
+    res.json({ activeMutes: mutes.filter((m) => m.active).length, mutes });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * GET /orchestrator-devices/checks?entityType=device&limit=200&centralId=&state=
+ * Recent per-check states from the shadow ledger (Dispositivos tab) — the latest
+ * computed connectivity/health per device (or central). JWT centrals:read.
+ */
+router.get('/checks', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
+    const entityType = req.query.entityType === 'central' || req.query.entityType === 'device' ? String(req.query.entityType) : null;
+    const centralId = (req.query.centralId as string) || null;
+    const statePattern = req.query.state ? `%${String(req.query.state)}%` : null;
+    // Only the LATEST check per entity from the most recent centrals run.
+    const checks = (await db.execute(sql`
+      select distinct on (k.entity_type, k.entity_id)
+             k.entity_type, k.entity_id, k.central_id, c.name as central_name,
+             d.name as device_name, d.slave_id, coalesce(c.customer_id, d.customer_id) as customer_id,
+             k.computed_state, k.proposed_write->>'unknownReason' as unknown_reason,
+             k.caused_transition, k.latency_ms, k.created_at
+      from orchestrator_devices_checks k
+      left join centrals c on c.id = k.central_id
+      left join devices d on (k.entity_type = 'device' and d.id = k.entity_id)
+      where (${entityType}::text is null or k.entity_type = ${entityType})
+        and (${centralId}::uuid is null or k.central_id = ${centralId}::uuid)
+        and (${statePattern}::text is null or k.computed_state ilike ${statePattern})
+      order by k.entity_type, k.entity_id, k.created_at desc
+      limit ${limit}`)) as unknown as Row[];
+    res.json({ checks });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

@@ -3027,6 +3027,26 @@ export const orchestratorDevicesControl = pgTable('orchestrator_devices_control'
   updatedBy: uuid('updated_by'),
 });
 
+// RFC-0036 (ED-1233) — durable CENTRAL_OFFLINE episode intent (migration 0077).
+// One row per central with an OPEN or pending-recovery episode; the worker
+// reconciles it against ALARMS /incidents/episodes each tick so a recover()
+// failure is retried and survives restart (no eternally-open episode).
+export const orchestratorDevicesCentralEpisodes = pgTable('orchestrator_devices_central_episodes', {
+  centralId:       uuid('central_id').primaryKey(),
+  tenantId:        uuid('tenant_id').notNull(),
+  customerId:      uuid('customer_id'),
+  kind:            varchar('kind', { length: 30 }).notNull().default('CENTRAL_OFFLINE'),
+  episodeId:       text('episode_id'),
+  phase:           varchar('phase', { length: 20 }).notNull().default('DOWN'), // DOWN | RECOVER
+  observedAt:      timestamp('observed_at', { withTimezone: true }).notNull(),
+  lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+  synced:          boolean('synced').notNull().default(false),
+  attempts:        integer('attempts').notNull().default(0),
+  lastError:       text('last_error'),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Per-scan run ledger (§7/§12): one row per monitor scan.
 export const orchestratorDevicesRuns = pgTable('orchestrator_devices_runs', {
   id:         uuid('id').primaryKey().defaultRandom(),
