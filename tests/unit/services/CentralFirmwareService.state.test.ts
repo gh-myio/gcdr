@@ -174,15 +174,18 @@ describe('deploy() — the refusals decided again', () => {
 
   it('carries the refusals on the error, so the screen can show all of them', async () => {
     const mender = fakeMender([device({ status: 'pending', artifactName: null })]);
-    try {
-      await new CentralFirmwareService(mender).deploy(TENANT, CENTRAL, 'rc14.1.3', 'ana');
-      throw new Error('should have refused');
-    } catch (err) {
-      const details = (err as unknown as { details?: Array<{ code: string }> }).details;
-      expect(details?.map((d) => d.code)).toEqual(
-        expect.arrayContaining(['DEVICE_PENDING', 'NO_INVENTORY']),
-      );
-    }
+    // Captured rather than caught: an expect inside a catch does not run at all
+    // if the call unexpectedly succeeds, which is the one outcome this test
+    // exists to rule out.
+    const err = await new CentralFirmwareService(mender)
+      .deploy(TENANT, CENTRAL, 'rc14.1.3', 'ana')
+      .then(() => null, (e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    const details = (err as { details?: Array<{ code: string }> }).details;
+    expect(details?.map((d) => d.code)).toEqual(
+      expect.arrayContaining(['DEVICE_PENDING', 'NO_INVENTORY']),
+    );
   });
 
   it('refuses an artifact name that is not a real artifact', async () => {
