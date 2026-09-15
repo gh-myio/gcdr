@@ -259,9 +259,61 @@ export interface MenderHttp {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body: unknown): Promise<T>;
   put<T>(path: string, body: unknown): Promise<T>;
+  /** POST whose answer is the created resource's id, taken from Location. */
+  create(path: string, body: unknown): Promise<string>;
+}
+
+/**
+ * The id of a resource Mender has just created.
+ *
+ * Creating a deployment answers 201 with an empty body and a Location header --
+ * `/api/management/v1/deployments/deployments/<id>` -- and reading the body
+ * instead gives an empty string. Measured on 2026-09-15: a deployment created
+ * for the bench board came back 202 from this API with deploymentId: "", while
+ * the deployment itself existed in Mender, correctly aimed, with
+ * initial_device_count 1. The update was fine; only the receipt was missing.
+ */
+export function idFromLocation(location: string | null): string {
+  if (!location) return '';
+  const tail = location.split('?')[0].replace(/\/+$/, '').split('/').pop() || '';
+  return tail.replace(/"/g, '');
 }
 
 class FetchMenderHttp implements MenderHttp {
+  private async raw(method: string, path: string, body?: unknown): Promise<Response> {
+    if (!MENDER_TOKEN) {
+      throw new ValidationError('MENDER_API_TOKEN não está configurado');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MENDER_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${MENDER_BASE}${path}`, {
+        method,
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${MENDER_TOKEN}`,
+          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
+      if (res.status === 404) throw new NotFoundError('recurso não encontrado no Mender');
+      if (res.status === 409) throw new ConflictError('o Mender recusou por conflito');
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        // The token must never reach a log or a response body.
+        throw new ValidationError(`Mender respondeu ${res.status}: ${text.slice(0, 300)}`);
+      }
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async create(path: string, body: unknown): Promise<string> {
+    const res = await this.raw('POST', path, body);
+    return idFromLocation(res.headers.get('location'));
+  }
+
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     if (!MENDER_TOKEN) {
       throw new ValidationError('MENDER_API_TOKEN não está configurado');
@@ -396,12 +448,21 @@ export class MenderService {
    * Keeping the check in one place is what stops the two from drifting apart.
    */
   async deploy(deviceId: string, artifactName: string, name: string): Promise<{ id: string }> {
-    const id = await this.http.post<string>('/v1/deployments/deployments', {
+    // create(), not post(): Mender answers 201 with an empty body and the id in
+    // Location. Reading the body gives "" -- which is what the first real
+    // deployment from this service returned, while the deployment itself existed
+    // and was correctly aimed at one device.
+    //
+    // force_installation is deliberately NOT set. The Mender console sets it on
+    // the deployments it creates, which tells the client to install even when it
+    // would rather not. For a button somebody uses without the person who built
+    // it standing next to them, the conservative default is the right one.
+    const id = await this.http.create('/v1/deployments/deployments', {
       name,
       artifact_name: artifactName,
       devices: [deviceId],
     });
-    return { id: String(id || '').replace(/"/g, '') };
+    return { id };
   }
 
   async abort(deploymentId: string): Promise<void> {
