@@ -55,7 +55,7 @@ export const connectivityStatusEnum = pgEnum('connectivity_status', ['ONLINE', '
 
 export const partnerStatusEnum = pgEnum('partner_status', ['PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED', 'REJECTED']);
 
-export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION']);
+export const ruleTypeEnum = pgEnum('rule_type', ['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION', 'CENTRAL_OFFLINE']);
 
 export const rulePriorityEnum = pgEnum('rule_priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 

@@ -1,6 +1,6 @@
 import { BaseEntity, EntityStatus } from '../../shared/types';
 
-export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW' | 'DEVICE_OFFLINE' | 'NO_CONSUMPTION';
+export type RuleType = 'ALARM_THRESHOLD' | 'SLA' | 'ESCALATION' | 'MAINTENANCE_WINDOW' | 'DEVICE_OFFLINE' | 'NO_CONSUMPTION' | 'CENTRAL_OFFLINE';
 export type RulePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComparisonOperator = 'GT' | 'GTE' | 'LT' | 'LTE' | 'EQ' | 'NEQ' | 'BETWEEN' | 'OUTSIDE' | 'UNCHANGED';
 export type AggregationType = 'AVG' | 'MIN' | 'MAX' | 'SUM' | 'COUNT' | 'LAST';

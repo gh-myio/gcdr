@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Enums
-const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION']);
+const RuleTypeSchema = z.enum(['ALARM_THRESHOLD', 'SLA', 'ESCALATION', 'MAINTENANCE_WINDOW', 'DEVICE_OFFLINE', 'NO_CONSUMPTION', 'CENTRAL_OFFLINE']);
 
 // RFC-0055 — no-consumption (data-absence) rule config. v1 restricts windowMinutes
 // to 60 and metric to the consumption domains; timezone is required (never defaulted).
