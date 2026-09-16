@@ -221,6 +221,7 @@ export class RuleService {
       MAINTENANCE_WINDOW: 0,
       DEVICE_OFFLINE: 0,
       NO_CONSUMPTION: 0,
+      CENTRAL_OFFLINE: 0,
     };
     const byPriority: Record<string, number> = {
       LOW: 0,

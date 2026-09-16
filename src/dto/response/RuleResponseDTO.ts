@@ -6,6 +6,7 @@ import {
   SLAConfig,
   EscalationConfig,
   MaintenanceWindowConfig,
+  OfflineConfig,
   NotificationChannel,
 } from '../../domain/entities/Rule';
 import { EntityStatus } from '../../shared/types';
@@ -23,6 +24,7 @@ export interface RuleResponseDTO {
   slaConfig?: SLAConfig;
   escalationConfig?: EscalationConfig;
   maintenanceConfig?: MaintenanceWindowConfig;
+  offlineConfig?: OfflineConfig;
   notificationChannels?: NotificationChannel[];
   tags: string[];
   status: EntityStatus;

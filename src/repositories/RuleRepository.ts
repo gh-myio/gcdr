@@ -47,6 +47,7 @@ export class RuleRepository implements IRuleRepository {
       escalationConfig: data.escalationConfig || null,
       maintenanceConfig: data.maintenanceConfig || null,
       noConsumptionConfig: data.noConsumptionConfig || null,
+      offlineConfig: data.offlineConfig || null,
       notificationChannels: data.notificationChannels || [],
       notifications: data.notifications || null,
       scopeProfiles: data.scope.scopeProfiles ?? null,
@@ -98,6 +99,7 @@ export class RuleRepository implements IRuleRepository {
     if (data.escalationConfig !== undefined) updateData.escalationConfig = data.escalationConfig;
     if (data.maintenanceConfig !== undefined) updateData.maintenanceConfig = data.maintenanceConfig;
     if (data.noConsumptionConfig !== undefined) updateData.noConsumptionConfig = data.noConsumptionConfig;
+    if (data.offlineConfig !== undefined) updateData.offlineConfig = data.offlineConfig;
   }
 
   async update(tenantId: string, id: string, data: UpdateRuleDTO, updatedBy: string): Promise<Rule> {
@@ -477,6 +479,7 @@ export class RuleRepository implements IRuleRepository {
       escalationConfig: row.escalationConfig as Rule['escalationConfig'],
       maintenanceConfig: row.maintenanceConfig as Rule['maintenanceConfig'],
       noConsumptionConfig: row.noConsumptionConfig as Rule['noConsumptionConfig'],
+      offlineConfig: row.offlineConfig as Rule['offlineConfig'],
       notificationChannels: row.notificationChannels as Rule['notificationChannels'],
       notifications: row.notifications as RuleNotifications ?? undefined,
       scopeProfiles: (row.scopeProfiles && row.scopeProfiles.length > 0) ? row.scopeProfiles as string[] : undefined,
