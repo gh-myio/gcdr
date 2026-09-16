@@ -21,6 +21,8 @@ export interface EpisodeSignal {
   centralId: string;
   tenantId: string;
   customerId: string | null;
+  centralName: string | null;   // enrichment — sent on the POST so ALARMS need not look it up
+  customerName: string | null;  // enrichment — same
   pastOffline: boolean; // genuine down AND ≥ the configured offline window
   online: boolean;      // last probe OK (reachable)
   lastSuccessAt: Date | null;
@@ -56,7 +58,7 @@ function headers(config: EpisodeEmitConfig): Record<string, string> {
 }
 
 async function postDown(
-  p: { customerId: string; centralId: string; observedAt: string; lastHeartbeatAt: string | null; episodeId: string | null },
+  p: { customerId: string; centralId: string; centralName: string | null; customerName: string | null; observedAt: string; lastHeartbeatAt: string | null; episodeId: string | null },
   config: EpisodeEmitConfig,
 ): Promise<DownResult> {
   try {
@@ -69,6 +71,11 @@ async function postDown(
       severity: config.severity ?? 'HIGH',
       observedAt: p.observedAt,
     };
+    // Enrichment (ALARMS §episodes): always send the names when we have them so
+    // the backend need not look them up, and the name survives even if the
+    // central isn't in the GCDR yet.
+    if (p.customerName) body.customerName = p.customerName;
+    if (p.centralName) body.centralName = p.centralName;
     if (p.lastHeartbeatAt) body.lastHeartbeatAt = p.lastHeartbeatAt;
     if (p.episodeId) body.episodeId = p.episodeId;
     const res = await fetch(`${config.apiUrl!.replace(/\/$/, '')}/incidents/episodes`, {
@@ -128,7 +135,7 @@ async function handleDown(sig: EpisodeSignal, row: EpisodeRow | undefined, confi
     },
   });
 
-  const r = await postDown({ customerId: sig.customerId, centralId: sig.centralId, observedAt, lastHeartbeatAt, episodeId }, config);
+  const r = await postDown({ customerId: sig.customerId, centralId: sig.centralId, centralName: sig.centralName, customerName: sig.customerName, observedAt, lastHeartbeatAt, episodeId }, config);
   if (r.ok) {
     await db.update(episodes).set({ episodeId: r.episodeId ?? episodeId, synced: true, lastError: null, updatedAt: new Date() })
       .where(eq(episodes.centralId, sig.centralId));
