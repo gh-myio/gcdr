@@ -39,7 +39,7 @@ async function main(): Promise<void> {
       };
       if (req.method === 'POST' && url.endsWith('/incidents/episodes')) {
         json(201, { episodeId: 'ep-' + randomUUID(), created: true });
-      } else if (req.method === 'POST' && /\/incidents\/episodes\/.+\/recover$/.test(url)) {
+      } else if (req.method === 'POST' && url.startsWith('/incidents/episodes/') && url.endsWith('/recover')) {
         json(200, { alreadyRecovered: false });
       } else {
         json(404, {});
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   console.log('\n[2] ONLINE (central recovered)');
   const up: EpisodeSignal = { centralId, tenantId, customerId, centralName: 'Central E2E', customerName: 'Cliente E2E', pastOffline: false, online: true, lastSuccessAt: new Date() };
   const r2 = await reconcileCentralEpisodes([up], config, log);
-  const postRecover = received.find((x) => x.method === 'POST' && /\/recover$/.test(x.url));
+  const postRecover = received.find((x) => x.method === 'POST' && x.url.endsWith('/recover'));
   const row2 = (await db.select().from(episodes).where(eq(episodes.centralId, centralId)))[0];
   check('recovered = 1', r2.recovered === 1);
   check('POST .../recover received', !!postRecover);
