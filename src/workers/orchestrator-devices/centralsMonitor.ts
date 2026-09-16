@@ -18,6 +18,7 @@ import { and, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '../../infrastructure/database/drizzle/db';
 import {
   centrals,
+  customers,
   devices,
   orchestratorDevicesRuns,
   orchestratorDevicesChecks,
@@ -45,6 +46,8 @@ interface CentralRow {
   hardwareId: string | null;
   tenantId: string;
   customerId: string;
+  name: string;
+  customerName: string | null;
   connectionStatus: string;
   checkIntervalSeconds: number | null;
   retryPolicy: string | null;
@@ -159,6 +162,7 @@ async function processCentral(c: CentralRow, centralDevices: DeviceRow[], policy
   //    now carries DEVICE_OFFLINE only. ──
   const episodeSignal: EpisodeSignal = {
     centralId: c.id, tenantId: c.tenantId, customerId: c.customerId ?? null,
+    centralName: c.name ?? null, customerName: c.customerName ?? null,
     pastOffline: verdict.genuineDown && verdict.pastOffline,
     online: outcome.ok,
     lastSuccessAt: c.lastGatewaySuccessCheckAt ?? null,
@@ -290,10 +294,14 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     checkIntervalSeconds: centrals.checkIntervalSeconds, retryPolicy: centrals.retryPolicy,
     lastGatewayCheckAt: centrals.lastGatewayCheckAt,
     lastGatewaySuccessCheckAt: centrals.lastGatewaySuccessCheckAt,
-  }).from(centrals).where(and(
-    eq(centrals.monitoringEnabled, true),
-    eq(centrals.status, 'ACTIVE'), // never scan archived/inactive gateways, even if the flag is on
-  ))) as CentralRow[];
+    name: centrals.name,
+    customerName: customers.name,
+  }).from(centrals)
+    .leftJoin(customers, eq(centrals.customerId, customers.id))
+    .where(and(
+      eq(centrals.monitoringEnabled, true),
+      eq(centrals.status, 'ACTIVE'), // never scan archived/inactive gateways, even if the flag is on
+    ))) as CentralRow[];
 
   const due = enabled
     .filter((c) => isDue(c, workerConfig.checkIntervalSeconds, workerConfig.checkJitterPct))
