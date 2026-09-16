@@ -2,10 +2,11 @@ import { eq, and, desc, lt, inArray, sql } from 'drizzle-orm';
 import { db, schema, CentralCommand } from '../infrastructure/database/drizzle/db';
 import { generateId } from '../shared/utils/idGenerator';
 import { now } from '../shared/utils/dateUtils';
+import { WifiPayloadDTO } from '../dto/request/CentralCommandDTO';
 
 const { centralCommands } = schema;
 
-export type CommandType = 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI';
+export type CommandType = 'REBOOT' | 'RESTART_ERLANG' | 'RESTART_MYIOAPI' | 'SET_WIFI';
 export type CommandStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
 
 export interface CreateCommandInput {
@@ -13,6 +14,8 @@ export interface CreateCommandInput {
   tenantId: string;
   centralId: string;
   type: CommandType;
+  // SET_WIFI carries { ssid, password, country }; null for payload-less commands.
+  payload?: WifiPayloadDTO | null;
   createdBy?: string | null;
 }
 
@@ -24,6 +27,8 @@ export interface UpdateCommandPatch {
   errorMessage?: string | null;
   claimedAt?: Date | null;
   completedAt?: Date | null;
+  // Set to null on a terminal transition to purge the consumed SET_WIFI secret.
+  payload?: WifiPayloadDTO | null;
 }
 
 /**
@@ -43,6 +48,7 @@ export class CentralCommandRepository {
         tenantId: input.tenantId,
         centralId: input.centralId,
         type: input.type,
+        payload: input.payload ?? null,
         status: 'QUEUED',
         createdAt: ts,
         updatedAt: ts,
@@ -193,19 +199,31 @@ export class CentralCommandRepository {
   }
 
   /**
-   * Visibility-timeout: a RUNNING command whose central died stops reporting, so
-   * updated_at goes stale while status stays RUNNING. Sweep cross-tenant for
-   * RUNNING commands not updated within `olderThanMs` and fail them.
+   * Visibility-timeout sweep for stalled commands — both ways a central can go
+   * away:
+   *   - RUNNING whose central died mid-command and stopped reporting;
+   *   - QUEUED that an offline central never claimed. Left forever, that orphan
+   *     makes findActiveByCentral reject every new command (including a REBOOT),
+   *     and its SET_WIFI password lingers with it.
+   * Fail rows in either state not updated within `olderThanMs`, and null the
+   * payload so no consumed/abandoned WiFi secret is retained.
    */
   reapStalledJobsQuery(cutoff: Date) {
     return db
       .update(centralCommands)
       .set({
         status: 'FAILED',
-        errorMessage: 'command timed out: no result reported within the stall window',
+        errorMessage:
+          'command timed out: the central did not claim or report it within the stall window',
+        payload: null,
         updatedAt: new Date(now()),
       })
-      .where(and(eq(centralCommands.status, 'RUNNING'), lt(centralCommands.updatedAt, cutoff)))
+      .where(
+        and(
+          inArray(centralCommands.status, ['QUEUED', 'RUNNING']),
+          lt(centralCommands.updatedAt, cutoff),
+        ),
+      )
       .returning({ id: centralCommands.id, centralId: centralCommands.centralId });
   }
 

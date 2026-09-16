@@ -1,14 +1,45 @@
 import { z } from 'zod';
 
-export const COMMAND_TYPES = ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI'] as const;
+export const COMMAND_TYPES = ['REBOOT', 'RESTART_ERLANG', 'RESTART_MYIOAPI', 'SET_WIFI'] as const;
 export const COMMAND_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED'] as const;
 
-// POST /centrals/:id/commands — operator sends an operational command to the
-// central (reboot the box, restart the erlang/myio-core service, or restart the
-// myioapi service).
-export const CreateCommandSchema = z.object({
-  type: z.enum(COMMAND_TYPES),
+// SET_WIFI payload — the target network the central applies via myio-wifi-set.
+// The password is a secret: it is written for the central to consume and is
+// stripped from every operator-facing response (see CentralCommandService).
+export const WifiPayloadSchema = z.object({
+  ssid: z.string().min(1).max(64),
+  password: z.string().min(8).max(128),
+  // Normalized to upper case on the way in: the regex accepts `br` but
+  // wpa_supplicant expects an upper-case ISO 3166-1 alpha-2 code, and the value
+  // is handed to myio-wifi-set verbatim.
+  country: z
+    .string()
+    .regex(/^[A-Z]{2}$/i, 'country must be a 2-letter ISO code')
+    .transform((c) => c.toUpperCase())
+    .optional(),
 });
+export type WifiPayloadDTO = z.infer<typeof WifiPayloadSchema>;
+
+// POST /centrals/:id/commands — operator sends an operational command to the
+// central (reboot the box, restart the erlang/myio-core service, restart the
+// myioapi service, or configure WiFi). Only SET_WIFI carries a payload; the
+// refine makes a valid network mandatory for it and irrelevant for the rest.
+export const CreateCommandSchema = z
+  .object({
+    type: z.enum(COMMAND_TYPES),
+    payload: WifiPayloadSchema.optional(),
+  })
+  .refine((d) => d.type !== 'SET_WIFI' || d.payload !== undefined, {
+    message: 'SET_WIFI requires a payload with { ssid, password }',
+    path: ['payload'],
+  })
+  // And the other way round: reboot/restart take no payload, so accepting one
+  // would write a secret into a row that never consumes it -- retention with no
+  // purpose. Rejecting is also the honest answer, since the value is ignored.
+  .refine((d) => d.type === 'SET_WIFI' || d.payload === undefined, {
+    message: 'only SET_WIFI takes a payload',
+    path: ['payload'],
+  });
 export type CreateCommandDTO = z.infer<typeof CreateCommandSchema>;
 
 // PATCH /central-agent/commands/:cmdId — the central reports the result of the
