@@ -1,5 +1,6 @@
 export type TemplateType =
   | 'EMAIL_ALARM'
+  | 'EMAIL_CENTRAL_OFFLINE'
   | 'EMAIL_REPORT'
   | 'EMAIL_WELCOME'
   | 'RELEASE_NOTE'
