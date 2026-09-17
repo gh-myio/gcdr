@@ -182,7 +182,12 @@ export async function runRulesSweep(control: ControlState, log: Logger): Promise
       : { reader: reader.kind, rules: groups.length, wouldMute, wouldRestore, mode: 'shadow' },
   }).where(eq(orchestratorDevicesRuns.id, run.id));
 
-  log('info', 'rules sweep done', canonical
-    ? { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, muted, restored, skipped: applySkipped, errors: applyErrors, mode: 'canonical' }
-    : { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, mode: 'shadow' });
+  // Idle ticks (no rules to evaluate — the common case in prod) stay quiet, so
+  // the summary (which carries an `errors` counter) never floods the Dokploy
+  // panel or reads as an error. The DB run + heartbeat still record the tick.
+  if (groups.length > 0) {
+    log('info', 'rules sweep done', canonical
+      ? { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, muted, restored, skipped: applySkipped, errors: applyErrors, mode: 'canonical' }
+      : { reader: reader.kind, rules: groups.length, scanned, wouldMute, wouldRestore, mode: 'shadow' });
+  }
 }
