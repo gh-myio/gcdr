@@ -15,6 +15,7 @@ import {
 } from '../dto/request/CentralBackupDTO';
 import { centralRestoreService } from '../services/CentralRestoreService';
 import { centralCommandService } from '../services/CentralCommandService';
+import { centralFirmwareService } from '../services/CentralFirmwareService';
 import { CreateCommandSchema } from '../dto/request/CentralCommandDTO';
 import {
   StartRestoreSchema,
@@ -957,5 +958,95 @@ router.get('/:id/commands/:commandId', async (req: Request, res: Response, next:
     next(err);
   }
 });
+
+/* ===================================================================
+ * Firmware
+ *
+ * NOT a central command, and kept apart from them on purpose. A command goes into
+ * a queue that the board's agent claims on its next poll; firmware does not touch
+ * the board at all. gcdr creates a deployment in Mender, server to server, and the
+ * board picks it up on the poll it was already doing. That is what makes this work
+ * on the fleet: of 151 boards reporting inventory on 2026-09-15, 92 ran rc12.4.2
+ * and none of those images carry the agent.
+ *
+ * AUTHORIZATION: same posture as the commands above -- these sit behind the
+ * `centrals` write permission from app.ts, with no elevated scope today, and the
+ * UI gates on a confirm dialog. Updating a central is at least as disruptive as
+ * rebooting it, so the same tracked follow-up applies.
+ * =================================================================== */
+
+/**
+ * GET /centrals/:id/firmware
+ * What this central runs, what it could run, and every reason it should not.
+ */
+router.get('/:id/firmware', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const target = typeof req.query.target === 'string' ? req.query.target : undefined;
+    const result = await centralFirmwareService.state(tenantId, req.params.id, target);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /centrals/:id/firmware/deploy
+ * Ask Mender to update this central. 202: asked for, not done -- the board still
+ * has to poll, download, install and reboot, and it may still refuse.
+ */
+router.post('/:id/firmware/deploy',
+  logEvent({
+    eventType: EventType.CENTRAL_FIRMWARE_DEPLOY_REQUESTED,
+    description: (req) => `Firmware ${req.body?.artifactName} requested for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, userId, requestId } = req.context;
+      const artifactName = String(req.body?.artifactName || '');
+      const result = await centralFirmwareService.deploy(tenantId, req.params.id, artifactName, userId);
+      sendSuccess(res, result, 202, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /centrals/:id/firmware/deployment
+ * The deployment in flight, if there is one, with Mender's own statistics.
+ */
+router.get('/:id/firmware/deployment', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId, requestId } = req.context;
+    const result = await centralFirmwareService.deploymentStatus(tenantId, req.params.id);
+    sendSuccess(res, result, 200, requestId);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /centrals/:id/firmware/deployment
+ * Abort the deployment in flight. Only useful before the board has committed;
+ * after that the A/B rollback is the mechanism, not this.
+ */
+router.delete('/:id/firmware/deployment',
+  logEvent({
+    eventType: EventType.CENTRAL_FIRMWARE_DEPLOY_ABORTED,
+    description: (req) => `Firmware deployment aborted for central ${req.params.id}`,
+    getEntityId: (req) => req.params.id,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tenantId, requestId } = req.context;
+      await centralFirmwareService.abort(tenantId, req.params.id);
+      sendSuccess(res, { aborted: true }, 200, requestId);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;
