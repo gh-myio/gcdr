@@ -274,6 +274,10 @@ async function emitIncidents(candidates: DownCandidate[], control: ControlState,
   const detectedAt = new Date().toISOString();
   const emitCfg = { emissionEnabled: control.flags.incidentEmissionEnabled, apiUrl: workerConfig.alarmsApiUrl, apiToken: workerConfig.alarmsApiToken };
   for (const cand of candidates) {
+    // DEVICE_OFFLINE is not accepted by ALARMS /incidents/candidates yet (only
+    // NO_CONSUMPTION) — gate it behind its own flag (default off) so it never
+    // POSTs a 400. CENTRAL_OFFLINE goes through the episode path, unaffected.
+    if (cand.kind === 'DEVICE_OFFLINE' && !control.flags.deviceOfflineEmissionEnabled) { disabled += 1; continue; }
     const due = await debounceForCandidate(cand, control.flags.incidentOpenAfterTicks);
     if (!due) { debounced += 1; continue; }
     const r = await emitCandidate(buildCandidatePayload(cand, detectedAt), emitCfg, log);
