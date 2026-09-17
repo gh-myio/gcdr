@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "capturedAt": "2026-09-17T17:41:24-03:00",
+  "captureType": "minimal",
+  "captureTypeNote": "Captura via secao TL/DR do runbook (top -bn1 | head -6, df -h, uptime) apenas.",
+  "container": {
+    "service": "gcdr-frontend",
+    "serviceNote": "Nome inferido do processo observado (nginx) e do contexto da sessao; nao confirmado via variavel de ambiente/label do container. Confirmar nome exato no Dokploy se for usar este arquivo para alerta automatizado.",
+    "repo": "gcdr-frontend",
+    "os": "Alpine Linux (mesma familia do gcdr-backend-api, versao nao re-coletada nesta captura minima)",
+    "shell": "busybox sh (sem bash), prompt root (`/ #`) — diferente do gcdr-backend-api, que roda como usuario `gcdr` (`/ $`)",
+    "runbook": "./RUNBOOK-Container-Infra-Snapshot.md",
+    "sameHostAs": "2026-09-17-gcdr-backend-api*.json — mesmo disco (196.6G/81.0G/107.5G/43%) e mesma familia de uptime (2 days 2:1x), host EC2 do Dokploy em comum"
+  },
+  "cpu": {
+    "cpuCount": null,
+    "loadAverage": {
+      "1m": 1.73,
+      "5m": 1.37,
+      "15m": 1.42,
+      "source": "top -bn1 (host-wide, nao namespaceado por container — mesmo host dos snapshots do backend, entao load reflete a VM inteira, nao so este container)"
+    },
+    "topHeader": {
+      "usrPct": 4,
+      "sysPct": 0,
+      "nicePct": 0,
+      "idlePct": 95,
+      "ioPct": 0,
+      "irqPct": 0,
+      "sirqPct": 0,
+      "tasksRunning": "2/546",
+      "lastPid": 1387
+    }
+  },
+  "memory": {
+    "topHeader": {
+      "usedKB": 3787532,
+      "freeKB": 167620,
+      "shrdKB": 290704,
+      "buffKB": 36856,
+      "cachedKB": 2097932
+    },
+    "note": "free -h / /proc/meminfo nao coletados nesta captura minima. Valores muito proximos aos do gcdr-backend-api no mesmo horario — reforca que memory used/free do `top` neste ambiente reflete o HOST inteiro, nao so o container (coerente com load average tambem host-wide)."
+  },
+  "disk": {
+    "mounts": [
+      { "filesystem": "overlay", "mountedOn": "/", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/resolv.conf", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hostname", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hosts", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 }
+    ],
+    "rootRealUsePct": 43,
+    "note": "Identico byte-a-byte aos snapshots do gcdr-backend-api no mesmo dia — confirma tratar-se do overlay do MESMO host Docker, nao um volume proprio deste container."
+  },
+  "uptime": {
+    "hostUptime": "2 days, 2:18",
+    "users": 0,
+    "loadAverage": { "1m": 1.34, "5m": 1.29, "15m": 1.39 },
+    "loadAverageNote": "Leve diferenca vs top -bn1 (1.73/1.37/1.42) por amostragem em instantes distintos; host-wide, nao por container.",
+    "wallClockAtCapture": "17:41:24"
+  },
+  "process": {
+    "pid1": null,
+    "pid1Note": "Nao capturado: `head -6` cortou a saida do top antes da linha do PID 1 (provavelmente o processo master do nginx). Apenas os workers (PID 29 e 30) apareceram. Para pegar o master, usar `top -bn1 | head -10` ou mais nesta imagem.",
+    "observedProcesses": [
+      { "pid": 29, "ppid": 1, "user": "nginx", "cmd": "nginx: worker process", "vszKB": 10928, "cpuPct": 0 },
+      { "pid": 30, "ppid": 1, "user": "nginx", "cmd": "nginx: worker process", "vszKB": 10928, "cpuPct": 0 }
+    ]
+  },
+  "rawOutputs": {
+    "top -bn1 | head -6": "Mem: 3787532K used, 167620K free, 290704K shrd, 36856K buff, 2097932K cached\nCPU:   4% usr   0% sys   0% nic  95% idle   0% io   0% irq   0% sirq\nLoad average: 1.73 1.37 1.42 2/546 1387\n  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND\n   29     1 nginx    S    10928   0%   1   0% nginx: worker process\n   30     1 nginx    S    10928   0%   1   0% nginx: worker process",
+    "df -h | grep -vE tmpfs|shm$": "Filesystem                Size      Used Available Use% Mounted on\noverlay                 196.6G     81.0G    107.5G  43% /\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/resolv.conf\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hostname\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hosts",
+    "uptime": " 17:41:24 up 2 days,  2:18,  0 users,  load average: 1.34, 1.29, 1.39"
+  },
+  "comparisonToOtherContainerSameHost": {
+    "reference": "2026-09-17-gcdr-backend-api-1740.json (17:40:38, 46s antes)",
+    "memoryUsedKB": { "gcdr-frontend": 3787532, "gcdr-backend-api": 3796580, "note": "praticamente identicos, ~9MB de diferenca em 46s — mais uma confirmacao de que 'Mem:' do busybox top e do HOST, nao por container" },
+    "diskUsePct": { "gcdr-frontend": 43, "gcdr-backend-api": 43, "note": "identico, mesmo host" },
+    "loadAverage1m": { "gcdr-frontend_top": 1.73, "gcdr-backend-api_top": 0.57, "note": "load subiu entre as duas capturas (46s de diferenca) — normal, e o load da VM inteira variando, nao um efeito deste container especificamente" }
+  },
+  "notes": [
+    "Este container roda como root (prompt `/ #`), diferente do gcdr-backend-api que roda como usuario `gcdr` (`/ $`) — vale checar se isso e intencional (nginx tipicamente precisa de root so pra bind na porta 80/443 e depois dropa privilegio nos workers; master aqui aparenta ppid 1 dos workers, ou seja o master E o pid 1).",
+    "Mem/CPU/load deste `top` sao do HOST inteiro (confirmado por comparacao direta com o snapshot do gcdr-backend-api quase no mesmo segundo) — para saber o consumo REAL deste container especifico, usar as secoes 2c/1d do runbook (cgroup memory.current/cpu.max), nao capturadas nesta rodada minima.",
+    "PID 1 (nginx master) nao apareceu no `head -6` — se for repetir esta captura, usar `head -8` ou mais para garantir que o processo principal apareca."
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0",
+  "capturedAt": "2026-09-17T14:30:00-03:00",
+  "capturedAtNote": "Usuário reportou 14:30 como horário da captura; a saída literal do comando `uptime` abaixo mostra 17:35:31 no relógio do container. Discrepância não resolvida — registrada como observada, sem ajuste silencioso.",
+  "container": {
+    "service": "gcdr-backend-api",
+    "repo": "gcdr",
+    "os": "Alpine Linux 3.23",
+    "shell": "busybox sh (sem bash)",
+    "runbook": "./RUNBOOK-Container-Infra-Snapshot.md"
+  },
+  "cpu": {
+    "cpuCount": 2,
+    "loadAverage": {
+      "1m": 1.56,
+      "5m": 1.55,
+      "15m": 1.51,
+      "source": "top -bn1 (host-wide, nao namespaceado por container)"
+    },
+    "topHeader": {
+      "usrPct": 0,
+      "sysPct": 0,
+      "nicePct": 0,
+      "idlePct": 95,
+      "ioPct": 0,
+      "irqPct": 0,
+      "sirqPct": 5,
+      "tasksRunning": "3/544",
+      "lastPid": 1298
+    },
+    "procStatDeltaSamplesPct": [1.0, 19.6, 19.6, 113.0, 106.1, 101.6, 16.5, 19.6, 19.6, 68.4],
+    "procStatDeltaNote": "AMOSTRA NAO CONFIAVEL: a segunda linha do comando da secao 1b foi reexecutada varias vezes sem regenerar /tmp/cpu1, entao u1/t1 ficaram desatualizados em relacao ao /proc/stat corrente. Valores >100% confirmam o bug (impossivel com <=2 CPUs medindo uma janela real de 1s). O runbook foi corrigido (comando atomico com `set --`) apos este snapshot. Nao usar esta serie para conclusoes de CPU real; usar o topHeader (idle 95%) como referencia valida desta captura."
+  },
+  "memory": {
+    "freeH": {
+      "totalMB": 3800,
+      "usedMB": 1400,
+      "freeMB": 165.4,
+      "sharedMB": 284.1,
+      "buffCacheMB": 2200,
+      "availableMB": 1800,
+      "swapTotalMB": 4096,
+      "swapUsedMB": 224.1,
+      "swapFreeMB": 3800
+    },
+    "procMeminfo": {
+      "memTotalMB": 3862.5,
+      "memFreeMB": 154.4,
+      "memAvailableMB": 1874.5,
+      "buffersMB": 35.2,
+      "cachedMB": 2050.3,
+      "swapCachedMB": 11.7,
+      "swapTotalMB": 4096.0,
+      "swapFreeMB": 3871.9
+    },
+    "topHeader": {
+      "usedKB": 3780972,
+      "freeKB": 174180,
+      "shrdKB": 290888,
+      "buffKB": 35852,
+      "cachedKB": 2093592
+    },
+    "pid1": {
+      "vmRssKB": 141728,
+      "threads": 11
+    },
+    "swapNote": "Diverge da nota historica 'EC2 sem swap' (motivadora do cutover GHCR/OOM): esta captura mostra 4.0G de swap total configurado na VM, com apenas 224.1M em uso. Ver secao 8 do runbook."
+  },
+  "disk": {
+    "mounts": [
+      { "filesystem": "overlay", "mountedOn": "/", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "tmpfs", "mountedOn": "/dev", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "shm", "mountedOn": "/dev/shm", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/resolv.conf", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hostname", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hosts", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "tmpfs", "mountedOn": "/proc/acpi", "sizeH": "1.9G", "usedH": "0", "availableH": "1.9G", "usePct": 0 },
+      { "filesystem": "tmpfs", "mountedOn": "/proc/interrupts", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "tmpfs", "mountedOn": "/proc/kcore", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "tmpfs", "mountedOn": "/proc/keys", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "tmpfs", "mountedOn": "/proc/timer_list", "sizeH": "64.0M", "usedH": "0", "availableH": "64.0M", "usePct": 0 },
+      { "filesystem": "tmpfs", "mountedOn": "/sys/firmware", "sizeH": "1.9G", "usedH": "0", "availableH": "1.9G", "usePct": 0 }
+    ],
+    "rootRealUsePct": 43,
+    "note": "Raiz (overlay/nvme0n1p1) e o volume real que importa: 196.6G total, 81.0G usado, 107.5G disponivel (43%). Os demais mounts sao pseudo-fs (tmpfs/shm) vazios, esperado."
+  },
+  "uptime": {
+    "hostUptime": "2 days, 2:12",
+    "users": 0,
+    "loadAverage": { "1m": 1.33, "5m": 1.42, "15m": 1.45 },
+    "loadAverageNote": "Levemente diferente do load reportado pelo `top -bn1` (1.56/1.55/1.51) por terem sido amostrados em momentos distintos da sessao; ambos sao host-wide, nao por container.",
+    "wallClockAtCapture": "17:35:31"
+  },
+  "process": {
+    "pid1": {
+      "name": "node",
+      "cmd": "node dist/app.js",
+      "vszKB": 763000,
+      "vszPctOfTotal": "20%",
+      "cpuPct": 0,
+      "threads": 11,
+      "vmRssKB": 141728,
+      "user": "gcdr",
+      "stat": "S"
+    },
+    "otherProcessesObserved": [
+      { "pid": 1125, "ppid": 0, "cmd": "sh", "note": "shell da sessao anterior/persistente" },
+      { "pid": 1291, "ppid": 0, "cmd": "sh", "note": "shell da sessao atual do terminal Dokploy" },
+      { "pid": 1297, "ppid": 1291, "cmd": "top -bn1", "note": "o proprio comando de captura" },
+      { "pid": 1298, "ppid": 1291, "cmd": "head -20", "note": "o proprio comando de captura" }
+    ]
+  },
+  "rawOutputs": {
+    "top -bn1 | head -20": "Mem: 3780972K used, 174180K free, 290888K shrd, 35852K buff, 2093592K cached\nCPU:   0% usr   0% sys   0% nic  95% idle   0% io   0% irq   5% sirq\nLoad average: 1.56 1.55 1.51 3/544 1298\n  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND\n    1     0 gcdr     S     763m  20%   0   0% node dist/app.js\n 1125     0 gcdr     S     1740   0%   0   0% sh\n 1291     0 gcdr     S     1712   0%   1   0% sh\n 1297  1291 gcdr     R     1636   0%   0   0% top -bn1\n 1298  1291 gcdr     S     1624   0%   1   0% head -20",
+    "nproc": "2",
+    "cat /proc/1/status (filtered)": "Name:   node\nVmRSS:    141728 kB\nThreads:        11",
+    "free -h": "              total        used        free      shared  buff/cache   available\nMem:           3.8G        1.4G      165.4M      284.1M        2.2G        1.8G\nSwap:          4.0G      224.1M        3.8G",
+    "df -h": "Filesystem                Size      Used Available Use% Mounted on\noverlay                 196.6G     81.0G    107.5G  43% /\ntmpfs                    64.0M         0     64.0M   0% /dev\nshm                      64.0M         0     64.0M   0% /dev/shm\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/resolv.conf\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hostname\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hosts\ntmpfs                     1.9G         0      1.9G   0% /proc/acpi\ntmpfs                    64.0M         0     64.0M   0% /proc/interrupts\ntmpfs                    64.0M         0     64.0M   0% /proc/kcore\ntmpfs                    64.0M         0     64.0M   0% /proc/keys\ntmpfs                    64.0M         0     64.0M   0% /proc/timer_list\ntmpfs                     1.9G         0      1.9G   0% /sys/firmware",
+    "uptime": " 17:35:31 up 2 days,  2:12,  0 users,  load average: 1.33, 1.42, 1.45"
+  },
+  "notes": [
+    "Ambiente confirmado Alpine 3.23 + busybox (sem bash) — motivou correcoes no runbook (ps -o com %cpu/%mem nao confiavel em busybox).",
+    "Serie de amostras de CPU via /proc/stat (secao 1b) invalidada por reexecucao incorreta do comando — ver cpu.procStatDeltaNote. Usar cpu.topHeader.idlePct como referencia desta captura.",
+    "Swap presente e majoritariamente livre nesta VM hoje, contrariando a nota historica de 'sem swap' do incidente de OOM que motivou o cutover para GHCR — atualizar suposicoes operacionais.",
+    "Memoria/CPU saudaveis nesta captura: idle 95%, available ~1.8G de 3.8G, disco raiz em 43% de uso."
+  ]
+}
