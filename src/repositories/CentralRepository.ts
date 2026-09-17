@@ -464,6 +464,10 @@ export class CentralRepository implements ICentralRepository {
       displayName: row.displayName,
       serialNumber: row.serialNumber,
       hardwareId: row.hardwareId,
+      // RFC-0035 network identity — surfaced top-level from config (additive;
+      // also remains nested in `config`). null/undefined when unset.
+      macAddress: (row.config as Central['config'])?.macAddress,
+      ipv6Yggdrasil: (row.config as Central['config'])?.ipv6Yggdrasil,
       type: row.type,
       status: row.status,
       connectionStatus: row.connectionStatus,

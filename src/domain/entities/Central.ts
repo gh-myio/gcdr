@@ -98,6 +98,13 @@ export interface Central extends BaseEntity {
    * ({id}.y.myio.com.br, RFC-0062). null ⇒ monitor falls back to `id`.
    */
   hardwareId?: string | null;
+  /**
+   * RFC-0035 network identity, surfaced top-level from `config` as a read
+   * convenience (also remains nested in `config`). Optional/additive — writes
+   * go through `config`.
+   */
+  macAddress?: string;
+  ipv6Yggdrasil?: string;
   type: CentralType;
 
   // Status
