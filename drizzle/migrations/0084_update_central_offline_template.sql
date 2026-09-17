@@ -1,4 +1,14 @@
-<!DOCTYPE html>
+-- ED-1244: refresh the central-offline template HTML.
+-- Adds: notified emails in the header ({{#if emails}}), optional central
+-- MAC/IPv6/UID ({{#if gateway.mac/ipv6/uid}}), and optional final sections
+-- Observação ({{#if observation}}) and Ordens de Serviço ({{#if workOrders}}).
+-- The per-rule "Notificados: {{rule.emails}}" line is intentionally kept.
+--
+-- The template already exists (seeded by 0082) — this UPDATEs its html_content
+-- in place. Idempotent: re-running sets the same content. All new fields are
+-- optional, so the alarm-backend render context stays backward-compatible.
+UPDATE templates
+SET html_content = $tmpl$<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -123,3 +133,9 @@
 </div>
 </body>
 </html>
+$tmpl$,
+    updated_at = now()
+WHERE tenant_id = '11111111-1111-1111-1111-111111111111'
+  AND customer_id IS NULL
+  AND type = 'EMAIL_CENTRAL_OFFLINE'
+  AND slug = 'central-offline-notification-v1';

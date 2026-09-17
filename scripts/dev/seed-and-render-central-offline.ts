@@ -40,20 +40,25 @@ async function main(): Promise<void> {
   console.log(`  [seed] template '${SLUG}' inserted id=${row.id} status=${row.status} (tenant default)`);
 
   // ── 3) render with sample data via the real service ───────────────────────
+  // FLAT / singular-aliased shape: {{#each rules}} -> rule, {{#each rule.centrals}}
+  // -> central. Emails + centralsCount live in the header; the notification can
+  // cover MULTIPLE centrals, each with optional mac/ipv6/uid below its label.
   const data = {
-    gateway: { name: 'Central Moxuara 01' },
-    summary: { rulesCount: 1 },
-    // FLAT shape — the custom renderer aliases each {{#each rules}} item as `rule`
-    // and each {{#each rule.devices}} item as `device`, so the item objects hold
-    // the fields directly (item.name, device.name). Same shape the alarm-backend
-    // buildAlarmRenderContext produces; central offline just omits device.value.
+    summary: { rulesCount: 1, centralsCount: 2 },
+    emails: 'ops@moxuara.com.br, suporte@myio.com.br',
+    observation: 'Duas centrais sem comunicação na região; equipe de campo acionada.',
+    workOrders: [
+      { number: 'OS-2087', title: 'Verificar conectividade das centrais', status: 'Aberta' },
+    ],
     rules: [
       {
         name: 'Central offline > 150 min',
         description: 'Notifica quando a central fica sem comunicar por mais de 150 minutos',
         condition: 'offline por 150 minutos',
-        emails: 'ops@moxuara.com.br, suporte@myio.com.br',
-        devices: [{ name: 'Central Moxuara 01', status: 'OFFLINE', timestamp: '16/09/2026 10:42' }],
+        centrals: [
+          { label: 'Central Loja Q303A', name: 'MOX_CENTRAL_01', status: 'OFFLINE', timestamp: '16/09/2026 10:42', mac: '00:1A:2B:3C:4D:5E', ipv6: 'fe80::1a2b:3c4d:5e6f:7a8b', uid: 'gw-7f3a1c9e' },
+          { label: 'Central Subsolo', name: 'MOX_CENTRAL_02', status: 'OFFLINE', timestamp: '16/09/2026 10:55' },
+        ],
       },
     ],
   };
@@ -69,10 +74,22 @@ async function main(): Promise<void> {
   const leftover = result.html.match(/\{\{[^}]+\}\}/g);
   const hasValor = /<th[^>]*>\s*Valor\s*<\/th>/i.test(result.html);
   const hasDeviceRow = /class="status-offline">\s*OFFLINE\s*</i.test(result.html);
+  const centralMeta = result.html.includes('00:1A:2B:3C:4D:5E') && result.html.includes('gw-7f3a1c9e') && (result.html.match(/MAC:/g) ?? []).length === 1;
+  const multiCentral = result.html.includes('Central Loja Q303A') && result.html.includes('MOX_CENTRAL_01') && result.html.includes('Central Subsolo');
+  const headerEmails = result.html.includes('ops@moxuara.com.br, suporte@myio.com.br');
+  const centralsHeader = /<strong[^>]*>2<\/strong> central\(is\) offline/.test(result.html);
+  const noPerRuleEmails = !result.html.includes('class="emails-row"');
+  const optionalSections = result.html.includes('Observa') && result.html.includes('Ordens de Servi') && result.html.includes('OS-2087');
   console.log(`  [check] unresolved handlebars tokens: ${leftover ? leftover.join(', ') : 'none'}`);
   console.log(`  [check] has "Valor" column: ${hasValor}`);
-  console.log(`  [check] device row rendered (OFFLINE cell): ${hasDeviceRow}`);
-  const ok = !leftover && !hasValor && hasDeviceRow;
+  console.log(`  [check] central OFFLINE row rendered: ${hasDeviceRow}`);
+  console.log(`  [check] optional central meta (mac/uid) shown once: ${centralMeta}`);
+  console.log(`  [check] multiple centrals listed: ${multiCentral}`);
+  console.log(`  [check] header emails present: ${headerEmails}`);
+  console.log(`  [check] header shows total centrals offline (2): ${centralsHeader}`);
+  console.log(`  [check] per-rule emails removed (only header): ${noPerRuleEmails}`);
+  console.log(`  [check] optional Observação + OS sections: ${optionalSections}`);
+  const ok = !leftover && !hasValor && hasDeviceRow && centralMeta && multiCentral && headerEmails && centralsHeader && noPerRuleEmails && optionalSections;
   console.log(`\n=== ${ok ? 'SEED+RENDER OK ✅' : 'CHECK FAILED ❌'} ===`);
   process.exit(ok ? 0 : 1);
 }
