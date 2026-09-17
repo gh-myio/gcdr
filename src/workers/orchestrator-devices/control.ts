@@ -26,6 +26,12 @@ export interface OrchestratorFlags {
   canonicalWritesEnabled: boolean;
   /** Master gate for pushing incident candidates to ALARMS. */
   incidentEmissionEnabled: boolean;
+  /** Per-kind gate for DEVICE_OFFLINE candidates. ALARMS /incidents/candidates
+   *  accepts only NO_CONSUMPTION today, so DEVICE_OFFLINE POSTs 400 — default
+   *  OFF. Flip to true (config) once the ALARMS side accepts DEVICE_OFFLINE.
+   *  Independent of incidentEmissionEnabled (which also gates CENTRAL_OFFLINE
+   *  episodes). */
+  deviceOfflineEmissionEnabled: boolean;
   /** Sanity gate (§7): hold canonical writes if > this % of a scope flips. */
   sanityMaxFleetFlipPct: number;
   /** Incident debounce (§8): open only after N consecutive down ticks. */
@@ -36,6 +42,7 @@ export const FLAG_DEFAULTS: OrchestratorFlags = {
   shadowMode: true,
   canonicalWritesEnabled: false,
   incidentEmissionEnabled: false,
+  deviceOfflineEmissionEnabled: false,
   sanityMaxFleetFlipPct: 30,
   incidentOpenAfterTicks: 2,
 };
@@ -50,6 +57,7 @@ type FlagsConfig = {
   shadow_mode?: boolean;
   canonical_writes_enabled?: boolean;
   incident_emission_enabled?: boolean;
+  device_offline_emission_enabled?: boolean;
   sanity_max_fleet_flip_pct?: number;
   incident_open_after_ticks?: number;
 };
@@ -73,6 +81,7 @@ export async function loadControl(masterBootDefault: boolean): Promise<ControlSt
       shadowMode: cfg.shadow_mode ?? FLAG_DEFAULTS.shadowMode,
       canonicalWritesEnabled: cfg.canonical_writes_enabled ?? FLAG_DEFAULTS.canonicalWritesEnabled,
       incidentEmissionEnabled: cfg.incident_emission_enabled ?? FLAG_DEFAULTS.incidentEmissionEnabled,
+      deviceOfflineEmissionEnabled: cfg.device_offline_emission_enabled ?? FLAG_DEFAULTS.deviceOfflineEmissionEnabled,
       sanityMaxFleetFlipPct: cfg.sanity_max_fleet_flip_pct ?? FLAG_DEFAULTS.sanityMaxFleetFlipPct,
       incidentOpenAfterTicks: cfg.incident_open_after_ticks ?? FLAG_DEFAULTS.incidentOpenAfterTicks,
     },
