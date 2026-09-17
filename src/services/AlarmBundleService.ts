@@ -46,7 +46,7 @@ export class AlarmBundleService {
   private deviceRepository: IDeviceRepository;
   private customerRepository: ICustomerRepository;
   private versionRepository: AlarmBundleVersionRepository;
-  private cache = new Map<string, { bundle: any; version: string; expiresAt: number }>();
+  private cache = new Map<string, { bundle: AlarmRulesBundle | SimpleAlarmRulesBundle; version: string; expiresAt: number }>();
   private pendingInvalidation: InvalidationMeta | null = null;
 
   constructor(
@@ -113,7 +113,7 @@ export class AlarmBundleService {
     const cacheKey = this.getCacheKey(params, 'full');
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
-      return cached.bundle;
+      return cached.bundle as AlarmRulesBundle;
     }
 
     const { tenantId, customerId, domain, deviceType, includeDisabled = false } = params;
@@ -174,7 +174,7 @@ export class AlarmBundleService {
     const cacheKey = this.getCacheKey(params, 'simple');
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
-      return cached.bundle;
+      return cached.bundle as SimpleAlarmRulesBundle;
     }
 
     const { tenantId, customerId, centralId, domain, deviceType, includeDisabled = false, deep = false, includeInternalSupportRule = true } = params;
@@ -384,6 +384,7 @@ export class AlarmBundleService {
   /**
    * Build simplified bundle structure
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- pre-existing complexity; ED-1255 only adds a centralId field, refactoring this builder is out of scope
   private buildSimplifiedBundle(
     customer: Customer,
     devices: Device[],
@@ -453,7 +454,8 @@ export class AlarmBundleService {
       // Get offset from device metadata or attributes (default 0)
       const offset = this.getDeviceOffset(device);
 
-      // Note: centralId is now passed via X-Central-Id header (filters devices)
+      // centralId is also included per-device (additive) so customer-wide bundles
+      // (no X-Central-Id header) can tell which central each device belongs to.
       // Note: channels are included in rule entries with channelId when applicable
       // Only include devices that have at least one applicable rule
       if (applicableRuleIds.length === 0) continue;
@@ -485,6 +487,7 @@ export class AlarmBundleService {
       const mapping: SimpleDeviceMapping = {
         deviceName: device.name,
         slaveId: device.slaveId,
+        centralId: device.centralId,
         offset,
         ruleIds: resolvedRuleIds,
       };
@@ -548,15 +551,24 @@ export class AlarmBundleService {
    * Sign the simplified bundle using HMAC-SHA256
    */
   private signSimplifiedBundle(bundle: SimpleAlarmRulesBundle): string {
+    return this.computeBundleSignature(bundle.meta);
+  }
+
+  /**
+   * Shared HMAC-SHA256 signing over the common meta projection. The full and
+   * simplified bundles sign the exact same fields, so both delegate here
+   * (previously two byte-identical implementations).
+   */
+  private computeBundleSignature(meta: AlarmRulesBundle['meta'] | SimpleAlarmRulesBundle['meta']): string {
     const contentToSign = {
       meta: {
-        version: bundle.meta.version,
-        generatedAt: bundle.meta.generatedAt,
-        customerId: bundle.meta.customerId,
-        tenantId: bundle.meta.tenantId,
+        version: meta.version,
+        generatedAt: meta.generatedAt,
+        customerId: meta.customerId,
+        tenantId: meta.tenantId,
       },
-      rulesCount: bundle.meta.rulesCount,
-      devicesCount: bundle.meta.devicesCount,
+      rulesCount: meta.rulesCount,
+      devicesCount: meta.devicesCount,
     };
 
     const serialized = JSON.stringify(contentToSign);
@@ -921,23 +933,7 @@ export class AlarmBundleService {
    * Sign the bundle using HMAC-SHA256
    */
   private signBundle(bundle: AlarmRulesBundle): string {
-    // Create a copy without the signature for signing
-    const contentToSign = {
-      meta: {
-        version: bundle.meta.version,
-        generatedAt: bundle.meta.generatedAt,
-        customerId: bundle.meta.customerId,
-        tenantId: bundle.meta.tenantId,
-      },
-      rulesCount: bundle.meta.rulesCount,
-      devicesCount: bundle.meta.devicesCount,
-    };
-
-    const serialized = JSON.stringify(contentToSign);
-    return crypto
-      .createHmac('sha256', BUNDLE_SIGNING_SECRET)
-      .update(serialized)
-      .digest('hex');
+    return this.computeBundleSignature(bundle.meta);
   }
 }
 

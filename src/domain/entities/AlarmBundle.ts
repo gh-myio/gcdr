@@ -172,6 +172,10 @@ export interface SimpleBundleAlarmRule {
 export interface SimpleDeviceMapping {
   deviceName: string;
   slaveId?: number;
+  /** UUID of the device's central. Additive: lets customer-wide bundles (no
+   *  X-Central-Id header) tell which central each device belongs to. Omitted
+   *  (like slaveId) when the device has no central. */
+  centralId?: string;
   offset: Record<string, number>;  // Calibration offset per metric (e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 })
   ruleIds: RuleIdEntry[];          // Rule IDs - string for simple rules, object with channel for channel-specific rules
 }
