@@ -6,7 +6,7 @@ import {
 import type { OrchestratorFlags } from '../../../src/workers/orchestrator-devices/control';
 
 function flags(over: Partial<OrchestratorFlags> = {}): OrchestratorFlags {
-  return { shadowMode: false, canonicalWritesEnabled: true, incidentEmissionEnabled: false, sanityMaxFleetFlipPct: 30, incidentOpenAfterTicks: 2, ...over };
+  return { shadowMode: false, canonicalWritesEnabled: true, incidentEmissionEnabled: false, deviceOfflineEmissionEnabled: false, sanityMaxFleetFlipPct: 30, incidentOpenAfterTicks: 2, ...over };
 }
 
 function centralT(id: string, to: string): Transition {
