@@ -8,6 +8,9 @@ export interface CentralSummaryDTO {
   displayName: string;
   serialNumber: string;
   hardwareId?: string | null;
+  /** RFC-0035 network identity — surfaced from config for list consumers. Optional/additive. */
+  macAddress?: string | null;
+  ipv6Yggdrasil?: string | null;
   type: string;
   status: string;
   connectionStatus: string;
@@ -28,6 +31,9 @@ export interface CentralDetailDTO {
   displayName: string;
   serialNumber: string;
   hardwareId?: string | null;
+  /** RFC-0035 network identity — also present nested in `config`; surfaced top-level for a consistent shape with the list. Optional/additive. */
+  macAddress?: string | null;
+  ipv6Yggdrasil?: string | null;
   type: string;
   status: string;
   connectionStatus: string;
@@ -63,6 +69,8 @@ export function toCentralSummaryDTO(central: Central): CentralSummaryDTO {
     displayName: central.displayName,
     serialNumber: central.serialNumber,
     hardwareId: central.hardwareId ?? null,
+    macAddress: central.config.macAddress ?? null,
+    ipv6Yggdrasil: central.config.ipv6Yggdrasil ?? null,
     type: central.type,
     status: central.status,
     connectionStatus: central.connectionStatus,
@@ -85,6 +93,8 @@ export function toCentralDetailDTO(central: Central): CentralDetailDTO {
     displayName: central.displayName,
     serialNumber: central.serialNumber,
     hardwareId: central.hardwareId ?? null,
+    macAddress: central.config.macAddress ?? null,
+    ipv6Yggdrasil: central.config.ipv6Yggdrasil ?? null,
     type: central.type,
     status: central.status,
     connectionStatus: central.connectionStatus,
