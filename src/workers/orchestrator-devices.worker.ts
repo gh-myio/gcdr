@@ -33,13 +33,19 @@ function log(level: 'info' | 'warn' | 'error', msg: string, extra?: Record<strin
 // A monitor's per-tick body. Filled in by the next batch (centrals/devices).
 type MonitorFn = (control: ControlState) => Promise<void>;
 
+// The devices monitor is a Phase 2 stub — announce it once, not every tick.
+let devicesPhase2Logged = false;
+
 const monitors: Record<MonitorName, MonitorFn> = {
   // Phase 1: one /v2/slaves probe per central reconciles the central AND all its
   // slaves (evidence always; status/health → shadow ledger). No fan-out.
   centrals: (control) => runCentralsSweep(control, log),
   // Phase 2: the per-slave telemetry pull fan-out (freshness gate, full health).
   devices: async () => {
-    log('info', 'devices-monitor: Phase 2 telemetry fan-out — not yet implemented');
+    if (!devicesPhase2Logged) {
+      devicesPhase2Logged = true;
+      log('info', 'devices-monitor: Phase 2 telemetry fan-out — not yet implemented (logged once)');
+    }
   },
   os: async () => {
     log('info', 'os-monitor: Phase 3 (contract-blocked) — skipped');

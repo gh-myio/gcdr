@@ -289,6 +289,29 @@ async function emitIncidents(candidates: DownCandidate[], control: ControlState,
   return { posted, dryRun, disabled, debounced, failed };
 }
 
+type CentralsSweepSummary = {
+  due: number; scanned: number; changed: number; skipped: number; probeMisses: number;
+  deviceTotal: number; deviceFlipsToDown: number; mode: string; applied: number; audited: number;
+  sanityHeld: boolean;
+  incidents: { posted: number; dryRun: number; disabled: number; debounced: number; failed: number };
+  centralEpisodes: { opened: number; reposted: number; recovered: number; failed: number; skipped: number };
+  timeline: { inserted: number; failed: boolean };
+};
+
+/** Log the centrals sweep summary ONLY when something happened — idle ticks stay
+ *  quiet so the Dokploy log panel isn't flooded (its keyword highlighter also
+ *  stops mis-flagging the counters). Liveness is unaffected: the per-tick
+ *  "centrals-monitor tick done" line + the DB heartbeat still record every tick. */
+function logCentralsSweepSummary(log: Logger, s: CentralsSweepSummary): void {
+  const i = s.incidents, e = s.centralEpisodes;
+  const noteworthy =
+    s.changed > 0 || s.probeMisses > 0 || s.applied > 0 ||
+    i.disabled > 0 || i.posted > 0 || i.failed > 0 ||
+    e.opened > 0 || e.reposted > 0 || e.recovered > 0 || e.failed > 0 ||
+    s.timeline.inserted > 0 || s.sanityHeld;
+  if (noteworthy) log('info', 'centrals sweep done', s);
+}
+
 export async function runCentralsSweep(control: ControlState, log: Logger): Promise<void> {
   const policies = await loadRetryPolicies();
   const defaultPolicy = policies.get(workerConfig.defaultRetryPolicy) ?? policies.get('default') ?? { name: 'default', attempts: [{ delay_ms: 0 }] };
@@ -455,8 +478,12 @@ export async function runCentralsSweep(control: ControlState, log: Logger): Prom
     },
   }).where(eq(orchestratorDevicesRuns.id, runId));
 
-  log('info', 'centrals sweep done', {
-    due: due.length, scanned, changed, skipped, failures, deviceTotal, deviceFlipsToDown,
+  // Idle ticks stay quiet (see logCentralsSweepSummary): the Dokploy panel isn't
+  // flooded and its keyword highlighter stops mis-flagging the counters. `failures`
+  // is the probe-miss count (centrals that did not answer the probe), logged as
+  // `probeMisses` so it does not read as a worker error.
+  logCentralsSweepSummary(log, {
+    due: due.length, scanned, changed, skipped, probeMisses: failures, deviceTotal, deviceFlipsToDown,
     mode, applied, audited, sanityHeld: sanity.held, incidents, centralEpisodes: episodeResult,
     timeline: { inserted: timelineInserted, failed: timelineFailed },
   });
