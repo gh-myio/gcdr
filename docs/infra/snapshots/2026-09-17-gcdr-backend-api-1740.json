@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0",
+  "capturedAt": "2026-09-17T17:40:38-03:00",
+  "captureType": "minimal",
+  "captureTypeNote": "Captura via secao TL/DR do runbook (top -bn1 | head -6, df -h, uptime) apenas — nao inclui cgroup, /proc/meminfo, processos completos nem fd/rede. Ver 2026-09-17-gcdr-backend-api.json para a captura completa do mesmo container ~5min antes (17:35:31).",
+  "container": {
+    "service": "gcdr-backend-api",
+    "repo": "gcdr",
+    "os": "Alpine Linux 3.23",
+    "shell": "busybox sh (sem bash)",
+    "runbook": "./RUNBOOK-Container-Infra-Snapshot.md",
+    "sameContainerAs": "2026-09-17-gcdr-backend-api.json (uptime consistente: 2 days 2:12 -> 2 days 2:17, +5min)"
+  },
+  "cpu": {
+    "cpuCount": null,
+    "loadAverage": {
+      "1m": 0.57,
+      "5m": 1.20,
+      "15m": 1.37,
+      "source": "top -bn1 (host-wide, nao namespaceado por container)"
+    },
+    "topHeader": {
+      "usrPct": 0,
+      "sysPct": 0,
+      "nicePct": 0,
+      "idlePct": 100,
+      "ioPct": 0,
+      "irqPct": 0,
+      "sirqPct": 0,
+      "tasksRunning": "2/544",
+      "lastPid": 1428
+    }
+  },
+  "memory": {
+    "topHeader": {
+      "usedKB": 3796580,
+      "freeKB": 158572,
+      "shrdKB": 290696,
+      "buffKB": 36584,
+      "cachedKB": 2095564
+    },
+    "note": "free -h / /proc/meminfo nao coletados nesta captura minima."
+  },
+  "disk": {
+    "mounts": [
+      { "filesystem": "overlay", "mountedOn": "/", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/resolv.conf", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hostname", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 },
+      { "filesystem": "/dev/nvme0n1p1", "mountedOn": "/etc/hosts", "sizeH": "196.6G", "usedH": "81.0G", "availableH": "107.5G", "usePct": 43 }
+    ],
+    "rootRealUsePct": 43,
+    "note": "Filtro `grep -vE tmpfs|shm$` aplicado no proprio comando (secao TL;DR), por isso pseudo-fs ja nao aparecem aqui. Inalterado vs snapshot anterior (43%, 81.0G usado) — esperado em 5min."
+  },
+  "uptime": {
+    "hostUptime": "2 days, 2:17",
+    "users": 0,
+    "loadAverage": { "1m": 0.47, "5m": 1.15, "15m": 1.35 },
+    "loadAverageNote": "Leve diferenca vs o load do top -bn1 (0.57/1.20/1.37) por amostragem em instantes distintos dentro da mesma captura — mesmo padrao ja visto no snapshot anterior; host-wide, nao por container.",
+    "wallClockAtCapture": "17:40:38"
+  },
+  "process": {
+    "pid1": {
+      "name": "node",
+      "cmd": "node dist/app.js",
+      "vszKB": 766000,
+      "vszPctOfTotal": "20%",
+      "cpuPct": 0,
+      "user": "gcdr",
+      "stat": "S"
+    }
+  },
+  "rawOutputs": {
+    "top -bn1 | head -6": "Mem: 3796580K used, 158572K free, 290696K shrd, 36584K buff, 2095564K cached\nCPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq\nLoad average: 0.57 1.20 1.37 2/544 1428\n  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND\n    1     0 gcdr     S     766m  20%   1   0% node dist/app.js\n 1125     0 gcdr     S     1740   0%   0   0% sh",
+    "df -h | grep -vE tmpfs|shm$": "Filesystem                Size      Used Available Use% Mounted on\noverlay                 196.6G     81.0G    107.5G  43% /\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/resolv.conf\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hostname\n/dev/nvme0n1p1          196.6G     81.0G    107.5G  43% /etc/hosts",
+    "uptime": " 17:40:38 up 2 days,  2:17,  0 users,  load average: 0.47, 1.15, 1.35"
+  },
+  "comparisonToPrevious": {
+    "previousSnapshot": "2026-09-17-gcdr-backend-api.json",
+    "previousWallClock": "17:35:31",
+    "deltaMinutes": 5,
+    "memoryUsedKB": { "previous": 3780972, "now": 3796580, "deltaKB": 15608, "note": "estavel, crescimento de ~15MB em 5min, sem sinal de leak" },
+    "diskUsePct": { "previous": 43, "now": 43, "note": "inalterado, esperado" },
+    "idlePct": { "previous": 95, "now": 100, "note": "CPU mais ociosa agora; load 1min caiu de 1.56 para 0.57/0.47, consistente com decaimento de um pico breve anterior ao invés de carga sustentada" }
+  },
+  "notes": [
+    "Captura minima (TL;DR) — sem cgroup/meminfo/processos completos. Para diagnostico mais profundo, usar a captura completa (secoes 1-7 do runbook).",
+    "Nenhuma anomalia observada nesta captura."
+  ]
+}
