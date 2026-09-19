@@ -12,7 +12,7 @@ import {
   UpdateEntityTypeSchema,
 } from '../dto/request/EntityDTO';
 import { sendSuccess, sendCreated, sendNoContent } from '../middleware';
-import { ValidationError } from '../shared/errors/AppError';
+import { AppError, ValidationError } from '../shared/errors/AppError';
 
 /** Coerce the `deep` query param (`string | string[]`) to `number | 'all' | undefined`. */
 function parseDeep(v: unknown): number | 'all' | undefined {
@@ -83,6 +83,45 @@ function isAdminContext(req: Request): boolean {
   }
 
   return false;
+}
+
+/**
+ * RFC-0064 A.5 stopgap — `hybridAuthMiddleware`'s JWT branch never checks the
+ * `requiredScope` it's given (only the API-key branch does — see
+ * `src/middleware/auth.ts`), so today ANY authenticated JWT, regardless of
+ * role, reaches every `/entities` write handler. `is_system` row mutation and
+ * `entity_type` creation are already independently re-checked by
+ * `EntityService` (`isAdmin` tier), so they were never actually exposed by
+ * this gap — but a write to a NON-system row (a customer's cloned tree, or a
+ * non-protected system-scope row like a manually-inserted `GROUP`) had **no**
+ * JWT-side check at all.
+ *
+ * This is an entities-scoped stopgap, not the general fix: it does not touch
+ * `hybridAuthMiddleware` (which would affect every other `hybridAuthByMethod`
+ * route and needs its own wider audit — see RFC-0064's Unresolved Questions).
+ * It reuses the same `isAdminContext()` tier already used for `is_system`/
+ * `entity_type` mutation, applied here to every `/entities` write.
+ *
+ * A Customer API Key request is left untouched — `req.context.apiKeyId` is
+ * only ever set by the API-key branch of `hybridAuthMiddleware`, which
+ * already correctly enforces `entities:write` before this router is reached
+ * (no `gcdr_cust_*` key is ever granted that scope). Narrowing or widening
+ * that path is out of scope for this guard.
+ */
+function requireEntitiesWriteAuthorized(req: Request, res: Response, next: NextFunction): void {
+  if (req.context?.apiKeyId) {
+    next();
+    return;
+  }
+  if (!isAdminContext(req)) {
+    next(new AppError(
+      'FORBIDDEN',
+      'Writing to the entity registry requires the MYIO-operator admin tier',
+      403,
+    ));
+    return;
+  }
+  next();
 }
 
 // -----------------------------------------------------------------------------
@@ -225,7 +264,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  * POST /entities/clone
  * Materialize the whole system tree under a customer.
  */
-router.post('/clone', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/clone', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { customerId } = CloneSchema.parse(req.body);
@@ -240,7 +279,7 @@ router.post('/clone', async (req: Request, res: Response, next: NextFunction) =>
  * POST /entities/revert
  * Soft-delete all of a customer's rows -> resolution falls back to system.
  */
-router.post('/revert', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/revert', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { customerId } = RevertSchema.parse(req.body);
@@ -257,7 +296,7 @@ router.post('/revert', async (req: Request, res: Response, next: NextFunction) =
  * at the subtree level via the `If-Match` request header (the X-Version-Id of
  * the subtree being replaced). Sets `X-Version-Id` = the new version on success.
  */
-router.put('/bulk-replace', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/bulk-replace', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { customerId, type } = BulkReplaceQuerySchema.parse(req.query);
@@ -295,7 +334,7 @@ router.put('/bulk-replace', async (req: Request, res: Response, next: NextFuncti
  * POST /entities
  * Create a node.
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const data = CreateEntitySchema.parse(req.body);
@@ -361,7 +400,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  * Partial update; optimistic `version`. `?metadataMode=replace` swaps metadata
  * wholesale. Editing an `is_system` row requires the admin tier.
  */
-router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
@@ -384,7 +423,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
  * DELETE /entities/:id
  * Soft delete (default); `?hard=true`, `?cascade=true`.
  */
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId } = req.context;
     const { id } = req.params;
@@ -404,7 +443,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
  * POST /entities/:id/restore
  * Un-delete a soft-deleted node.
  */
-router.post('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/restore', requireEntitiesWriteAuthorized, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId, userId, requestId } = req.context;
     const { id } = req.params;
