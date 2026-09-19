@@ -1,0 +1,91 @@
+{
+  "endpoint": "/api/v1/entity-types",
+  "method": "GET",
+  "queryParams": {},
+  "capturedAt": "2026-09-18T18:50:58.059Z",
+  "source": "production (gcdr-api.a.myio-bas.com), live captured",
+  "response": {
+    "success": true,
+    "data": [
+      {
+        "entityType": "CLASSIFICATION_ENERGY",
+        "label": "Classification · Energy",
+        "description": "RFC-0207 energy classification root.",
+        "allowedParentTypes": [],
+        "isActive": true
+      },
+      {
+        "entityType": "CLASSIFICATION_NODE",
+        "label": "Classification · Node",
+        "description": "RFC-0207 classification descendant (any depth).",
+        "allowedParentTypes": [
+          "CLASSIFICATION_ENERGY",
+          "CLASSIFICATION_WATER",
+          "CLASSIFICATION_TEMPERATURE",
+          "CLASSIFICATION_NODE"
+        ],
+        "isActive": true
+      },
+      {
+        "entityType": "CLASSIFICATION_REPORTS",
+        "label": "Relatõrios",
+        "description": "Abre menu de relatõrios",
+        "allowedParentTypes": [],
+        "isActive": true
+      },
+      {
+        "entityType": "CLASSIFICATION_TEMPERATURE",
+        "label": "Classification · Temperature",
+        "description": "RFC-0207 temperature classification root.",
+        "allowedParentTypes": [],
+        "isActive": true
+      },
+      {
+        "entityType": "CLASSIFICATION_WATER",
+        "label": "Classification · Water",
+        "description": "RFC-0207 water classification root.",
+        "allowedParentTypes": [],
+        "isActive": true
+      },
+      {
+        "entityType": "customer-setup",
+        "label": "Customer Setup",
+        "description": "Documento de setup por cliente: título, centrais (ipv6 + uuid), anexos e status.",
+        "allowedParentTypes": [],
+        "isActive": true
+      },
+      {
+        "entityType": "EQUIPMENT",
+        "label": "Equipment",
+        "description": "An equipment node under a profile.",
+        "allowedParentTypes": [
+          "PROFILE"
+        ],
+        "isActive": true
+      },
+      {
+        "entityType": "GROUP",
+        "label": "Group",
+        "description": "Top-level telemetry grouping (root-only).",
+        "allowedParentTypes": [
+          "GROUP",
+          ""
+        ],
+        "isActive": true
+      },
+      {
+        "entityType": "PROFILE",
+        "label": "Profile",
+        "description": "A profile under a group (e.g. CHILLER, FANCOIL).",
+        "allowedParentTypes": [
+          "GROUP"
+        ],
+        "isActive": true
+      }
+    ],
+    "meta": {
+      "requestId": "20905b0c-3591-476d-a71d-ddc2b47c0594",
+      "timestamp": "2026-09-18T18:50:58.059Z"
+    }
+  }
+}
