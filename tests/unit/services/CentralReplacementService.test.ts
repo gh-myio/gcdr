@@ -42,6 +42,43 @@ function makeService(outcome?: { result: ReplaceCentralResult; replayed: boolean
   return { svc: new CentralReplacementService(repo), repo };
 }
 
+describe('CentralReplacementService.replace — bundle cache invalidation (RFC-0065 C)', () => {
+  it('invalidates the customer bundle cache after a real replacement', async () => {
+    const repo = { replace: jest.fn(async () => ({ result: makeResult(), replayed: false })) };
+    const invalidate = jest.fn();
+    const svc = new CentralReplacementService(repo, invalidate);
+
+    await svc.replace('t1', OLD_UUID, DTO, ACTOR);
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith('t1', 'cust-1', {
+      reason: 'central_replaced',
+      entityType: 'central',
+      entityId: NEW_UUID,
+      userId: 'u1',
+    });
+  });
+
+  it('does NOT invalidate on an idempotent replay (nothing changed)', async () => {
+    const repo = { replace: jest.fn(async () => ({ result: makeResult(), replayed: true })) };
+    const invalidate = jest.fn();
+    const svc = new CentralReplacementService(repo, invalidate);
+
+    await svc.replace('t1', OLD_UUID, DTO, ACTOR);
+
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('does NOT invalidate when the replacement fails', async () => {
+    const repo = { replace: jest.fn(async () => { throw new Error('boom'); }) };
+    const invalidate = jest.fn();
+    const svc = new CentralReplacementService(repo, invalidate);
+
+    await expect(svc.replace('t1', OLD_UUID, DTO, ACTOR)).rejects.toThrow('boom');
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+});
+
 describe('CentralReplacementService.replace (RFC-0005)', () => {
   it('delegates to the repository and returns the RFC response shape', async () => {
     const { svc, repo } = makeService();
