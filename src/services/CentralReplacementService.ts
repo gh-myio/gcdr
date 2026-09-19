@@ -18,14 +18,23 @@ import {
   centralReplacementRepository,
 } from '../repositories/CentralReplacementRepository';
 import { ValidationError } from '../shared/errors/AppError';
+import { alarmBundleService, InvalidationMeta } from './AlarmBundleService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type BundleCacheInvalidator = (tenantId: string, customerId: string, meta: InvalidationMeta) => void;
+
 export class CentralReplacementService {
   private repository: Pick<CentralReplacementRepository, 'replace'>;
+  private invalidateBundleCache: BundleCacheInvalidator;
 
-  constructor(repository?: Pick<CentralReplacementRepository, 'replace'>) {
+  constructor(
+    repository?: Pick<CentralReplacementRepository, 'replace'>,
+    invalidateBundleCache?: BundleCacheInvalidator,
+  ) {
     this.repository = repository ?? centralReplacementRepository;
+    this.invalidateBundleCache =
+      invalidateBundleCache ?? ((t, c, m) => alarmBundleService.invalidateCache(t, c, m));
   }
 
   /**
@@ -47,6 +56,18 @@ export class CentralReplacementService {
     }
 
     const outcome: ReplaceOutcome = await this.repository.replace(tenantId, oldUuid, data, actor);
+
+    // RFC-0065: the devices were repointed to the new central inside the
+    // (already committed) transaction, so any cached alarm bundle still carries
+    // the OLD centralId until its TTL expires. A replay changed nothing.
+    if (!outcome.replayed) {
+      this.invalidateBundleCache(tenantId, outcome.result.newCentral.customerId, {
+        reason: 'central_replaced',
+        entityType: 'central',
+        entityId: outcome.result.newCentral.id,
+        userId: actor.userId,
+      });
+    }
     return outcome.result;
   }
 }

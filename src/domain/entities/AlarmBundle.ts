@@ -120,6 +120,12 @@ export interface GenerateBundleParams {
   deep?: boolean;
   /** When false, excludes rules where isInternalSupportRule=true. Default: true (include) */
   includeInternalSupportRule?: boolean;
+  /**
+   * RFC-0065 — when true, `deviceIndex` also lists devices that are only in the
+   * scope of an enabled NO_CONSUMPTION rule (scope DEVICE), with `ruleIds: []`.
+   * Default false: `/bundle/simple` stays unchanged. Part of the cache key.
+   */
+  includeNoConsumptionScope?: boolean;
 }
 
 // =============================================================================
@@ -176,6 +182,11 @@ export interface SimpleDeviceMapping {
    *  X-Central-Id header) tell which central each device belongs to. Omitted
    *  (like slaveId) when the device has no central. */
   centralId?: string;
+  /**
+   * RFC-0065 — physical hardware UUID of the device's central (centrals.hardware_id).
+   * Second stable handle next to `centralId` (the central row UUID). Omitted when unset.
+   */
+  centralHardwareId?: string;
   offset: Record<string, number>;  // Calibration offset per metric (e.g., { temp: -0.5, hum: 0, pot: 0, water_level: 5 })
   ruleIds: RuleIdEntry[];          // Rule IDs - string for simple rules, object with channel for channel-specific rules
 }

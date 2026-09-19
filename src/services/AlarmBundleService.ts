@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { Rule, isAlarmRule, isNoConsumptionRule } from '../domain/entities/Rule';
 import { Device } from '../domain/entities/Device';
+import { Central } from '../domain/entities/Central';
 import { Customer } from '../domain/entities/Customer';
 import {
   AlarmRulesBundle,
@@ -19,10 +20,12 @@ import {
 import { RuleRepository } from '../repositories/RuleRepository';
 import { DeviceRepository } from '../repositories/DeviceRepository';
 import { CustomerRepository } from '../repositories/CustomerRepository';
+import { CentralRepository } from '../repositories/CentralRepository';
 import { AlarmBundleVersionRepository, alarmBundleVersionRepository } from '../repositories/AlarmBundleVersionRepository';
 import { IRuleRepository } from '../repositories/interfaces/IRuleRepository';
 import { IDeviceRepository } from '../repositories/interfaces/IDeviceRepository';
 import { ICustomerRepository } from '../repositories/interfaces/ICustomerRepository';
+import { ICentralRepository } from '../repositories/interfaces/ICentralRepository';
 import { AlarmBundleVersion } from '../domain/entities/AlarmBundleVersion';
 import { NotFoundError } from '../shared/errors/AppError';
 import { GroupChannelRepository } from '../repositories/GroupChannelRepository';
@@ -41,10 +44,23 @@ export interface InvalidationMeta {
   userId?: string;
 }
 
+/** RFC-0065 — extra inputs for the simplified builder (kept out of the positional args). */
+interface SimplifiedBuildOptions {
+  /** Also index devices that are only in a NO_CONSUMPTION DEVICE scope. */
+  includeNcScope?: boolean;
+  /** Centrals of the target customers, for the hybrid identity fields. */
+  centralsById?: Map<string, Central>;
+}
+
 export class AlarmBundleService {
   private ruleRepository: IRuleRepository;
   private deviceRepository: IDeviceRepository;
   private customerRepository: ICustomerRepository;
+  // Lazy on purpose: the module-level `alarmBundleService` singleton is built at
+  // import time, and now that the central-replacement path imports this file,
+  // eagerly constructing a CentralRepository here would run in every importer
+  // (and break suites that mock that module). Only bundle generation needs it.
+  private centralRepository?: ICentralRepository;
   private versionRepository: AlarmBundleVersionRepository;
   private cache = new Map<string, { bundle: AlarmRulesBundle | SimpleAlarmRulesBundle; version: string; expiresAt: number }>();
   private pendingInvalidation: InvalidationMeta | null = null;
@@ -52,11 +68,13 @@ export class AlarmBundleService {
   constructor(
     ruleRepository?: IRuleRepository,
     deviceRepository?: IDeviceRepository,
-    customerRepository?: ICustomerRepository
+    customerRepository?: ICustomerRepository,
+    centralRepository?: ICentralRepository
   ) {
     this.ruleRepository = ruleRepository || new RuleRepository();
     this.deviceRepository = deviceRepository || new DeviceRepository();
     this.customerRepository = customerRepository || new CustomerRepository();
+    this.centralRepository = centralRepository;
     this.versionRepository = alarmBundleVersionRepository;
   }
 
@@ -73,6 +91,7 @@ export class AlarmBundleService {
       params.deviceType || '',
       String(params.includeDisabled || false),
       String(params.includeInternalSupportRule ?? true),
+      String(params.includeNoConsumptionScope ?? false),
     ].join(':');
   }
 
@@ -224,8 +243,14 @@ export class AlarmBundleService {
       noConsumptionRules = noConsumptionRules.filter(r => r.enabled);
     }
 
+    // RFC-0065: centrals of the target customers, for the hybrid identity fields.
+    const centralsById = await this.loadCentralsById(tenantId, customerIds);
+
     // Build simplified bundle
-    const bundle = this.buildSimplifiedBundle(customer, devices, alarmRules, tenantId, noConsumptionRules);
+    const bundle = this.buildSimplifiedBundle(customer, devices, alarmRules, tenantId, noConsumptionRules, {
+      includeNcScope: params.includeNoConsumptionScope === true,
+      centralsById,
+    });
 
     // Sign the bundle
     bundle.meta.signature = this.signSimplifiedBundle(bundle);
@@ -262,8 +287,11 @@ export class AlarmBundleService {
   }> {
     const { tenantId, customerId } = params;
 
-    // Base simplified bundle (uses cache)
-    const base = await this.generateSimplifiedBundle(params);
+    // Base simplified bundle (uses cache). RFC-0065: the verify consumer needs
+    // per-device identity for devices that are only in a NO_CONSUMPTION scope,
+    // so this path opts in (the flag is part of the cache key — /bundle/simple
+    // keeps its own, unchanged entry).
+    const base = await this.generateSimplifiedBundle({ ...params, includeNoConsumptionScope: true });
 
     // Full rules to access notifications JSONB
     const allRules = await this.ruleRepository.getByCustomerId(tenantId, customerId);
@@ -390,9 +418,15 @@ export class AlarmBundleService {
     devices: Device[],
     rules: Rule[],
     tenantId: string,
-    noConsumptionRules: Rule[] = []
+    noConsumptionRules: Rule[] = [],
+    opts: SimplifiedBuildOptions = {}
   ): SimpleAlarmRulesBundle {
     const generatedAt = new Date().toISOString();
+
+    // RFC-0065: devices that are only in a NO_CONSUMPTION DEVICE scope (opt-in).
+    const ncScopedIds = opts.includeNcScope
+      ? this.collectNcScopedDeviceIds(noConsumptionRules)
+      : new Set<string>();
 
     // Create simplified rules catalog (minimal fields + schedule)
     const rulesCatalog: Record<string, SimpleBundleAlarmRule> = {};
@@ -457,8 +491,9 @@ export class AlarmBundleService {
       // centralId is also included per-device (additive) so customer-wide bundles
       // (no X-Central-Id header) can tell which central each device belongs to.
       // Note: channels are included in rule entries with channelId when applicable
-      // Only include devices that have at least one applicable rule
-      if (applicableRuleIds.length === 0) continue;
+      // Only include devices that have at least one applicable rule — or, when
+      // opted in (RFC-0065), that are in a NO_CONSUMPTION DEVICE scope.
+      if (applicableRuleIds.length === 0 && !ncScopedIds.has(device.id.toLowerCase())) continue;
 
       // RFC-0018: resolve per-device value overrides
       const resolvedRuleIds: RuleIdEntry[] = [];
@@ -488,6 +523,7 @@ export class AlarmBundleService {
         deviceName: device.name,
         slaveId: device.slaveId,
         centralId: device.centralId,
+        ...this.centralIdentityFields(device.centralId ? opts.centralsById?.get(device.centralId) : undefined),
         offset,
         ruleIds: resolvedRuleIds,
       };
@@ -529,6 +565,50 @@ export class AlarmBundleService {
       rules: rulesCatalog,
       ...(ncRules.length ? { noConsumptionRules: ncRules } : {}),
     };
+  }
+
+  /**
+   * RFC-0065 — ids (lower-cased) of the devices listed in the scope of the given
+   * NO_CONSUMPTION rules whose scope type is DEVICE. Other scope types are not
+   * expanded: the consumer only needs per-device identity for DEVICE scope.
+   */
+  private collectNcScopedDeviceIds(rules: Rule[]): Set<string> {
+    const ids = new Set<string>();
+    for (const r of this.toNoConsumptionBundleRules(rules)) {
+      if (r.scope.type !== 'DEVICE') continue;
+      for (const id of r.scope.entityIds) ids.add(id.toLowerCase());
+    }
+    return ids;
+  }
+
+  /**
+   * RFC-0065 — centrals of the target customers keyed by id (one query per
+   * customer). Never throws: a failed lookup only means the hybrid identity
+   * fields are omitted — alarm bundle generation must not depend on it.
+   */
+  private async loadCentralsById(tenantId: string, customerIds: string[]): Promise<Map<string, Central>> {
+    const byId = new Map<string, Central>();
+    try {
+      this.centralRepository = this.centralRepository ?? new CentralRepository();
+      const centrals = this.centralRepository;
+      const lists = await Promise.all(customerIds.map(cid => centrals.listByCustomer(tenantId, cid)));
+      for (const central of lists.flat()) byId.set(central.id, central);
+    } catch (err) {
+      // eslint-disable-next-line no-console -- degrade to "fields omitted", but leave a trace
+      console.warn('[AlarmBundleService] central identity lookup failed; hybrid fields omitted:', err instanceof Error ? err.message : err);
+    }
+    return byId;
+  }
+
+  /**
+   * RFC-0065 — hybrid central identity for a device mapping: the central row
+   * UUID (`centralId`, already on the mapping) OR the physical `hardwareId`,
+   * whichever the consumer holds. `serialNumber` is deliberately NOT part of
+   * the identity (it is the radio's address-like value, not a gateway id).
+   * Unset/unknown central => no field (never fabricated).
+   */
+  private centralIdentityFields(central?: Central): Pick<SimpleDeviceMapping, 'centralHardwareId'> {
+    return central?.hardwareId ? { centralHardwareId: central.hardwareId } : {};
   }
 
   /**
