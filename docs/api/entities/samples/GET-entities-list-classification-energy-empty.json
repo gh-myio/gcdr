@@ -1,0 +1,28 @@
+{
+  "endpoint": "/api/v1/entities",
+  "method": "GET",
+  "queryParams": {
+    "type": "CLASSIFICATION_ENERGY",
+    "scope": "system",
+    "deep": "all",
+    "parentId": "null"
+  },
+  "capturedAt": "2026-09-18T18:5X:00Z (approx)",
+  "source": "production (gcdr-api.a.myio-bas.com), live captured",
+  "note": "Zero rows — confirms no CLASSIFICATION_* data is seeded in production as of this capture. See API-Entities.md §8.",
+  "response": {
+    "success": true,
+    "data": {
+      "items": [],
+      "pagination": {
+        "total": 0,
+        "totalPages": 0,
+        "hasMore": false
+      }
+    },
+    "meta": {
+      "requestId": "288baf74-99cf-41d5-97b0-2c5c13181e2c",
+      "timestamp": "2026-09-18T18:52:32.109Z"
+    }
+  }
+}

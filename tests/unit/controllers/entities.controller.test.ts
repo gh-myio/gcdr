@@ -215,7 +215,12 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('POST /entities -> create(tenantId, dto, userId)', async () => {
     svc.create.mockResolvedValue({ id: ENTITY_ID } as never);
-    const srv = await listen(buildApp());
+    // apiKeyId simulates a real (entities:write-scoped, non-admin) Customer
+    // API Key context — required post-RFC-0064-A.5 so this write-wiring test
+    // reaches the service (see the "write authorization" describe block
+    // below for the authorization behavior itself). Mirrors production:
+    // auth.ts's API-key branch always sets apiKeyId alongside apiKeyScopes.
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(`${srv.url}/entities`, {
         method: 'POST',
@@ -338,7 +343,7 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('DELETE /entities/:id -> remove with hard+cascade flags, 204', async () => {
     svc.remove.mockResolvedValue(undefined as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(`${srv.url}/entities/${ENTITY_ID}?hard=true&cascade=true`, {
         method: 'DELETE',
@@ -355,7 +360,7 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('POST /entities/:id/restore -> restore', async () => {
     svc.restore.mockResolvedValue({ id: ENTITY_ID } as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(`${srv.url}/entities/${ENTITY_ID}/restore`, { method: 'POST' });
       expect(res.status).toBe(200);
@@ -367,7 +372,7 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('POST /entities/clone -> clone(tenantId, customerId, userId)', async () => {
     svc.clone.mockResolvedValue({ cloned: 17, customerId: CUSTOMER_ID } as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(`${srv.url}/entities/clone`, {
         method: 'POST',
@@ -383,7 +388,7 @@ describe('entities.controller — route -> service wiring', () => {
 
   it('POST /entities/revert -> revert(tenantId, customerId, userId)', async () => {
     svc.revert.mockResolvedValue({ reverted: 17, customerId: CUSTOMER_ID } as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(`${srv.url}/entities/revert`, {
         method: 'POST',
@@ -467,7 +472,7 @@ describe('entities.controller — /bulk-replace If-Match', () => {
       source: 'customer',
       replaced: 4,
     } as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       const res = await fetch(
         `${srv.url}/entities/bulk-replace?customerId=${CUSTOMER_ID}&type=CLASSIFICATION_ENERGY`,
@@ -494,7 +499,7 @@ describe('entities.controller — /bulk-replace If-Match', () => {
 
   it('PUT passes undefined If-Match when the header is absent', async () => {
     svc.bulkReplace.mockResolvedValue({ version: 'v', source: 'customer', replaced: 0 } as never);
-    const srv = await listen(buildApp());
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:write'] }));
     try {
       await fetch(
         `${srv.url}/entities/bulk-replace?customerId=${CUSTOMER_ID}&type=CLASSIFICATION_ENERGY`,
@@ -518,28 +523,106 @@ describe('entities.controller — /bulk-replace If-Match', () => {
   });
 });
 
-describe('entities.controller — write authorization (documented)', () => {
-  // The controller itself is mounted in app.ts behind
-  // `hybridAuthByMethod('entities:read','entities:write')`. That mount is what
-  // rejects a read-only customer key (gcdr_cust_*, scopes ['entities:read'])
-  // on any write method with 403 FORBIDDEN — the router under test here is
-  // mounted WITHOUT that guard, so write methods reach the service. We assert
-  // the wiring (service is reachable) and document that the 403 is enforced at
-  // the mount, not in the router. A read-only key never carries entities:write,
-  // so hybridAuthByMethod denies POST/PATCH/PUT/DELETE before this code runs.
-  it('write reaches the service when auth is NOT applied (guard lives at the mount)', async () => {
+describe('entities.controller — write authorization (RFC-0064 A.5 stopgap)', () => {
+  // Background: `hybridAuthByMethod('entities:read','entities:write')` at the
+  // app.ts mount is a real, correct guard for Customer API Keys (a
+  // gcdr_cust_* key is never granted entities:write, so it 403s before
+  // reaching this router) — but `hybridAuthMiddleware`'s JWT branch never
+  // actually checks `requiredScope` (only the API-key branch does), so
+  // *any* authenticated JWT, regardless of role, used to reach every write
+  // handler below unchecked. `requireEntitiesWriteAuthorized` (this file)
+  // closes that gap at the router level, independent of the mount, by
+  // requiring the same `isAdminContext()` tier already used for is_system/
+  // entity_type mutation — for EVERY entities write, not just those.
+
+  it('API-key context (apiKeyId set) is not re-gated here — that stays the mount\'s job', async () => {
     svc.create.mockResolvedValue({ id: ENTITY_ID } as never);
-    const srv = await listen(buildApp({ apiKeyScopes: ['entities:read'] }));
+    // This isolated router-only test app does not wire hybridAuthByMethod,
+    // so it can't demonstrate the mount rejecting a read-only key — it only
+    // demonstrates that the NEW router-level guard recognizes an API-key
+    // context (via apiKeyId) and defers to the mount instead of re-checking
+    // scope a second time. In production a gcdr_cust_* key with only
+    // entities:read never reaches this far — hybridAuthByMethod 403s it first.
+    const srv = await listen(buildApp({ apiKeyId: 'key-1', apiKeyScopes: ['entities:read'] }));
     try {
       const res = await fetch(`${srv.url}/entities`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ entityType: 'PROFILE', entityKey: 'K' }),
       });
-      // No 403 here because the mount-level hybridAuthByMethod guard is not
-      // wired in this isolated test app; the service is invoked.
       expect(res.status).toBe(201);
       expect(svc.create).toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('a non-admin JWT gets 403 on a write — the gap this fix closes', async () => {
+    const app = buildApp({}, {
+      sub: USER_ID,
+      tenant_id: TENANT_ID,
+      email: 'someone@myio.com.br',
+      roles: ['role:customer-admin'],
+      type: 'USER',
+    } as Request['user']);
+    const srv = await listen(app);
+    try {
+      const res = await fetch(`${srv.url}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ entityType: 'PROFILE', entityKey: 'K' }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { success: boolean; error?: { code?: string } };
+      expect(body.success).toBe(false);
+      expect(body.error?.code).toBe('FORBIDDEN');
+      expect(svc.create).not.toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('an unauthenticated-looking context (no user, no apiKeyId) is rejected, not silently allowed', async () => {
+    svc.remove.mockResolvedValue(undefined as never);
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${srv.url}/entities/${ENTITY_ID}`, { method: 'DELETE' });
+      expect(res.status).toBe(403);
+      expect(svc.remove).not.toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('an admin JWT (role:super-admin) can write', async () => {
+    svc.create.mockResolvedValue({ id: ENTITY_ID } as never);
+    const app = buildApp({}, {
+      sub: USER_ID,
+      tenant_id: TENANT_ID,
+      email: 'admin@gcdr.io',
+      roles: ['role:super-admin'],
+      type: 'USER',
+    } as Request['user']);
+    const srv = await listen(app);
+    try {
+      const res = await fetch(`${srv.url}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ entityType: 'PROFILE', entityKey: 'K' }),
+      });
+      expect(res.status).toBe(201);
+      expect(svc.create).toHaveBeenCalled();
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('reads are unaffected — GET /entities still works with no auth context at all', async () => {
+    svc.list.mockResolvedValue({ items: [], pagination: {} } as never);
+    const srv = await listen(buildApp());
+    try {
+      const res = await fetch(`${srv.url}/entities`);
+      expect(res.status).toBe(200);
     } finally {
       await srv.close();
     }

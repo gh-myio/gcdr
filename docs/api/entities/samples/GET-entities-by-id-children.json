@@ -1,0 +1,37 @@
+{
+  "endpoint": "/api/v1/entities/{id}/children",
+  "method": "GET",
+  "pathParams": {
+    "id": "15c7483c-f23e-4204-8b21-d5afb92f83e5"
+  },
+  "queryParams": {
+    "deep": 0,
+    "state": "active"
+  },
+  "capturedAt": "2026-09-18",
+  "source": "carved from the live system-tree capture (GET-entities-list-system-tree.json) — this parent nodes real children array, reshaped to this endpoints flat-array response; not a separately-issued request.",
+  "note": "Unlike GET /:id, this endpoint always returns an array (never omitted) — [] for a childless node, per src/repositories/EntityRepository.ts getChildren().",
+  "response": [
+    {
+      "id": "307e71d8-bf93-462c-9079-12b26e40acc1",
+      "tenantId": "11111111-1111-1111-1111-111111111111",
+      "customerId": null,
+      "entityType": "PROFILE",
+      "entityKey": "TRANSFORMADOR",
+      "entityValue": "TRANSFORMADOR",
+      "parentEntityId": "15c7483c-f23e-4204-8b21-d5afb92f83e5",
+      "sortOrder": 0,
+      "cloneScopeKey": "*",
+      "isSystem": false,
+      "isActive": true,
+      "isDeleted": false,
+      "metadata": {},
+      "createdAt": "2026-09-18T18:33:30.070Z",
+      "createdBy": "bbbb1111-1111-1111-1111-111111111111",
+      "updatedAt": "2026-09-18T18:33:30.070Z",
+      "updatedBy": "bbbb1111-1111-1111-1111-111111111111",
+      "version": 1,
+      "children": []
+    }
+  ]
+}
